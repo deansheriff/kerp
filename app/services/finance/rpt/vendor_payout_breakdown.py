@@ -179,7 +179,9 @@ def vendor_payout_breakdown_context(
                 {
                     "line_type": "invoice",
                     "invoice_id": str(row.invoice.invoice_id) if row.invoice else "",
-                    "invoice_number": row.invoice.invoice_number if row.invoice else "—",
+                    "invoice_number": row.invoice.invoice_number
+                    if row.invoice
+                    else "—",
                     "invoice_date": row.invoice.invoice_date.strftime("%d %b %Y")
                     if row.invoice and row.invoice.invoice_date
                     else "—",
@@ -217,9 +219,13 @@ def vendor_payout_breakdown_context(
                     "invoice_number": "—",
                     "invoice_date": "—",
                     "description": "Withholding tax deduction",
-                    "allocated_amount": _format_currency(wht_amount, payment.currency_code),
+                    "allocated_amount": _format_currency(
+                        wht_amount, payment.currency_code
+                    ),
                     "allocated_amount_raw": float(wht_amount),
-                    "discount_taken": _format_currency(Decimal("0"), payment.currency_code),
+                    "discount_taken": _format_currency(
+                        Decimal("0"), payment.currency_code
+                    ),
                     "discount_taken_raw": 0.0,
                     "exchange_difference": _format_currency(
                         Decimal("0"), payment.currency_code
@@ -242,7 +248,9 @@ def vendor_payout_breakdown_context(
                         unallocated_amount, payment.currency_code
                     ),
                     "allocated_amount_raw": float(unallocated_amount),
-                    "discount_taken": _format_currency(Decimal("0"), payment.currency_code),
+                    "discount_taken": _format_currency(
+                        Decimal("0"), payment.currency_code
+                    ),
                     "discount_taken_raw": 0.0,
                     "exchange_difference": _format_currency(
                         Decimal("0"), payment.currency_code
@@ -261,7 +269,9 @@ def vendor_payout_breakdown_context(
                 "supplier_name": supplier_name,
                 "supplier_id": str(payment.supplier_id),
                 "status": payment.status.value,
-                "payment_method": payment.payment_method.value.replace("_", " ").title(),
+                "payment_method": payment.payment_method.value.replace(
+                    "_", " "
+                ).title(),
                 "reference": payment.reference or "—",
                 "currency_code": payment.currency_code,
                 "gross_amount": _format_currency(gross_amount, payment.currency_code),

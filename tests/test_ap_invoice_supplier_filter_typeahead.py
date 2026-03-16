@@ -76,11 +76,13 @@ def test_list_invoices_context_uses_selected_supplier_without_preloading(monkeyp
 
 
 def test_ap_invoices_template_uses_remote_supplier_typeahead():
-    template_path = "/home/dotmac/projects/dotmac_erp/templates/finance/ap/invoices.html"
+    template_path = (
+        "/home/dotmac/projects/dotmac_erp/templates/finance/ap/invoices.html"
+    )
 
     with open(template_path, encoding="utf-8") as template_file:
         template = template_file.read()
 
     assert 'data-typeahead-url="/finance/ap/suppliers/search"' in template
-    assert 'data-typeahead-hidden' in template
+    assert "data-typeahead-hidden" in template
     assert 'filter_entity_select_field("supplier_id"' not in template

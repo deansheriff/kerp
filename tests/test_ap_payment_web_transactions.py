@@ -49,7 +49,9 @@ def test_list_payments_context_includes_summary_stats(monkeypatch):
 async def test_create_payment_response_commits_on_success(monkeypatch):
     request = MagicMock()
     request.headers = {"content-type": "application/json"}
-    request.json = AsyncMock(return_value={"supplier_id": str(uuid4()), "allocations": []})
+    request.json = AsyncMock(
+        return_value={"supplier_id": str(uuid4()), "allocations": []}
+    )
     auth = SimpleNamespace(organization_id=uuid4(), person_id=uuid4())
     db = MagicMock()
 
