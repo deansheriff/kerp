@@ -2,8 +2,14 @@ from __future__ import annotations
 
 
 def test_ap_payment_detail_template_exposes_workflow_actions():
+    from pathlib import Path
+
     template_path = (
-        "/home/dotmac/projects/dotmac_erp/templates/finance/ap/payment_detail.html"
+        Path(__file__).resolve().parent.parent
+        / "templates"
+        / "finance"
+        / "ap"
+        / "payment_detail.html"
     )
 
     with open(template_path, encoding="utf-8") as template_file:

@@ -76,8 +76,14 @@ def test_list_invoices_context_uses_selected_supplier_without_preloading(monkeyp
 
 
 def test_ap_invoices_template_uses_remote_supplier_typeahead():
+    from pathlib import Path
+
     template_path = (
-        "/home/dotmac/projects/dotmac_erp/templates/finance/ap/invoices.html"
+        Path(__file__).resolve().parent.parent
+        / "templates"
+        / "finance"
+        / "ap"
+        / "invoices.html"
     )
 
     with open(template_path, encoding="utf-8") as template_file:
