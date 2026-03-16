@@ -251,6 +251,49 @@ def tax_summary_report(
     )
 
 
+@router.get("/vendor-payout-breakdown", response_class=HTMLResponse)
+def vendor_payout_breakdown_report(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    supplier_id: str | None = None,
+    status: str | None = None,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+):
+    """Supplier payout report with payment-level line-item breakdown."""
+    return reports_web_service.vendor_payout_breakdown_response(
+        request,
+        auth,
+        start_date,
+        end_date,
+        supplier_id,
+        status,
+        db,
+    )
+
+
+@router.get("/vendor-payout-breakdown/export")
+def export_vendor_payout_breakdown(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    supplier_id: str | None = None,
+    status: str | None = None,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """Export supplier payout breakdown as CSV."""
+    csv = reports_web_service.export_vendor_payout_breakdown_csv(
+        str(auth.organization_id),
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        supplier_id=supplier_id,
+        status=status,
+    )
+    return _csv_response(csv, "supplier_payout_breakdown.csv")
+
+
 @router.get("/tax-summary/export")
 def export_tax_summary(
     start_date: str | None = None,

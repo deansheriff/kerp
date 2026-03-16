@@ -315,6 +315,7 @@ def payment_detail_view(
         "amount": format_currency(payment.amount, payment.currency_code),
         "amount_raw": float(payment.amount),
         "status": payment_status_label(payment.status),
+        "status_raw": payment.status.value,
         "currency_code": payment.currency_code,
         "bank_account_name": bank_account_name,
         "has_wht": has_wht,

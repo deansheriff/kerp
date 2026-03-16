@@ -1629,35 +1629,70 @@ class DotMacCRMSyncService:
         vendor_erp_id: str | None,
         vendor_code: str | None,
     ) -> Supplier:
-        """Resolve a supplier by erpnext_id or supplier_code.
+        """Resolve a supplier by erpnext_id, supplier_code, or supplier name.
 
         Raises:
             ValueError: If supplier not found.
         """
         from app.models.finance.ap.supplier import Supplier
 
-        if vendor_erp_id:
+        normalized_erp_id = (vendor_erp_id or "").strip() or None
+        normalized_vendor_code = (vendor_code or "").strip() or None
+
+        logger.info(
+            "CRM supplier resolution org=%s erp_id=%r vendor_code=%r normalized_erp_id=%r normalized_vendor_code=%r",
+            org_id,
+            vendor_erp_id,
+            vendor_code,
+            normalized_erp_id,
+            normalized_vendor_code,
+        )
+
+        if normalized_erp_id:
             stmt = select(Supplier).where(
                 Supplier.organization_id == org_id,
-                Supplier.erpnext_id == vendor_erp_id,
+                Supplier.erpnext_id == normalized_erp_id,
                 Supplier.is_active.is_(True),
             )
             supplier = self.db.scalar(stmt)
             if supplier:
                 return supplier
 
-        if vendor_code:
+        if normalized_vendor_code:
             stmt = select(Supplier).where(
                 Supplier.organization_id == org_id,
-                Supplier.supplier_code == vendor_code,
+                Supplier.supplier_code == normalized_vendor_code,
                 Supplier.is_active.is_(True),
             )
             supplier = self.db.scalar(stmt)
             if supplier:
                 return supplier
 
+            # CRM has historically sent vendor display names in vendor_code.
+            stmt = select(Supplier).where(
+                Supplier.organization_id == org_id,
+                Supplier.is_active.is_(True),
+                or_(
+                    func.lower(func.trim(Supplier.legal_name))
+                    == normalized_vendor_code.lower(),
+                    func.lower(func.trim(Supplier.trading_name))
+                    == normalized_vendor_code.lower(),
+                ),
+            )
+            supplier = self.db.scalar(stmt)
+            if supplier:
+                return supplier
+
+        logger.warning(
+            "CRM supplier resolution failed org=%s erp_id=%r vendor_code=%r normalized_erp_id=%r normalized_vendor_code=%r",
+            org_id,
+            vendor_erp_id,
+            vendor_code,
+            normalized_erp_id,
+            normalized_vendor_code,
+        )
         raise ValueError(
-            f"Supplier not found: erp_id={vendor_erp_id}, code={vendor_code}"
+            f"Supplier not found: erp_id={normalized_erp_id}, code={normalized_vendor_code}"
         )
 
     def _resolve_person_id_by_email(

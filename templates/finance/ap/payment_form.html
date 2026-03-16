@@ -50,6 +50,7 @@
                             </button>
                         </div>
                         <input type="hidden" name="supplier_id" x-model="supplierId">
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Type at least 2 characters to search all suppliers.</p>
                         <div x-cloak
                              x-show="supplierOpen"
                              x-transition
@@ -330,12 +331,16 @@ function paymentForm() {
 
     // Pre-selected invoice data
     const invoiceData = {{ invoice|tojson if invoice else 'null' }};
+    const selectedSupplierData = {{ selected_supplier|tojson if selected_supplier else 'null' }};
 
     return {
         // Form fields
         supplierId: '{{ invoice.supplier_id if invoice else "" }}',
-        supplierSearch: '',
+        supplierSearch: selectedSupplierData ? [selectedSupplierData.supplier_code, selectedSupplierData.supplier_name].filter(Boolean).join(' - ') : '',
         supplierOpen: false,
+        supplierResults: selectedSupplierData ? [selectedSupplierData] : [],
+        selectedSupplier: selectedSupplierData,
+        supplierSearchTimer: null,
         paymentDate: new Date().toISOString().split('T')[0],
         bankAccountId: '',
         paymentMethod: 'BANK_TRANSFER',
@@ -390,42 +395,67 @@ function paymentForm() {
         },
 
         filteredSuppliers() {
-            const query = (this.supplierSearch || '').trim().toLowerCase();
-            if (!query) {
-                return suppliers;
+            return this.supplierResults;
+        },
+
+        async fetchSuppliers(query) {
+            const trimmed = (query || '').trim();
+            if (trimmed.length < 2) {
+                this.supplierResults = this.selectedSupplier ? [this.selectedSupplier] : [];
+                return;
             }
-            return suppliers.filter((supplier) => {
-                const haystacks = [
-                    supplier.supplier_code,
-                    supplier.supplier_name,
-                    supplier.currency_code
-                ]
-                    .filter(Boolean)
-                    .map((value) => value.toLowerCase());
-                return haystacks.some((value) => value.includes(query));
-            });
+
+            try {
+                const response = await fetch(`/finance/ap/suppliers/search?q=${encodeURIComponent(trimmed)}&limit=20`);
+                if (!response.ok) {
+                    throw new Error('supplier search failed');
+                }
+                const data = await response.json();
+                this.supplierResults = ((data && data.items) || []).map((item) => ({
+                    supplier_id: item.ref || item.id || '',
+                    supplier_code: item.supplier_code || '',
+                    supplier_name: item.supplier_name || item.label || item.name || '',
+                    currency_code: item.currency_code || '',
+                    payment_terms_days: item.payment_terms_days || null,
+                    withholding_tax_applicable: !!item.withholding_tax_applicable,
+                    withholding_tax_code_id: item.withholding_tax_code_id || '',
+                    default_tax_code_id: item.default_tax_code_id || ''
+                }));
+            } catch (error) {
+                this.supplierResults = [];
+            }
         },
 
         onSupplierSearch() {
             this.supplierOpen = true;
-            const selected = suppliers.find((supplier) => supplier.supplier_id === this.supplierId);
-            if (selected && this.supplierSearch !== this.supplierLabel(selected)) {
+            if (this.selectedSupplier && this.supplierSearch !== this.supplierLabel(this.selectedSupplier)) {
                 this.supplierId = '';
+                this.selectedSupplier = null;
                 this.hasWht = false;
                 this.whtCodeId = '';
                 this.calculateAmounts();
             }
+            if (this.supplierSearchTimer) {
+                window.clearTimeout(this.supplierSearchTimer);
+            }
+            this.supplierSearchTimer = window.setTimeout(() => {
+                this.fetchSuppliers(this.supplierSearch);
+            }, 250);
         },
 
         selectSupplier(supplier) {
             this.supplierId = supplier.supplier_id;
             this.supplierSearch = this.supplierLabel(supplier);
+            this.selectedSupplier = supplier;
+            this.supplierResults = [supplier];
             this.supplierOpen = false;
             this.onSupplierChange();
         },
 
         onSupplierChange() {
-            const supplier = suppliers.find((option) => option.supplier_id === this.supplierId);
+            const supplier = this.selectedSupplier && this.selectedSupplier.supplier_id === this.supplierId
+                ? this.selectedSupplier
+                : this.supplierResults.find((option) => option.supplier_id === this.supplierId);
             if (!supplier) {
                 this.hasWht = false;
                 this.whtCodeId = '';
@@ -433,7 +463,11 @@ function paymentForm() {
                 return;
             }
 
+            this.selectedSupplier = supplier;
             this.supplierSearch = this.supplierLabel(supplier);
+            if (supplier.currency_code) {
+                this.currencyCode = supplier.currency_code;
+            }
             const whtApplicable = !!supplier.withholding_tax_applicable;
             const whtCodeId = supplier.withholding_tax_code_id;
 

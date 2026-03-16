@@ -219,6 +219,62 @@ class TestSupplierResolution:
         assert mock_db.scalar.call_count == 2
 
     @patch("app.services.sync.dotmac_crm_sync_service.select")
+    def test_resolve_trims_identifiers_before_lookup(
+        self,
+        mock_select: MagicMock,
+        service: DotMacCRMSyncService,
+        org_id: uuid.UUID,
+        mock_db: MagicMock,
+    ) -> None:
+        """Should trim incoming ERP IDs and supplier codes from CRM."""
+        mock_supplier = MagicMock()
+        mock_supplier.supplier_id = uuid.uuid4()
+
+        call_count = 0
+
+        def scalar_side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return None  # trimmed erpnext_id not found
+            return mock_supplier  # trimmed supplier_code found
+
+        mock_db.scalar.side_effect = scalar_side_effect
+
+        result = service._resolve_supplier(org_id, " SUP-0001 ", " Miracle David ")
+
+        assert result == mock_supplier
+        assert mock_db.scalar.call_count == 2
+
+    @patch("app.services.sync.dotmac_crm_sync_service.select")
+    def test_resolve_fallback_to_supplier_name(
+        self,
+        mock_select: MagicMock,
+        service: DotMacCRMSyncService,
+        org_id: uuid.UUID,
+        mock_db: MagicMock,
+    ) -> None:
+        """Should fall back to legal/trading name when CRM sends a display name."""
+        mock_supplier = MagicMock()
+        mock_supplier.supplier_id = uuid.uuid4()
+
+        call_count = 0
+
+        def scalar_side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return None  # supplier_code not found
+            return mock_supplier  # supplier name found
+
+        mock_db.scalar.side_effect = scalar_side_effect
+
+        result = service._resolve_supplier(org_id, None, "Miracle David")
+
+        assert result == mock_supplier
+        assert mock_db.scalar.call_count == 2
+
+    @patch("app.services.sync.dotmac_crm_sync_service.select")
     def test_raises_value_error_when_supplier_not_found(
         self,
         mock_select: MagicMock,

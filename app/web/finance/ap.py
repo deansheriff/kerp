@@ -68,7 +68,19 @@ def list_suppliers(
 def supplier_search(
     q: str = Query(..., min_length=1),
     limit: int = Query(default=8, ge=1, le=20),
-    auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:read")),
+    auth: WebAuthContext = Depends(
+        require_any_web_permission(
+            [
+                "ap:suppliers:read",
+                "ap:payments:read",
+                "ap:payments:create",
+                "ap:payments:update",
+                "ap:purchase_orders:read",
+                "ap:purchase_orders:create",
+                "ap:purchase_orders:update",
+            ]
+        )
+    ),
     db: Session = Depends(get_db),
 ):
     """Search active suppliers for typeahead/autocomplete."""

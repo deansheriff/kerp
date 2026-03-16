@@ -208,15 +208,14 @@ class InvoiceWebService:
                 }
             )
 
-        suppliers_list = [
-            supplier_option_view(supplier)
-            for supplier in supplier_service.list(
-                db,
-                organization_id=org_id,
-                is_active=True,
-                limit=200,
-            )
-        ]
+        selected_supplier = None
+        if supplier_id:
+            try:
+                selected_supplier = supplier_option_view(
+                    supplier_service.get(db, org_id, supplier_id)
+                )
+            except (ValueError, LookupError):
+                selected_supplier = None
 
         total_pages = max(1, (total_count + limit - 1) // limit)
 
@@ -238,15 +237,21 @@ class InvoiceWebService:
             },
             labels={"start_date": "From", "end_date": "To"},
             options={
-                "supplier_id": {
-                    str(s["supplier_id"]): s["supplier_name"] for s in suppliers_list
-                }
+                "supplier_id": (
+                    {
+                        str(selected_supplier["supplier_id"]): selected_supplier[
+                            "supplier_name"
+                        ]
+                    }
+                    if selected_supplier
+                    else {}
+                )
             },
         )
 
         return {
             "invoices": invoices_view,
-            "suppliers_list": suppliers_list,
+            "selected_supplier": selected_supplier,
             "stats": stats.__dict__,
             "search": search,
             "supplier_id": supplier_id,

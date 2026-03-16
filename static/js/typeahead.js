@@ -12,6 +12,7 @@
         let timer = null;
         let lastQuery = "";
         let selecting = false;
+        let lastHiddenValue = hidden.value || "";
 
         function clearResults() {
             results.innerHTML = "";
@@ -39,6 +40,7 @@
                     } catch (e) {
                         hidden.removeAttribute("data-typeahead-item");
                     }
+                    lastHiddenValue = hidden.value;
                     // Trigger input/change so frameworks (e.g. Alpine x-model) can react.
                     try {
                         hidden.dispatchEvent(new Event("input", { bubbles: true }));
@@ -78,7 +80,19 @@
                 return;
             }
             const query = input.value.trim();
-            hidden.value = "";
+            if (hidden.value) {
+                hidden.value = "";
+                hidden.removeAttribute("data-typeahead-item");
+            }
+            if (lastHiddenValue) {
+                try {
+                    hidden.dispatchEvent(new Event("input", { bubbles: true }));
+                    hidden.dispatchEvent(new Event("change", { bubbles: true }));
+                } catch (e) {
+                    // Ignore: older browsers / non-DOM contexts.
+                }
+            }
+            lastHiddenValue = "";
             if (query.length < minChars) {
                 clearResults();
                 lastQuery = query;

@@ -95,6 +95,15 @@ class SupplierWebService:
                     "supplier_name": name,
                     "currency_code": supplier.currency_code,
                     "payment_terms_days": supplier.payment_terms_days or 30,
+                    "withholding_tax_applicable": getattr(
+                        supplier, "withholding_tax_applicable", False
+                    ),
+                    "withholding_tax_code_id": str(supplier.withholding_tax_code_id)
+                    if getattr(supplier, "withholding_tax_code_id", None)
+                    else "",
+                    "default_tax_code_id": str(supplier.default_tax_code_id)
+                    if getattr(supplier, "default_tax_code_id", None)
+                    else "",
                 }
             )
         return {"items": items}

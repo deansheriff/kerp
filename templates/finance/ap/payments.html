@@ -1,5 +1,5 @@
 {% extends "finance/base_finance.html" %}
-{% from "components/macros.html" import compact_filters, pagination, status_badge, empty_state, stats_card, bulk_select_header, bulk_select_cell, bulk_action_bar, bulk_icon_delete, bulk_icon_export, filter_select_field, filter_entity_select_field, list_header_actions, action_buttons, sortable_th, icon_svg %}
+{% from "components/macros.html" import compact_filters, pagination, status_badge, empty_state, stats_card, bulk_select_header, bulk_select_cell, bulk_action_bar, bulk_icon_delete, bulk_icon_export, filter_select_field, list_header_actions, action_buttons, sortable_th, icon_svg %}
 
 {% block page_title %}AP Payments{% endblock %}
 
@@ -48,7 +48,24 @@
             {"value": "RECONCILED", "label": "Reconciled"},
             {"value": "VOIDED", "label": "Voided"}
         ], filter_attrs) }}
-        {{ filter_entity_select_field("supplier_id", "Supplier", supplier_id, suppliers_list, "supplier_id", "supplier_name", filter_attrs) }}
+        <div>
+            <label class="form-label text-xs" for="filter-supplier-search">Supplier</label>
+            <div class="relative" data-typeahead-url="/finance/ap/suppliers/search" data-typeahead-min="2" data-typeahead-limit="20">
+                <input type="text"
+                       id="filter-supplier-search"
+                       value="{{ (selected_supplier.supplier_code ~ ' - ' ~ selected_supplier.supplier_name) if selected_supplier and selected_supplier.supplier_code else (selected_supplier.supplier_name if selected_supplier else '') }}"
+                       placeholder="Search supplier..."
+                       autocomplete="off"
+                       class="form-input w-full"
+                       data-typeahead-input>
+                <input type="hidden"
+                       name="supplier_id"
+                       value="{{ supplier_id if supplier_id else '' }}"
+                       data-typeahead-hidden
+                       {{ filter_attrs | safe }}>
+                <div data-typeahead-results></div>
+            </div>
+        </div>
     {% endcall %}
 
     <div id="results-container">

@@ -1,0 +1,270 @@
+{% extends "finance/base_finance.html" %}
+
+{% from "components/macros.html" import compact_filters, empty_state, export_actions_menu, filter_date_field, filter_select_field, icon_svg, status_badge %}
+
+{% block page_title %}Supplier Payout Breakdown{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 mt-1" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/dashboard" class="hover:text-slate-700 dark:hover:text-slate-300">Dashboard</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/finance/reports" class="hover:text-slate-700 dark:hover:text-slate-300">Reports</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="text-slate-700 dark:text-slate-300" aria-current="page">Supplier Payout Breakdown</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+{{ export_actions_menu(
+    csv_href="/finance/reports/vendor-payout-breakdown/export?start_date=" ~ start_date_iso ~ "&end_date=" ~ end_date_iso ~ "&supplier_id=" ~ (supplier_id or '') ~ "&status=" ~ (status or ''),
+    print_action=true
+) }}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <section class="space-y-4">
+        <div class="card p-6">
+            <div class="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Supplier payout overview</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        Payout activity from {{ start_date }} to {{ end_date }}, including invoice allocations, WHT, and any unallocated remainder.
+                    </p>
+                </div>
+                <div class="text-sm text-slate-500 dark:text-slate-400">
+                    Scope: <span class="font-medium text-slate-700 dark:text-slate-200">{{ selected_supplier_name if selected_supplier_name else 'All suppliers' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Net Paid</p>
+                <p class="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">{{ total_net }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Actual cash paid to suppliers</p>
+            </div>
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Gross Payout</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900 dark:text-white font-mono">{{ total_gross }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Before WHT deductions</p>
+            </div>
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">WHT Withheld</p>
+                <p class="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">{{ total_wht }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Tax held back from supplier payouts</p>
+            </div>
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Suppliers Paid</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{{ total_suppliers }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ total_payments }} payments processed</p>
+            </div>
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Average Payout</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900 dark:text-white font-mono">{{ average_payout }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Average net payout per payment</p>
+            </div>
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Unallocated Amount</p>
+                <p class="mt-2 text-2xl font-bold {% if total_unallocated_raw %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} font-mono">{{ total_unallocated }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Recorded payouts not fully tied to allocations</p>
+            </div>
+        </section>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Top Paid Supplier</p>
+                <p class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{{ top_supplier_name if top_supplier_name else '—' }}</p>
+                <p class="mt-1 text-sm font-mono text-slate-600 dark:text-slate-300">{{ top_supplier_total }}</p>
+            </div>
+            <div class="card p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Largest Single Payout</p>
+                <p class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{{ largest_payment_number if largest_payment_number else '—' }}</p>
+                <p class="mt-1 text-sm font-mono text-slate-600 dark:text-slate-300">{{ largest_payment_amount }}</p>
+            </div>
+        </div>
+    </section>
+
+    {% call(filter_attrs) compact_filters(
+        base_url="/finance/reports/vendor-payout-breakdown",
+        active_filters=active_filters | default([]),
+        auto_submit=false,
+        show_apply_button=true
+    ) %}
+    {{ filter_date_field("start_date", "From", start_date_iso) }}
+    {{ filter_date_field("end_date", "To", end_date_iso) }}
+    <div x-data='{
+            options: {{ supplier_options | tojson }},
+            selectedId: {{ (supplier_id or "") | tojson }},
+            query: {{ (selected_supplier_display or "") | tojson }},
+            syncFromQuery() {
+                const match = this.options.find((option) => option.supplier_display === this.query);
+                this.selectedId = match ? match.supplier_id : "";
+            },
+            init() {
+                if (!this.query && this.selectedId) {
+                    const match = this.options.find((option) => option.supplier_id === this.selectedId);
+                    if (match) this.query = match.supplier_display;
+                }
+            }
+        }'
+        @submit.window="syncFromQuery()">
+        <label class="form-label text-xs" for="filter-supplier-search">Supplier</label>
+        <input id="filter-supplier-search"
+               type="text"
+               list="supplier-filter-options"
+               x-model="query"
+               @input="syncFromQuery()"
+               class="form-input w-full"
+               placeholder="All Suppliers"
+               autocomplete="off"
+               {{ filter_attrs | safe }}>
+        <input type="hidden" name="supplier_id" :value="selectedId">
+        <datalist id="supplier-filter-options">
+            {% for supplier in supplier_options %}
+            <option value="{{ supplier.supplier_display }}"></option>
+            {% endfor %}
+        </datalist>
+    </div>
+    {{ filter_select_field("status", "Status", status, status_options, filter_attrs) }}
+    {% endcall %}
+
+    <div id="results-container" class="space-y-6">
+        <div class="card p-6">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Supplier payout report</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        Showing payouts from {{ start_date }} to {{ end_date }} with invoice-level allocation lines.
+                    </p>
+                </div>
+                <div class="text-sm text-slate-500 dark:text-slate-400">
+                    Allocated total: <span class="font-semibold text-slate-900 dark:text-white font-mono">{{ total_allocated }}</span>
+                </div>
+            </div>
+        </div>
+
+        {% if payments %}
+        <div class="space-y-4">
+            {% for payment in payments %}
+            <section class="card overflow-hidden" x-data="{ open: {{ 'true' if loop.first else 'false' }} }">
+                <button type="button"
+                        class="w-full border-b border-slate-200 bg-slate-50/80 px-6 py-5 text-left dark:border-slate-800 dark:bg-slate-900/40"
+                        @click="open = !open">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="space-y-2">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h3 class="text-base font-semibold text-slate-900 dark:text-white">{{ payment.payment_number }}</h3>
+                                {{ status_badge(payment.status, 'sm') }}
+                                <span class="text-sm text-slate-500 dark:text-slate-400">{{ payment.payment_date }}</span>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                                <span class="font-medium text-slate-700 dark:text-slate-200">{{ payment.supplier_name }}</span>
+                                <span>{{ payment.payment_method }}</span>
+                                <span>Ref: {{ payment.reference }}</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-400">Gross</p>
+                                <p class="mt-1 font-mono font-semibold text-slate-900 dark:text-white">{{ payment.gross_amount }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-400">WHT</p>
+                                <p class="mt-1 font-mono font-semibold text-amber-600 dark:text-amber-400">{{ payment.withholding_tax_amount }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-400">Net</p>
+                                <p class="mt-1 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{{ payment.net_amount }}</p>
+                            </div>
+                            <div class="flex items-end justify-between gap-3">
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-400">Lines</p>
+                                    <p class="mt-1 font-semibold text-slate-900 dark:text-white">{{ payment.line_count }}</p>
+                                </div>
+                                <svg class="h-5 w-5 text-slate-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </button>
+
+                <div x-show="open" x-collapse class="px-6 py-6">
+                    {% if payment.lines %}
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[56rem] text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-left dark:border-slate-800">
+                                    <th scope="col" class="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</th>
+                                    <th scope="col" class="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Invoice</th>
+                                    <th scope="col" class="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Description</th>
+                                    <th scope="col" class="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</th>
+                                    <th scope="col" class="pb-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Allocated</th>
+                                    <th scope="col" class="pb-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Discount</th>
+                                    <th scope="col" class="pb-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">FX Diff</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                {% for line in payment.lines %}
+                                <tr>
+                                    <td class="py-3 pr-4">
+                                        <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium
+                                            {% if line.line_type == 'invoice' %}
+                                                bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300
+                                            {% elif line.line_type == 'wht' %}
+                                                bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300
+                                            {% else %}
+                                                bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300
+                                            {% endif %}">
+                                            {{ line.line_type | replace('_', ' ') | title }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 pr-4">
+                                        {% if line.invoice_id %}
+                                        <a href="/finance/ap/invoices/{{ line.invoice_id }}" class="font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">
+                                            {{ line.invoice_number }}
+                                        </a>
+                                        {% else %}
+                                        <span class="text-slate-400 dark:text-slate-500">{{ line.invoice_number }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 pr-4 text-slate-700 dark:text-slate-300">{{ line.description }}</td>
+                                    <td class="py-3 pr-4 text-slate-500 dark:text-slate-400">{{ line.allocation_date }}</td>
+                                    <td class="py-3 pr-4 text-right font-mono text-slate-900 dark:text-white">{{ line.allocated_amount }}</td>
+                                    <td class="py-3 pr-4 text-right font-mono text-slate-600 dark:text-slate-300">{{ line.discount_taken }}</td>
+                                    <td class="py-3 text-right font-mono text-slate-600 dark:text-slate-300">{{ line.exchange_difference }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="border-t border-slate-200 dark:border-slate-800">
+                                    <td colspan="4" class="pt-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Payment totals</td>
+                                    <td class="pt-4 pr-4 text-right font-mono font-semibold text-slate-900 dark:text-white">{{ payment.allocated_total }}</td>
+                                    <td class="pt-4 pr-4 text-right font-mono font-semibold text-slate-700 dark:text-slate-200">{{ payment.discount_total }}</td>
+                                    <td class="pt-4 text-right font-mono font-semibold text-slate-700 dark:text-slate-200">{{ payment.fx_total }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="py-8">
+                        {{ empty_state("No payout lines", "This payout does not have any allocation lines yet.", "document") }}
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card p-6">
+            {{ empty_state(
+                "No supplier payouts found",
+                "No payouts were recorded for " ~ selected_supplier_name ~ " in the selected date range." if selected_supplier_name else "Try adjusting the date range, supplier, or status filters.",
+                "currency"
+            ) }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

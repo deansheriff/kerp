@@ -47,6 +47,10 @@ from app.services.finance.rpt.trial_balance import (
     export_trial_balance_csv,
     trial_balance_context,
 )
+from app.services.finance.rpt.vendor_payout_breakdown import (
+    export_vendor_payout_breakdown_csv,
+    vendor_payout_breakdown_context,
+)
 from app.templates import templates
 
 # NOTE: WebAuthContext and base_context are imported lazily inside response methods
@@ -278,6 +282,59 @@ class ReportsWebService:
         )
         return templates.TemplateResponse(
             request, "finance/reports/tax_summary.html", context
+        )
+
+    def vendor_payout_breakdown_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        start_date: str | None,
+        end_date: str | None,
+        supplier_id: str | None,
+        status: str | None,
+        db: Session,
+    ) -> HTMLResponse:
+        from app.services.common_filters import build_active_filters
+        from app.web.deps import base_context
+
+        context = base_context(request, auth, "Supplier Payout Breakdown", "reports")
+        context.update(
+            vendor_payout_breakdown_context(
+                db,
+                str(auth.organization_id),
+                start_date=start_date,
+                end_date=end_date,
+                supplier_id=supplier_id,
+                status=status,
+            )
+        )
+        context["active_filters"] = build_active_filters(
+            params={
+                "start_date": start_date,
+                "end_date": end_date,
+                "supplier_id": supplier_id,
+                "status": status,
+            },
+            labels={
+                "start_date": "From",
+                "end_date": "To",
+                "supplier_id": "Supplier",
+                "status": "Status",
+            },
+            options={
+                "supplier_id": {
+                    item["supplier_id"]: item["supplier_name"]
+                    for item in context["supplier_options"]
+                },
+                "status": {
+                    item["value"]: item["label"] for item in context["status_options"]
+                },
+            },
+        )
+        return templates.TemplateResponse(
+            request,
+            "finance/reports/vendor_payout_breakdown.html",
+            context,
         )
 
     def expense_summary_response(
@@ -541,6 +598,25 @@ class ReportsWebService:
     ) -> str:
         """Export management accounts as CSV."""
         return export_management_accounts_csv(organization_id, db, start_date, end_date)
+
+    def export_vendor_payout_breakdown_csv(
+        self,
+        organization_id: str,
+        db: Session,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        supplier_id: str | None = None,
+        status: str | None = None,
+    ) -> str:
+        """Export supplier payout breakdown as CSV."""
+        return export_vendor_payout_breakdown_csv(
+            organization_id,
+            db,
+            start_date=start_date,
+            end_date=end_date,
+            supplier_id=supplier_id,
+            status=status,
+        )
 
     # ─────────────────── PDF Export helpers ───────────────────
 

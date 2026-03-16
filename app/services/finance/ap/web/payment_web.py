@@ -6,7 +6,9 @@ Provides view-focused data and operations for AP payment and aging web routes.
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
+from html import escape
 from uuid import UUID
 
 from fastapi import HTTPException, Request, UploadFile
@@ -135,6 +137,34 @@ class PaymentWebService:
             .offset(offset)
         ).all()
 
+        today = date.today()
+        month_start = today.replace(day=1)
+        this_month_total = db.scalar(
+            select(func.coalesce(func.sum(SupplierPayment.amount), 0)).where(
+                SupplierPayment.organization_id == org_id,
+                SupplierPayment.payment_date >= month_start,
+                SupplierPayment.payment_date <= today,
+            )
+        ) or Decimal("0")
+        posted_count = (
+            db.scalar(
+                select(func.count(SupplierPayment.payment_id)).where(
+                    SupplierPayment.organization_id == org_id,
+                    SupplierPayment.status.in_(APPaymentStatus.effective()),
+                )
+            )
+            or 0
+        )
+        draft_count = (
+            db.scalar(
+                select(func.count(SupplierPayment.payment_id)).where(
+                    SupplierPayment.organization_id == org_id,
+                    SupplierPayment.status == APPaymentStatus.DRAFT,
+                )
+            )
+            or 0
+        )
+
         payments_view = []
         for payment, supplier in payments:
             payments_view.append(
@@ -159,6 +189,14 @@ class PaymentWebService:
                 limit=200,
             )
         ]
+        selected_supplier = None
+        if supplier_id:
+            try:
+                selected_supplier = supplier_option_view(
+                    supplier_service.get(db, org_id, supplier_id)
+                )
+            except (ValueError, LookupError):
+                selected_supplier = None
 
         total_pages = max(1, (total_count + limit - 1) // limit)
 
@@ -176,6 +214,7 @@ class PaymentWebService:
         return {
             "payments": payments_view,
             "suppliers_list": suppliers_list,
+            "selected_supplier": selected_supplier,
             "search": search,
             "supplier_id": supplier_id,
             "status": status,
@@ -184,6 +223,9 @@ class PaymentWebService:
             "page": page,
             "limit": limit,
             "offset": offset,
+            "this_month_total": format_currency(this_month_total) or "$0.00",
+            "posted_count": posted_count,
+            "draft_count": draft_count,
             "total_count": total_count,
             "total_pages": total_pages,
             "active_filters": active_filters,
@@ -236,6 +278,7 @@ class PaymentWebService:
 
         open_invoices = []
         selected_invoice = None
+        selected_supplier = None
         for invoice, supplier in rows:
             balance = invoice.total_amount - invoice.amount_paid
             view = {
@@ -256,6 +299,7 @@ class PaymentWebService:
             open_invoices.append(view)
             if invoice_id and invoice.invoice_id == coerce_uuid(invoice_id):
                 selected_invoice = view
+                selected_supplier = supplier_option_view(supplier)
 
         # Get WHT codes for payments
         wht_codes = db.scalars(
@@ -305,6 +349,7 @@ class PaymentWebService:
 
         context = {
             "suppliers_list": suppliers_list,
+            "selected_supplier": selected_supplier,
             "invoice_id": invoice_id,
             "invoice": selected_invoice,
             "open_invoices": open_invoices,
@@ -693,6 +738,7 @@ class PaymentWebService:
                 input=input_data,
                 created_by_user_id=user_id,
             )
+            db.commit()
 
             if "application/json" in content_type:
                 return {"success": True, "payment_id": str(payment.payment_id)}
@@ -706,11 +752,25 @@ class PaymentWebService:
             return RedirectResponse(url=redirect_url, status_code=303)
 
         except Exception as e:
+            db.rollback()
             logger.exception("create_payment_response: failed")
             if "application/json" in content_type:
                 return JSONResponse(
                     status_code=400,
                     content={"detail": str(e)},
+                )
+            if request.headers.get("HX-Request"):
+                return HTMLResponse(
+                    content=(
+                        '<div class="p-4 rounded-lg bg-rose-50 border border-rose-200 '
+                        'dark:bg-rose-900/20 dark:border-rose-800">'
+                        '<div class="flex items-center gap-2 text-rose-700 '
+                        'dark:text-rose-400">'
+                        '<span class="text-sm font-medium">'
+                        f"{escape(str(e))}"
+                        "</span></div></div>"
+                    ),
+                    status_code=400,
                 )
 
             context = base_context(request, auth, "New AP Payment", "ap")
@@ -828,6 +888,88 @@ class PaymentWebService:
             context["form_data"] = data
             return templates.TemplateResponse(
                 request, "finance/ap/payment_form.html", context
+            )
+
+    def approve_payment_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        payment_id: str,
+    ) -> RedirectResponse:
+        """Approve payment."""
+        try:
+            supplier_payment_service.approve_payment(
+                db=db,
+                organization_id=auth.organization_id,
+                payment_id=coerce_uuid(payment_id),
+                approved_by_user_id=auth.user_id,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/finance/ap/payments/{payment_id}?success=Payment+approved",
+                status_code=303,
+            )
+        except Exception as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/finance/ap/payments/{payment_id}?error={str(e)}",
+                status_code=303,
+            )
+
+    def post_payment_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        payment_id: str,
+    ) -> RedirectResponse:
+        """Post payment to general ledger."""
+        try:
+            supplier_payment_service.post_payment(
+                db=db,
+                organization_id=auth.organization_id,
+                payment_id=coerce_uuid(payment_id),
+                posted_by_user_id=auth.user_id,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/finance/ap/payments/{payment_id}?success=Payment+posted+to+ledger",
+                status_code=303,
+            )
+        except Exception as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/finance/ap/payments/{payment_id}?error={str(e)}",
+                status_code=303,
+            )
+
+    def void_payment_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        payment_id: str,
+    ) -> RedirectResponse:
+        """Void a payment."""
+        try:
+            supplier_payment_service.void_payment(
+                db=db,
+                organization_id=auth.organization_id,
+                payment_id=coerce_uuid(payment_id),
+                voided_by_user_id=auth.user_id,
+                reason="Voided via web interface",
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/finance/ap/payments/{payment_id}?success=Payment+voided",
+                status_code=303,
+            )
+        except Exception as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/finance/ap/payments/{payment_id}?error={str(e)}",
+                status_code=303,
             )
 
     def aging_report_response(

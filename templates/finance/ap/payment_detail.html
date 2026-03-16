@@ -15,13 +15,48 @@
 
 {% block header_actions %}
 {% if payment %}
-<div class="flex items-center gap-2">
+<div class="flex flex-wrap items-center justify-end gap-2">
     <a href="/finance/remita/generate?source_type=ap_payment&source_id={{ payment.payment_id }}&amount={{ payment.amount }}&description={{ ('Remita payment for ' ~ payment.payment_number) | urlencode }}"
        class="btn btn-secondary">
         {{ icon_svg("plus", "h-4 w-4") }}
         Generate RRR
     </a>
-    {% if payment.status == 'DRAFT' %}
+    {% if payment.status_raw == 'DRAFT' and auth is defined and auth.has_permission('ap:payments:update') %}
+    <a href="/finance/ap/payments/{{ payment.payment_id }}/edit"
+       class="btn btn-secondary">
+        {{ icon_svg("edit", "h-4 w-4") }}
+        Edit
+    </a>
+    {% endif %}
+    {% if payment.status_raw == 'DRAFT' and auth is defined and auth.has_any_permission(['ap:payments:approve:tier1', 'ap:payments:approve:tier2', 'ap:payments:approve:tier3']) %}
+    <form method="POST" action="/finance/ap/payments/{{ payment.payment_id }}/approve" class="inline">
+        {{ request.state.csrf_form | safe }}
+        <button type="submit" class="btn btn-primary">
+            {{ icon_svg("check", "h-4 w-4") }}
+            Approve
+        </button>
+    </form>
+    {% endif %}
+    {% if payment.status_raw == 'APPROVED' and auth is defined and auth.has_permission('ap:payments:post') %}
+    <form method="POST" action="/finance/ap/payments/{{ payment.payment_id }}/post" class="inline">
+        {{ request.state.csrf_form | safe }}
+        <button type="submit" class="btn btn-primary">
+            {{ icon_svg("document", "h-4 w-4") }}
+            Post to Ledger
+        </button>
+    </form>
+    {% endif %}
+    {% if payment.status_raw in ['APPROVED', 'SENT'] and auth is defined and auth.has_permission('ap:payments:void') %}
+    <form method="POST" action="/finance/ap/payments/{{ payment.payment_id }}/void" class="inline"
+          onsubmit="return confirm('Void this payment? This will reverse the workflow state.');">
+        {{ request.state.csrf_form | safe }}
+        <button type="submit" class="btn btn-danger-outline">
+            {{ icon_svg("x-mark", "h-4 w-4") }}
+            Void
+        </button>
+    </form>
+    {% endif %}
+    {% if payment.status_raw == 'DRAFT' and auth is defined and auth.has_permission('ap:payments:delete') %}
     <form method="POST" action="/finance/ap/payments/{{ payment.payment_id }}/delete"
           onsubmit="return confirm('Are you sure you want to delete this payment? This action cannot be undone.');">
         {{ request.state.csrf_form | safe }}
@@ -33,7 +68,7 @@
     </form>
     {% endif %}
     <a href="/finance/ap/payments/new"
-       class="btn btn-primary">
+       class="btn btn-secondary">
         {{ icon_svg("plus", "h-4 w-4") }}
         New Payment
     </a>

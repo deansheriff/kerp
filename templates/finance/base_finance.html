@@ -329,7 +329,10 @@
         {% set page_title_html %}{% block page_title %}{{ page_title | default("Dashboard") }}{% endblock %}{% endset %}
         {% set breadcrumbs_html %}{% block breadcrumbs %}{% endblock %}{% endset %}
         {% set header_actions_html %}{% block header_actions %}{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="teal", back_fallback=(back_fallback_url | trim)) }}
+        {% set topbar_left_actions_html %}{% block topbar_left_actions %}{% endblock %}{% endset %}
+        {% set topbar_search_breakpoint %}{% block topbar_search_breakpoint %}sm{% endblock %}{% endset %}
+        {% set show_topbar_search %}{% block show_topbar_search %}true{% endblock %}{% endset %}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, topbar_left_actions_html, accent="teal", back_fallback=(back_fallback_url | trim), search_breakpoint=(topbar_search_breakpoint | trim), show_search=(show_topbar_search | trim | lower) == 'true') }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-dashboard">
