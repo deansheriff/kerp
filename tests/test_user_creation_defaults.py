@@ -15,7 +15,9 @@ from app.services.people.hr import employees as employee_module
 def _ensure_employee_role(db_session):
     role = db_session.scalar(select(Role).where(Role.name == "employee"))
     if role is None:
-        role = Role(name="employee", description="Default employee role", is_active=True)
+        role = Role(
+            name="employee", description="Default employee role", is_active=True
+        )
         db_session.add(role)
         db_session.commit()
         db_session.refresh(role)
