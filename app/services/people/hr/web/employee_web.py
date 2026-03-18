@@ -33,6 +33,7 @@ from app.models.people.hr.employee import SalaryMode
 from app.models.people.payroll.employee_tax_profile import EmployeeTaxProfile
 from app.models.people.payroll.salary_assignment import SalaryStructureAssignment
 from app.models.person import Gender, Person
+from app.net import get_request_host, get_request_scheme
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.people.attendance.attendance_service import AttendanceService
@@ -66,6 +67,12 @@ class HRWebService:
     # =========================================================================
     # Employees
     # =========================================================================
+
+    @staticmethod
+    def _resolve_app_url(request: Request) -> str:
+        scheme = get_request_scheme(request)
+        host = get_request_host(request) or request.url.netloc
+        return f"{scheme}://{host}".rstrip("/")
 
     def list_employees_response(
         self,
@@ -564,6 +571,10 @@ class HRWebService:
             raise HTTPException(status_code=400, detail="Person not found")
         employee = svc.create_employee(person.id, data)
         db.commit()
+        svc.send_employee_access_invite(
+            employee.employee_id,
+            app_url=self._resolve_app_url(request),
+        )
 
         return RedirectResponse(
             url=f"/people/hr/employees/{employee.employee_id}?saved=1",

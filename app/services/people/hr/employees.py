@@ -35,8 +35,9 @@ from app.models.people.hr import (
 from app.models.person import Person
 from app.models.rbac import PersonRole, Role
 from app.services.audit_dispatcher import fire_audit_event
-from app.services.auth_flow import hash_password
+from app.services.auth_flow import hash_password, request_password_reset
 from app.services.common import PaginatedResult, PaginationParams, paginate
+from app.services.email import send_password_reset_email
 
 from .employee_filter_contract import FilterExpression
 from .employee_filter_engine import apply_employee_filter_expression
@@ -747,6 +748,7 @@ class EmployeeService:
 
         self.db.add(employee)
         self.db.flush()
+        self.ensure_local_user_credentials_for_employee(employee.employee_id)
         self._ensure_default_employee_role(person.id)
 
         fire_audit_event(
@@ -763,6 +765,79 @@ class EmployeeService:
         )
 
         return employee
+
+    def ensure_local_user_credentials_for_employee(
+        self,
+        employee_id: uuid.UUID,
+    ) -> UserCredential:
+        """Ensure the employee has a usable local credential.
+
+        Newly created employees should always have a login-ready local account.
+        If a local credential already exists but is incomplete, normalize it so
+        the username matches the person's email and a temporary password exists.
+        """
+        employee = self.get_employee(employee_id)
+        person = self.db.get(Person, employee.person_id)
+        if not person or person.organization_id != self.organization_id:
+            raise ValidationError("Employee is not linked to a valid user")
+
+        normalized_email = (person.email or "").strip().lower() or None
+        if not normalized_email:
+            raise ValidationError("Employee user account requires a valid email")
+
+        credential = self.db.scalar(
+            select(UserCredential).where(
+                UserCredential.person_id == person.id,
+                UserCredential.provider == AuthProvider.local,
+            )
+        )
+        if credential:
+            if not credential.username:
+                credential.username = normalized_email
+            if not credential.password_hash:
+                credential.password_hash = hash_password(DEFAULT_NEW_LOCAL_PASSWORD)
+                credential.password_updated_at = datetime.now(UTC)
+            credential.must_change_password = True
+            self.db.flush()
+            self.db.refresh(credential)
+            return credential
+
+        return self.create_user_credentials_for_employee(
+            employee_id,
+            username=normalized_email,
+            password=None,
+            provider=AuthProvider.local,
+            must_change_password=True,
+        )
+
+    def send_employee_access_invite(
+        self,
+        employee_id: uuid.UUID,
+        *,
+        app_url: str | None = None,
+    ) -> bool:
+        """Send a password-setup invite using the standard reset-password flow."""
+        employee = self.get_employee(employee_id)
+        person = self.db.get(Person, employee.person_id)
+        if not person or person.organization_id != self.organization_id:
+            raise ValidationError("Employee is not linked to a valid user")
+
+        email = (person.email or "").strip().lower()
+        if not email:
+            raise ValidationError("Employee user account requires a valid email")
+
+        invite = request_password_reset(self.db, email)
+        if not invite:
+            raise ValidationError("Employee user credentials are not ready for invite")
+
+        return send_password_reset_email(
+            db=self.db,
+            to_email=invite["email"],
+            reset_token=invite["token"],
+            person_name=invite["person_name"],
+            app_url=app_url,
+            organization_id=invite.get("organization_id"),
+        )
 
     def _ensure_default_employee_role(self, person_id: uuid.UUID) -> None:
         """Ensure newly created employees have the default employee role."""

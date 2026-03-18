@@ -7,13 +7,14 @@ Thin API wrapper for HR Core endpoints. All business logic is in services.
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_organization_id, require_tenant_auth
 from app.db import SessionLocal
 from app.models.finance.core_org.location import LocationType
 from app.models.people.hr.checklist_template import ChecklistTemplateType
+from app.net import get_request_host, get_request_scheme
 from app.schemas.auth import UserCredentialRead
 from app.schemas.people.checklist import (
     ChecklistTemplateCreate,
@@ -90,6 +91,12 @@ router = APIRouter(
     tags=["hr"],
     dependencies=[Depends(require_tenant_auth)],
 )
+
+
+def _resolve_app_url(request: Request) -> str:
+    scheme = get_request_scheme(request)
+    host = get_request_host(request) or request.url.netloc
+    return f"{scheme}://{host}".rstrip("/")
 
 
 def get_db():
@@ -747,6 +754,7 @@ def get_employee_stats(
 )
 def create_employee(
     payload: EmployeeCreate,
+    request: Request,
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db),
 ):
@@ -774,6 +782,8 @@ def create_employee(
         notes=payload.notes,
     )
     emp = svc.create_employee(payload.person_id, data)
+    db.commit()
+    svc.send_employee_access_invite(emp.employee_id, app_url=_resolve_app_url(request))
     return EmployeeRead.model_validate(emp)
 
 
