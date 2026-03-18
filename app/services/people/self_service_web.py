@@ -1649,9 +1649,7 @@ class SelfServiceWebService:
         claim_date: date,
         purpose: str,
         expense_date: date,
-        category_id: str,
-        description: str,
-        claimed_amount: str,
+        items: list[dict],
         recipient_bank_code: str | None = None,
         recipient_bank_name: str | None = None,
         recipient_account_number: str | None = None,
@@ -1660,7 +1658,6 @@ class SelfServiceWebService:
         receipt_url: str | None = None,
         receipt_number: str | None = None,
         receipt_files: list[UploadFile] | None = None,
-        receipt_file: UploadFile | None = None,
         submit_now: str | None = None,
         project_id: str | None = None,
         ticket_id: str | None = None,
@@ -1671,31 +1668,20 @@ class SelfServiceWebService:
         person_id = coerce_uuid(auth.person_id)
         employee_id = self._get_employee_id(db, org_id, person_id)
 
-        try:
-            amount = Decimal(claimed_amount)
-        except (InvalidOperation, TypeError) as exc:
-            raise HTTPException(
-                status_code=400, detail="Invalid claimed amount"
-            ) from exc
+        if not items:
+            raise HTTPException(status_code=400, detail="At least one expense item is required")
 
         resolved_receipt_urls: list[str] = []
-        if receipt_url and receipt_url.strip():
-            resolved_receipt_urls.append(receipt_url.strip())
+        if receipt_url and str(receipt_url).strip():
+            resolved_receipt_urls.append(str(receipt_url).strip())
 
         upload_files: list[UploadFile] = []
-        if receipt_files:
-            upload_files.extend(
-                f
-                for f in receipt_files
-                if isinstance(f, UploadFile) and getattr(f, "filename", None)
-            )
-        if (
-            receipt_file
-            and isinstance(receipt_file, UploadFile)
-            and getattr(receipt_file, "filename", None)
-            and receipt_file not in upload_files
-        ):
-            upload_files.append(receipt_file)
+        raw_receipt_files = receipt_files or []
+        upload_files.extend(
+            f
+            for f in raw_receipt_files
+            if isinstance(f, UploadFile) and getattr(f, "filename", None)
+        )
 
         if upload_files:
             # File uploads can fail validation (e.g. unsupported MIME type).
@@ -1710,7 +1696,6 @@ class SelfServiceWebService:
             uploaded_paths: list[str] = []
             try:
                 for upload in upload_files:
-                    # Note: UploadFile.file is a SpooledTemporaryFile; reading consumes it.
                     file_data = upload.file.read()
                     result = upload_svc.save(
                         file_data=file_data,
@@ -1721,7 +1706,6 @@ class SelfServiceWebService:
                     uploaded_paths.append(str(result.file_path))
                     resolved_receipt_urls.append(str(result.file_path))
             except FileUploadError as exc:
-                # Best-effort cleanup of any earlier uploads in this request.
                 for path in uploaded_paths:
                     try:
                         upload_svc.delete(path)
@@ -1746,6 +1730,25 @@ class SelfServiceWebService:
         else:
             resolved_receipt_url = json.dumps(resolved_receipt_urls)
 
+        resolved_items: list[dict] = []
+        for item in items:
+            try:
+                amount = Decimal(str(item["claimed_amount"]))
+            except (InvalidOperation, TypeError, KeyError) as exc:
+                raise HTTPException(
+                    status_code=400, detail="Invalid claimed amount"
+                ) from exc
+            resolved_items.append(
+                {
+                    "expense_date": expense_date,
+                    "category_id": coerce_uuid(item["category_id"]),
+                    "description": str(item["description"]).strip(),
+                    "claimed_amount": amount,
+                    "receipt_url": resolved_receipt_url,
+                    "receipt_number": receipt_number.strip() if receipt_number else None,
+                }
+            )
+
         svc = ExpenseService(db, auth)
         claim = svc.create_claim(
             org_id,
@@ -1763,18 +1766,7 @@ class SelfServiceWebService:
             requested_approver_id=coerce_uuid(requested_approver_id)
             if requested_approver_id
             else None,
-            items=[
-                {
-                    "expense_date": expense_date,
-                    "category_id": coerce_uuid(category_id),
-                    "description": description.strip(),
-                    "claimed_amount": amount,
-                    "receipt_url": resolved_receipt_url,
-                    "receipt_number": receipt_number.strip()
-                    if receipt_number
-                    else None,
-                }
-            ],
+            items=resolved_items,
         )
         if submit_now:
             svc.submit_claim(org_id, claim.claim_id, skip_receipt_validation=True)
@@ -1953,6 +1945,19 @@ class SelfServiceWebService:
                     org_id,
                     claim_id=claim_id,
                     item_id=coerce_uuid(item["item_id"]),
+                )
+                continue
+
+            if not item.get("item_id"):
+                svc.add_claim_item(
+                    org_id,
+                    claim_id=claim_id,
+                    expense_date=item["expense_date"],
+                    category_id=coerce_uuid(item["category_id"]),
+                    description=item["description"],
+                    claimed_amount=item["claimed_amount"],
+                    receipt_number=item.get("receipt_number"),
+                    receipt_url=item.get("receipt_url"),
                 )
                 continue
 

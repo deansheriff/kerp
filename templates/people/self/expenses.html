@@ -176,29 +176,6 @@
                         <input type="date" name="expense_date" id="expense_date" class="form-input w-full" required>
                     </div>
                     <div>
-                        <label for="category_id" class="form-label">Category <span class="text-rose-500">*</span></label>
-                        <select name="category_id" id="category_id" class="form-select w-full" required onchange="updateReceiptRequirement()">
-                            {% for cat in categories %}
-                            <option value="{{ cat.category_id }}"
-                                    data-category-code="{{ cat.category_code }}"
-                                    data-requires-receipt="{{ 'true' if cat.requires_receipt else 'false' }}"
-                                    data-max-amount="{{ cat.max_amount_per_claim or '' }}">
-                                {{ cat.category_name }}{% if cat.requires_receipt %} *{% endif %}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <p id="receipt-hint" class="mt-1 text-xs text-amber-600 dark:text-amber-400 hidden">
-                            <svg class="inline h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                            </svg>
-                            Receipt required for this category
-                        </p>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label for="description" class="form-label">Description <span class="text-rose-500">*</span></label>
-                        <input type="text" name="description" id="description" class="form-input w-full" required>
-                    </div>
-                    <div>
                         <label for="requested_approver_id" class="form-label">Expense Approver <span class="text-rose-500">*</span></label>
                         <select name="requested_approver_id" id="requested_approver_id" class="form-select w-full" required>
                             <option value="">Select approver...</option>
@@ -209,6 +186,45 @@
                             {% endfor %}
                         </select>
                         <p class="mt-1 text-xs text-slate-400">Required for submission</p>
+                    </div>
+                    <div class="sm:col-span-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Expense Items</h3>
+                                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Add all expenses for the same activity under one claim.</p>
+                            </div>
+                            <button type="button" id="add-expense-item" class="btn btn-secondary btn-sm">Add Item</button>
+                        </div>
+                        <div class="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                                <thead class="bg-slate-50 dark:bg-slate-800/50">
+                                    <tr>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">#</th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Category</th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Description</th>
+                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Amount</th>
+                                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Remove</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expense-items" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="receipt_number" class="form-label">Receipt Number</label>
+                        <input type="text" name="receipt_number" id="receipt_number" class="form-input w-full">
+                    </div>
+                    <div>
+                        <label for="receipt_url" class="form-label">Receipt URL</label>
+                        <input type="url" name="receipt_url" id="receipt_url" class="form-input w-full">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="receipt_file" class="form-label">Receipt Files</label>
+                        <input type="file" name="receipt_file" id="receipt_file" class="form-input w-full" multiple>
+                        <p class="mt-1 text-xs text-slate-400">Upload once here when the receipt covers the whole claim.</p>
+                        <p id="receipt-hint" class="mt-1 hidden text-xs text-amber-600 dark:text-amber-400">
+                            One or more selected categories require a receipt for this claim.
+                        </p>
                     </div>
                     <div>
                         <label for="recipient_name" class="form-label">Beneficiary Name</label>
@@ -256,23 +272,6 @@
                         <label for="recipient_account_number" class="form-label">Account Number <span class="text-rose-500">*</span></label>
                         <input type="text" name="recipient_account_number" id="recipient_account_number" class="form-input w-full" required maxlength="10" pattern="[0-9]{10}" value="{{ employee_bank_account_number }}">
                         <p class="mt-1 text-xs text-slate-400">10-digit account number</p>
-                    </div>
-                    <div>
-                        <label for="claimed_amount" class="form-label">Amount <span class="text-rose-500">*</span></label>
-                        <input type="number" step="0.01" name="claimed_amount" id="claimed_amount" class="form-input w-full" required>
-                    </div>
-                    <div>
-                        <label for="receipt_number" class="form-label">Receipt Number</label>
-                        <input type="text" name="receipt_number" id="receipt_number" class="form-input w-full">
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label for="receipt_url" class="form-label">Receipt URL</label>
-                        <input type="url" name="receipt_url" id="receipt_url" class="form-input w-full">
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label for="receipt_file" class="form-label">Receipt Files</label>
-                        <input type="file" name="receipt_file" id="receipt_file" class="form-input w-full" multiple>
-                        <p class="mt-1 text-xs text-slate-400">You can select multiple files.</p>
                     </div>
                     <div>
                         <label for="cost_center_id" class="form-label">Cost Center (Optional)</label>
@@ -347,33 +346,38 @@
     </div>
 </div>
 
+<template id="expense-item-template">
+    <tr class="expense-item bg-white dark:bg-slate-900" data-expense-item>
+        <td class="px-3 py-3 text-sm font-medium text-slate-700 dark:text-slate-300" data-item-number></td>
+        <td class="px-3 py-3 align-top">
+            <input type="hidden" name="item_key" value="__KEY__">
+            <label class="sr-only" for="category_id___KEY__">Category</label>
+                <select name="category_id___KEY__" id="category_id___KEY__" class="form-select w-full" required data-item-category>
+                    {% for cat in categories %}
+                    <option value="{{ cat.category_id }}"
+                            data-category-code="{{ cat.category_code }}"
+                            data-requires-receipt="{{ 'true' if cat.requires_receipt else 'false' }}"
+                            data-max-amount="{{ cat.max_amount_per_claim or '' }}">
+                        {{ cat.category_name }}{% if cat.requires_receipt %} *{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+        </td>
+        <td class="px-3 py-3 align-top">
+            <label class="sr-only" for="description___KEY__">Description</label>
+            <input type="text" name="description___KEY__" id="description___KEY__" class="form-input w-full min-w-[220px]" required>
+        </td>
+        <td class="px-3 py-3 align-top">
+            <label class="sr-only" for="claimed_amount___KEY__">Amount</label>
+            <input type="number" step="0.01" name="claimed_amount___KEY__" id="claimed_amount___KEY__" class="form-input w-full min-w-[140px] text-right" required data-item-amount>
+        </td>
+        <td class="px-3 py-3 text-center align-top">
+            <button type="button" class="text-sm font-medium text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300" data-remove-item>Remove</button>
+        </td>
+    </tr>
+</template>
+
 <script>
-function updateReceiptRequirement() {
-    const select = document.getElementById('category_id');
-    const hint = document.getElementById('receipt-hint');
-    const receiptUrl = document.getElementById('receipt_url');
-    const receiptFile = document.getElementById('receipt_file');
-    const amountInput = document.getElementById('claimed_amount');
-
-    const option = select.options[select.selectedIndex];
-    const requiresReceipt = categoryRequiresReceipt(option);
-    const maxAmount = option.dataset.maxAmount;
-
-    if (requiresReceipt) {
-        hint.classList.remove('hidden');
-    } else {
-        hint.classList.add('hidden');
-    }
-
-    if (maxAmount) {
-        amountInput.setAttribute('max', maxAmount);
-        amountInput.placeholder = 'Max: ' + parseFloat(maxAmount).toLocaleString();
-    } else {
-        amountInput.removeAttribute('max');
-        amountInput.placeholder = '';
-    }
-}
-
 function normalizeCategoryToken(value) {
     return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -390,17 +394,146 @@ function categoryRequiresReceipt(option) {
 }
 
 const claimForm = document.getElementById('expense-claim-form');
-if (claimForm) {
-    claimForm.addEventListener('submit', function(e) {
-        const select = document.getElementById('category_id');
-        const option = select.options[select.selectedIndex];
+const itemContainer = document.getElementById('expense-items');
+const itemTemplate = document.getElementById('expense-item-template');
+const addItemButton = document.getElementById('add-expense-item');
+const receiptHint = document.getElementById('receipt-hint');
+const claimReceiptUrlInput = document.getElementById('receipt_url');
+const claimReceiptFileInput = document.getElementById('receipt_file');
 
-        const maxAmount = option.dataset.maxAmount;
-        const amount = parseFloat(document.getElementById('claimed_amount').value);
-        if (maxAmount && amount > parseFloat(maxAmount)) {
+function updateItemNumbers() {
+    const itemRows = itemContainer ? Array.from(itemContainer.querySelectorAll('[data-expense-item]')) : [];
+    itemRows.forEach(function(row, index) {
+        const numberEl = row.querySelector('[data-item-number]');
+        if (numberEl) {
+            numberEl.textContent = String(index + 1);
+        }
+        const removeButton = row.querySelector('[data-remove-item]');
+        if (removeButton) {
+            removeButton.disabled = itemRows.length === 1;
+            removeButton.classList.toggle('opacity-50', itemRows.length === 1);
+            removeButton.classList.toggle('cursor-not-allowed', itemRows.length === 1);
+        }
+    });
+}
+
+function updateReceiptHint() {
+    if (!itemContainer || !receiptHint) {
+        return;
+    }
+    const requiresReceipt = Array.from(itemContainer.querySelectorAll('[data-item-category]')).some(function(select) {
+        const option = select.options[select.selectedIndex];
+        return option && categoryRequiresReceipt(option);
+    });
+    receiptHint.classList.toggle('hidden', !requiresReceipt);
+}
+
+function addExpenseItem() {
+    if (!itemContainer || !itemTemplate) {
+        return;
+    }
+    const key = String(Date.now()) + String(Math.floor(Math.random() * 1000));
+    const markup = itemTemplate.innerHTML.replaceAll('__KEY__', key);
+    itemContainer.insertAdjacentHTML('beforeend', markup);
+    const row = itemContainer.lastElementChild;
+    if (row) {
+        const select = row.querySelector('[data-item-category]');
+        const amountInput = row.querySelector('[data-item-amount]');
+        const option = select ? select.options[select.selectedIndex] : null;
+        const maxAmount = option ? option.dataset.maxAmount : '';
+        if (amountInput) {
+            if (maxAmount) {
+                amountInput.setAttribute('max', maxAmount);
+                amountInput.placeholder = 'Max: ' + parseFloat(maxAmount).toLocaleString();
+            } else {
+                amountInput.removeAttribute('max');
+                amountInput.placeholder = '';
+            }
+        }
+    }
+    updateItemNumbers();
+    updateReceiptHint();
+}
+
+if (itemContainer) {
+    itemContainer.addEventListener('click', function(e) {
+        const removeButton = e.target.closest('[data-remove-item]');
+        if (!removeButton) {
+            return;
+        }
+        const rows = itemContainer.querySelectorAll('[data-expense-item]');
+        if (rows.length <= 1) {
+            return;
+        }
+        const row = removeButton.closest('[data-expense-item]');
+        if (row) {
+            row.remove();
+            updateItemNumbers();
+            updateReceiptHint();
+        }
+    });
+
+    itemContainer.addEventListener('change', function(e) {
+        if (e.target.matches('[data-item-category]')) {
+            const row = e.target.closest('[data-expense-item]');
+            const amountInput = row ? row.querySelector('[data-item-amount]') : null;
+            const option = e.target.options[e.target.selectedIndex];
+            const maxAmount = option ? option.dataset.maxAmount : '';
+            if (amountInput) {
+                if (maxAmount) {
+                    amountInput.setAttribute('max', maxAmount);
+                    amountInput.placeholder = 'Max: ' + parseFloat(maxAmount).toLocaleString();
+                } else {
+                    amountInput.removeAttribute('max');
+                    amountInput.placeholder = '';
+                }
+            }
+            updateReceiptHint();
+        }
+    });
+}
+
+if (addItemButton) {
+    addItemButton.addEventListener('click', addExpenseItem);
+}
+
+if (claimForm) {
+    if (itemContainer && !itemContainer.querySelector('[data-expense-item]')) {
+        addExpenseItem();
+    }
+
+    claimForm.addEventListener('submit', function(e) {
+        const itemRows = itemContainer ? Array.from(itemContainer.querySelectorAll('[data-expense-item]')) : [];
+        if (!itemRows.length) {
             e.preventDefault();
-            window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Amount exceeds the maximum allowed (' + parseFloat(maxAmount).toLocaleString() + ') for this category.', type: 'warning' } }));
+            window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Add at least one expense item before creating the claim.', type: 'warning' } }));
             return false;
+        }
+
+        for (const row of itemRows) {
+            const select = row.querySelector('[data-item-category]');
+            const amountInput = row.querySelector('[data-item-amount]');
+            if (!select || !amountInput) {
+                continue;
+            }
+
+            const option = select.options[select.selectedIndex];
+            const maxAmount = option.dataset.maxAmount;
+            const amount = parseFloat(amountInput.value);
+            if (maxAmount && amount > parseFloat(maxAmount)) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'One of the expense items exceeds the maximum allowed (' + parseFloat(maxAmount).toLocaleString() + ') for its category.', type: 'warning' } }));
+                return false;
+            }
+
+            const requiresReceipt = categoryRequiresReceipt(option);
+            const hasReceiptUrl = claimReceiptUrlInput && claimReceiptUrlInput.value.trim();
+            const hasReceiptFile = claimReceiptFileInput && claimReceiptFileInput.files.length > 0;
+            if (requiresReceipt && !hasReceiptUrl && !hasReceiptFile) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'A selected category requires a receipt. Add a receipt URL or file for this claim.', type: 'warning' } }));
+                return false;
+            }
         }
     });
 }

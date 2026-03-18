@@ -459,7 +459,7 @@ async def create_expense_claim(
     auth: WebAuthContext = Depends(require_self_service_access),
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
-    """Create an expense claim with a single line item."""
+    """Create an expense claim with one or more line items."""
     form = getattr(request.state, "csrf_form", None)
     if form is None:
         form = await request.form()
@@ -467,9 +467,6 @@ async def create_expense_claim(
     claim_date_str = _safe_form_text(form.get("claim_date"))
     purpose = _safe_form_text(form.get("purpose"))
     expense_date_str = _safe_form_text(form.get("expense_date"))
-    category_id = _safe_form_text(form.get("category_id"))
-    description = _safe_form_text(form.get("description"))
-    claimed_amount = _safe_form_text(form.get("claimed_amount"))
     recipient_bank_code = _safe_form_text(form.get("recipient_bank_code"))
     recipient_bank_name = _safe_form_text(form.get("recipient_bank_name"))
     recipient_account_number = _safe_form_text(form.get("recipient_account_number"))
@@ -485,14 +482,78 @@ async def create_expense_claim(
     task_id = _safe_form_text(form.get("task_id"))
     cost_center_id = _safe_form_text(form.get("cost_center_id"))
 
+    if (
+        receipt_file
+        and getattr(receipt_file, "filename", None)
+        and receipt_file not in receipt_files
+    ):
+        receipt_files.append(receipt_file)
+
+    item_keys = [key for key in form.getlist("item_key") if _safe_form_text(key)]
+    items: list[dict] = []
+    if item_keys:
+        for item_key in item_keys:
+            category_id = _safe_form_text(form.get(f"category_id_{item_key}"))
+            description = _safe_form_text(form.get(f"description_{item_key}"))
+            claimed_amount = _safe_form_text(form.get(f"claimed_amount_{item_key}"))
+
+            if not all(
+                [
+                    category_id,
+                    description,
+                    claimed_amount,
+                ]
+            ):
+                raise HTTPException(status_code=400, detail="Missing required item fields")
+
+            try:
+                amount = Decimal(claimed_amount)
+            except (InvalidOperation, TypeError) as exc:
+                raise HTTPException(
+                    status_code=400, detail="Invalid claimed amount"
+                ) from exc
+
+            items.append(
+                {
+                    "category_id": category_id,
+                    "description": description,
+                    "claimed_amount": amount,
+                }
+            )
+    else:
+        category_id = _safe_form_text(form.get("category_id"))
+        description = _safe_form_text(form.get("description"))
+        claimed_amount = _safe_form_text(form.get("claimed_amount"))
+
+        if not all(
+            [
+                category_id,
+                description,
+                claimed_amount,
+            ]
+        ):
+            raise HTTPException(status_code=400, detail="Missing required item fields")
+
+        try:
+            amount = Decimal(claimed_amount)
+        except (InvalidOperation, TypeError) as exc:
+            raise HTTPException(
+                status_code=400, detail="Invalid claimed amount"
+            ) from exc
+
+        items.append(
+            {
+                "category_id": category_id,
+                "description": description,
+                "claimed_amount": amount,
+            }
+        )
+
     if not all(
         [
             claim_date_str,
             purpose,
             expense_date_str,
-            category_id,
-            description,
-            claimed_amount,
             recipient_bank_code,
             recipient_account_number,
             requested_approver_id,
@@ -500,11 +561,20 @@ async def create_expense_claim(
     ):
         raise HTTPException(status_code=400, detail="Missing required fields")
 
-    claim_date = date.fromisoformat(claim_date_str) if claim_date_str else None
-    expense_date = date.fromisoformat(expense_date_str) if expense_date_str else None
+    try:
+        claim_date = date.fromisoformat(claim_date_str) if claim_date_str else None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid claim date") from exc
 
-    if not claim_date or not expense_date:
+    try:
+        expense_date = date.fromisoformat(expense_date_str) if expense_date_str else None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid expense date") from exc
+
+    if not claim_date:
         raise HTTPException(status_code=400, detail="Invalid dates submitted")
+    if not expense_date:
+        raise HTTPException(status_code=400, detail="Invalid expense date")
 
     return self_service_web_service.expense_claim_create_response(
         auth,
@@ -512,9 +582,7 @@ async def create_expense_claim(
         claim_date=claim_date,
         purpose=purpose,
         expense_date=expense_date,
-        category_id=category_id,
-        description=description,
-        claimed_amount=claimed_amount,
+        items=items,
         recipient_bank_code=recipient_bank_code or None,
         recipient_bank_name=recipient_bank_name or None,
         recipient_account_number=recipient_account_number or None,
@@ -523,7 +591,6 @@ async def create_expense_claim(
         receipt_url=receipt_url or None,
         receipt_number=receipt_number or None,
         receipt_files=receipt_files,
-        receipt_file=receipt_file,
         submit_now=submit_now,
         project_id=project_id or None,
         ticket_id=ticket_id or None,
@@ -560,8 +627,11 @@ async def update_expense_claim(
     if form is None:
         form = await request.form()
 
-    item_ids = form.getlist("item_id")
-    if not item_ids:
+    item_ids = [_safe_form_text(item_id) for item_id in form.getlist("item_id")]
+    item_ids = [item_id for item_id in item_ids if item_id]
+    item_keys = [_safe_form_text(item_key) for item_key in form.getlist("item_key")]
+    item_keys = [item_key for item_key in item_keys if item_key]
+    if not item_ids and not item_keys:
         raise HTTPException(status_code=400, detail="No claim items submitted")
 
     recipient_bank_code = _safe_form_text(form.get("recipient_bank_code"))
@@ -622,6 +692,40 @@ async def update_expense_claim(
         items.append(
             {
                 "item_id": item_id,
+                "expense_date": expense_date,
+                "category_id": category_id,
+                "description": description,
+                "claimed_amount": claimed_amount,
+                "receipt_number": receipt_number or None,
+                "receipt_url": receipt_url or None,
+            }
+        )
+
+    for item_key in item_keys:
+        expense_date_str = _safe_form_text(form.get(f"expense_date_{item_key}"))
+        category_id = _safe_form_text(form.get(f"category_id_{item_key}"))
+        description = _safe_form_text(form.get(f"description_{item_key}"))
+        claimed_amount_str = _safe_form_text(form.get(f"claimed_amount_{item_key}"))
+        receipt_number = _safe_form_text(form.get(f"receipt_number_{item_key}"))
+        receipt_url = _safe_form_text(form.get(f"receipt_url_{item_key}"))
+
+        if not all([expense_date_str, category_id, description, claimed_amount_str]):
+            raise HTTPException(status_code=400, detail="Missing required item fields")
+
+        try:
+            expense_date = date.fromisoformat(expense_date_str)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid expense date") from exc
+
+        try:
+            claimed_amount = Decimal(claimed_amount_str)
+        except (InvalidOperation, TypeError) as exc:
+            raise HTTPException(
+                status_code=400, detail="Invalid claimed amount"
+            ) from exc
+
+        items.append(
+            {
                 "expense_date": expense_date,
                 "category_id": category_id,
                 "description": description,
