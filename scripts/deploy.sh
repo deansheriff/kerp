@@ -29,13 +29,13 @@ docker start dotmac_erp_app
 
 # Step 3: Wait for health check
 echo "→ Waiting for health check..."
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
     if curl -sf http://localhost:8003/health > /dev/null 2>&1; then
         echo "  App healthy after ${i}s"
         break
     fi
-    if [ "$i" -eq 30 ]; then
-        echo "  ERROR: App not healthy after 30s!"
+    if [ "$i" -eq 60 ]; then
+        echo "  ERROR: App not healthy after 60s!"
         docker logs dotmac_erp_app --tail 20
         exit 1
     fi
