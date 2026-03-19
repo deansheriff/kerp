@@ -194,11 +194,10 @@
       {% for card in content.core_modules.cards %}
       <div class="stagger-in group">
         <div class="h-full rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-700 dark:bg-slate-800 card-hover">
-          <div class="flex h-12 w-12 items-center justify-center rounded-xl mb-4 bg-primary-100 dark:bg-primary-900/30">
-            <svg class="h-6 w-6 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/>
-            </svg>
-          </div>
+          {% set _module_img_map = {'finance': 'module-finance.png', 'people': 'module-people.png', 'inventory': 'module-inventory.png', 'ar': 'module-ar.png', 'ap': 'module-ap.png', 'fa': 'module-inventory.png', 'banking': 'module-banking.png', 'reports': 'module-finance.png', 'payroll': 'module-people.png', 'leave': 'module-people.png', 'attendance': 'module-people.png', 'expense': 'module-expense.png', 'procurement': 'module-procurement.png', 'projects': 'module-projects.png', 'support': 'module-support.png', 'coach': 'module-coach.png'} %}
+          {% set _card_img = _module_img_map.get(card.key, 'module-finance.png') %}
+          <img src="/static/img/illustrations/{{ _card_img }}" alt="" aria-hidden="true"
+               class="h-12 w-12 rounded-xl object-contain mb-4" loading="lazy">
           <h3 class="text-xl font-semibold text-slate-900 dark:text-white font-display">{{ card.title }}</h3>
           <p class="mt-3 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
             {{ card.description }}
