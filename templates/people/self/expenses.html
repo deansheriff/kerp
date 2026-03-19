@@ -232,40 +232,29 @@
                         <p class="mt-1 text-xs text-slate-400">Who should receive the reimbursement</p>
                     </div>
                     <div>
-                        <label for="recipient_bank_name_input" class="form-label">Bank Name</label>
-                        {% if allowed_banks %}
-                        <div id="recipient_bank_name_input_wrap">
-                            <input type="text"
-                                   name="recipient_bank_name"
-                                   id="recipient_bank_name_input"
-                                   class="form-input w-full"
-                                   placeholder="e.g. Access Bank"
-                                   value="{{ employee_bank_name }}"
-                                   data-initial-value="{{ employee_bank_name }}">
-                            <p class="mt-1 text-xs text-slate-400">Use when reimbursing a third party</p>
-                        </div>
-                        <div id="recipient_bank_name_select_wrap" class="hidden">
-                            <select name="recipient_bank_name"
-                                    id="recipient_bank_name_select"
-                                    class="form-select w-full"
-                                    disabled>
-                                <option value="">-- Select Bank --</option>
-                                {% for bank in allowed_banks %}
-                                <option value="{{ bank.bank_name }}" data-sort-code="{{ bank.bank_sort_code }}">
-                                    {{ bank.bank_name }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <p class="mt-1 text-xs text-slate-400">Select a bank from your organization list</p>
-                        </div>
-                        {% else %}
-                        <input type="text" name="recipient_bank_name" id="recipient_bank_name_input" class="form-input w-full" placeholder="e.g. Access Bank" value="{{ employee_bank_name }}">
-                        <p class="mt-1 text-xs text-slate-400">Use when reimbursing a third party</p>
-                        {% endif %}
+                        <label for="recipient_bank_name_display" class="form-label">Bank Name <span class="text-rose-500">*</span></label>
+                        <input type="hidden"
+                               name="recipient_bank_name"
+                               id="recipient_bank_name"
+                               value="{{ employee_bank_name }}">
+                        <input type="text"
+                               id="recipient_bank_name_display"
+                               class="form-input w-full"
+                               list="recipient_bank_name_options"
+                               autocomplete="off"
+                               required
+                               placeholder="Type to search banks"
+                               value="{{ employee_bank_name }}">
+                        <datalist id="recipient_bank_name_options">
+                            {% for bank in allowed_banks %}
+                            <option value="{{ bank.bank_name }}" data-sort-code="{{ bank.bank_sort_code }}"></option>
+                            {% endfor %}
+                        </datalist>
+                        <p class="mt-1 text-xs text-slate-400">Search and select a bank from the approved list</p>
                     </div>
                     <div>
                         <label for="recipient_bank_code" class="form-label">Bank Code <span class="text-rose-500">*</span></label>
-                        <input type="text" name="recipient_bank_code" id="recipient_bank_code" class="form-input w-full" required placeholder="e.g. 058" value="{{ employee_bank_code }}">
+                        <input type="text" name="recipient_bank_code" id="recipient_bank_code" class="form-input w-full" required readonly placeholder="Auto-filled from bank selection" value="{{ employee_bank_code }}">
                         <p class="mt-1 text-xs text-slate-400">Paystack bank code for reimbursement</p>
                     </div>
                     <div>
@@ -398,8 +387,6 @@ const itemContainer = document.getElementById('expense-items');
 const itemTemplate = document.getElementById('expense-item-template');
 const addItemButton = document.getElementById('add-expense-item');
 const receiptHint = document.getElementById('receipt-hint');
-const claimReceiptUrlInput = document.getElementById('receipt_url');
-const claimReceiptFileInput = document.getElementById('receipt_file');
 
 function updateItemNumbers() {
     const itemRows = itemContainer ? Array.from(itemContainer.querySelectorAll('[data-expense-item]')) : [];
@@ -525,15 +512,6 @@ if (claimForm) {
                 window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'One of the expense items exceeds the maximum allowed (' + parseFloat(maxAmount).toLocaleString() + ') for its category.', type: 'warning' } }));
                 return false;
             }
-
-            const requiresReceipt = categoryRequiresReceipt(option);
-            const hasReceiptUrl = claimReceiptUrlInput && claimReceiptUrlInput.value.trim();
-            const hasReceiptFile = claimReceiptFileInput && claimReceiptFileInput.files.length > 0;
-            if (requiresReceipt && !hasReceiptUrl && !hasReceiptFile) {
-                e.preventDefault();
-                window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'A selected category requires a receipt. Add a receipt URL or file for this claim.', type: 'warning' } }));
-                return false;
-            }
         }
     });
 }
@@ -600,56 +578,41 @@ function refreshTable() {
     applyFilters();
 }
 
-function setupBankListToggle() {
-    const inputWrap = document.getElementById('recipient_bank_name_input_wrap');
-    const selectWrap = document.getElementById('recipient_bank_name_select_wrap');
-    const nameInput = document.getElementById('recipient_bank_name_input');
-    const nameSelect = document.getElementById('recipient_bank_name_select');
+function setupExpenseBankTypeahead() {
+    const nameInput = document.getElementById('recipient_bank_name_display');
+    const hiddenNameInput = document.getElementById('recipient_bank_name');
     const codeInput = document.getElementById('recipient_bank_code');
-    if (!inputWrap || !selectWrap || !nameInput || !nameSelect) return;
+    if (!nameInput || !hiddenNameInput || !codeInput) return;
 
-    const initialValue = nameInput.dataset.initialValue || '';
+    const bankCodesByName = new Map([
+        {% for bank in allowed_banks %}
+        [{{ bank.bank_name|tojson }}, {{ bank.bank_sort_code|tojson }}],
+        {% endfor %}
+    ].map(([name, code]) => [String(name).trim().toLowerCase(), String(code)]));
 
-    const ensureCustomOption = (value) => {
-        if (!value) return;
-        let option = Array.from(nameSelect.options).find((opt) => opt.value === value);
-        if (!option) {
-            option = document.createElement('option');
-            option.value = value;
-            option.textContent = value + ' (not in list)';
-            nameSelect.insertBefore(option, nameSelect.options[1] || null);
+    const syncSelectedBank = () => {
+        const rawValue = nameInput.value.trim();
+        const sortCode = bankCodesByName.get(rawValue.toLowerCase()) || '';
+
+        if (!rawValue || !sortCode) {
+            hiddenNameInput.value = '';
+            codeInput.value = '';
+            nameInput.setCustomValidity('Select a bank from the approved list.');
+            return;
         }
-        option.selected = true;
+
+        hiddenNameInput.value = rawValue;
+        codeInput.value = sortCode;
+        nameInput.setCustomValidity('');
     };
 
-    const syncSortCode = () => {
-        const selected = nameSelect.options[nameSelect.selectedIndex];
-        const sortCode = selected ? selected.dataset.sortCode : '';
-        if (sortCode && codeInput) {
-            codeInput.value = sortCode;
-        }
-    };
-
-    const showSelect = (currentValue) => {
-        inputWrap.classList.add('hidden');
-        selectWrap.classList.remove('hidden');
-        nameInput.disabled = true;
-        nameSelect.disabled = false;
-        if (currentValue) {
-            ensureCustomOption(currentValue);
-        }
-        syncSortCode();
-    };
-
-    const maybeSwitch = () => {
-        const currentValue = nameInput.value || '';
-        if (currentValue !== initialValue) {
-            showSelect(currentValue);
-        }
-    };
-
-    nameInput.addEventListener('input', maybeSwitch);
-    nameSelect.addEventListener('change', syncSortCode);
+    syncSelectedBank();
+    nameInput.addEventListener('input', syncSelectedBank);
+    nameInput.addEventListener('change', syncSelectedBank);
+    nameInput.addEventListener('blur', syncSelectedBank);
+    if (claimForm) {
+        claimForm.addEventListener('submit', syncSelectedBank);
+    }
 }
 
 function setupLinkedEntityTypeahead(inputId, hiddenId, listId) {
@@ -693,9 +656,9 @@ coinParticles.forEach((particle) => {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    updateReceiptRequirement();
+    updateReceiptHint();
     refreshTable();
-    setupBankListToggle();
+    setupExpenseBankTypeahead();
     setupLinkedEntityTypeahead('project_search', 'project_id', 'project_typeahead_list');
     setupLinkedEntityTypeahead('ticket_search', 'ticket_id', 'ticket_typeahead_list');
 });

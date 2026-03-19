@@ -65,6 +65,55 @@ class SelfServiceWebService:
     """View service for employee self-service pages."""
 
     @staticmethod
+    def _match_org_bank(
+        allowed_banks: list,
+        *,
+        bank_name: str | None = None,
+        bank_code: str | None = None,
+    ):
+        normalized_name = (bank_name or "").strip().lower()
+        normalized_code = (bank_code or "").strip()
+
+        if normalized_code:
+            for bank in allowed_banks:
+                if (bank.bank_sort_code or "").strip() == normalized_code:
+                    return bank
+
+        if normalized_name:
+            for bank in allowed_banks:
+                if bank.bank_name.strip().lower() == normalized_name:
+                    return bank
+
+        return None
+
+    def _resolve_expense_bank_selection(
+        self,
+        db: Session,
+        org_id: UUID,
+        *,
+        bank_name: str | None = None,
+        bank_code: str | None = None,
+        required: bool = False,
+    ) -> tuple[str, str]:
+        allowed_banks = OrgBankDirectoryService(db).list_active_banks(org_id)
+        matched_bank = self._match_org_bank(
+            allowed_banks,
+            bank_name=bank_name,
+            bank_code=bank_code,
+        )
+
+        if matched_bank:
+            return matched_bank.bank_name, matched_bank.bank_sort_code
+
+        if required:
+            raise HTTPException(
+                status_code=400,
+                detail="Select a bank from the approved bank list",
+            )
+
+        return "", ""
+
+    @staticmethod
     def _resolve_month_range(
         month_value: str | None, fallback_date: date
     ) -> tuple[date, date, str, str, str]:
@@ -1600,6 +1649,11 @@ class SelfServiceWebService:
         cost_centers = list(db.scalars(cost_centers_stmt).all())
 
         allowed_banks = OrgBankDirectoryService(db).list_active_banks(org_id)
+        selected_employee_bank = self._match_org_bank(
+            allowed_banks,
+            bank_name=employee.bank_name if employee else None,
+            bank_code=employee.bank_branch_code if employee else None,
+        )
 
         selected_ticket_id = request.query_params.get("ticket_id")
         selected_project_id = request.query_params.get("project_id")
@@ -1617,9 +1671,14 @@ class SelfServiceWebService:
                 "selected_ticket_id": selected_ticket_id,
                 "selected_project_id": selected_project_id,
                 "selected_task_id": selected_task_id,
-                "employee_bank_code": (employee.bank_branch_code if employee else "")
-                or "",
-                "employee_bank_name": (employee.bank_name if employee else "") or "",
+                "employee_bank_code": (
+                    selected_employee_bank.bank_sort_code
+                    if selected_employee_bank
+                    else ""
+                ),
+                "employee_bank_name": (
+                    selected_employee_bank.bank_name if selected_employee_bank else ""
+                ),
                 "employee_bank_account_number": (
                     employee.bank_account_number if employee else ""
                 )
@@ -1818,7 +1877,11 @@ class SelfServiceWebService:
         cost_centers = list(db.scalars(cost_centers_stmt).all())
 
         allowed_banks = OrgBankDirectoryService(db).list_active_banks(org_id)
-        allowed_bank_names = {bank.bank_name for bank in allowed_banks}
+        selected_claim_bank = self._match_org_bank(
+            allowed_banks,
+            bank_name=claim.recipient_bank_name,
+            bank_code=claim.recipient_bank_code,
+        )
 
         context = base_context(
             request, auth, "Edit Expense Claim", "self-expenses", db=db
@@ -1834,7 +1897,12 @@ class SelfServiceWebService:
                 "tasks": tasks,
                 "cost_centers": cost_centers,
                 "allowed_banks": allowed_banks,
-                "allowed_bank_names": allowed_bank_names,
+                "selected_claim_bank_name": (
+                    selected_claim_bank.bank_name if selected_claim_bank else ""
+                ),
+                "selected_claim_bank_code": (
+                    selected_claim_bank.bank_sort_code if selected_claim_bank else ""
+                ),
                 "expense_approver_options": self._get_expense_approver_options(
                     db, org_id
                 ),
@@ -1927,6 +1995,17 @@ class SelfServiceWebService:
         if claim.status != ExpenseClaimStatus.DRAFT:
             raise HTTPException(
                 status_code=400, detail="Only draft claims can be edited"
+            )
+
+        if recipient_bank_name or recipient_bank_code:
+            recipient_bank_name, recipient_bank_code = (
+                self._resolve_expense_bank_selection(
+                    db,
+                    org_id,
+                    bank_name=recipient_bank_name or claim.recipient_bank_name,
+                    bank_code=recipient_bank_code or claim.recipient_bank_code,
+                    required=True,
+                )
             )
 
         svc.update_claim(

@@ -82,68 +82,40 @@
                        value="{{ claim.recipient_name or '' }}"
                        {% if not can_edit %}disabled{% endif %}>
             </div>
-            {% set has_bank = claim.recipient_bank_name and claim.recipient_bank_code %}
             <div>
-                <label for="recipient_bank_name_select" class="form-label">Bank Name</label>
-                <div id="bank-name-view" class="{% if not has_bank %}hidden{% endif %} flex items-center justify-between gap-3">
-                    <span id="bank-name-display" class="text-sm text-slate-900 dark:text-white">
-                        {{ claim.recipient_bank_name or '-' }}
-                    </span>
-                    {% if can_edit %}
-                    <button type="button" id="edit-bank-toggle" class="text-xs text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors">
-                        Edit bank
-                    </button>
-                    {% endif %}
-                </div>
-                <div id="bank-name-edit" class="{% if has_bank %}hidden{% endif %}">
-                    {% if allowed_banks %}
-                    <select name="recipient_bank_name"
-                            id="recipient_bank_name_select"
-                            class="form-select w-full"
-                            {% if not can_edit %}disabled{% endif %}>
-                        <option value="">-- Select Bank --</option>
-                        {% if claim.recipient_bank_name and claim.recipient_bank_name not in allowed_bank_names %}
-                        <option value="{{ claim.recipient_bank_name }}" selected>
-                            {{ claim.recipient_bank_name }} (not in list)
-                        </option>
-                        {% endif %}
-                        {% for bank in allowed_banks %}
-                        <option value="{{ bank.bank_name }}"
-                                data-sort-code="{{ bank.bank_sort_code }}"
-                                {% if claim.recipient_bank_name == bank.bank_name %}selected{% endif %}>
-                            {{ bank.bank_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    {% else %}
-                    <input type="text"
-                           name="recipient_bank_name"
-                           id="recipient_bank_name"
-                           class="form-input w-full"
-                           placeholder="e.g. Access Bank"
-                           value="{{ claim.recipient_bank_name or '' }}"
-                           {% if not can_edit %}disabled{% endif %}>
-                    <p class="mt-1 text-xs text-slate-400">No bank list configured.</p>
-                    {% endif %}
-                </div>
+                <label for="recipient_bank_name_display" class="form-label">Bank Name <span class="text-rose-500">*</span></label>
+                <input type="hidden"
+                       name="recipient_bank_name"
+                       id="recipient_bank_name"
+                       value="{{ selected_claim_bank_name }}"
+                       {% if not can_edit %}disabled{% endif %}>
+                <input type="text"
+                       id="recipient_bank_name_display"
+                       class="form-input w-full"
+                       list="recipient_bank_name_options"
+                       autocomplete="off"
+                       required
+                       placeholder="Type to search banks"
+                       value="{{ selected_claim_bank_name }}"
+                       {% if not can_edit %}disabled{% endif %}>
+                <datalist id="recipient_bank_name_options">
+                    {% for bank in allowed_banks %}
+                    <option value="{{ bank.bank_name }}" data-sort-code="{{ bank.bank_sort_code }}"></option>
+                    {% endfor %}
+                </datalist>
+                <p class="mt-1 text-xs text-slate-400">Search and select a bank from the approved list</p>
             </div>
             <div>
                 <label for="recipient_bank_code" class="form-label">Bank Code <span class="text-rose-500">*</span></label>
-                <div id="bank-code-view" class="{% if not has_bank %}hidden{% endif %}">
-                    <span id="bank-code-display" class="text-sm text-slate-900 dark:text-white">
-                        {{ claim.recipient_bank_code or '-' }}
-                    </span>
-                </div>
-                <div id="bank-code-edit" class="{% if has_bank %}hidden{% endif %}">
-                    <input type="text"
-                           name="recipient_bank_code"
-                           id="recipient_bank_code"
-                           class="form-input w-full"
-                           required
-                           placeholder="e.g. 058"
-                           value="{{ claim.recipient_bank_code or '' }}"
-                           {% if not can_edit %}disabled{% endif %}>
-                </div>
+                <input type="text"
+                       name="recipient_bank_code"
+                       id="recipient_bank_code"
+                       class="form-input w-full"
+                       required
+                       readonly
+                       placeholder="Auto-filled from bank selection"
+                       value="{{ selected_claim_bank_code }}"
+                       {% if not can_edit %}disabled{% endif %}>
             </div>
             <div>
                 <label for="recipient_account_number" class="form-label">Account Number <span class="text-rose-500">*</span></label>
@@ -356,42 +328,47 @@
 </template>
 <script>
     document.addEventListener("DOMContentLoaded", () => {
-        const editToggle = document.getElementById("edit-bank-toggle");
-        const bankNameView = document.getElementById("bank-name-view");
-        const bankCodeView = document.getElementById("bank-code-view");
-        const bankNameEdit = document.getElementById("bank-name-edit");
-        const bankCodeEdit = document.getElementById("bank-code-edit");
-        const bankSelect = document.getElementById("recipient_bank_name_select");
+        const bankNameInput = document.getElementById("recipient_bank_name_display");
+        const hiddenBankNameInput = document.getElementById("recipient_bank_name");
         const bankCodeInput = document.getElementById("recipient_bank_code");
         const addItemButton = document.getElementById("add-expense-item");
         const itemTemplate = document.getElementById("expense-item-template");
         const tableBody = document.querySelector("tbody");
+        const form = document.querySelector('form[action$="/edit"]');
+        const bankCodesByName = new Map([
+            {% for bank in allowed_banks %}
+            [{{ bank.bank_name|tojson }}, {{ bank.bank_sort_code|tojson }}],
+            {% endfor %}
+        ].map(([name, code]) => [String(name).trim().toLowerCase(), String(code)]));
 
-        const showEdit = () => {
-            if (bankNameView) bankNameView.classList.add("hidden");
-            if (bankCodeView) bankCodeView.classList.add("hidden");
-            if (bankNameEdit) bankNameEdit.classList.remove("hidden");
-            if (bankCodeEdit) bankCodeEdit.classList.remove("hidden");
-            if (bankSelect) bankSelect.focus();
-        };
-
-        const syncSortCode = () => {
-            if (!bankSelect || !bankCodeInput) return;
-            const selected = bankSelect.options[bankSelect.selectedIndex];
-            const sortCode = selected ? selected.dataset.sortCode : "";
-            if (sortCode) {
-                bankCodeInput.value = sortCode;
+        const syncSelectedBank = () => {
+            if (!bankNameInput || !hiddenBankNameInput || !bankCodeInput) {
+                return;
             }
+
+            const rawValue = bankNameInput.value.trim();
+            const sortCode = bankCodesByName.get(rawValue.toLowerCase()) || "";
+
+            if (!rawValue || !sortCode) {
+                hiddenBankNameInput.value = "";
+                bankCodeInput.value = "";
+                bankNameInput.setCustomValidity("Select a bank from the approved bank list.");
+                return;
+            }
+
+            hiddenBankNameInput.value = rawValue;
+            bankCodeInput.value = sortCode;
+            bankNameInput.setCustomValidity("");
         };
 
-        if (editToggle) {
-            editToggle.addEventListener("click", showEdit);
+        syncSelectedBank();
+        if (bankNameInput) {
+            bankNameInput.addEventListener("input", syncSelectedBank);
+            bankNameInput.addEventListener("change", syncSelectedBank);
+            bankNameInput.addEventListener("blur", syncSelectedBank);
         }
-        if (bankSelect) {
-            bankSelect.addEventListener("change", syncSortCode);
-            if (bankCodeInput && !bankCodeInput.value) {
-                syncSortCode();
-            }
+        if (form) {
+            form.addEventListener("submit", syncSelectedBank);
         }
 
         const addExpenseItem = () => {
