@@ -149,6 +149,12 @@ class StatementLineCreate(BaseModel):
             )
 
         if not has_debit_credit or not (has_debit or has_credit):
+            # Allow balance-only rows (e.g. opening balance) when running_balance is present
+            if self.running_balance is not None:
+                # Set both to zero so downstream can detect and skip or handle
+                self.debit = self.debit or Decimal("0")
+                self.credit = self.credit or Decimal("0")
+                return self
             raise ValueError("Provide either transaction_type+amount or debit/credit")
         if has_debit and has_credit:
             raise ValueError("Only one of debit or credit can be greater than 0")

@@ -7,9 +7,8 @@ body {
   font-family: var(--font-primary);
 }
 
-/* Override display and body fonts only - NOT font-mono
-   font-mono should use JetBrains Mono for tabular numbers */
-.font-display,
+/* Body font override - NOT font-mono or font-display
+   font-mono uses JetBrains Mono, font-display uses Fraunces */
 .font-body {
   font-family: var(--font-primary) !important;
 }

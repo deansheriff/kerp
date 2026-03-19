@@ -1215,6 +1215,17 @@ textarea,
     -webkit-tap-highlight-color: transparent;
 }
 
+/* Sidebar nav links — meet WCAG 2.5.8 target size (44px minimum) */
+.app-sidebar nav a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+.app-sidebar nav button {
+    min-height: 44px;
+}
+
 /* Touch device minimum targets (48px Material Design, 44px Apple) */
 
 @media (hover: none) and (pointer: coarse) {
@@ -1228,9 +1239,10 @@ textarea,
         min-width: 44px;
     }
 
-    .nav-module {
+    .nav-module,
+    .app-sidebar nav a,
+    .app-sidebar nav button {
         min-height: 48px;
-        padding: var(--spacing-md) var(--spacing-lg);
     }
 
     .dropdown-item,

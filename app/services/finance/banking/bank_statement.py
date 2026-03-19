@@ -688,6 +688,14 @@ class BankStatementService:
                     transaction_type = StatementLineType.credit
                     amount = credit
                 else:
+                    # Balance-only row (e.g. opening balance) — skip silently
+                    running_balance = getattr(line, "running_balance", None)
+                    if running_balance is not None:
+                        logger.debug(
+                            "Skipping balance-only line %s (no debit/credit)",
+                            line_number,
+                        )
+                        continue
                     errors.append(
                         f"Line {line_number}: provide transaction_type+amount or debit/credit"
                     )
