@@ -1,56 +1,55 @@
 #!/bin/bash
-# Dotmac ERP Deployment Script
-# Usage: ./scripts/deploy.sh
+# Deploy DotMac ERP — pull, restart containers, sync static files.
+#
+# Usage:
+#   ./scripts/deploy.sh          # Full deploy
+#   ./scripts/deploy.sh --quick  # Skip pull, just restart + sync
 
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-STATIC_SRC="$PROJECT_DIR/static"
-STATIC_DEST="/var/www/dotmac/static"
 
-echo "==> Deploying Dotmac ERP..."
+echo "=== DotMac ERP Deploy ==="
+echo "Project: $PROJECT_DIR"
+echo ""
 
-# Pull latest changes (if in git repo)
-if [ -d "$PROJECT_DIR/.git" ]; then
-    echo "==> Pulling latest changes..."
+# Step 1: Pull latest code (unless --quick)
+if [[ "${1:-}" != "--quick" ]]; then
+    echo "→ Pulling latest code..."
     cd "$PROJECT_DIR"
-    git pull --ff-only || echo "Warning: git pull failed, continuing with local files"
+    git pull --rebase
+    echo ""
 fi
 
-# Build CSS if npm is available
-if command -v npm &> /dev/null && [ -f "$PROJECT_DIR/package.json" ]; then
-    echo "==> Building CSS..."
-    cd "$PROJECT_DIR"
-    npm run build:css
-fi
+# Step 2: Restart app container (stop+start for preload_app reload)
+echo "→ Restarting app container..."
+docker stop dotmac_erp_app
+docker start dotmac_erp_app
 
-# Sync static files to nginx serving directory
-echo "==> Syncing static files to $STATIC_DEST..."
-mkdir -p "$STATIC_DEST"
-rsync -av --delete "$STATIC_SRC/" "$STATIC_DEST/"
-chown -R www-data:www-data "$STATIC_DEST"
+# Step 3: Wait for health check
+echo "→ Waiting for health check..."
+for i in $(seq 1 30); do
+    if curl -sf http://localhost:8003/health > /dev/null 2>&1; then
+        echo "  App healthy after ${i}s"
+        break
+    fi
+    if [ "$i" -eq 30 ]; then
+        echo "  ERROR: App not healthy after 30s!"
+        docker logs dotmac_erp_app --tail 20
+        exit 1
+    fi
+    sleep 1
+done
 
-# Rebuild and restart containers
-echo "==> Rebuilding containers..."
-cd "$PROJECT_DIR"
-docker compose build app worker beat
+# Step 4: Sync static files to Nginx
+echo "→ Syncing static files to Nginx..."
+"$SCRIPT_DIR/sync-static.sh"
 
-echo "==> Restarting services..."
-docker compose up -d app worker beat
+# Step 5: Restart worker + beat
+echo "→ Restarting worker and beat..."
+docker restart dotmac_erp_worker dotmac_erp_beat
 
-# Wait for app to be healthy
-echo "==> Waiting for app to be healthy..."
-timeout 60 bash -c 'until curl -sf http://127.0.0.1:8002/health > /dev/null; do sleep 2; done' || {
-    echo "Warning: Health check timed out"
-}
-
-# Run migrations
-echo "==> Running database migrations..."
-docker compose exec -T app alembic upgrade head
-
-# Reload nginx (in case config changed)
-echo "==> Reloading nginx..."
-nginx -t && systemctl reload nginx
-
-echo "==> Deployment complete!"
+echo ""
+echo "=== Deploy complete ==="
+echo "Verify: https://erp.dotmac.io/health"
