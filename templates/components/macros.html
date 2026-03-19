@@ -166,24 +166,24 @@
 {#- Auto-select illustration from title keywords if not explicitly provided -#}
 {% set _title_lower = title | lower %}
 {% if not illustration %}
-  {% if 'invoice' in _title_lower or 'bill' in _title_lower or 'receipt' in _title_lower or 'journal' in _title_lower or 'document' in _title_lower %}
+  {% if 'invoice' in _title_lower or 'bill' in _title_lower or 'receipt' in _title_lower or 'journal' in _title_lower or 'document' in _title_lower or 'quote' in _title_lower or 'order' in _title_lower or 'credit note' in _title_lower %}
     {% set illustration = 'empty-invoices.png' %}
-  {% elif 'transaction' in _title_lower or 'banking' in _title_lower or 'statement' in _title_lower or 'payment' in _title_lower or 'transfer' in _title_lower %}
+  {% elif 'transaction' in _title_lower or 'banking' in _title_lower or 'statement' in _title_lower or 'payment' in _title_lower or 'transfer' in _title_lower or 'reconcil' in _title_lower %}
     {% set illustration = 'empty-transactions.png' %}
-  {% elif 'employee' in _title_lower or 'staff' in _title_lower or 'team' in _title_lower or 'people' in _title_lower or 'member' in _title_lower or 'claimant' in _title_lower %}
+  {% elif 'employee' in _title_lower or 'staff' in _title_lower or 'team' in _title_lower or 'people' in _title_lower or 'member' in _title_lower or 'claimant' in _title_lower or 'leave' in _title_lower or 'payroll' in _title_lower %}
     {% set illustration = 'empty-employees.png' %}
-  {% elif 'inventory' in _title_lower or 'item' in _title_lower or 'stock' in _title_lower or 'warehouse' in _title_lower or 'product' in _title_lower %}
+  {% elif 'inventory' in _title_lower or 'item' in _title_lower or 'stock' in _title_lower or 'warehouse' in _title_lower or 'product' in _title_lower or 'asset' in _title_lower or 'material' in _title_lower %}
     {% set illustration = 'empty-inventory.png' %}
-  {% elif 'claim' in _title_lower or 'expense' in _title_lower or 'reimburs' in _title_lower %}
+  {% elif 'claim' in _title_lower or 'expense' in _title_lower or 'reimburs' in _title_lower or 'advance' in _title_lower %}
     {% set illustration = 'empty-claims.png' %}
-  {% elif 'search' in _title_lower or 'result' in _title_lower or 'found' in _title_lower or 'match' in _title_lower %}
-    {% set illustration = 'empty-search.png' %}
-  {% elif 'report' in _title_lower or 'chart' in _title_lower or 'trend' in _title_lower or 'data' in _title_lower or 'analytic' in _title_lower or 'status' in _title_lower or 'category' in _title_lower or 'department' in _title_lower or 'monthly' in _title_lower %}
+  {% elif 'report' in _title_lower or 'chart' in _title_lower or 'trend' in _title_lower or 'data' in _title_lower or 'analytic' in _title_lower or 'status' in _title_lower or 'category' in _title_lower or 'department' in _title_lower or 'monthly' in _title_lower or 'summary' in _title_lower or 'aging' in _title_lower %}
     {% set illustration = 'empty-reports.png' %}
-  {% elif 'approval' in _title_lower or 'pending' in _title_lower or 'review' in _title_lower %}
+  {% elif 'approval' in _title_lower or 'pending' in _title_lower or 'review' in _title_lower or 'workflow' in _title_lower %}
     {% set illustration = 'empty-approvals.png' %}
   {% elif 'started' in _title_lower or 'begin' in _title_lower or 'first' in _title_lower or 'onboard' in _title_lower or 'welcome' in _title_lower %}
     {% set illustration = 'getting-started.png' %}
+  {% elif 'search' in _title_lower or 'result' in _title_lower or 'found' in _title_lower or 'match' in _title_lower %}
+    {% set illustration = 'empty-search.png' %}
   {% endif %}
 {% endif %}
 <div class="empty-state">
