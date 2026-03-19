@@ -80,6 +80,7 @@ test_statement_*.xlsx
 
 # Screenshots / audit artifacts
 *.png
+!static/img/illustrations/*.png
 
 # OS
 .DS_Store
