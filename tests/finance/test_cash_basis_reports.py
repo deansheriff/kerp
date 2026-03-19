@@ -78,10 +78,15 @@ class TestClassifySection:
 
 class TestBuildLineLabel:
     def test_customer_payment_label(self):
-        assert _build_line_label("AR", "CUSTOMER_PAYMENT", None) == "Receipts from customers"
+        assert (
+            _build_line_label("AR", "CUSTOMER_PAYMENT", None)
+            == "Receipts from customers"
+        )
 
     def test_supplier_payment_label(self):
-        assert _build_line_label("AP", "SUPPLIER_PAYMENT", None) == "Payments to suppliers"
+        assert (
+            _build_line_label("AP", "SUPPLIER_PAYMENT", None) == "Payments to suppliers"
+        )
 
     def test_asset_acquisition_label(self):
         label = _build_line_label("FA", "ASSET_ACQUISITION", None)
@@ -117,7 +122,9 @@ class TestAggregateSectionLines:
         assert "Receipts from customers" in labels
         assert "Payments to suppliers" in labels
 
-        customer_line = next(r for r in result if r["label"] == "Receipts from customers")
+        customer_line = next(
+            r for r in result if r["label"] == "Receipts from customers"
+        )
         assert customer_line["amount_raw"] == 3000.0
 
     def test_filters_zero_amounts(self):
@@ -176,7 +183,10 @@ class TestIncomeStatementBasisParam:
         # Verify _category_balances was called with basis="cash"
         mock_balances.assert_called_once()
         call_kwargs = mock_balances.call_args
-        assert call_kwargs.kwargs.get("basis") == "cash" or call_kwargs[1].get("basis") == "cash"
+        assert (
+            call_kwargs.kwargs.get("basis") == "cash"
+            or call_kwargs[1].get("basis") == "cash"
+        )
 
     @patch("app.services.finance.rpt.income_statement._category_balances")
     @patch("app.services.finance.rpt.income_statement.coerce_uuid")

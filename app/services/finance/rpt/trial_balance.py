@@ -99,8 +99,7 @@ def trial_balance_context(
             Account.account_name,
             AccountCategory.ifrs_category,
             Account.is_active,
-        )
-        .order_by(Account.account_code)
+        ).order_by(Account.account_code)
     ).all()
 
     for account_code, account_name, ifrs_category, is_active, debit, credit in rows:

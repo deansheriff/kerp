@@ -130,7 +130,9 @@ def export_income_statement_csv(
     basis: str = "accrual",
 ) -> str:
     """Export income statement as CSV."""
-    ctx = income_statement_context(db, organization_id, start_date, end_date, basis=basis)
+    ctx = income_statement_context(
+        db, organization_id, start_date, end_date, basis=basis
+    )
     headers = ["Line Item", "Amount"]
     rows = [
         [item["name"], str(item["amount_raw"])]

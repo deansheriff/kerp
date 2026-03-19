@@ -257,7 +257,9 @@ def test_paye_exports_route_permanent_staff_by_tax_state():
         deductions=[_make_deduction("PAYE", "45")],
     )
 
-    lirs = service._generate_lirs_format([lagos_slip, abuja_slip, contract_slip], 2026, 1)
+    lirs = service._generate_lirs_format(
+        [lagos_slip, abuja_slip, contract_slip], 2026, 1
+    )
     lirs_rows = list(csv.reader(io.StringIO(lirs.content.decode("utf-8"))))
     assert len(lirs_rows) == 2
     assert lirs_rows[1][0] == "Jane Doe"

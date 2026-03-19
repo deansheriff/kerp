@@ -64,9 +64,7 @@ NON_CASH_DOC_TYPES: frozenset[str] = frozenset(
 )
 
 
-def _get_cash_account_ids(
-    db: Session, org_id: Any
-) -> list[Any]:
+def _get_cash_account_ids(db: Session, org_id: Any) -> list[Any]:
     """Get all account IDs for cash/bank accounts."""
     cash_category_ids = list(
         db.scalars(
@@ -103,9 +101,9 @@ def _cash_balance_as_of(
             func.coalesce(func.sum(JournalEntryLine.debit_amount_functional), 0).label(
                 "debit"
             ),
-            func.coalesce(
-                func.sum(JournalEntryLine.credit_amount_functional), 0
-            ).label("credit"),
+            func.coalesce(func.sum(JournalEntryLine.credit_amount_functional), 0).label(
+                "credit"
+            ),
         )
         .join(
             JournalEntry,
@@ -172,9 +170,9 @@ def _cash_movements_by_section(
             func.coalesce(func.sum(JournalEntryLine.debit_amount_functional), 0).label(
                 "debit"
             ),
-            func.coalesce(
-                func.sum(JournalEntryLine.credit_amount_functional), 0
-            ).label("credit"),
+            func.coalesce(func.sum(JournalEntryLine.credit_amount_functional), 0).label(
+                "credit"
+            ),
         )
         .join(
             JournalEntry,
@@ -340,8 +338,12 @@ def ias7_cash_flow_context(
     )
 
     def balance_delta(code: str) -> Decimal:
-        opening = Decimal(str(opening_balances.get(code, {}).get("amount", Decimal("0"))))
-        closing = Decimal(str(closing_balances.get(code, {}).get("amount", Decimal("0"))))
+        opening = Decimal(
+            str(opening_balances.get(code, {}).get("amount", Decimal("0")))
+        )
+        closing = Decimal(
+            str(closing_balances.get(code, {}).get("amount", Decimal("0")))
+        )
         return closing - opening
 
     # For assets: increase = use of cash (negative), decrease = source of cash
@@ -447,9 +449,9 @@ def _query_non_cash_adjustments(
             func.coalesce(func.sum(JournalEntryLine.debit_amount_functional), 0).label(
                 "debit"
             ),
-            func.coalesce(
-                func.sum(JournalEntryLine.credit_amount_functional), 0
-            ).label("credit"),
+            func.coalesce(func.sum(JournalEntryLine.credit_amount_functional), 0).label(
+                "credit"
+            ),
         )
         .join(
             JournalEntry,
@@ -489,20 +491,44 @@ def export_ias7_cash_flow_csv(
 
     # Operating
     rows.append(["Operating Activities", "Net Income", str(ctx["net_income_raw"])])
-    rows.append(["Operating Activities", "Depreciation & Amortisation", str(ctx["depreciation_raw"])])
+    rows.append(
+        [
+            "Operating Activities",
+            "Depreciation & Amortisation",
+            str(ctx["depreciation_raw"]),
+        ]
+    )
     for line in ctx["working_capital_lines"]:
         rows.append(["Operating Activities", line["label"], str(line["amount_raw"])])
-    rows.append(["Operating Activities", "Net Cash from Operating", str(ctx["net_operating_raw"])])
+    rows.append(
+        [
+            "Operating Activities",
+            "Net Cash from Operating",
+            str(ctx["net_operating_raw"]),
+        ]
+    )
 
     # Investing
     for line in ctx["investing_lines"]:
         rows.append(["Investing Activities", line["label"], str(line["amount_raw"])])
-    rows.append(["Investing Activities", "Net Cash from Investing", str(ctx["net_investing_raw"])])
+    rows.append(
+        [
+            "Investing Activities",
+            "Net Cash from Investing",
+            str(ctx["net_investing_raw"]),
+        ]
+    )
 
     # Financing
     for line in ctx["financing_lines"]:
         rows.append(["Financing Activities", line["label"], str(line["amount_raw"])])
-    rows.append(["Financing Activities", "Net Cash from Financing", str(ctx["net_financing_raw"])])
+    rows.append(
+        [
+            "Financing Activities",
+            "Net Cash from Financing",
+            str(ctx["net_financing_raw"]),
+        ]
+    )
 
     # Summary
     rows.append(["", "Net Change in Cash", str(ctx["net_change_raw"])])
