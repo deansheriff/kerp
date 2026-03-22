@@ -82,10 +82,8 @@ class TestStatementDuplicateIsolation:
             f"organization_id not found in WHERE clause: {compiled}"
         )
 
-    def test_check_duplicate_without_org_still_works(
-        self, bank_account_id: uuid.UUID
-    ) -> None:
-        """_check_duplicate_line works with org_id=None (backward compat)."""
+    def test_check_duplicate_requires_org_id(self, bank_account_id: uuid.UUID) -> None:
+        """_check_duplicate_line requires organization_id (no cross-tenant)."""
         db = MagicMock()
         mock_result = MagicMock()
         mock_result.scalars.return_value.first.return_value = None
@@ -99,9 +97,16 @@ class TestStatementDuplicateIsolation:
             amount=Decimal("500.00"),
         )
 
-        # Should not raise even without org_id
-        result = service._check_duplicate_line(db, bank_account_id, line)
+        # Must pass org_id — no longer optional
+        org_id = uuid.uuid4()
+        result = service._check_duplicate_line(db, bank_account_id, line, org_id)
         assert result is None
+        # Verify the SQL includes organization_id filter
+        call_args = db.execute.call_args
+        stmt = call_args[0][0]
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+        where_part = compiled.split("WHERE")[1] if "WHERE" in compiled else ""
+        assert "organization_id" in where_part
 
 
 # ============ Reconciliation Prior Reconciliation Isolation ============
