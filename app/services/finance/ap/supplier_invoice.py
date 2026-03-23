@@ -92,6 +92,7 @@ class SupplierInvoiceInput:
     due_date: date
     currency_code: str
     lines: list[InvoiceLineInput] = field(default_factory=list)
+    purpose: str | None = None
     supplier_invoice_number: str | None = None
     exchange_rate: Decimal | None = None
     exchange_rate_type_id: UUID | None = None
@@ -187,6 +188,7 @@ class SupplierInvoiceService(ListResponseMixin):
             currency_code=resolve_currency_code(
                 db, org_id, payload.get("currency_code")
             ),
+            purpose=(payload.get("purpose") or "").strip() or None,
             exchange_rate=exchange_rate,
             supplier_invoice_number=payload.get("invoice_number") or None,
             lines=lines,
@@ -395,6 +397,7 @@ class SupplierInvoiceService(ListResponseMixin):
             received_date=input.received_date,
             due_date=input.due_date,
             currency_code=input.currency_code,
+            purpose=input.purpose,
             exchange_rate=exchange_rate,
             exchange_rate_type_id=input.exchange_rate_type_id,
             subtotal=subtotal,
@@ -607,6 +610,7 @@ class SupplierInvoiceService(ListResponseMixin):
         invoice.received_date = input.received_date
         invoice.due_date = input.due_date
         invoice.currency_code = input.currency_code
+        invoice.purpose = input.purpose
         invoice.exchange_rate = exchange_rate
         invoice.exchange_rate_type_id = input.exchange_rate_type_id
         invoice.subtotal = subtotal

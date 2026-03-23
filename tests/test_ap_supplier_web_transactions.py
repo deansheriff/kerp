@@ -21,14 +21,18 @@ async def test_create_supplier_response_commits_on_success(monkeypatch):
         "build_supplier_input",
         staticmethod(lambda _db, _form_data, _org_id: object()),
     )
+    created_supplier = SimpleNamespace(supplier_id=uuid4())
     monkeypatch.setattr(
         "app.services.finance.ap.web.supplier_web.supplier_service.create_supplier",
-        lambda **_kwargs: object(),
+        lambda **_kwargs: created_supplier,
     )
 
     response = await SupplierWebService().create_supplier_response(request, auth, db)
 
     assert response.status_code == 303
+    assert response.headers["location"].startswith(
+        f"/finance/ap/suppliers/{created_supplier.supplier_id}"
+    )
     db.commit.assert_called_once()
     db.rollback.assert_not_called()
 

@@ -717,7 +717,7 @@ class SupplierWebService:
                 raise HTTPException(status_code=401, detail="Authentication required")
             input_data = self.build_supplier_input(db, dict(form_data), org_id)
 
-            supplier_service.create_supplier(
+            supplier = supplier_service.create_supplier(
                 db=db,
                 organization_id=org_id,
                 input=input_data,
@@ -725,7 +725,7 @@ class SupplierWebService:
             db.commit()
 
             return RedirectResponse(
-                url="/finance/ap/suppliers?success=Supplier+created+successfully",
+                url=f"/finance/ap/suppliers/{supplier.supplier_id}?success=Supplier+created+successfully",
                 status_code=303,
             )
 

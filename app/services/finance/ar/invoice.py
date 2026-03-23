@@ -84,6 +84,7 @@ class ARInvoiceInput:
     due_date: date
     currency_code: str
     lines: list[ARInvoiceLineInput] = field(default_factory=list)
+    purpose: str | None = None
     contract_id: UUID | None = None
     exchange_rate: Decimal | None = None
     exchange_rate_type_id: UUID | None = None
@@ -346,6 +347,7 @@ class ARInvoiceService(ListResponseMixin):
             invoice_date=input.invoice_date,
             due_date=input.due_date,
             currency_code=input.currency_code,
+            purpose=input.purpose,
             exchange_rate=exchange_rate,
             exchange_rate_type_id=input.exchange_rate_type_id,
             subtotal=subtotal,
@@ -599,6 +601,7 @@ class ARInvoiceService(ListResponseMixin):
         invoice.invoice_date = input.invoice_date
         invoice.due_date = input.due_date
         invoice.currency_code = input.currency_code
+        invoice.purpose = input.purpose
         invoice.exchange_rate = exchange_rate
         invoice.exchange_rate_type_id = input.exchange_rate_type_id
         invoice.subtotal = subtotal
@@ -758,6 +761,7 @@ class ARInvoiceService(ListResponseMixin):
             invoice_date=invoice_date,
             due_date=due_date,
             currency_code=currency_code,
+            purpose=(payload.get("purpose") or "").strip() or None,
             exchange_rate=exchange_rate,
             notes=payload.get("terms"),
             internal_notes=payload.get("notes"),

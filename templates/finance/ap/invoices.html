@@ -80,11 +80,14 @@
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <a href="/finance/ap/invoices/{{ invoice.invoice_id }}" class="font-mono text-sm font-semibold text-teal-600 dark:text-teal-400" data-copy-text="{{ invoice.invoice_number }}" title="Click to copy invoice number">{{ invoice.invoice_number }}</a>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ invoice.invoice_date }} · Due {{ invoice.due_date }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Created {{ invoice.created_at }} · Invoice {{ invoice.invoice_date }}</p>
                         </div>
                         {{ status_badge(invoice.status | default('draft'), 'sm') }}
                     </div>
                     <p class="text-sm text-slate-700 dark:text-slate-200 mt-2 truncate">{{ invoice.supplier_name }}</p>
+                    {% if invoice.purpose %}
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{{ invoice.purpose }}</p>
+                    {% endif %}
                     <div class="mt-3 grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
                         <div><p class="text-slate-500 dark:text-slate-400">Amount</p><p class="text-slate-900 dark:text-white">{{ invoice.total_amount | default(zero_amount) }}</p></div>
                         <div><p class="text-slate-500 dark:text-slate-400">Balance</p><p class="text-slate-900 dark:text-white">{{ invoice.balance | default(zero_amount) }}</p></div>
@@ -102,11 +105,12 @@
                     <thead>
                         <tr>
                             {{ bulk_select_header() }}
+                            {{ sortable_th("Creation Date", "created_at", sort, sort_dir) }}
                             {{ sortable_th("Invoice Date", "invoice_date", sort, sort_dir) }}
                             {{ sortable_th("Invoice #", "invoice_number", sort, sort_dir) }}
                             {{ sortable_th("Supplier", "supplier_name", sort, sort_dir) }}
-                            {{ sortable_th("Due Date", "due_date", sort, sort_dir, class="hidden sm:table-cell") }}
                             {{ sortable_th("Amount", "total_amount", sort, sort_dir, class="text-right") }}
+                            <th scope="col">Purpose</th>
                             <th scope="col" class="text-right hidden md:table-cell">Tax</th>
                             <th scope="col" class="text-right">Balance</th>
                             {{ sortable_th("Status", "status", sort, sort_dir, class="text-center") }}
@@ -117,6 +121,7 @@
                         {% for invoice in invoices %}
                         <tr class="group">
                             {{ bulk_select_cell(invoice.invoice_id) }}
+                            <td class="text-slate-600 dark:text-slate-400">{{ invoice.created_at }}</td>
                             <td class="text-slate-600 dark:text-slate-400">{{ invoice.invoice_date }}</td>
                             <td>
                                 <a href="/finance/ap/invoices/{{ invoice.invoice_id }}" class="font-mono text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors" data-copy-text="{{ invoice.invoice_number }}" title="Click to copy invoice number">
@@ -126,15 +131,10 @@
                         <td>
                             <p class="text-sm font-medium text-slate-900 dark:text-white">{{ invoice.supplier_name }}</p>
                         </td>
-                        <td class="hidden sm:table-cell">
-                            {% if invoice.is_overdue %}
-                            <span class="text-rose-600 dark:text-rose-400 font-medium">{{ invoice.due_date }}</span>
-                            {{ status_badge('OVERDUE', 'sm') }}
-                            {% else %}
-                            <span class="text-slate-600 dark:text-slate-400">{{ invoice.due_date }}</span>
-                            {% endif %}
-                        </td>
                         <td class="text-right font-mono tabular-nums text-sm text-slate-500 dark:text-slate-400">{{ invoice.total_amount | default(zero_amount) }}</td>
+                        <td class="max-w-xs">
+                            <p class="truncate text-sm text-slate-600 dark:text-slate-400">{{ invoice.purpose if invoice.purpose else '—' }}</p>
+                        </td>
                         <td class="text-right font-mono tabular-nums text-sm text-slate-500 dark:text-slate-400 hidden md:table-cell">{{ invoice.tax_amount if invoice.tax_amount else '—' }}</td>
                         <td class="text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-white">{{ invoice.balance | default(zero_amount) }}</td>
                         <td class="text-center">
@@ -157,7 +157,7 @@
                     </tr>
                         {% else %}
                         <tr>
-                            <td colspan="10" class="py-12">
+                            <td colspan="11" class="py-12">
                                 {{ empty_state(
                                     'No invoices found',
                                     'Create your first supplier invoice to get started' if not (search or status or supplier_id or start_date or end_date) else 'Try adjusting your search or filter criteria',

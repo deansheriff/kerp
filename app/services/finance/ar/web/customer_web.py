@@ -649,14 +649,14 @@ class CustomerWebService:
                 raise HTTPException(status_code=401, detail="Authentication required")
             input_data = self.build_customer_input(db, dict(form_data), org_id)
 
-            customer_service.create_customer(
+            customer = customer_service.create_customer(
                 db=db,
                 organization_id=org_id,
                 input=input_data,
             )
 
             return RedirectResponse(
-                url="/finance/ar/customers?success=Customer+created+successfully",
+                url=f"/finance/ar/customers/{customer.customer_id}?success=Customer+created+successfully",
                 status_code=303,
             )
 

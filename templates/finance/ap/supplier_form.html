@@ -294,7 +294,7 @@
             window.dispatchEvent(new CustomEvent('show-toast', {
                 detail: { message: 'Supplier saved successfully', type: 'success' }
             }));
-            setTimeout(() => window.location.href = '/finance/ap/suppliers', 1000);
+            setTimeout(() => window.location.href = evt.detail.xhr.responseURL || '/finance/ap/suppliers', 1000);
         } else {
             const response = JSON.parse(evt.detail.xhr.responseText);
             window.dispatchEvent(new CustomEvent('show-toast', {

@@ -662,6 +662,18 @@
                            class="form-input">
                 </div>
 
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label for="purpose" class="form-label">Purpose</label>
+                    <textarea id="purpose"
+                              name="purpose"
+                              x-model="form.purpose"
+                              rows="3"
+                              maxlength="1000"
+                              placeholder="What is this invoice for overall?"
+                              class="form-input resize-none"></textarea>
+                    <p class="form-help">Describe the overall purpose of the invoice, separate from line item details.</p>
+                </div>
+
                 <!-- Attachments -->
                 <div class="sm:col-span-2 lg:col-span-3">
                     <label for="attachments" class="form-label">Attachments</label>
@@ -940,6 +952,7 @@ function invoiceForm() {
             invoice_date: '{{ invoice.invoice_date if invoice else "" }}',
             received_date: '{{ invoice.received_date if invoice else "" }}',
             due_date: '{{ invoice.due_date if invoice else "" }}',
+            purpose: '{{ invoice.purpose if invoice else "" }}',
             currency_code: '{{ invoice.currency_code if invoice else "" }}' || (selectedSupplier?.currency_code || selectedPO?.currency_code || '{{ default_currency_code }}'),
             exchange_rate: '{{ invoice.exchange_rate if invoice and invoice.exchange_rate else "1" }}',
             po_id: selectedPO?.po_id || '',
@@ -978,6 +991,7 @@ function invoiceForm() {
             // Pre-populate from duplicated invoice
             this.form.currency_code = '{{ duplicate_source.currency_code }}';
             this.form.exchange_rate = '{{ duplicate_source.exchange_rate }}';
+            this.form.purpose = '{{ duplicate_source.purpose if duplicate_source.purpose else "" }}';
             this.form.lines = [
                 {% for line in duplicate_source.lines %}
                 {
@@ -1231,11 +1245,12 @@ function invoiceForm() {
                     if (invoiceId) {
                         await this.uploadAttachments(invoiceId);
                     }
+                    const redirectUrl = data.redirect_url || (invoiceId ? `/finance/ap/invoices/${invoiceId}` : '/finance/ap/invoices');
                     window.dispatchEvent(new CustomEvent('show-toast', {
                         detail: { message: 'Invoice saved successfully', type: 'success' }
                     }));
                     setTimeout(() => {
-                        window.location.href = '/finance/ap/invoices';
+                        window.location.href = redirectUrl;
                     }, 1000);
                 } else {
                     const data = await response.json();

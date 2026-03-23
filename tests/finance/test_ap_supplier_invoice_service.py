@@ -212,6 +212,34 @@ def test_update_invoice_requires_draft():
         )
 
 
+def test_build_input_from_payload_includes_purpose():
+    db = MagicMock()
+    org_id = uuid4()
+
+    result = SupplierInvoiceService.build_input_from_payload(
+        db,
+        org_id,
+        {
+            "supplier_id": str(uuid4()),
+            "invoice_date": "2026-03-20",
+            "received_date": "2026-03-21",
+            "due_date": "2026-03-25",
+            "currency_code": "NGN",
+            "purpose": "Office internet subscription for March",
+            "lines": [
+                {
+                    "description": "Internet service",
+                    "quantity": "1",
+                    "unit_price": "500",
+                    "expense_account_id": str(uuid4()),
+                }
+            ],
+        },
+    )
+
+    assert result.purpose == "Office internet subscription for March"
+
+
 def test_submit_approve_post_void_hold_release_record_payment():
     db = MagicMock()
     org_id = uuid4()

@@ -172,6 +172,7 @@ class Invoice(Base, VersionedMixin, TrackedMixin):
     shipping_address: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )
+    purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     internal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

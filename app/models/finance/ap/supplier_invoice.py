@@ -260,6 +260,7 @@ class SupplierInvoice(Base, VersionedMixin):
         nullable=True,
     )
     correlation_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
     comments: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

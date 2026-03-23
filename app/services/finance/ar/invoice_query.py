@@ -52,6 +52,7 @@ def build_invoice_query(
         query = query.where(
             or_(
                 Invoice.invoice_number.ilike(search_pattern),
+                Invoice.purpose.ilike(search_pattern),
                 Customer.legal_name.ilike(search_pattern),
                 Customer.trading_name.ilike(search_pattern),
             )

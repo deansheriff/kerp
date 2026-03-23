@@ -113,6 +113,37 @@ def test_create_invoice_requires_lines():
     assert excinfo.value.status_code == 400
 
 
+def test_build_input_from_payload_includes_purpose():
+    db = MagicMock()
+    org_id = uuid4()
+
+    result = ARInvoiceService.build_input_from_payload(
+        db,
+        org_id,
+        {
+            "customer_id": str(uuid4()),
+            "invoice_date": "2026-03-20",
+            "due_date": "2026-03-25",
+            "currency_code": "NGN",
+            "purpose": "Monthly managed service billing",
+            "terms": "Net 5",
+            "notes": "Internal follow-up",
+            "lines": [
+                {
+                    "description": "Managed service",
+                    "quantity": "1",
+                    "unit_price": "1000",
+                    "revenue_account_id": str(uuid4()),
+                }
+            ],
+        },
+    )
+
+    assert result.purpose == "Monthly managed service billing"
+    assert result.notes == "Net 5"
+    assert result.internal_notes == "Internal follow-up"
+
+
 def test_create_credit_note_applies_negative_amounts():
     db = MagicMock()
     svc = ARInvoiceService()

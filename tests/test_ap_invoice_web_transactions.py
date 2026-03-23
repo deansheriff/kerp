@@ -31,6 +31,7 @@ async def test_create_invoice_response_commits_on_success(monkeypatch):
     response = await InvoiceWebService().create_invoice_response(request, auth, db)
 
     assert response["success"] is True
+    assert response["redirect_url"].startswith("/finance/ap/invoices/")
     db.commit.assert_called_once()
     db.rollback.assert_not_called()
 
@@ -89,5 +90,6 @@ async def test_update_invoice_response_commits_on_success(monkeypatch):
     payload = json.loads(response.body)
     assert payload["success"] is True
     assert payload["invoice_id"]
+    assert payload["redirect_url"].startswith("/finance/ap/invoices/")
     db.commit.assert_called_once()
     db.rollback.assert_not_called()

@@ -54,7 +54,7 @@ def test_ar_ap_transaction_tables_put_date_first():
     ordered_headers = [
         (
             "templates/finance/ar/invoices.html",
-            ("Invoice Date", 'sortable_th("Invoice Date"'),
+            ("Creation Date", 'sortable_th("Creation Date"'),
             ("Invoice #", 'sortable_th("Invoice #"'),
         ),
         (
@@ -83,7 +83,7 @@ def test_ar_ap_transaction_tables_put_date_first():
         ),
         (
             "templates/finance/ap/invoices.html",
-            ("Invoice Date", 'sortable_th("Invoice Date"'),
+            ("Creation Date", 'sortable_th("Creation Date"'),
             ("Invoice #", 'sortable_th("Invoice #"'),
         ),
         (
@@ -142,9 +142,9 @@ def test_other_finance_transaction_tables_put_date_first():
 
 def test_key_transaction_date_columns_are_visible_on_small_screens():
     for path, date_header in [
-        ("templates/finance/ar/invoices.html", "Invoice Date"),
+        ("templates/finance/ar/invoices.html", "Creation Date"),
         ("templates/finance/ar/receipts.html", "Receipt Date"),
-        ("templates/finance/ap/invoices.html", "Invoice Date"),
+        ("templates/finance/ap/invoices.html", "Creation Date"),
         ("templates/finance/ap/payments.html", "Payment Date"),
     ]:
         html = _read(path)

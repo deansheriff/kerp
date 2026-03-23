@@ -509,12 +509,13 @@ function receiptForm() {
                 });
 
                 if (response.ok) {
+                    const data = await response.json().catch(() => ({}));
                     const successMessage = this.isEditMode ? 'Receipt updated successfully' : 'Receipt created successfully';
                     window.dispatchEvent(new CustomEvent('show-toast', {
                         detail: { message: successMessage, type: 'success' }
                     }));
                     setTimeout(() => {
-                        window.location.href = this.isEditMode ? `/finance/ar/receipts/${this.receiptId}` : '/finance/ar/receipts';
+                        window.location.href = data.redirect_url || (this.isEditMode ? `/finance/ar/receipts/${this.receiptId}` : (data.receipt_id ? `/finance/ar/receipts/${data.receipt_id}` : '/finance/ar/receipts'));
                     }, 1000);
                 } else {
                     const data = await response.json();

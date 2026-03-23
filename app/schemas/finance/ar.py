@@ -130,6 +130,7 @@ class ARInvoiceCreate(BaseModel):
     invoice_date: date
     due_date: date
     currency_code: str = Field(max_length=3)
+    purpose: str | None = Field(default=None, max_length=1000)
     description: str | None = None
     lines: list[ARInvoiceLineCreate]
 
@@ -163,6 +164,7 @@ class ARInvoiceRead(BaseModel):
     invoice_date: date
     due_date: date
     currency_code: str
+    purpose: str | None = None
     subtotal: Decimal
     tax_amount: Decimal
     total_amount: Decimal

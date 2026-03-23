@@ -115,14 +115,14 @@ class InvoiceWebService:
             sort_dir_norm = "desc"
 
         order_map = {
+            "created_at": Invoice.created_at,
             "invoice_date": Invoice.invoice_date,
             "invoice_number": Invoice.invoice_number,
             "customer_name": Customer.legal_name,
-            "due_date": Invoice.due_date,
             "total_amount": Invoice.total_amount,
             "status": Invoice.status,
         }
-        order_col = order_map.get(sort or "", Invoice.invoice_date)
+        order_col = order_map.get(sort or "", Invoice.created_at)
         order_expr = order_col.asc() if sort_dir_norm == "asc" else order_col.desc()
 
         invoices = db.execute(
@@ -184,11 +184,12 @@ class InvoiceWebService:
                     "invoice_id": invoice.invoice_id,
                     "invoice_number": invoice.invoice_number,
                     "customer_name": customer_display_name(customer),
+                    "created_at": format_date(invoice.created_at),
                     "invoice_date": format_date(invoice.invoice_date),
-                    "due_date": format_date(invoice.due_date),
                     "total_amount": format_currency(
                         invoice.total_amount, invoice.currency_code
                     ),
+                    "purpose": invoice.purpose or "",
                     "tax_amount": format_currency(
                         invoice.tax_amount, invoice.currency_code
                     ),
@@ -660,6 +661,7 @@ class InvoiceWebService:
             "customer_id": str(invoice.customer_id),
             "currency_code": invoice.currency_code or "",
             "po_number": getattr(invoice, "po_number", "") or "",
+            "purpose": invoice.purpose or "",
             "notes": invoice.notes or "",
             "terms": getattr(invoice, "payment_terms", "") or "",
             "exchange_rate": str(invoice.exchange_rate)
@@ -723,10 +725,14 @@ class InvoiceWebService:
             )
 
             if "application/json" in content_type:
-                return {"success": True, "invoice_id": str(invoice.invoice_id)}
+                return {
+                    "success": True,
+                    "invoice_id": str(invoice.invoice_id),
+                    "redirect_url": f"/finance/ar/invoices/{invoice.invoice_id}",
+                }
 
             return RedirectResponse(
-                url="/finance/ar/invoices?success=Invoice+created+successfully",
+                url=f"/finance/ar/invoices/{invoice.invoice_id}?success=Invoice+created+successfully",
                 status_code=303,
             )
 
@@ -976,10 +982,10 @@ class InvoiceWebService:
             "due_date": invoice.due_date,
             "currency_code": invoice.currency_code,
             "po_number": "",
-            "description": invoice.notes or "",
-            "notes": invoice.notes or "",
+            "purpose": invoice.purpose or "",
+            "notes": invoice.internal_notes or "",
             "internal_notes": invoice.internal_notes or "",
-            "terms": "",
+            "terms": invoice.notes or "",
             "cost_center_id": None,
             "project_id": None,
             "lines": [
@@ -1044,6 +1050,7 @@ class InvoiceWebService:
                     content={
                         "success": True,
                         "invoice_id": str(invoice.invoice_id),
+                        "redirect_url": f"/finance/ar/invoices/{invoice.invoice_id}",
                     }
                 )
 

@@ -120,11 +120,11 @@ class InvoiceWebService:
         )
 
         invoice_sort_map = {
+            "created_at": SupplierInvoice.created_at,
             "invoice_date": SupplierInvoice.invoice_date,
             "invoice_number": SupplierInvoice.invoice_number,
             "supplier_name": Supplier.legal_name,
             "total_amount": SupplierInvoice.total_amount,
-            "due_date": SupplierInvoice.due_date,
             "status": SupplierInvoice.status,
         }
         sorted_stmt = apply_sort(
@@ -132,7 +132,7 @@ class InvoiceWebService:
             sort,
             sort_dir,
             invoice_sort_map,
-            default=SupplierInvoice.invoice_date.desc(),
+            default=SupplierInvoice.created_at.desc(),
         )
 
         # Add Supplier to the result columns so we get (SupplierInvoice, Supplier) tuples
@@ -190,11 +190,12 @@ class InvoiceWebService:
                     "invoice_id": invoice.invoice_id,
                     "invoice_number": invoice.invoice_number,
                     "supplier_name": supplier_display_name(supplier),
+                    "created_at": format_date(invoice.created_at),
                     "invoice_date": format_date(invoice.invoice_date),
-                    "due_date": format_date(invoice.due_date),
                     "total_amount": format_currency(
                         invoice.total_amount, invoice.currency_code
                     ),
+                    "purpose": invoice.purpose or "",
                     "tax_amount": format_currency(
                         invoice.tax_amount, invoice.currency_code
                     ),
@@ -766,6 +767,7 @@ class InvoiceWebService:
             "supplier_id": str(invoice.supplier_id),
             "currency_code": invoice.currency_code or "",
             "supplier_invoice_number": invoice.supplier_invoice_number or "",
+            "purpose": invoice.purpose or "",
             "comments": invoice.comments or "",
             "exchange_rate": str(invoice.exchange_rate)
             if invoice.exchange_rate
@@ -833,6 +835,7 @@ class InvoiceWebService:
             "received_date": invoice.received_date,
             "due_date": invoice.due_date,
             "currency_code": invoice.currency_code,
+            "purpose": invoice.purpose or "",
             "exchange_rate": str(invoice.exchange_rate)
             if invoice.exchange_rate
             else "",
@@ -890,10 +893,14 @@ class InvoiceWebService:
             db.commit()
 
             if "application/json" in content_type:
-                return {"success": True, "invoice_id": str(invoice.invoice_id)}
+                return {
+                    "success": True,
+                    "invoice_id": str(invoice.invoice_id),
+                    "redirect_url": f"/finance/ap/invoices/{invoice.invoice_id}",
+                }
 
             return RedirectResponse(
-                url="/finance/ap/invoices?success=Invoice+created+successfully",
+                url=f"/finance/ap/invoices/{invoice.invoice_id}?success=Invoice+created+successfully",
                 status_code=303,
             )
 
@@ -946,7 +953,11 @@ class InvoiceWebService:
 
             if "application/json" in content_type:
                 return JSONResponse(
-                    content={"success": True, "invoice_id": str(invoice.invoice_id)}
+                    content={
+                        "success": True,
+                        "invoice_id": str(invoice.invoice_id),
+                        "redirect_url": f"/finance/ap/invoices/{invoice.invoice_id}",
+                    }
                 )
 
             return RedirectResponse(

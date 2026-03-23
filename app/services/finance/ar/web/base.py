@@ -306,6 +306,7 @@ def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
         "payment_terms": None,  # Set by invoice_detail_context if available
         "billing_address": getattr(invoice, "billing_address", None),
         "customer_tin": customer.tax_identification_number if customer else None,
+        "purpose": getattr(invoice, "purpose", None),
         "subtotal": format_currency(invoice.subtotal, invoice.currency_code),
         "discount_amount": format_currency(discount_amount, invoice.currency_code)
         if discount_amount is not None

@@ -518,10 +518,14 @@ class CreditNoteWebService:
             )
 
             if "application/json" in content_type:
-                return {"success": True, "credit_note_id": str(credit_note.invoice_id)}
+                return {
+                    "success": True,
+                    "credit_note_id": str(credit_note.invoice_id),
+                    "redirect_url": f"/finance/ar/credit-notes/{credit_note.invoice_id}",
+                }
 
             return RedirectResponse(
-                url="/finance/ar/credit-notes?success=Credit+note+created+successfully",
+                url=f"/finance/ar/credit-notes/{credit_note.invoice_id}?success=Credit+note+created+successfully",
                 status_code=303,
             )
 
@@ -654,6 +658,7 @@ class CreditNoteWebService:
                     content={
                         "success": True,
                         "credit_note_id": str(credit_note.invoice_id),
+                        "redirect_url": f"/finance/ar/credit-notes/{credit_note.invoice_id}",
                     }
                 )
 

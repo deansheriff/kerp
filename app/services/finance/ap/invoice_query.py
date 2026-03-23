@@ -54,6 +54,7 @@ def build_invoice_query(
             or_(
                 SupplierInvoice.invoice_number.ilike(search_pattern),
                 SupplierInvoice.supplier_invoice_number.ilike(search_pattern),
+                SupplierInvoice.purpose.ilike(search_pattern),
                 Supplier.legal_name.ilike(search_pattern),
                 Supplier.trading_name.ilike(search_pattern),
             )

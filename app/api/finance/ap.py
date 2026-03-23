@@ -204,6 +204,7 @@ def create_ap_invoice(
         received_date=payload.received_date or payload.invoice_date,
         due_date=payload.due_date,
         currency_code=payload.currency_code,
+        purpose=payload.purpose,
         lines=lines,
     )
 

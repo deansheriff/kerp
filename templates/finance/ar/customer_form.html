@@ -724,7 +724,7 @@
                 detail: { message: 'Customer saved successfully', type: 'success' }
             }));
             setTimeout(() => {
-                window.location.href = '/finance/ar/customers';
+                window.location.href = evt.detail.xhr.responseURL || '/finance/ar/customers';
             }, 1000);
         } else {
             const response = JSON.parse(evt.detail.xhr.responseText);

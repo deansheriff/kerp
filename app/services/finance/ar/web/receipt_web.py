@@ -750,10 +750,14 @@ class ReceiptWebService:
             )
 
             if "application/json" in content_type:
-                return {"success": True, "receipt_id": str(receipt.payment_id)}
+                return {
+                    "success": True,
+                    "receipt_id": str(receipt.payment_id),
+                    "redirect_url": f"/finance/ar/receipts/{receipt.payment_id}",
+                }
 
             return RedirectResponse(
-                url="/finance/ar/receipts?success=Receipt+created+successfully",
+                url=f"/finance/ar/receipts/{receipt.payment_id}?success=Receipt+created+successfully",
                 status_code=303,
             )
 

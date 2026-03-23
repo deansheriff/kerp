@@ -125,6 +125,7 @@ class APInvoiceCreate(BaseModel):
     received_date: date | None = None
     due_date: date
     currency_code: str = Field(max_length=3)
+    purpose: str | None = Field(default=None, max_length=1000)
     description: str | None = None
     lines: list[APInvoiceLineCreate] = Field(min_length=1)
 
@@ -160,6 +161,7 @@ class APInvoiceRead(BaseModel):
     received_date: date
     due_date: date
     currency_code: str
+    purpose: str | None = None
     subtotal: Decimal
     tax_amount: Decimal
     total_amount: Decimal

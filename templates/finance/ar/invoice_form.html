@@ -246,18 +246,18 @@
                            class="form-input">
                 </div>
 
-                <!-- Description -->
+                <!-- Purpose -->
                 <div class="sm:col-span-2 lg:col-span-3">
-                    <label for="description" class="form-label">
-                        Description
+                    <label for="purpose" class="form-label">
+                        Purpose
                     </label>
-                    <input type="text"
-                           id="description"
-                           name="description"
-                           x-model="form.description"
-                           maxlength="500"
-                           placeholder="Invoice description or reference"
-                           class="form-input">
+                    <textarea id="purpose"
+                              name="purpose"
+                              x-model="form.purpose"
+                              rows="3"
+                              maxlength="1000"
+                              placeholder="What is this invoice for overall?"
+                              class="form-input resize-none"></textarea>
                 </div>
             </div>
         </div>
@@ -594,7 +594,7 @@ function invoiceForm() {
             due_date: '{{ invoice.due_date if invoice else "" }}',
             currency_code: '{{ invoice.currency_code if invoice else default_currency_code }}',
             po_number: '{{ invoice.po_number if invoice else "" }}',
-            description: '{{ invoice.description if invoice else "" }}',
+            purpose: '{{ invoice.purpose if invoice else "" }}',
             cost_center_id: '{{ invoice.cost_center_id if invoice else "" }}',
             project_id: '{{ invoice.project_id if invoice else "" }}',
             terms: '{{ invoice.terms if invoice else "" }}',
@@ -666,6 +666,7 @@ function invoiceForm() {
             // Pre-fill from duplicated invoice (dates left empty for today's auto-fill)
             this.form.po_number = '{{ duplicate_source.po_number }}';
             this.form.currency_code = '{{ duplicate_source.currency_code }}';
+            this.form.purpose = '{{ duplicate_source.purpose if duplicate_source.purpose else "" }}';
             this.form.terms = '{{ duplicate_source.terms }}';
             this.form.notes = '{{ duplicate_source.notes }}';
             this.form.exchange_rate = '{{ duplicate_source.exchange_rate }}';
@@ -991,11 +992,13 @@ function invoiceForm() {
                 });
 
                 if (response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    const redirectUrl = data.redirect_url || (_invoiceId ? `/finance/ar/invoices/${_invoiceId}` : (data.invoice_id ? `/finance/ar/invoices/${data.invoice_id}` : '/finance/ar/invoices'));
                     window.dispatchEvent(new CustomEvent('show-toast', {
                         detail: { message: successMsg, type: 'success' }
                     }));
                     setTimeout(() => {
-                        window.location.href = '/finance/ar/invoices';
+                        window.location.href = redirectUrl;
                     }, 1000);
                 } else {
                     const data = await response.json();
