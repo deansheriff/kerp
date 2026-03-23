@@ -2255,7 +2255,7 @@ class SelfServiceWebService:
             status = status.upper()
             if status not in {"APPROVED", "REJECTED"}:
                 raise HTTPException(status_code=400, detail="Invalid status")
-            action_filter = "APPROVE" if status == "APPROVED" else "REJECT"
+            action_filter = status
             decisions = [
                 d
                 for d in decisions
