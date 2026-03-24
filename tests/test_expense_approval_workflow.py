@@ -417,3 +417,300 @@ def test_submitted_to_me_view_uses_pending_approval_steps(
 
     assert response.status_code == 200
     assert "CLM-301" in response.body.decode()
+
+
+def test_submitted_to_me_view_retains_latest_round_claims_after_decision(
+    db_session, engine, monkeypatch
+):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant7@example.com")
+    approver_person = _make_person(org_id, "approver7@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-701")
+    approver = _make_employee(org_id, approver_person, "EMP-702")
+    approved_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-701",
+        status=ExpenseClaimStatus.APPROVED,
+    )
+    rejected_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-702",
+        status=ExpenseClaimStatus.REJECTED,
+    )
+
+    db_session.add_all(
+        [
+            claimant_person,
+            approver_person,
+            claimant,
+            approver,
+            approved_claim,
+            rejected_claim,
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=approved_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=approver.employee_id,
+                approver_name=approver.full_name,
+                decision="APPROVED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=rejected_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=approver.employee_id,
+                approver_name=approver.full_name,
+                decision="REJECTED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=approver.person_id,
+        employee_id=approver.employee_id,
+        organization_id=org_id,
+        roles=["admin"],
+    )
+    captured_context: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.services.expense.web.base_context",
+        lambda request, auth, title, section: {"user": auth.user},
+    )
+
+    def _template_response(request, template_name, context):
+        captured_context.update(context)
+        return HTMLResponse("ok")
+
+    monkeypatch.setattr(
+        "app.services.expense.web.templates.TemplateResponse",
+        _template_response,
+    )
+
+    response = ExpenseClaimsWebService.claims_list_response(
+        request=_request("/expense/claims/list?view=submitted_to_me"),
+        auth=auth,
+        db=db_session,
+        view="submitted_to_me",
+        status=None,
+        start_date=None,
+        end_date=None,
+    )
+
+    assert response.status_code == 200
+    assert {claim.claim_number for claim in captured_context["claims"]} == {
+        "CLM-701",
+        "CLM-702",
+    }
+
+
+def test_submitted_to_me_view_supports_status_filter_for_retained_claims(
+    db_session, engine, monkeypatch
+):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant8@example.com")
+    approver_person = _make_person(org_id, "approver8@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-801")
+    approver = _make_employee(org_id, approver_person, "EMP-802")
+    approved_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-801",
+        status=ExpenseClaimStatus.APPROVED,
+    )
+    paid_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-802",
+        status=ExpenseClaimStatus.PAID,
+    )
+
+    db_session.add_all(
+        [
+            claimant_person,
+            approver_person,
+            claimant,
+            approver,
+            approved_claim,
+            paid_claim,
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=approved_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=approver.employee_id,
+                approver_name=approver.full_name,
+                decision="APPROVED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=paid_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=approver.employee_id,
+                approver_name=approver.full_name,
+                decision="APPROVED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=approver.person_id,
+        employee_id=approver.employee_id,
+        organization_id=org_id,
+        roles=["admin"],
+    )
+    captured_context: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.services.expense.web.base_context",
+        lambda request, auth, title, section: {"user": auth.user},
+    )
+
+    def _template_response(request, template_name, context):
+        captured_context.update(context)
+        return HTMLResponse("ok")
+
+    monkeypatch.setattr(
+        "app.services.expense.web.templates.TemplateResponse",
+        _template_response,
+    )
+
+    response = ExpenseClaimsWebService.claims_list_response(
+        request=_request("/expense/claims/list?view=submitted_to_me&status=PAID"),
+        auth=auth,
+        db=db_session,
+        view="submitted_to_me",
+        status=ExpenseClaimStatus.PAID.value,
+        start_date=None,
+        end_date=None,
+    )
+
+    assert response.status_code == 200
+    assert [claim.claim_number for claim in captured_context["claims"]] == ["CLM-802"]
+
+
+def test_claims_list_includes_selected_employee_filter_label(
+    db_session, engine, monkeypatch
+):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant5@example.com")
+    approver_person = _make_person(org_id, "approver5@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-401")
+    approver = _make_employee(org_id, approver_person, "EMP-402")
+    claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-401",
+        status=ExpenseClaimStatus.SUBMITTED,
+    )
+
+    db_session.add_all([claimant_person, approver_person, claimant, approver, claim])
+    db_session.commit()
+
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=approver.person_id,
+        employee_id=approver.employee_id,
+        organization_id=org_id,
+        roles=["admin"],
+    )
+    captured_context: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.services.expense.web.base_context",
+        lambda request, auth, title, section: {"user": auth.user},
+    )
+
+    def _template_response(request, template_name, context):
+        captured_context.update(context)
+        return HTMLResponse("ok")
+
+    monkeypatch.setattr(
+        "app.services.expense.web.templates.TemplateResponse",
+        _template_response,
+    )
+
+    response = ExpenseClaimsWebService.claims_list_response(
+        request=_request(f"/expense/claims/list?employee_id={claimant.employee_id}"),
+        auth=auth,
+        db=db_session,
+        view=None,
+        status=None,
+        start_date=None,
+        end_date=None,
+        employee_id=str(claimant.employee_id),
+    )
+
+    assert response.status_code == 200
+    assert [c.claim_number for c in captured_context["claims"]] == ["CLM-401"]
+    assert captured_context["selected_employee"].employee_id == claimant.employee_id
+    assert [emp.employee_id for emp in captured_context["claim_employees"]] == [
+        claimant.employee_id
+    ]
+    assert captured_context["active_filters"] == [
+        {
+            "name": "employee_id",
+            "value": str(claimant.employee_id),
+            "display_value": f"Employee: {claimant.full_name}",
+        }
+    ]
+
+
+def test_claim_employee_typeahead_returns_claim_employees_only(db_session, engine):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant6@example.com")
+    other_person = _make_person(org_id, "observer6@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-501")
+    other_employee = _make_employee(org_id, other_person, "EMP-502")
+    claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-501",
+        status=ExpenseClaimStatus.SUBMITTED,
+    )
+
+    db_session.add_all([claimant_person, other_person, claimant, other_employee, claim])
+    db_session.commit()
+
+    payload = ExpenseClaimsWebService.claim_employee_typeahead(
+        db=db_session,
+        organization_id=str(org_id),
+        query="claimant",
+        limit=10,
+    )
+
+    assert payload == {
+        "items": [
+            {
+                "ref": str(claimant.employee_id),
+                "label": f"{claimant.full_name} ({claimant.employee_code})",
+                "name": claimant.full_name,
+                "employee_code": claimant.employee_code,
+            }
+        ]
+    }

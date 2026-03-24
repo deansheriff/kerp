@@ -39,6 +39,28 @@
     ) %}
         <input type="hidden" name="view" value="{{ filter_view }}">
         {{ filter_select_field("status", "Status", filter_status, statuses, filter_attrs, "All Status", true) }}
+        <div>
+            <label class="form-label text-xs" for="filter-employee-search">Employee</label>
+            <input type="text"
+                   id="filter-employee-search"
+                   value="{{ (selected_employee.full_name ~ ' (' ~ selected_employee.employee_code ~ ')') if selected_employee and selected_employee.employee_code else (selected_employee.full_name if selected_employee else '') }}"
+                   placeholder="Type employee name..."
+                   autocomplete="off"
+                   list="expense-claim-employee-options"
+                   class="form-input w-full">
+            <input type="hidden"
+                   id="filter-employee-id"
+                   name="employee_id"
+                   value="{{ filter_employee_id }}"
+                   {{ filter_attrs | safe }}>
+            <datalist id="expense-claim-employee-options">
+                {% for employee in claim_employees %}
+                <option value="{{ (employee.full_name ~ ' (' ~ employee.employee_code ~ ')') if employee.employee_code else employee.full_name }}"
+                        data-employee-id="{{ employee.employee_id }}">
+                </option>
+                {% endfor %}
+            </datalist>
+        </div>
         {{ filter_date_field("start_date", "Start date", filter_start_date or '', filter_attrs) }}
         {{ filter_date_field("end_date", "End date", filter_end_date or '', filter_attrs) }}
     {% endcall %}
@@ -139,4 +161,37 @@
     </div>
     </div>{# /results-container #}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const employeeInput = document.getElementById('filter-employee-search');
+    const employeeHidden = document.getElementById('filter-employee-id');
+    const optionList = document.getElementById('expense-claim-employee-options');
+    if (!employeeInput || !employeeHidden || !optionList) {
+        return;
+    }
+
+    function syncEmployeeFilter() {
+        const match = Array.from(optionList.options).find(function (option) {
+            return option.value === employeeInput.value;
+        });
+        const nextValue = match ? (match.dataset.employeeId || '') : '';
+        if (employeeHidden.value === nextValue) {
+            return;
+        }
+        employeeHidden.value = nextValue;
+        employeeHidden.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    employeeInput.addEventListener('change', syncEmployeeFilter);
+    employeeInput.addEventListener('input', function () {
+        if (!employeeInput.value) {
+            employeeHidden.value = '';
+            employeeHidden.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+});
+</script>
 {% endblock %}

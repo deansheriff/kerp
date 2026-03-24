@@ -26,6 +26,7 @@ from app.models.expense import (
     ExpenseClaimStatus,
 )
 from app.models.people.hr.employee import Employee
+from app.models.person import Person
 from app.services.common import coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.expense.expense_service import (
@@ -49,6 +50,56 @@ def _web_facade():
 
 
 class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
+    @staticmethod
+    def claim_employee_typeahead(
+        db,
+        organization_id: str,
+        query: str,
+        limit: int = 20,
+    ) -> dict[str, list[dict[str, str]]]:
+        """Search employees that have expense claims for claims list filters."""
+        org_id = coerce_uuid(organization_id)
+        search_term = f"%{query.strip()}%"
+        stmt = (
+            select(Employee)
+            .join(Person, Person.id == Employee.person_id)
+            .options(joinedload(Employee.person))
+            .where(
+                Employee.organization_id == org_id,
+                exists(
+                    select(1).where(
+                        ExpenseClaim.organization_id == org_id,
+                        ExpenseClaim.employee_id == Employee.employee_id,
+                    )
+                ),
+            )
+            .where(
+                or_(
+                    Person.first_name.ilike(search_term),
+                    Person.last_name.ilike(search_term),
+                    Person.email.ilike(search_term),
+                    Employee.employee_code.ilike(search_term),
+                )
+            )
+            .order_by(Person.first_name.asc(), Person.last_name.asc())
+            .limit(limit)
+        )
+        employees = list(db.scalars(stmt).unique().all())
+        items: list[dict[str, str]] = []
+        for employee in employees:
+            label = employee.full_name or employee.employee_code or "Unknown Employee"
+            if employee.employee_code and employee.full_name:
+                label = f"{employee.full_name} ({employee.employee_code})"
+            items.append(
+                {
+                    "ref": str(employee.employee_id),
+                    "label": label,
+                    "name": employee.full_name or "",
+                    "employee_code": employee.employee_code or "",
+                }
+            )
+        return {"items": items}
+
     @staticmethod
     def claims_list_response(
         request: Request,
@@ -100,26 +151,11 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                     .correlate(ExpenseClaim)
                     .scalar_subquery()
                 )
-                current_step = (
-                    select(func.min(ExpenseClaimApprovalStep.step_number))
-                    .where(
-                        ExpenseClaimApprovalStep.claim_id == ExpenseClaim.claim_id,
-                        ExpenseClaimApprovalStep.submission_round == latest_round,
-                        ExpenseClaimApprovalStep.decision.is_(None),
-                    )
-                    .correlate(ExpenseClaim)
-                    .scalar_subquery()
-                )
-                step_assigned = exists(
+                assigned_in_latest_round = exists(
                     select(1).where(
                         ExpenseClaimApprovalStep.claim_id == ExpenseClaim.claim_id,
                         ExpenseClaimApprovalStep.submission_round == latest_round,
                         ExpenseClaimApprovalStep.approver_id == auth_employee_id,
-                        ExpenseClaimApprovalStep.decision.is_(None),
-                        or_(
-                            ExpenseClaimApprovalStep.requires_all_approvals.is_(True),
-                            ExpenseClaimApprovalStep.step_number == current_step,
-                        ),
                     )
                 )
                 has_steps = exists(
@@ -136,15 +172,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 )
                 stmt = stmt.where(
                     or_(
-                        and_(
-                            ExpenseClaim.status.in_(
-                                [
-                                    ExpenseClaimStatus.SUBMITTED,
-                                    ExpenseClaimStatus.PENDING_APPROVAL,
-                                ]
-                            ),
-                            step_assigned,
-                        ),
+                        assigned_in_latest_round,
                         and_(~has_steps, legacy_assignment),
                     )
                 )
@@ -177,6 +205,43 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             .unique()
             .all()
         )
+        claim_employees = list(
+            db.scalars(
+                select(Employee)
+                .join(Person, Person.id == Employee.person_id)
+                .options(joinedload(Employee.person))
+                .where(
+                    Employee.organization_id == org_id,
+                    exists(
+                        select(1).where(
+                            ExpenseClaim.organization_id == org_id,
+                            ExpenseClaim.employee_id == Employee.employee_id,
+                        )
+                    ),
+                )
+                .order_by(Person.first_name.asc(), Person.last_name.asc())
+            )
+            .unique()
+            .all()
+        )
+        selected_employee = None
+        employee_options: dict[str, str] = {}
+        if filter_employee_id:
+            selected_employee = db.scalars(
+                select(Employee)
+                .join(Person, Person.id == Employee.person_id)
+                .options(joinedload(Employee.person))
+                .where(
+                    Employee.organization_id == org_id,
+                    Employee.employee_id == filter_employee_id,
+                )
+            ).first()
+            if selected_employee:
+                employee_options[str(selected_employee.employee_id)] = (
+                    selected_employee.full_name
+                    or selected_employee.employee_code
+                    or str(selected_employee.employee_id)
+                )
 
         status_rows = db.execute(
             select(ExpenseClaim.status, func.count())
@@ -205,6 +270,8 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 "filter_start_date": start_date or "",
                 "filter_end_date": end_date or "",
                 "filter_employee_id": employee_id or "",
+                "claim_employees": claim_employees,
+                "selected_employee": selected_employee,
                 "total": total or 0,
                 "offset": offset,
                 "limit": limit,
@@ -224,6 +291,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                         "end_date": "To",
                         "employee_id": "Employee",
                     },
+                    options={"employee_id": employee_options},
                 ),
             }
         )
