@@ -1,0 +1,204 @@
+{% extends "finance/base_finance.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Reports{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Reports</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Reports</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose a reporting category to continue.</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/finance/reports/trial-balance" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                    {{ icon_svg("scale", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Trial Balance</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review balances across all accounts at a point in time.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/income-statement" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    {{ icon_svg("trending-up", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Income Statement</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Analyze revenue, expenses, and profit performance.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/balance-sheet" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                    {{ icon_svg("building-library", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Balance Sheet</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">View assets, liabilities, and equity positions.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/general-ledger" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    {{ icon_svg("book-open", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">General Ledger</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Inspect posted transactions and account activity.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/ap-aging" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                    {{ icon_svg("clock", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">AP Aging</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track supplier liabilities by overdue age buckets.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/ar-aging" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                    {{ icon_svg("clock", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">AR Aging</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track customer receivables by overdue age buckets.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/tax-summary" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-900/30 dark:text-fuchsia-400">
+                    {{ icon_svg("receipt-tax", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Tax Summary</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review tax activity, liability, and filing summaries.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/expense-summary" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400">
+                    {{ icon_svg("currency-dollar", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Expenses</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Summarize spend by category and reporting period.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/cash-flow" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
+                    {{ icon_svg("arrows-right-left", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Cash Flow</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review cash movement and liquidity reporting.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/cash-flow/ias7" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-lime-100 text-lime-600 dark:bg-lime-900/30 dark:text-lime-400">
+                    {{ icon_svg("chart-bar", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Cash Flow (IAS 7)</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open the IAS 7 cash flow statement view.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/changes-in-equity" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                    {{ icon_svg("refresh", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Changes in Equity</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review period-over-period equity movements.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/budget-vs-actual" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                    {{ icon_svg("presentation-chart-line", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Budget vs Actual</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Compare budgeted amounts to realized performance.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/management-accounts" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {{ icon_svg("briefcase", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Management Accounts</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Access management reporting packs and summaries.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/analysis" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    {{ icon_svg("view-grid", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Analysis</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Explore pivot-style and analytical finance views.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/finance/reports/inventory-valuation-reconciliation" class="card p-5 transition-colors hover:border-teal-200 hover:bg-teal-50/40 dark:hover:border-teal-800 dark:hover:bg-teal-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                    {{ icon_svg("cube", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Inventory Valuation Reconciliation</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Reconcile inventory values between stock and finance.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "inventory/base_inventory.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Inventory{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/inventory" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">Inventory</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Overview</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Inventory</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose an inventory category to continue.</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/inventory/items" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">{{ icon_svg("box", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Items</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage stock items, definitions, costing, and reorder settings.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/categories" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">{{ icon_svg("tag", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Categories</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Organize items by category structure and stock grouping.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/warehouses" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">{{ icon_svg("building", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Warehouses</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage warehouse locations, storage rules, and balances.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/transactions" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">{{ icon_svg("switch-horizontal", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Transactions</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review receipts, issues, transfers, and stock adjustments.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/counts" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">{{ icon_svg("clipboard-check", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Stock Counts</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Run stock counts, compare variances, and adjust balances.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/boms" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400">{{ icon_svg("collection", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Bill of Materials</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Maintain BOM structures for assemblies and production items.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/price-lists" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-900/30 dark:text-fuchsia-400">{{ icon_svg("cash", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Price Lists</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage item pricing references and valuation support lists.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/lots" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">{{ icon_svg("ticket", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Lots & Serials</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track lot-controlled and serial-controlled inventory records.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/material-requests" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-lime-100 text-lime-600 dark:bg-lime-900/30 dark:text-lime-400">{{ icon_svg("document-text", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Material Requests</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review requested stock issues and internal material demand.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/reports" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">{{ icon_svg("chart", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Reports</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open stock-on-hand and inventory reporting views.</p></div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

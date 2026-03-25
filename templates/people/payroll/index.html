@@ -1,0 +1,32 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Payroll{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Payroll</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Payroll</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose a payroll category to continue.</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/people/payroll/slips" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">{{ icon_svg("receipt", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Salary Slips</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review issued payslips and employee payroll results.</p></div></div></a>
+        <a href="/people/payroll/components" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">{{ icon_svg("cog", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Salary Components</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Configure earnings, deductions, and calculation inputs.</p></div></div></a>
+        <a href="/people/payroll/structures" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">{{ icon_svg("collection", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Salary Structures</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage payroll structure templates and component groupings.</p></div></div></a>
+        <a href="/people/payroll/assignments" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">{{ icon_svg("users", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Salary Assignments</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Assign structures and payroll settings to employees.</p></div></div></a>
+        <a href="/people/payroll/runs" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">{{ icon_svg("clock", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Payroll Runs</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Process payroll periods, review totals, and post results.</p></div></div></a>
+        <a href="/people/payroll/loans" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400">{{ icon_svg("cash", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Loans & Advances</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track employee loans, advances, and payroll recoveries.</p></div></div></a>
+        <a href="/people/payroll/reports/summary" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-900/30 dark:text-fuchsia-400">{{ icon_svg("chart", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Reports</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open payroll summaries, trends, and tax reporting views.</p></div></div></a>
+    </div>
+</div>
+{% endblock %}

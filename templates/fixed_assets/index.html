@@ -1,0 +1,60 @@
+{% extends "inventory/base_inventory.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Fixed Assets{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Fixed Assets</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Fixed Assets</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose an asset category to continue.</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/fixed-assets/assets" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                    {{ icon_svg("building", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Assets</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage asset records, values, and lifecycle status.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/fixed-assets/categories" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                    {{ icon_svg("collection", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Categories</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Define asset classes and depreciation defaults.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/fixed-assets/depreciation" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    {{ icon_svg("calculator", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Depreciation</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review schedules and run depreciation calculations.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

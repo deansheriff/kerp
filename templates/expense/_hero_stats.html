@@ -1,0 +1,15 @@
+{% from "components/macros.html" import stats_card %}
+
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="{{ hero_stats_testid | default('expense-hero-stats') }}">
+    {% for card in hero_stats %}
+        {{ stats_card(
+            card.label,
+            card.value,
+            icon=card.icon,
+            color=card.color | default('amber', true),
+            href=card.href | default(none, true),
+            subtitle=card.subtitle | default(none, true),
+            trend=card.trend | default(none, true)
+        ) }}
+    {% endfor %}
+</div>

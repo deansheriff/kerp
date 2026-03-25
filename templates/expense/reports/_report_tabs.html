@@ -1,0 +1,28 @@
+{% set summary_href = "/expense/reports/summary" ~ ("?start_date=" ~ start_date ~ "&end_date=" ~ end_date if start_date or end_date else "") %}
+{% set category_href = "/expense/reports/by-category" ~ ("?start_date=" ~ start_date ~ "&end_date=" ~ end_date if start_date or end_date else "") %}
+{% set employee_query = [] %}
+{% if start_date %}{% set _ = employee_query.append("start_date=" ~ start_date) %}{% endif %}
+{% if end_date %}{% set _ = employee_query.append("end_date=" ~ end_date) %}{% endif %}
+{% if department_id %}{% set _ = employee_query.append("department_id=" ~ department_id) %}{% endif %}
+{% set employee_href = "/expense/reports/by-employee" ~ ("?" ~ employee_query | join("&") if employee_query else "") %}
+{% set trends_href = "/expense/reports/trends" ~ ("?months=" ~ months if months is defined and months else "") %}
+
+<div class="flex flex-wrap gap-3">
+    {% for item in [
+        {"key": "summary", "label": "Summary", "href": summary_href},
+        {"key": "category", "label": "By Category", "href": category_href},
+        {"key": "employee", "label": "By Employee", "href": employee_href},
+        {"key": "trends", "label": "Trends", "href": trends_href}
+    ] %}
+    <a href="{{ item.href }}"
+       hx-get="{{ item.href }}"
+       hx-target="#expense-report-view"
+       hx-select="#expense-report-view"
+       hx-swap="outerHTML"
+       hx-push-url="true"
+       hx-indicator="#expense-report-loading"
+       class="inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors {% if current_report_view == item.key %}border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300{% else %}border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800{% endif %}">
+        {{ item.label }}
+    </a>
+    {% endfor %}
+</div>

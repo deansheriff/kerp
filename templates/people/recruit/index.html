@@ -1,0 +1,30 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Recruitment{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Recruitment</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Recruitment</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose a recruitment category to continue.</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/people/recruit/jobs" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">{{ icon_svg("briefcase", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Job Openings</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage vacancies, hiring status, and published roles.</p></div></div></a>
+        <a href="/people/recruit/applicants" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">{{ icon_svg("users", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Applicants</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track candidates, stages, and source performance.</p></div></div></a>
+        <a href="/people/recruit/interviews" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">{{ icon_svg("calendar", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Interviews</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Schedule interviews and monitor pipeline activity.</p></div></div></a>
+        <a href="/people/recruit/offers" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">{{ icon_svg("document-text", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Job Offers</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Prepare and track offer letters and acceptance status.</p></div></div></a>
+        <a href="/people/recruit/reports/overview" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">{{ icon_svg("chart", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Reports</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open hiring pipeline, sources, and time-to-hire reports.</p></div></div></a>
+    </div>
+</div>
+{% endblock %}

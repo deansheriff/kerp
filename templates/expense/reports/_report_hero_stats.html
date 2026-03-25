@@ -1,0 +1,18 @@
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    {% for stat in report_hero_stats %}
+    <div class="card p-5">
+        <div class="flex items-center gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl {{ stat.icon_bg }}">
+                {{ icon_svg(stat.icon, stat.icon_class) }}
+            </div>
+            <div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">{{ stat.label }}</p>
+                <p class="text-2xl font-semibold {{ stat.value_class | default('text-slate-900 dark:text-white') }}">{{ stat.value }}</p>
+                {% if stat.subtitle %}
+                <p class="text-xs {{ stat.subtitle_class | default('text-slate-500 dark:text-slate-400') }}">{{ stat.subtitle }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>

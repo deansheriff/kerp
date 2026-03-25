@@ -1,0 +1,49 @@
+{% extends "inventory/base_inventory.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Quick Entry{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/inventory" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">Inventory</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Quick Entry</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Quick Entry</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose an inventory transaction to continue.</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <a href="/inventory/transactions/receipt/new" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">{{ icon_svg("download", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Receipt</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Record inbound stock receipts into inventory.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/transactions/issue/new" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">{{ icon_svg("upload", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Issue</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Issue stock out to departments, jobs, or requests.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/transactions/transfer/new" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">{{ icon_svg("switch-horizontal", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Transfer</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Move stock between warehouses and storage locations.</p></div>
+            </div>
+        </a>
+        <a href="/inventory/transactions/adjustment/new" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">{{ icon_svg("edit", "h-5 w-5") }}</div>
+                <div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Adjustment</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Correct stock balances and valuation discrepancies.</p></div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

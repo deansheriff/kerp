@@ -1,0 +1,116 @@
+{% set modules = accessible_modules | default([], true) %}
+{% set current_path = request.url.path if request is defined and request and request.url else '' %}
+{% if user and user.is_admin and not modules %}
+  {% set modules = [
+    "finance",
+    "public_sector",
+    "people",
+    "discipline",
+    "self_service",
+    "inventory",
+    "fleet",
+    "support",
+    "procurement",
+    "projects",
+    "coach",
+    "expense",
+  ] %}
+{% endif %}
+{% set launcher_modules = [] %}
+{% set launcher_modules = launcher_modules + [{"key": "home", "label": "Home", "href": "/", "icon": "/static/favicon.svg"}] %}
+
+{% if "finance" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "finance", "label": "Finance", "href": "/finance/dashboard", "icon": "/static/img/illustrations/module-finance.png", "accent": "bg-teal-500"}] %}
+{% endif %}
+{% if "public_sector" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "public_sector", "label": "Public Sector", "href": "/public-sector/", "icon": "/static/img/illustrations/module-public-sector.png", "accent": "bg-cyan-500"}] %}
+{% endif %}
+{% if "people" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "people", "label": "People", "href": "/people", "icon": "/static/img/illustrations/module-people.png", "accent": "bg-violet-500"}] %}
+{% endif %}
+{% if "discipline" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "discipline", "label": "Discipline", "href": "/people/hr/discipline", "icon": "/static/img/illustrations/module-people.png", "accent": "bg-rose-500"}] %}
+{% endif %}
+{% if "self_service" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "self_service", "label": "Self Service", "href": "/people/self", "icon": "/static/img/illustrations/module-people.png", "accent": "bg-emerald-500"}] %}
+{% endif %}
+{% if "inventory" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "inventory", "label": "Inventory", "href": "/inventory/items", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
+{% endif %}
+{% if "fleet" in modules or "support" in modules or "projects" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "operations", "label": "Operations", "href": "/operations/dashboard", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
+{% endif %}
+{% if "procurement" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "procurement", "label": "Procurement", "href": "/procurement", "icon": "/static/img/illustrations/module-procurement.png", "accent": "bg-blue-500"}] %}
+{% endif %}
+{% if "coach" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "coach", "label": "Coach", "href": "/coach/", "icon": "/static/img/illustrations/module-coach.png", "accent": "bg-teal-500"}] %}
+{% endif %}
+{% if "expense" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "expense", "label": "Expenses", "href": "/expense", "icon": "/static/img/illustrations/module-expense.png", "accent": "bg-orange-500"}] %}
+{% endif %}
+{% if user and user.is_admin %}
+  {% set launcher_modules = launcher_modules + [{"key": "admin", "label": "Admin", "href": "/admin", "icon": "/static/img/illustrations/module-finance.png", "accent": "bg-slate-500"}] %}
+{% endif %}
+
+{% if current_path != "/" %}
+<div x-data="{ open: false }" class="relative">
+  <button
+    type="button"
+    @click="open = !open"
+    :aria-expanded="open.toString()"
+    aria-haspopup="true"
+    aria-label="Open module launcher"
+    class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60">
+    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="5" cy="5" r="1.8"></circle>
+      <circle cx="12" cy="5" r="1.8"></circle>
+      <circle cx="19" cy="5" r="1.8"></circle>
+      <circle cx="5" cy="12" r="1.8"></circle>
+      <circle cx="12" cy="12" r="1.8"></circle>
+      <circle cx="19" cy="12" r="1.8"></circle>
+      <circle cx="5" cy="19" r="1.8"></circle>
+      <circle cx="12" cy="19" r="1.8"></circle>
+      <circle cx="19" cy="19" r="1.8"></circle>
+    </svg>
+  </button>
+
+  <div
+    x-show="open"
+    @click.away="open = false"
+    @keydown.escape.window="open = false"
+    x-transition:enter="transition ease-out duration-100"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-75"
+    x-transition:leave-start="opacity-100 scale-100"
+    x-transition:leave-end="opacity-0 scale-95"
+    class="fixed right-4 top-20 z-50 w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800"
+    x-cloak>
+    {% if launcher_modules %}
+    <div class="max-h-[32rem] overflow-y-auto px-4 py-6">
+      <div class="grid grid-cols-3 gap-4 auto-rows-[6.5rem]">
+      {% for module in launcher_modules %}
+      <a
+        href="{{ module.href }}"
+        class="group flex h-full w-full flex-col items-center justify-start rounded-2xl border border-slate-200/80 bg-white px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-slate-600 dark:hover:bg-slate-900/70">
+        <span class="mb-2 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-50 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+          <img src="{{ module.icon }}"
+               alt=""
+               aria-hidden="true"
+               class="h-6 w-6 rounded-md object-contain"
+               loading="lazy">
+        </span>
+        <span class="block w-full truncate px-1 text-center text-[13px] font-medium leading-4 text-slate-900 dark:text-white">{{ module.label }}</span>
+      </a>
+      {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">
+      No modules are available for this account.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,23 @@
+{% from "components/macros.html" import icon_svg %}
+
+<div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white font-display">{{ dashboard_title }}</h2>
+        <p class="text-sm text-slate-500 dark:text-slate-400">{{ dashboard_subtitle }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <form method="get" class="flex items-center gap-3">
+            <label for="period-filter" class="text-sm text-slate-500 dark:text-slate-400">Period</label>
+            <select id="period-filter" name="period" class="form-select" onchange="this.form.submit()">
+                <option value="month" {% if selected_period == 'month' %}selected{% endif %}>This Month</option>
+                <option value="quarter" {% if selected_period == 'quarter' %}selected{% endif %}>This Quarter</option>
+                <option value="year" {% if selected_period == 'year' %}selected{% endif %}>This Year</option>
+                <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All Time</option>
+            </select>
+        </form>
+        <a href="/expense/claims/new" class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:from-amber-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
+            {{ icon_svg("plus", "h-4 w-4") }}
+            New Claim
+        </a>
+    </div>
+</div>
