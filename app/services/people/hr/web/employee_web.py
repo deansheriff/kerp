@@ -100,14 +100,14 @@ class HRWebService:
             return
 
         gender_value = self._clean_person_text(self._form_str(form, "gender"))
-        gender = None
+        gender: str | None = None
         if gender_value:
             try:
-                gender = Gender(gender_value)
+                gender = Gender(gender_value).value
             except ValueError:
-                gender = person.gender
+                gender = person.gender.value if person.gender else None
         else:
-            gender = person.gender
+            gender = person.gender.value if person.gender else None
 
         payload = PersonUpdate(
             first_name=self._clean_person_text(self._form_str(form, "first_name")),
