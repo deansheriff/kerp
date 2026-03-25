@@ -606,33 +606,33 @@ class HRWebService:
                     auth,
                     db,
                     error=f"A person with email '{email}' already has an employee record.",
-                        form_data={
-                            "first_name": first_name,
-                            "last_name": last_name,
-                            "email": email,
-                            "employee_code": employee_code,
-                            "department_id": department_id,
-                            "designation_id": designation_id,
-                            "assigned_location_id": assigned_location_id,
-                            "default_shift_type_id": default_shift_type_id,
-                            "expense_approver_id": expense_approver_id,
-                            "linked_person_id": linked_person_id,
-                            "date_of_joining": date_of_joining,
-                            "status": status,
-                            "bank_name": bank_name,
-                            "bank_account_name": bank_account_name,
-                            "bank_account_number": bank_account_number,
-                            "bank_branch_code": bank_branch_code,
-                            "ctc": ctc_raw,
-                            "salary_mode": salary_mode_raw,
-                            "tin": tin,
-                            "tax_state": tax_state,
-                            "rsa_pin": rsa_pin,
-                            "pfa_code": pfa_code,
-                            "pension_rate": pension_rate_raw,
-                            "nhf_number": nhf_number,
-                        },
-                    )
+                    form_data={
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "employee_code": employee_code,
+                        "department_id": department_id,
+                        "designation_id": designation_id,
+                        "assigned_location_id": assigned_location_id,
+                        "default_shift_type_id": default_shift_type_id,
+                        "expense_approver_id": expense_approver_id,
+                        "linked_person_id": linked_person_id,
+                        "date_of_joining": date_of_joining,
+                        "status": status,
+                        "bank_name": bank_name,
+                        "bank_account_name": bank_account_name,
+                        "bank_account_number": bank_account_number,
+                        "bank_branch_code": bank_branch_code,
+                        "ctc": ctc_raw,
+                        "salary_mode": salary_mode_raw,
+                        "tin": tin,
+                        "tax_state": tax_state,
+                        "rsa_pin": rsa_pin,
+                        "pfa_code": pfa_code,
+                        "pension_rate": pension_rate_raw,
+                        "nhf_number": nhf_number,
+                    },
+                )
             person = existing_person
         else:
             if linked_person_id:
@@ -1483,10 +1483,7 @@ class HRWebService:
     @staticmethod
     def _list_pfas(db: Session) -> list[PFADirectory]:
         """Return the PFA dictionary ordered by name."""
-        rows = db.scalars(
-            select(PFADirectory)
-            .order_by(PFADirectory.pfa_name)
-        ).all()
+        rows = db.scalars(select(PFADirectory).order_by(PFADirectory.pfa_name)).all()
         return list(rows)
 
     def employee_edit_form_response(

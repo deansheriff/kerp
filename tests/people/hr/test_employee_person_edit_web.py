@@ -50,6 +50,11 @@ async def test_update_employee_response_updates_linked_person_with_people_write(
         "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
         lambda self, _employee_id, _data: employee,
     )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
+    )
 
     request = _make_request(
         {
@@ -96,6 +101,11 @@ async def test_update_employee_response_keeps_linked_person_read_only_without_pe
     monkeypatch.setattr(
         "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
         lambda self, _employee_id, _data: employee,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
     )
 
     request = _make_request(
