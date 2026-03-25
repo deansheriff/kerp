@@ -1483,10 +1483,11 @@ class HRWebService:
     @staticmethod
     def _list_pfas(db: Session) -> list[PFADirectory]:
         """Return the PFA dictionary ordered by name."""
-        return db.scalars(
+        rows = db.scalars(
             select(PFADirectory)
             .order_by(PFADirectory.pfa_name)
         ).all()
+        return list(rows)
 
     def employee_edit_form_response(
         self,
