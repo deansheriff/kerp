@@ -34,6 +34,7 @@ from app.models.people.payroll.employee_tax_profile import EmployeeTaxProfile
 from app.models.people.payroll.salary_assignment import SalaryStructureAssignment
 from app.models.person import Gender, Person
 from app.net import get_request_host, get_request_scheme
+from app.schemas.person import PersonUpdate
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.people.attendance.attendance_service import AttendanceService
@@ -73,6 +74,61 @@ class HRWebService:
         scheme = get_request_scheme(request)
         host = get_request_host(request) or request.url.netloc
         return f"{scheme}://{host}".rstrip("/")
+
+    @staticmethod
+    def _clean_person_text(value: str | None) -> str | None:
+        cleaned = (value or "").strip()
+        if not cleaned or cleaned.lower() in {"none", "null"}:
+            return None
+        return cleaned
+
+    def _update_linked_person(
+        self,
+        *,
+        auth: WebAuthContext,
+        db: Session,
+        employee: Employee,
+        form: Any,
+    ) -> None:
+        """Apply linked Person updates when the caller has people:write."""
+        if not auth.has_permission("people:write") or not employee.person_id:
+            return
+
+        person = db.get(Person, employee.person_id)
+        org_id = coerce_uuid(auth.organization_id)
+        if not person or person.organization_id != org_id:
+            return
+
+        gender_value = self._clean_person_text(self._form_str(form, "gender"))
+        gender = None
+        if gender_value:
+            try:
+                gender = Gender(gender_value)
+            except ValueError:
+                gender = person.gender
+        else:
+            gender = person.gender
+
+        payload = PersonUpdate(
+            first_name=self._clean_person_text(self._form_str(form, "first_name")),
+            last_name=self._clean_person_text(self._form_str(form, "last_name")),
+            email=self._clean_person_text(self._form_str(form, "email")),
+            phone=self._clean_person_text(self._form_str(form, "phone")),
+            date_of_birth=self._parse_date(self._form_str(form, "date_of_birth")),
+            gender=gender,
+            address_line1=self._clean_person_text(self._form_str(form, "address_line1")),
+            address_line2=self._clean_person_text(self._form_str(form, "address_line2")),
+            city=self._clean_person_text(self._form_str(form, "city")),
+            region=self._clean_person_text(self._form_str(form, "region")),
+            postal_code=self._clean_person_text(self._form_str(form, "postal_code")),
+            country_code=(
+                self._clean_person_text(self._form_str(form, "country_code")) or ""
+            ).upper()
+            or None,
+        )
+
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(person, key, value)
 
     def list_employees_response(
         self,
@@ -593,6 +649,7 @@ class HRWebService:
         """Handle employee update form submission."""
         org_id = coerce_uuid(auth.organization_id)
         svc = EmployeeService(db, org_id)
+        employee = svc.get_employee(coerce_uuid(employee_id))
 
         form = getattr(request.state, "csrf_form", None)
         if form is None:
@@ -710,6 +767,9 @@ class HRWebService:
                 coerce_uuid(employee_id),
                 coerce_uuid(linked_person_id),
             )
+            employee = svc.get_employee(coerce_uuid(employee_id))
+
+        self._update_linked_person(auth=auth, db=db, employee=employee, form=form)
 
         svc.update_employee(coerce_uuid(employee_id), data)
         db.commit()
@@ -1387,6 +1447,7 @@ class HRWebService:
             **base_context(request, auth, "Edit Employee", "employees"),
             "employee": employee,
             "person": person,
+            "can_edit_person": auth.has_permission("people:write"),
             "departments": departments,
             "designations": designations,
             "employment_types": employment_types,

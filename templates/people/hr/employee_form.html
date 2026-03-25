@@ -14,6 +14,7 @@
 {% endblock %}
 
 {% block content %}
+{% set can_edit_person = can_edit_person if can_edit_person is defined else false %}
 <div class="max-w-2xl">
     {# Error alert #}
     {% if error %}
@@ -56,7 +57,7 @@
                         <label for="first_name" class="form-label{% if not employee %} required{% endif %}">First Name <span class="text-rose-500">*</span></label>
                         <input type="text" name="first_name" id="first_name"
                             value="{{ person.first_name if person else form_data.first_name | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.first_name %}border-red-500{% endif %}"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.first_name %}border-red-500{% endif %}"{% endif %}>
                         {% if errors.first_name %}
                         <p class="text-sm text-red-500 mt-1">{{ errors.first_name }}</p>
                         {% endif %}
@@ -65,7 +66,7 @@
                         <label for="last_name" class="form-label{% if not employee %} required{% endif %}">Last Name <span class="text-rose-500">*</span></label>
                         <input type="text" name="last_name" id="last_name"
                             value="{{ person.last_name if person else form_data.last_name | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.last_name %}border-red-500{% endif %}"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.last_name %}border-red-500{% endif %}"{% endif %}>
                         {% if errors.last_name %}
                         <p class="text-sm text-red-500 mt-1">{{ errors.last_name }}</p>
                         {% endif %}
@@ -75,11 +76,11 @@
                     <label for="email" class="form-label{% if not employee %} required{% endif %}">Email <span class="text-rose-500">*</span></label>
                     <input type="email" name="email" id="email"
                         value="{{ person.email if person else form_data.email | default('', true) }}"
-                        {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.email %}border-red-500{% endif %}"{% endif %}>
+                        {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.email %}border-red-500{% endif %}"{% endif %}>
                     {% if errors.email %}
                     <p class="text-sm text-red-500 mt-1">{{ errors.email }}</p>
                     {% endif %}
-                    {% if employee %}
+                    {% if employee and not can_edit_person %}
                     <p class="text-xs text-slate-500 mt-1">Personal info is managed in the Person record.</p>
                     {% endif %}
                 </div>
@@ -88,18 +89,18 @@
                         <label for="phone" class="form-label">Phone</label>
                         <input type="text" name="phone" id="phone"
                             value="{{ person.phone if person else form_data.phone | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
                     </div>
                     <div>
                         <label for="date_of_birth" class="form-label">Date of Birth</label>
                         <input type="date" name="date_of_birth" id="date_of_birth"
                             value="{{ person.date_of_birth.isoformat() if person and person.date_of_birth else form_data.date_of_birth | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
                     </div>
                 </div>
                 <div>
                     <label for="gender" class="form-label">Gender</label>
-                    <select name="gender" id="gender" class="form-input w-full" {% if employee %}disabled{% endif %}>
+                    <select name="gender" id="gender" class="form-input w-full" {% if employee and not can_edit_person %}disabled{% endif %}>
                         <option value="">Select gender</option>
                         {% for g in genders %}
                         <option value="{{ g }}"
@@ -114,13 +115,13 @@
                         <label for="address_line1" class="form-label">Address Line 1</label>
                         <input type="text" name="address_line1" id="address_line1"
                             value="{{ person.address_line1 if person else form_data.address_line1 | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
                     </div>
                     <div>
                         <label for="address_line2" class="form-label">Address Line 2</label>
                         <input type="text" name="address_line2" id="address_line2"
                             value="{{ person.address_line2 if person else form_data.address_line2 | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -128,13 +129,13 @@
                         <label for="city" class="form-label">City</label>
                         <input type="text" name="city" id="city"
                             value="{{ person.city if person else form_data.city | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
                     </div>
                     <div>
                         <label for="region" class="form-label">State/Region</label>
                         <input type="text" name="region" id="region"
                             value="{{ person.region if person else form_data.region | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -142,13 +143,13 @@
                         <label for="postal_code" class="form-label">Postal Code</label>
                         <input type="text" name="postal_code" id="postal_code"
                             value="{{ person.postal_code if person else form_data.postal_code | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
                     </div>
                     <div>
                         <label for="country_code" class="form-label">Country Code</label>
                         <input type="text" name="country_code" id="country_code"
                             value="{{ person.country_code if person else form_data.country_code | default('', true) }}"
-                            {% if employee %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full" placeholder="US"{% endif %}>
+                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full" placeholder="US"{% endif %}>
                     </div>
                 </div>
             </div>
