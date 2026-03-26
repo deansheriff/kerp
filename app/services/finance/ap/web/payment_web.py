@@ -1043,6 +1043,9 @@ class PaymentWebService:
         request: Request,
         auth: WebAuthContext,
         db: Session,
+        *,
+        search: str | None = None,
+        supplier_id: str | None = None,
     ) -> HTMLResponse:
         """Render new payment batch form."""
         org_id = auth.organization_id
@@ -1054,13 +1057,21 @@ class PaymentWebService:
             status=BankAccountStatus.active,
             limit=200,
         )
-        invoices = db.execute(
+        stmt = (
             select(SupplierInvoice, Supplier)
             .join(Supplier, SupplierInvoice.supplier_id == Supplier.supplier_id)
             .where(SupplierInvoice.organization_id == org_id)
-            .order_by(SupplierInvoice.invoice_date.desc())
-            .limit(50)
         )
+        if supplier_id:
+            stmt = stmt.where(SupplierInvoice.supplier_id == supplier_id)
+        if search:
+            stmt = stmt.where(
+                SupplierInvoice.invoice_number.ilike(f"%{search}%")
+                | Supplier.trading_name.ilike(f"%{search}%")
+                | Supplier.legal_name.ilike(f"%{search}%")
+            )
+        stmt = stmt.order_by(SupplierInvoice.invoice_date.desc()).limit(50)
+        invoices = db.execute(stmt)
         invoices = invoices.all()
         invoices_view = [
             {
