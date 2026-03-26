@@ -710,7 +710,11 @@ def new_payment_batch_form(
 ):
     """New payment batch form page."""
     return ap_web_service.payment_batch_new_form_response(
-        request, auth, db, search=search, supplier_id=supplier_id,
+        request,
+        auth,
+        db,
+        search=search,
+        supplier_id=supplier_id,
     )
 
 

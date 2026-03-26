@@ -3643,7 +3643,10 @@ class APWebService:
         context = base_context(request, auth, "New Payment Batch", "ap")
         context.update(
             self.payment_batch_new_form_context(
-                db, auth.organization_id, search=search, supplier_id=supplier_id,
+                db,
+                auth.organization_id,
+                search=search,
+                supplier_id=supplier_id,
             )
         )
         return templates.TemplateResponse(
@@ -3707,8 +3710,7 @@ class APWebService:
         invoices = db.execute(
             stmt.order_by(
                 SupplierInvoice.due_date.asc(), SupplierInvoice.invoice_date.desc()
-            )
-            .limit(200)
+            ).limit(200)
         ).all()
         invoices_view = [
             {
