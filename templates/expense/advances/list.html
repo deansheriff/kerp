@@ -72,16 +72,16 @@
                                 {{ adv.advance_number }}
                             </a>
                         </td>
-                        <td class="text-slate-600 dark:text-slate-400">
+                        <td class="text-slate-600 dark:text-slate-300">
                             {{ adv.employee.full_name if adv.employee else 'N/A' }}
                         </td>
-                        <td class="text-slate-600 dark:text-slate-400 max-w-xs truncate">
+                        <td class="text-slate-600 dark:text-slate-300 max-w-xs truncate">
                             {{ adv.purpose }}
                         </td>
                         <td class="text-right font-mono tabular-nums text-slate-900 dark:text-white">
                             {{ "{:,.2f}".format(adv.requested_amount) }}
                         </td>
-                        <td class="text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
+                        <td class="text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">
                             {{ "{:,.2f}".format(adv.approved_amount) if adv.approved_amount else '—' }}
                         </td>
                         <td class="text-right font-mono tabular-nums">

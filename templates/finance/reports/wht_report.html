@@ -110,7 +110,7 @@
                             <p class="font-medium text-slate-900 dark:text-white">{{ item.tax_code }}</p>
                             <p class="text-xs text-slate-500">{{ item.tax_name }}</p>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                             {{ item.rate }}%
                         </td>
                         <td class="px-6 py-4">
@@ -124,13 +124,13 @@
                             </span>
                             {% endif %}
                         </td>
-                        <td class="font-mono tabular-nums px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-400">
+                        <td class="font-mono tabular-nums px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-300">
                             {{ item.base_amount|format_currency }}
                         </td>
                         <td class="font-mono tabular-nums px-6 py-4 text-right text-sm font-medium {% if item.source_module == 'AP' %}text-amber-600 dark:text-amber-400{% else %}text-purple-600 dark:text-purple-400{% endif %}">
                             {{ item.tax_amount|format_currency }}
                         </td>
-                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-300">
                             {{ item.count }}
                         </td>
                     </tr>
@@ -168,15 +168,15 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for txn in report.transactions %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-400">{{ txn.transaction_date }}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-300">{{ txn.transaction_date }}</td>
                         <td class="px-6 py-3 text-sm font-medium text-slate-900 dark:text-white">{{ txn.reference or '-' }}</td>
-                        <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-400">{{ txn.counterparty_name or '-' }}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-300">{{ txn.counterparty_name or '-' }}</td>
                         <td class="px-6 py-3 text-sm text-slate-500">{{ txn.counterparty_tax_id or '-' }}</td>
                         <td class="px-6 py-3">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">{{ txn.tax_code }}</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">{{ txn.tax_code }}</span>
                             <span class="text-xs text-slate-400">({{ txn.rate }}%)</span>
                         </td>
-                        <td class="font-mono tabular-nums px-6 py-3 text-right text-sm text-slate-600 dark:text-slate-400">
+                        <td class="font-mono tabular-nums px-6 py-3 text-right text-sm text-slate-600 dark:text-slate-300">
                             {{ txn.base_amount|format_currency }}
                         </td>
                         <td class="font-mono tabular-nums px-6 py-3 text-right text-sm font-medium text-amber-600 dark:text-amber-400">

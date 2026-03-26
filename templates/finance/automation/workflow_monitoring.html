@@ -90,10 +90,10 @@
                             <td class="px-6 py-3">
                                 {{ status_badge(ex.status_color, 'sm') }}
                             </td>
-                            <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-400">
+                            <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-300">
                                 {{ ex.entity_type | replace('_', ' ') | title }} <span class="text-slate-400">{{ ex.entity_id[:8] }}...</span>
                             </td>
-                            <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-400">{{ ex.trigger_event }}</td>
+                            <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-300">{{ ex.trigger_event }}</td>
                             <td class="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{{ ex.triggered_at }}</td>
                             <td class="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">
                                 {% if ex.duration_ms %}{{ ex.duration_ms }}ms{% else %}-{% endif %}

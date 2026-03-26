@@ -72,7 +72,7 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for kra in kras %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group" onclick="window.location='/people/perf/kras/{{ kra.kra_id }}'">
-                        <td class="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-300">
                             {{ kra.kra_code }}
                         </td>
                         <td class="px-4 py-3">
@@ -99,7 +99,7 @@
                             <span class="text-slate-400">-</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {% if kra.department_id %}
                             Dept. specific
                             {% elif kra.designation_id %}
@@ -108,7 +108,7 @@
                             Organization
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-sm text-right text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-right text-slate-600 dark:text-slate-300">
                             {{ kra.default_weightage }}%
                         </td>
                         <td class="px-4 py-3 text-sm">

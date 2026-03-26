@@ -187,11 +187,11 @@
             <!-- Summary -->
             <div class="mt-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-900" x-show="form.gross_amount > 0">
                 <div class="flex justify-between text-sm">
-                    <span class="text-slate-600 dark:text-slate-400">Gross Amount:</span>
+                    <span class="text-slate-600 dark:text-slate-300">Gross Amount:</span>
                     <span class="font-medium" x-text="formatCurrency(form.gross_amount)"></span>
                 </div>
                 <div x-show="whtApplied && form.wht_amount > 0" class="flex justify-between text-sm mt-1">
-                    <span class="text-slate-600 dark:text-slate-400">Less: WHT Deducted:</span>
+                    <span class="text-slate-600 dark:text-slate-300">Less: WHT Deducted:</span>
                     <span class="font-medium text-amber-600" x-text="'(' + formatCurrency(form.wht_amount) + ')'"></span>
                 </div>
                 <div class="flex justify-between text-sm mt-1 pt-2 border-t border-slate-200 dark:border-slate-700">
@@ -257,8 +257,8 @@
                             <td class="text-sm font-medium text-slate-900 dark:text-white">
                                 {{ inv.invoice_number }}
                             </td>
-                            <td class="text-sm text-slate-600 dark:text-slate-400">{{ inv.customer_name }}</td>
-                            <td class="text-sm text-slate-600 dark:text-slate-400">{{ inv.due_date }}</td>
+                            <td class="text-sm text-slate-600 dark:text-slate-300">{{ inv.customer_name }}</td>
+                            <td class="text-sm text-slate-600 dark:text-slate-300">{{ inv.due_date }}</td>
                             <td class="table-cell-amount">{{ inv.total_amount }}</td>
                             <td class="table-cell-amount">{{ inv.balance }}</td>
                             <td class="text-right">

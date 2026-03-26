@@ -66,7 +66,7 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for template in templates %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group" onclick="window.location='/people/perf/templates/{{ template.template_id }}'">
-                        <td class="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-300">
                             {{ template.template_code }}
                         </td>
                         <td class="px-4 py-3">
@@ -77,7 +77,7 @@
                             <p class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs">{{ template.description | truncate(50) }}</p>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {% if template.department_id %}
                             Dept. specific
                             {% elif template.designation_id %}
@@ -86,10 +86,10 @@
                             Organization
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-sm text-center text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-center text-slate-600 dark:text-slate-300">
                             {{ template.kras | length }}
                         </td>
-                        <td class="px-4 py-3 text-sm text-center text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-center text-slate-600 dark:text-slate-300">
                             1-{{ template.rating_scale_max }}
                         </td>
                         <td class="px-4 py-3 text-sm">

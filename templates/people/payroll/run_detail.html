@@ -338,7 +338,7 @@
         {% if slip_status_counts %}
         <div class="flex gap-2 text-xs">
             {% for status, count in slip_status_counts.items() %}
-            <span class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+            <span class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                 {{ status | title }}: {{ count }}
             </span>
             {% endfor %}
@@ -386,7 +386,7 @@
                             <div class="text-xs text-slate-500 dark:text-slate-400">{{ slip.employee.employee_code }}</div>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 font-mono">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300 font-mono">
                             {{ slip.slip_number }}
                         </td>
                         <td class="px-4 py-3 text-right text-sm text-slate-700 dark:text-slate-300 font-mono">

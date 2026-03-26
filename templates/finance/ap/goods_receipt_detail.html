@@ -139,7 +139,7 @@
                                     <p class="text-xs text-slate-500 dark:text-slate-400">Lot: {{ line.lot_number }}</p>
                                     {% endif %}
                                 </td>
-                                <td class="table-cell-amount text-slate-600 dark:text-slate-400">{{ line.quantity_ordered }}</td>
+                                <td class="table-cell-amount text-slate-600 dark:text-slate-300">{{ line.quantity_ordered }}</td>
                                 <td class="table-cell-amount text-blue-600 dark:text-blue-400 font-medium">{{ line.quantity_received }}</td>
                                 <td class="table-cell-amount text-emerald-600 dark:text-emerald-400 font-medium">{{ line.quantity_accepted or 0 }}</td>
                                 <td class="table-cell-amount {{ 'text-rose-600 dark:text-rose-400 font-medium' if line.quantity_rejected and line.quantity_rejected > 0 else 'text-slate-400 dark:text-slate-500' }}">
@@ -175,7 +175,7 @@
                     </div>
                 </div>
                 <div class="p-6">
-                    <p class="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ receipt.notes }}</p>
+                    <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ receipt.notes }}</p>
                 </div>
             </div>
             {% endif %}

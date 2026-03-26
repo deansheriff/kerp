@@ -123,13 +123,13 @@
                         <td class="text-sm text-slate-900 dark:text-white">
                             {{ res.employee.first_name }} {{ res.employee.last_name }}
                         </td>
-                        <td class="max-w-xs truncate text-sm text-slate-600 dark:text-slate-400">
+                        <td class="max-w-xs truncate text-sm text-slate-600 dark:text-slate-300">
                             {{ res.purpose }}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {{ res.start_datetime.strftime('%b %d, %H:%M') }}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {{ res.end_datetime.strftime('%b %d, %H:%M') }}
                         </td>
                         <td>{{ status_badge(res.status, 'sm') }}</td>

@@ -16,7 +16,7 @@
 
 {% block header_actions %}
 <a href="/automation/fields/new"
-   class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-amber-500/25 hover:from-amber-700 hover:to-amber-600">
+   class="inline-flex items-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 px-4 py-2 text-sm font-medium text-white shadow-lg">
     {{ icon_svg("plus", "h-4 w-4") }}
     New Field
 </a>
@@ -88,7 +88,7 @@
                         <td class="px-6 py-4">
                             <code class="rounded bg-slate-100 px-2 py-0.5 text-sm text-slate-700 dark:bg-slate-700 dark:text-slate-300">{{ field.field_code }}</code>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ field.field_type }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ field.field_type }}</td>
                         <td class="px-6 py-4 text-center">
                             {% if field.is_required %}
                             {{ icon_svg("check", "mx-auto h-5 w-5 text-emerald-500") }}

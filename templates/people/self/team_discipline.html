@@ -27,7 +27,7 @@
     </div>
 
     <div class="flex items-center gap-2">
-        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input type="checkbox"
                    class="rounded border-slate-300 dark:border-slate-600 text-teal-600 focus:ring-teal-500"
                    {% if include_closed %}checked{% endif %}
@@ -38,7 +38,7 @@
 
     {% if not has_direct_reports %}
     <div class="card p-8">
-        <p class="text-slate-600 dark:text-slate-400">No direct reports found. Team discipline cases are available when employees report to you.</p>
+        <p class="text-slate-600 dark:text-slate-300">No direct reports found. Team discipline cases are available when employees report to you.</p>
     </div>
     {% elif cases %}
     <div class="card overflow-hidden">
@@ -61,8 +61,8 @@
                             <div class="text-xs text-slate-500 dark:text-slate-400 max-w-xs truncate">{{ case.subject }}</div>
                         </td>
                         <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">{{ case.employee.full_name if case.employee else "-" }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ case.violation_type.value | replace('_', ' ') | title }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ case.status.value | replace('_', ' ') | title }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ case.violation_type.value | replace('_', ' ') | title }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ case.status.value | replace('_', ' ') | title }}</td>
                         <td class="px-4 py-3 text-right">
                             <a href="/people/self/team/discipline/{{ case.case_id }}" class="text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 font-medium">View</a>
                         </td>

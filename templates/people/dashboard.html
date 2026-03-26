@@ -92,15 +92,15 @@
                 <div class="flex items-center gap-4 text-xs">
                     <span class="flex items-center gap-1.5">
                         <span class="w-3 h-3 rounded-full bg-violet-500"></span>
-                        <span class="text-slate-600 dark:text-slate-400">Headcount</span>
+                        <span class="text-slate-600 dark:text-slate-300">Headcount</span>
                     </span>
                     <span class="flex items-center gap-1.5">
                         <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                        <span class="text-slate-600 dark:text-slate-400">Hires</span>
+                        <span class="text-slate-600 dark:text-slate-300">Hires</span>
                     </span>
                     <span class="flex items-center gap-1.5">
                         <span class="w-3 h-3 rounded-full bg-rose-500"></span>
-                        <span class="text-slate-600 dark:text-slate-400">Exits</span>
+                        <span class="text-slate-600 dark:text-slate-300">Exits</span>
                     </span>
                 </div>
             </div>
@@ -268,7 +268,7 @@
                     <div class="space-y-2">
                         {% if pending_approvals.leave_requests > 0 %}
                         <a href="/people/leave/applications?status=pending" class="flex justify-between items-center py-2 px-3 -mx-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">Leave Requests</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">Leave Requests</span>
                             <span class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                                 {{ pending_approvals.leave_requests }}
                             </span>
@@ -276,7 +276,7 @@
                         {% endif %}
                         {% if pending_approvals.job_offers > 0 %}
                         <a href="/people/recruit/offers?status=pending" class="flex justify-between items-center py-2 px-3 -mx-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">Job Offers</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">Job Offers</span>
                             <span class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
                                 {{ pending_approvals.job_offers }}
                             </span>
@@ -284,7 +284,7 @@
                         {% endif %}
                         {% if pending_approvals.interviews > 0 %}
                         <a href="/people/recruit/interviews?status=due" class="flex justify-between items-center py-2 px-3 -mx-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">Interviews Due</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">Interviews Due</span>
                             <span class="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                                 {{ pending_approvals.interviews }}
                             </span>
@@ -442,7 +442,7 @@
                     <div class="divide-y divide-slate-100 dark:divide-slate-700/60">
                         {% for employee in recent_hires %}
                         <a href="/people/hr/employees/{{ employee.id }}" class="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-purple-500 text-white text-sm font-semibold">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500 dark:bg-violet-400 text-white text-sm font-semibold">
                                 {{ employee.initials | default("?") }}
                             </div>
                             <div class="flex-1 min-w-0">

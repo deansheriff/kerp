@@ -217,7 +217,7 @@
     <!-- Multi-match toggle -->
     {% if reconciliation.status in ('draft', 'pending_review') %}
     <div class="flex items-center gap-3">
-        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
+        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" x-model="multiMode"
                    @change="selectedStatements = []; selectedGLs = []; selectedStatement = null; selectedGL = null;"
                    class="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500">
@@ -252,7 +252,7 @@
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer"
                             :class="{ 'bg-teal-50 dark:bg-teal-900/30': isStmtSelected('{{ line.line_id }}') }"
                             @click="toggleStatement('{{ line.line_id }}')">
-                            <td class="text-slate-600 dark:text-slate-400">{{ line.transaction_date }}</td>
+                            <td class="text-slate-600 dark:text-slate-300">{{ line.transaction_date }}</td>
                             <td>
                                 <p class="font-medium text-slate-900 dark:text-white truncate max-w-[150px]">{{ line.description if line.description else (line.payee_payer if line.payee_payer else '-') }}</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ line.reference if line.reference else '' }}</p>
@@ -331,7 +331,7 @@
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer"
                             :class="{ 'bg-teal-50 dark:bg-teal-900/30': isGLSelected('{{ line.line_id }}') }"
                             @click="toggleGL('{{ line.line_id }}')">
-                            <td class="text-slate-600 dark:text-slate-400">{{ line.entry_date }}</td>
+                            <td class="text-slate-600 dark:text-slate-300">{{ line.entry_date }}</td>
                             <td>
                                 <p class="font-medium text-slate-900 dark:text-white truncate max-w-[150px]">{{ line.description if line.description else '-' }}</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ line.reference if line.reference else '' }}</p>
@@ -452,7 +452,7 @@
                     {% set matched_lines = lines | rejectattr('is_adjustment') | rejectattr('is_outstanding') | list %}
                     {% for line in matched_lines %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                        <td class="text-slate-600 dark:text-slate-400">{{ line.transaction_date }}</td>
+                        <td class="text-slate-600 dark:text-slate-300">{{ line.transaction_date }}</td>
                         <td class="text-slate-900 dark:text-white">{{ line.description if line.description else '-' }}</td>
                         <td class="table-cell-amount text-slate-900 dark:text-white font-mono tabular-nums">{{ line.statement_amount if line.statement_amount is not none else '-' }}</td>
                         <td class="table-cell-amount text-slate-900 dark:text-white font-mono tabular-nums">{{ line.gl_amount if line.gl_amount is not none else '-' }}</td>
@@ -487,13 +487,13 @@
             <h3 id="mismatch-modal-title" class="text-lg font-semibold text-slate-900 dark:text-white mb-3">Amount Mismatch</h3>
             <template x-if="mismatchData">
                 <div class="space-y-3">
-                    <p class="text-sm text-slate-600 dark:text-slate-400">The amounts do not match:</p>
+                    <p class="text-sm text-slate-600 dark:text-slate-300">The amounts do not match:</p>
                     <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-1">
                         <p class="text-sm text-amber-700 dark:text-amber-400">Bank line: <span class="font-mono font-semibold" x-text="mismatchData.stmtAmount"></span></p>
                         <p class="text-sm text-amber-700 dark:text-amber-400">GL entry: <span class="font-mono font-semibold" x-text="mismatchData.glAmount"></span></p>
                         <p class="text-sm text-amber-700 dark:text-amber-400">Difference: <span class="font-mono font-semibold" x-text="mismatchData.diff"></span></p>
                     </div>
-                    <p class="text-sm text-slate-600 dark:text-slate-400">Do you want to force match these items?</p>
+                    <p class="text-sm text-slate-600 dark:text-slate-300">Do you want to force match these items?</p>
                     <div class="flex justify-end gap-3 pt-2">
                         <button @click="cancelMismatch()" class="btn btn-secondary">Cancel</button>
                         <button @click="confirmMismatch()" class="btn btn-primary">Force Match</button>
@@ -516,7 +516,7 @@
                         {% set deposit_lines = deposit_lines | selectattr('outstanding_type', 'equalto', 'deposit') | list %}
                         {% for line in deposit_lines %}
                         <tr>
-                            <td class="text-slate-600 dark:text-slate-400">{{ line.transaction_date }}</td>
+                            <td class="text-slate-600 dark:text-slate-300">{{ line.transaction_date }}</td>
                             <td class="text-slate-900 dark:text-white">{{ line.description }}</td>
                             <td class="table-cell-amount text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">{{ line.statement_amount or line.gl_amount }}</td>
                         </tr>
@@ -543,7 +543,7 @@
                         {% set payment_lines = payment_lines | selectattr('outstanding_type', 'equalto', 'payment') | list %}
                         {% for line in payment_lines %}
                         <tr>
-                            <td class="text-slate-600 dark:text-slate-400">{{ line.transaction_date }}</td>
+                            <td class="text-slate-600 dark:text-slate-300">{{ line.transaction_date }}</td>
                             <td class="text-slate-900 dark:text-white">{{ line.description }}</td>
                             <td class="table-cell-amount text-rose-600 dark:text-rose-400 font-mono tabular-nums"><span class="text-rose-600 dark:text-rose-400">({{ line.statement_amount or line.gl_amount }})</span></td>
                         </tr>

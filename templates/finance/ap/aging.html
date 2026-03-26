@@ -46,7 +46,7 @@
     <div id="results-container" class="space-y-6">
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <!-- Total Payable -->
-        <div class="card p-5 bg-gradient-to-br from-rose-50 to-orange-50 dark:from-rose-900/20 dark:to-orange-900/20 border-rose-200/80 dark:border-rose-800/50">
+        <div class="card p-5 bg-rose-50 dark:bg-rose-900/20 border-rose-200/80 dark:border-rose-800/50">
             <p class="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400">Total Payable</p>
             <p class="text-2xl font-bold text-rose-700 dark:text-rose-300 tabular-nums mt-2">{{ aging_summary.total }}</p>
             <p class="text-xs text-rose-500/80 dark:text-rose-400/60 mt-1">{{ aging_summary.invoice_count }} bills</p>
@@ -133,7 +133,7 @@
             </div>
 
             <!-- DPO Metric -->
-            <div class="mt-6 p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-800/50">
+            <div class="mt-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Days Payable Outstanding</p>
@@ -150,7 +150,7 @@
 
     <!-- Cash Flow Impact Alert -->
     {% if aging_summary.days_90_raw > 0 %}
-    <div class="card p-4 bg-gradient-to-r from-rose-50 to-orange-50 dark:from-rose-900/20 dark:to-orange-900/20 border-rose-200 dark:border-rose-800/50">
+    <div class="card p-4 bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800/50">
         <div class="flex items-start gap-4">
             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-900/40 flex-shrink-0">
                 {{ icon_svg("warning", "h-5 w-5 text-rose-600 dark:text-rose-400") }}

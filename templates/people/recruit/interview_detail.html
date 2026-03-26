@@ -135,21 +135,21 @@
                     {% if interview.feedback %}
                     <div>
                         <h3 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">General Feedback</h3>
-                        <p class="text-sm text-slate-600 dark:text-slate-400">{{ interview.feedback }}</p>
+                        <p class="text-sm text-slate-600 dark:text-slate-300">{{ interview.feedback }}</p>
                     </div>
                     {% endif %}
 
                     {% if interview.strengths %}
                     <div>
                         <h3 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Strengths</h3>
-                        <p class="text-sm text-slate-600 dark:text-slate-400">{{ interview.strengths }}</p>
+                        <p class="text-sm text-slate-600 dark:text-slate-300">{{ interview.strengths }}</p>
                     </div>
                     {% endif %}
 
                     {% if interview.weaknesses %}
                     <div>
                         <h3 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Areas for Improvement</h3>
-                        <p class="text-sm text-slate-600 dark:text-slate-400">{{ interview.weaknesses }}</p>
+                        <p class="text-sm text-slate-600 dark:text-slate-300">{{ interview.weaknesses }}</p>
                     </div>
                     {% endif %}
                 </div>
@@ -246,7 +246,7 @@
                 </div>
                 <div class="p-6">
                     <div class="flex items-center gap-3">
-                        <div class="h-12 w-12 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white font-semibold text-lg">
+                        <div class="h-12 w-12 rounded-full bg-teal-600 dark:bg-teal-500 flex items-center justify-center text-white font-semibold text-lg">
                             {{ interview.applicant.first_name[0] }}{{ interview.applicant.last_name[0] }}
                         </div>
                         <div>

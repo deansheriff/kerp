@@ -31,7 +31,7 @@
         .animate-spin { animation: spin 1s linear infinite; }
     </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+<body class="min-h-screen bg-slate-50 dark:bg-slate-900">
     <div class="flex min-h-screen items-center justify-center p-4">
         <div class="w-full max-w-md">
             <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-700 dark:bg-slate-800">
@@ -49,9 +49,9 @@
                     <h1 class="text-2xl font-bold text-rose-600 dark:text-rose-400">Payment Failed</h1>
                     {% elif status == 'abandoned' %}
                     <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
-                        {{ icon_svg("x-circle", "h-10 w-10 text-slate-600 dark:text-slate-400") }}
+                        {{ icon_svg("x-circle", "h-10 w-10 text-slate-600 dark:text-slate-300") }}
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-600 dark:text-slate-400">Payment Cancelled</h1>
+                    <h1 class="text-2xl font-bold text-slate-600 dark:text-slate-300">Payment Cancelled</h1>
                     {% elif status == 'pending' %}
                     <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
                         <svg class="h-10 w-10 animate-spin text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,14 +62,14 @@
                     <h1 class="text-2xl font-bold text-amber-600 dark:text-amber-400">Processing Payment</h1>
                     {% elif status == 'expired' %}
                     <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
-                        {{ icon_svg("clock", "h-10 w-10 text-slate-600 dark:text-slate-400") }}
+                        {{ icon_svg("clock", "h-10 w-10 text-slate-600 dark:text-slate-300") }}
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-600 dark:text-slate-400">Payment Expired</h1>
+                    <h1 class="text-2xl font-bold text-slate-600 dark:text-slate-300">Payment Expired</h1>
                     {% else %}
                     <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
-                        {{ icon_svg("question-mark-circle", "h-10 w-10 text-slate-600 dark:text-slate-400") }}
+                        {{ icon_svg("question-mark-circle", "h-10 w-10 text-slate-600 dark:text-slate-300") }}
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-600 dark:text-slate-400">Unknown Status</h1>
+                    <h1 class="text-2xl font-bold text-slate-600 dark:text-slate-300">Unknown Status</h1>
                     {% endif %}
                 </div>
 
@@ -103,12 +103,12 @@
                 <div class="space-y-3">
                     {% if status == 'success' and is_authenticated %}
                     <a href="/finance/ar/invoices"
-                       class="block w-full rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 text-center text-sm font-medium text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-700 hover:to-teal-700">
+                       class="block w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-3 text-center text-sm font-medium text-white shadow-lg transition-all">
                         View Invoices
                     </a>
                     {% elif status in ['failed', 'abandoned', 'expired'] and invoice_number %}
                     <a href="/finance/ar/invoices"
-                       class="block w-full rounded-lg bg-gradient-to-r from-slate-600 to-slate-700 px-4 py-3 text-center text-sm font-medium text-white shadow-lg transition-all hover:from-slate-700 hover:to-slate-800">
+                       class="block w-full rounded-lg bg-slate-600 hover:bg-slate-700 px-4 py-3 text-center text-sm font-medium text-white shadow-lg transition-all">
                         Try Again
                     </a>
                     {% endif %}

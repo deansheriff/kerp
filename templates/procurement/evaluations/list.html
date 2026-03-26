@@ -40,7 +40,7 @@
                     {% for evaluation in evaluations %}
                     {% set rfq = rfq_map.get(evaluation.rfq_id) %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{{ evaluation.evaluation_date }}</td>
+                        <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ evaluation.evaluation_date }}</td>
                         <td class="px-4 py-3">
                             {% if rfq %}
                             <a href="/procurement/rfqs/{{ rfq.rfq_id }}" class="font-medium text-blue-600 hover:underline dark:text-blue-400">{{ rfq.rfq_number }}</a>
@@ -95,7 +95,7 @@
                 search=search
             ) }}
         {% if total > limit %}
-        <div class="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-sm text-slate-600 dark:text-slate-400">
+        <div class="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-sm text-slate-600 dark:text-slate-300">
             <span>Showing {{ offset + 1 }}-{{ [offset + limit, total] | min }} of {{ total }}</span>
             <div class="flex gap-2">
                 {% if offset > 0 %}<a href="?offset={{ offset - limit }}&limit={{ limit }}{% if filter_status %}&status={{ filter_status }}{% endif %}" class="btn btn-secondary text-xs">Previous</a>{% endif %}

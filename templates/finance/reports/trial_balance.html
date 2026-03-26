@@ -98,7 +98,7 @@
                 <tbody>
                     {% macro tb_row(item) %}
                     <tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 {{ 'opacity-60' if item.is_inactive else '' }}">
-                        <td class="py-2 px-2 font-mono text-slate-600 dark:text-slate-400">{{ item.account_code }}</td>
+                        <td class="py-2 px-2 font-mono text-slate-600 dark:text-slate-300">{{ item.account_code }}</td>
                         <td class="py-2 px-2 text-slate-900 dark:text-white">{{ item.account_name }}{% if item.is_inactive %} <span class="text-xs text-amber-600 dark:text-amber-400">(inactive)</span>{% endif %}</td>
                         <td class="py-2 px-2 text-right font-mono tabular-nums {% if item.debit %}text-slate-900 dark:text-white{% else %}text-slate-400 dark:text-slate-500{% endif %}">{{ item.debit or '-' }}</td>
                         <td class="py-2 px-2 text-right font-mono tabular-nums {% if item.credit %}text-slate-900 dark:text-white{% else %}text-slate-400 dark:text-slate-500{% endif %}">{{ item.credit or '-' }}</td>

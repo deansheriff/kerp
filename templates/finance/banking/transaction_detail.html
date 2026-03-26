@@ -257,7 +257,7 @@
                 <tbody>
                     {% for match in gl_matches %}
                     <tr class="group">
-                        <td class="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ match.entry_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{{ match.entry_date }}</td>
                         <td>
                             {% if match.source_url %}
                             <a href="{{ match.source_url }}"
@@ -271,8 +271,8 @@
                             <p class="text-xs text-slate-500 dark:text-slate-400">{{ match.match_detail.sub }}</p>
                             {% endif %}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ match.account_name | default("-") }}</td>
-                        <td class="text-sm font-mono text-slate-600 dark:text-slate-400">{{ match.reference | default("-") }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ match.account_name | default("-") }}</td>
+                        <td class="text-sm font-mono text-slate-600 dark:text-slate-300">{{ match.reference | default("-") }}</td>
                         <td class="text-right font-mono tabular-nums text-sm text-slate-900 dark:text-white">{{ match.debit_amount }}</td>
                         <td class="text-right font-mono tabular-nums text-sm text-slate-900 dark:text-white">{{ match.credit_amount }}</td>
                         <td class="text-center">
@@ -297,7 +297,7 @@
     {% if line.notes %}
     <div class="card p-6">
         <h3 class="mb-2 text-lg font-medium text-slate-900 dark:text-white">Notes</h3>
-        <p class="text-sm text-slate-600 dark:text-slate-400">{{ line.notes | sanitize_html }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300">{{ line.notes | sanitize_html }}</p>
     </div>
     {% endif %}
 </div>

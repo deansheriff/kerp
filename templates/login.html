@@ -52,7 +52,7 @@
         <div class="stagger-in login-card rounded-2xl p-8" x-data="loginForm()" x-init="init()">
             <div class="text-center mb-6">
                 <h1 class="text-2xl font-semibold text-slate-900 dark:text-white font-display">Sign in</h1>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Access your {{ brand_name }} workspace.</p>
+                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Access your {{ brand_name }} workspace.</p>
             </div>
 
             <!-- Session Expired / Access Denied Alert -->
@@ -177,7 +177,7 @@
                 <div x-show="!mfaRequired" class="flex items-center justify-between">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" x-model="rememberMe" class="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" />
-                        <span class="text-sm text-slate-600 dark:text-slate-400">Keep me signed in</span>
+                        <span class="text-sm text-slate-600 dark:text-slate-300">Keep me signed in</span>
                     </label>
                     <a href="/forgot-password" class="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
                         Forgot password?
@@ -222,7 +222,7 @@
             </div>
 
             <!-- Register Link -->
-            <p class="text-center text-sm text-slate-600 dark:text-slate-400" x-show="!mfaRequired">
+            <p class="text-center text-sm text-slate-600 dark:text-slate-300" x-show="!mfaRequired">
                 Don't have an account?
                 <a href="/register" class="font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
                     Request access

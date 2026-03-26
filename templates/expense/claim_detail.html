@@ -204,7 +204,7 @@
             {% for item in corrected_items %}
             <div class="rounded-lg border border-amber-200 bg-white p-3 dark:border-amber-700 dark:bg-slate-800">
                 <p class="text-sm font-medium text-slate-900 dark:text-white">{{ item.description }}</p>
-                <div class="mt-1 flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-400">
+                <div class="mt-1 flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300">
                     {% if item.original_claimed_amount is not none %}
                     <span>Amount: <span class="line-through font-mono">{{ item.original_claimed_amount | format_currency }}</span> &rarr; <span class="font-mono font-semibold text-amber-700 dark:text-amber-400">{{ item.approved_amount | format_currency }}</span></span>
                     {% endif %}

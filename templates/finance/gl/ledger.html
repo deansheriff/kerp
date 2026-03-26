@@ -98,7 +98,7 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for line in lines %}
                     <tr class="row-highlight">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">{{ line.posting_date }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">{{ line.posting_date }}</td>
                         {% if not selected_account %}
                         <td class="px-6 py-4 whitespace-nowrap">
                             <a href="/finance/gl/ledger?account_id={{ line.account_id }}" class="group">
@@ -115,7 +115,7 @@
                         <td class="px-6 py-4">
                             <p class="text-sm text-slate-900 dark:text-white">{{ line.description | truncate(50) }}</p>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">{{ line.reference }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">{{ line.reference }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium font-mono tabular-nums text-slate-900 dark:text-white table-cell-debit">{{ line.debit }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium font-mono tabular-nums text-slate-900 dark:text-white table-cell-credit">{{ line.credit }}</td>
                         {% if show_balance_column %}

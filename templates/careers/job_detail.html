@@ -30,7 +30,7 @@
                         {{ job.job_title }}
                     </h1>
                     {% if job.department %}
-                    <p class="mt-1 text-lg text-slate-600 dark:text-slate-400">
+                    <p class="mt-1 text-lg text-slate-600 dark:text-slate-300">
                         {{ job.department.department_name }}
                     </p>
                     {% endif %}
@@ -113,14 +113,14 @@
             {% if job.education_requirements %}
             <div class="mt-8">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Education</h2>
-                <p class="mt-2 text-slate-600 dark:text-slate-400">{{ job.education_requirements }}</p>
+                <p class="mt-2 text-slate-600 dark:text-slate-300">{{ job.education_requirements }}</p>
             </div>
             {% endif %}
 
             {% if job.min_experience_years %}
             <div class="mt-8">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Experience</h2>
-                <p class="mt-2 text-slate-600 dark:text-slate-400">
+                <p class="mt-2 text-slate-600 dark:text-slate-300">
                     Minimum {{ job.min_experience_years }} year{{ 's' if job.min_experience_years > 1 else '' }} of relevant experience
                 </p>
             </div>

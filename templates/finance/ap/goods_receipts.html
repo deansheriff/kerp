@@ -75,7 +75,7 @@
                 <tbody>
                     {% for receipt in receipts %}
                     <tr class="group cursor-pointer" onclick="window.location='/finance/ap/goods-receipts/{{ receipt.receipt_id }}'">
-                        <td class="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">{{ receipt.receipt_date }}</td>
+                        <td class="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">{{ receipt.receipt_date }}</td>
                         <td class="whitespace-nowrap">
                             <a href="/finance/ap/goods-receipts/{{ receipt.receipt_id }}" class="font-mono text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400">
                                 {{ receipt.receipt_number }}
@@ -89,7 +89,7 @@
                                 {{ receipt.po_number }}
                             </a>
                         </td>
-                        <td class="whitespace-nowrap text-center text-sm text-slate-600 dark:text-slate-400">{{ receipt.line_count }}</td>
+                        <td class="whitespace-nowrap text-center text-sm text-slate-600 dark:text-slate-300">{{ receipt.line_count }}</td>
                         <td class="whitespace-nowrap">
                             {{ status_badge(receipt.status | default('received'), 'sm') }}
                         </td>

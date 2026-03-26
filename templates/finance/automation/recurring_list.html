@@ -16,7 +16,7 @@
 
 {% block header_actions %}
 <a href="/automation/recurring/new"
-   class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-teal-500/25 hover:from-teal-700 hover:to-teal-600">
+   class="inline-flex items-center gap-2 rounded-lg bg-teal-600 hover:bg-teal-700 px-4 py-2 text-sm font-medium text-white shadow-lg">
     {{ icon_svg("plus", "h-4 w-4") }}
     New Template
 </a>
@@ -78,9 +78,9 @@
                                 {{ template.template_name }}
                             </a>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ template.entity_type | replace('_', ' ') | title }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ template.frequency | replace('_', ' ') | title }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ template.entity_type | replace('_', ' ') | title }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ template.frequency | replace('_', ' ') | title }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
                             {% if template.next_run_date %}{{ template.next_run_date }}{% else %}-{% endif %}
                         </td>
                         <td class="px-6 py-4 text-center">

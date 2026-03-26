@@ -74,7 +74,7 @@
             {% set diff = appraisal.self_overall_rating - appraisal.manager_overall_rating %}
             {% if diff != 0 %}
             <div class="mt-4 p-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-center">
-                <span class="text-sm text-slate-600 dark:text-slate-400">
+                <span class="text-sm text-slate-600 dark:text-slate-300">
                     Rating difference:
                     <span class="font-medium {% if diff > 0 %}text-blue-600{% else %}text-amber-600{% endif %}">
                         {{ diff | abs }} point{% if diff | abs != 1 %}s{% endif %}
@@ -101,19 +101,19 @@
             {% if appraisal.self_summary %}
             <div>
                 <h4 class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Employee's Self Summary</h4>
-                <p class="text-slate-600 dark:text-slate-400 text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">{{ appraisal.self_summary }}</p>
+                <p class="text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">{{ appraisal.self_summary }}</p>
             </div>
             {% endif %}
             {% if appraisal.manager_summary %}
             <div>
                 <h4 class="text-sm font-medium text-amber-700 dark:text-amber-300 mb-1">Manager's Summary</h4>
-                <p class="text-slate-600 dark:text-slate-400 text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">{{ appraisal.manager_summary }}</p>
+                <p class="text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">{{ appraisal.manager_summary }}</p>
             </div>
             {% endif %}
             {% if appraisal.manager_recommendations %}
             <div>
                 <h4 class="text-sm font-medium text-amber-700 dark:text-amber-300 mb-1">Manager's Recommendations</h4>
-                <p class="text-slate-600 dark:text-slate-400 text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">{{ appraisal.manager_recommendations }}</p>
+                <p class="text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">{{ appraisal.manager_recommendations }}</p>
             </div>
             {% endif %}
         </div>
@@ -139,7 +139,7 @@
                     {% for score in appraisal.kra_scores %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td class="px-4 py-3 text-sm text-slate-900 dark:text-white">{{ score.kra.kra_name if score.kra else 'Unknown KRA' }}</td>
-                        <td class="px-4 py-3 text-sm text-right text-slate-600 dark:text-slate-400 font-mono">{{ score.weightage }}%</td>
+                        <td class="px-4 py-3 text-sm text-right text-slate-600 dark:text-slate-300 font-mono">{{ score.weightage }}%</td>
                         <td class="px-4 py-3 text-sm text-right text-blue-600 dark:text-blue-400">{{ score.self_rating or '-' }}</td>
                         <td class="px-4 py-3 text-sm text-right text-amber-600 dark:text-amber-400">{{ score.manager_rating or '-' }}</td>
                     </tr>

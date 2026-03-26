@@ -166,8 +166,8 @@
                                 {{ inv.invoice_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ inv.invoice_date }}</td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ inv.due_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ inv.invoice_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ inv.due_date }}</td>
                         <td class="table-cell-amount">{{ inv.total_amount }}</td>
                         <td class="table-cell-amount">{{ inv.balance }}</td>
                         <td>{{ status_badge('OVERDUE' if inv.is_overdue else inv.status, 'sm') }}</td>
@@ -204,10 +204,10 @@
                                 {{ p.payment_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ p.payment_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ p.payment_date }}</td>
                         <td class="table-cell-amount">{{ p.amount }}</td>
                         <td class="text-sm">{{ p.payment_method | replace('_', ' ') | title }}</td>
-                        <td class="text-sm font-mono text-slate-600 dark:text-slate-400">{{ p.reference }}</td>
+                        <td class="text-sm font-mono text-slate-600 dark:text-slate-300">{{ p.reference }}</td>
                         <td>{{ status_badge(p.status, 'sm') }}</td>
                     </tr>
                     {% else %}
@@ -240,7 +240,7 @@
                                 {{ po.po_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ po.po_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ po.po_date }}</td>
                         <td class="table-cell-amount">{{ po.total_amount }}</td>
                         <td>{{ status_badge(po.status, 'sm') }}</td>
                     </tr>
@@ -273,7 +273,7 @@
                                 {{ gr.receipt_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ gr.receipt_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ gr.receipt_date }}</td>
                         <td>{{ status_badge(gr.status, 'sm') }}</td>
                     </tr>
                     {% else %}

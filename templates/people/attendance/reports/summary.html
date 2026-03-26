@@ -142,7 +142,7 @@
                         <td class="px-5 py-3 text-right text-sm font-medium text-slate-700 dark:text-slate-300">
                             {{ status.count }}
                         </td>
-                        <td class="px-5 py-3 text-right text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-5 py-3 text-right text-sm text-slate-600 dark:text-slate-300">
                             {{ "{:.1f}".format(pct) }}%
                         </td>
                         <td class="px-5 py-3">
@@ -177,11 +177,11 @@
             <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Punctuality</h3>
             <div class="space-y-4">
                 <div class="flex items-center justify-between">
-                    <span class="text-slate-600 dark:text-slate-400">Late Entries</span>
+                    <span class="text-slate-600 dark:text-slate-300">Late Entries</span>
                     <span class="font-medium text-amber-600 dark:text-amber-400">{{ report.late_entries }}</span>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-slate-600 dark:text-slate-400">Early Exits</span>
+                    <span class="text-slate-600 dark:text-slate-300">Early Exits</span>
                     <span class="font-medium text-rose-600 dark:text-rose-400">{{ report.early_exits }}</span>
                 </div>
                 {% set punctuality_issues = report.late_entries + report.early_exits %}
@@ -199,11 +199,11 @@
             <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Working Hours</h3>
             <div class="space-y-4">
                 <div class="flex items-center justify-between">
-                    <span class="text-slate-600 dark:text-slate-400">Total Hours</span>
+                    <span class="text-slate-600 dark:text-slate-300">Total Hours</span>
                     <span class="font-medium font-mono text-slate-900 dark:text-white">{{ "{:.1f}".format(report.total_working_hours) }}</span>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-slate-600 dark:text-slate-400">Overtime Hours</span>
+                    <span class="text-slate-600 dark:text-slate-300">Overtime Hours</span>
                     <span class="font-medium font-mono text-violet-600 dark:text-violet-400">{{ "{:.1f}".format(report.total_overtime_hours) }}</span>
                 </div>
                 {% set avg_hours = (report.total_working_hours / report.present) if report.present > 0 else 0 %}

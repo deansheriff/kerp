@@ -91,7 +91,7 @@
                 </div>
                 <div class="card-body">
                     {% if template.description %}
-                    <p class="text-slate-600 dark:text-slate-400 mb-4">{{ template.description }}</p>
+                    <p class="text-slate-600 dark:text-slate-300 mb-4">{{ template.description }}</p>
                     {% endif %}
 
                     <dl class="grid grid-cols-3 gap-4 text-sm">
@@ -191,7 +191,7 @@
                                         {% else %}bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300{% endif %}">
                                 {{ i }}
                             </div>
-                            <span class="text-sm text-slate-600 dark:text-slate-400">
+                            <span class="text-sm text-slate-600 dark:text-slate-300">
                                 {% if i == template.rating_scale_max %}Exceptional
                                 {% elif i == template.rating_scale_max - 1 %}Exceeds
                                 {% elif i == (template.rating_scale_max // 2) + 1 %}Meets

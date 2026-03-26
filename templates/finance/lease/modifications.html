@@ -29,10 +29,10 @@
                     {% for mod in modifications %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td class="px-6 py-4 text-sm text-slate-900 dark:text-white">{{ mod.lease_id }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ mod.modification_type }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ mod.effective_date }}</td>
-                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-400">{{ mod.liability_adjustment }}</td>
-                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-400">{{ mod.rou_asset_adjustment }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ mod.modification_type }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ mod.effective_date }}</td>
+                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-300">{{ mod.liability_adjustment }}</td>
+                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-300">{{ mod.rou_asset_adjustment }}</td>
                     </tr>
                     {% else %}
                     <tr>

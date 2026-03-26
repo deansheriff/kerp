@@ -88,14 +88,14 @@
                                 {{ payee.payee_type | title }}
                             </span>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {% if payee.default_account %}
                             {{ payee.default_account.account_code }} - {{ payee.default_account.account_name }}
                             {% else %}
                             <span class="text-slate-400">Not set</span>
                             {% endif %}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {% if payee.name_patterns %}
                             <span class="font-mono text-xs">{{ payee.name_patterns | truncate(30) }}</span>
                             {% else %}
@@ -105,7 +105,7 @@
                         <td class="whitespace-nowrap text-right text-sm font-medium text-slate-900 dark:text-white">
                             {{ payee.match_count | default(0) }}
                         </td>
-                        <td class="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+                        <td class="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
                             {{ payee.last_matched_at | format_date if payee.last_matched_at else 'Never' }}
                         </td>
                         <td class="whitespace-nowrap">

@@ -127,7 +127,7 @@
                     {% for qs in qualification_scores %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td class="px-4 py-3 text-slate-900 dark:text-white">{{ qs.category | replace('_', ' ') | title }}</td>
-                        <td class="px-4 py-3 text-right text-slate-600 dark:text-slate-400">{{ qs.weight }}</td>
+                        <td class="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{{ qs.weight }}</td>
                         <td class="px-4 py-3 text-right">
                             <span class="font-semibold {% if qs.score >= 80 %}text-emerald-600 dark:text-emerald-400{% elif qs.score >= 60 %}text-amber-600 dark:text-amber-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ qs.score }}</span>
                         </td>
@@ -167,7 +167,7 @@
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td class="px-4 py-3 text-slate-900 dark:text-white">{{ pc.title }}</td>
                         <td class="px-4 py-3 text-right font-medium text-slate-900 dark:text-white">{{ "{:,.2f}".format(pc.value) }}</td>
-                        <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{{ pc.start_date }} - {{ pc.end_date }}</td>
+                        <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ pc.start_date }} - {{ pc.end_date }}</td>
                         <td class="px-4 py-3 text-right">
                             <span class="font-semibold {% if pc.rating >= 4 %}text-emerald-600 dark:text-emerald-400{% elif pc.rating >= 3 %}text-amber-600 dark:text-amber-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ pc.rating }}/5</span>
                         </td>

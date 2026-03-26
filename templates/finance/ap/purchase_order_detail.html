@@ -150,7 +150,7 @@
                                     <p class="text-sm font-medium text-slate-900 dark:text-white">{{ line.description }}</p>
                                 </td>
                                 <td class="table-cell-amount">{{ line.quantity_ordered }}</td>
-                                <td class="table-cell-amount {{ 'text-emerald-600 dark:text-emerald-400' if line.quantity_received == line.quantity_ordered else 'text-slate-600 dark:text-slate-400' }}">{{ line.quantity_received }}</td>
+                                <td class="table-cell-amount {{ 'text-emerald-600 dark:text-emerald-400' if line.quantity_received == line.quantity_ordered else 'text-slate-600 dark:text-slate-300' }}">{{ line.quantity_received }}</td>
                                 <td class="table-cell-amount">{{ line.unit_price }}</td>
                                 <td class="table-cell-amount font-medium text-slate-900 dark:text-white">{{ line.line_amount }}</td>
                             </tr>
@@ -196,7 +196,7 @@
                     </div>
                 </div>
                 <div class="p-6">
-                    <p class="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ order.terms_and_conditions }}</p>
+                    <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ order.terms_and_conditions }}</p>
                 </div>
             </div>
             {% endif %}

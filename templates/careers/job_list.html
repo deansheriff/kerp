@@ -10,7 +10,7 @@
             <h1 class="text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
                 Join Our Team
             </h1>
-            <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-600 dark:text-slate-400">
+            <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-600 dark:text-slate-300">
                 Explore open positions and start your journey with {{ org_name }}.
             </p>
         </div>
@@ -43,7 +43,7 @@
             <option value="{{ value }}" {{ 'selected' if employment_type == value else '' }}>{{ label }}</option>
             {% endfor %}
         </select>
-        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input type="checkbox" name="is_remote" value="true" {{ 'checked' if is_remote else '' }}
                    class="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                    {{ search_attrs }}>
@@ -54,7 +54,7 @@
     <div id="results-container">
     <!-- Results count -->
     <div class="mb-6 flex items-center justify-between">
-        <p class="text-sm text-slate-600 dark:text-slate-400">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
             {% if total == 0 %}
                 No open positions found
             {% elif total == 1 %}

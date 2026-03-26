@@ -105,7 +105,7 @@
             <div class="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <div class="flex items-center gap-2">
                     <div class="w-3 h-3 rounded bg-violet-500"></div>
-                    <span class="text-sm text-slate-600 dark:text-slate-400">Average Rating</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">Average Rating</span>
                 </div>
             </div>
         </div>
@@ -137,7 +137,7 @@
                         <td class="px-5 py-3">
                             <div class="font-medium text-slate-900 dark:text-white">{{ c.cycle_name }}</div>
                         </td>
-                        <td class="px-5 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-5 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ c.period_start.strftime('%b %Y') if c.period_start else '' }} - {{ c.period_end.strftime('%b %Y') if c.period_end else '' }}
                         </td>
                         <td class="px-5 py-3 text-center">

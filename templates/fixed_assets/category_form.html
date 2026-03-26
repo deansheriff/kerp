@@ -100,7 +100,7 @@
 
                 {% if category %}
                 <div class="sm:col-span-2">
-                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                         <input type="checkbox" name="is_active" class="form-checkbox" {{ 'checked' if category.is_active else '' }}>
                         Active
                     </label>
@@ -167,7 +167,7 @@
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                         <input type="checkbox" name="revaluation_model_allowed" class="form-checkbox" {{ 'checked' if category and category.revaluation_model_allowed else '' }}>
                         Allow revaluation model
                     </label>

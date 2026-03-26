@@ -297,7 +297,7 @@
             {% for report in standard_reports %}
             <a href="{{ report.url }}" class="card card-hover p-6 group">
                 <div class="flex items-start gap-4">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-teal-50 to-emerald-50 text-teal-600 dark:from-teal-900/30 dark:to-emerald-900/30 dark:text-teal-400 group-hover:from-teal-100 group-hover:to-emerald-100 dark:group-hover:from-teal-900/50 dark:group-hover:to-emerald-900/50 transition-colors">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 group-hover:bg-teal-100 dark:group-hover:bg-teal-900/50 transition-colors">
                         {% if report.icon == 'scale' %}
                         {{ icon_svg("scale", "h-6 w-6") }}
                         {% elif report.icon == 'trending-up' %}

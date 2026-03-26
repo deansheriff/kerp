@@ -1,5 +1,5 @@
 {% extends "finance/base_finance.html" %}
-{% from "components/macros.html" import status_badge, empty_state, icon_svg %}
+{% from "components/macros.html" import status_badge, empty_state, icon_svg, live_search %}
 
 {% block page_title %}New Payment Batch{% endblock %}
 
@@ -16,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div x-data='{ selectedCount: 0, totalAmount: 0, invoiceAmounts: {{ invoices | map(attribute="amount") | list | tojson }} }' class="space-y-6">
     {% if error %}
     <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
         {{ error }}
@@ -24,103 +24,164 @@
     {% endif %}
     <form method="post" class="space-y-6">
         {{ request.state.csrf_form | safe }}
+
+        {# ── Batch Details ── #}
         <div class="card p-6">
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-white mb-4">Batch Details</h3>
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Batch Date</label>
+                    <label class="form-label">Batch Date <span class="text-rose-500">*</span></label>
                     <input type="date" name="batch_date" value="{{ form_data.get('batch_date', '') }}"
-                           class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                           class="form-input" required>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Payment Method</label>
-                    <select name="payment_method"
-                            class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                    <label class="form-label">Payment Method</label>
+                    <select name="payment_method" class="form-select">
                         {% for method in payment_methods %}
-                        <option value="{{ method }}" {{ 'selected' if form_data.get('payment_method', payment_methods[0] if payment_methods else '') == method else '' }}>{{ method.replace('_', ' ').title() }}</option>
+                        <option value="{{ method }}" {{ 'selected' if form_data.get('payment_method', payment_methods[0] if payment_methods else '') == method else '' }}>{{ method | replace('_', ' ') | title }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Bank Account</label>
-                    <select name="bank_account_id"
-                            class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                    <label class="form-label">Bank Account <span class="text-rose-500">*</span></label>
+                    <select name="bank_account_id" class="form-select" required>
                         <option value="">Select bank account</option>
                         {% for account in bank_accounts %}
                         <option value="{{ account.bank_account_id }}" {{ 'selected' if form_data.get('bank_account_id', '') == (account.bank_account_id | string) else '' }}>
-                            {{ account.bank_name }} • {{ account.account_name }} ({{ account.account_number }})
+                            {{ account.bank_name }} &bull; {{ account.account_name }} ({{ account.account_number }})
                         </option>
                         {% endfor %}
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Currency</label>
+                    <label class="form-label">Currency</label>
                     <input type="text" name="currency_code" value="{{ form_data.get('currency_code', default_currency_code) }}"
-                           class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                           class="form-input">
                 </div>
             </div>
         </div>
 
+        {# ── Invoice Selection ── #}
         <div class="card">
             <div class="border-b border-slate-200 px-6 py-4 dark:border-slate-700">
-                <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Select Invoices</h3>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Select Invoices</h3>
+                    <span x-show="selectedCount > 0" x-cloak
+                          class="inline-flex items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
+                        <span x-text="selectedCount"></span> selected
+                    </span>
+                </div>
             </div>
+
+            {# Search and filter #}
+            <div class="border-b border-slate-200 px-6 py-3 dark:border-slate-700">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div class="flex-1">
+                        <input type="search" name="search" value="{{ search }}"
+                               placeholder="Search invoice #, supplier name, reference..."
+                               class="form-input w-full"
+                               hx-get="/finance/ap/payment-batches/new"
+                               hx-trigger="input changed delay:300ms"
+                               hx-target="#invoice-table-body"
+                               hx-select="#invoice-table-body"
+                               hx-include="[name='supplier_id']"
+                               hx-push-url="true">
+                    </div>
+                    <div class="flex-shrink-0">
+                        <select name="supplier_id" class="form-select"
+                                hx-get="/finance/ap/payment-batches/new"
+                                hx-trigger="change"
+                                hx-target="#invoice-table-body"
+                                hx-select="#invoice-table-body"
+                                hx-include="[name='search']"
+                                hx-push-url="true">
+                            <option value="">All Suppliers</option>
+                            {% for s in suppliers %}
+                            <option value="{{ s.supplier_id }}" {{ 'selected' if selected_supplier_id == (s.supplier_id | string) else '' }}>
+                                {{ s.trading_name if s.trading_name else s.legal_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="table-container">
                 <table class="table invoice-selection">
                     <thead>
                         <tr>
-                            <th scope="col">Select</th>
+                            <th scope="col" class="w-10">
+                                <input type="checkbox"
+                                       class="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 dark:border-slate-600"
+                                       @change="
+                                           const cbs = $el.closest('table').querySelectorAll('tbody input[type=checkbox]');
+                                           cbs.forEach(cb => { cb.checked = $el.checked; });
+                                           selectedCount = $el.checked ? cbs.length : 0;
+                                       "
+                                       aria-label="Select all invoices">
+                            </th>
                             <th scope="col">Invoice #</th>
                             <th scope="col">Supplier</th>
                             <th scope="col" class="text-right">Outstanding</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Due Date</th>
+                            <th scope="col" class="text-center">Status</th>
+                            <th scope="col" class="hidden sm:table-cell">Due Date</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="invoice-table-body">
                         {% for invoice in invoices %}
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <tr class="group hover:bg-slate-50 dark:hover:bg-slate-800/50">
                             <td>
                                 <input type="checkbox" name="invoice_ids" value="{{ invoice.invoice_id }}"
                                        {{ 'checked' if (invoice.invoice_id | string) in form_data.get('invoice_ids', []) else '' }}
-                                       class="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600">
+                                       class="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 dark:border-slate-600"
+                                       @change="selectedCount = $el.closest('table').querySelectorAll('tbody input[type=checkbox]:checked').length">
                             </td>
-                            <td class="text-sm text-slate-700 dark:text-slate-200">
-                                {{ invoice.invoice_number }}
+                            <td>
+                                <a href="/finance/ap/invoices/{{ invoice.invoice_id }}" target="_blank"
+                                   class="font-mono tabular-nums text-sm font-medium text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400">
+                                    {{ invoice.invoice_number }}
+                                </a>
                             </td>
-                            <td class="text-sm text-slate-600 dark:text-slate-400">
+                            <td class="text-sm text-slate-600 dark:text-slate-300">
                                 {{ invoice.supplier_name }}
                             </td>
-                            <td class="text-right font-mono tabular-nums text-slate-900 dark:text-white">
-                                {{ "{:,.2f}".format(invoice.amount) if invoice.amount else '0.00' }} {{ invoice.currency_code }}
+                            <td class="text-right font-mono tabular-nums text-sm text-slate-900 dark:text-white">
+                                {{ "{:,.2f}".format(invoice.amount) if invoice.amount else '0.00' }}
+                                <span class="text-xs text-slate-500">{{ invoice.currency_code }}</span>
                             </td>
                             <td class="text-center">
                                 {{ status_badge(invoice.status if invoice.status else '', 'sm') }}
                             </td>
-                            <td class="text-sm text-slate-600 dark:text-slate-400">
+                            <td class="hidden sm:table-cell text-sm text-slate-600 dark:text-slate-300">
                                 {{ invoice.due_date.strftime('%d %b %Y') if invoice.due_date else '—' }}
                             </td>
                         </tr>
                         {% else %}
                         <tr>
                             <td colspan="6" class="py-12">
-                                {{ empty_state('No invoices available', 'There are no invoices ready for batching.', 'document') }}
+                                {{ empty_state('No payable invoices found', 'Try adjusting your search or filters. Only posted invoices with outstanding balances appear here.', 'document') }}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            {% if invoices | length >= 200 %}
+            <div class="border-t border-slate-200 px-6 py-3 dark:border-slate-700">
+                <p class="text-xs text-slate-500 dark:text-slate-400">Showing first 200 invoices. Use search to find specific invoices.</p>
+            </div>
+            {% endif %}
         </div>
 
-        <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <a href="/finance/ap/payment-batches"
-               class="btn btn-secondary">
-                Cancel
-            </a>
-            <button type="submit"
-                    class="btn btn-primary">
-                Create Batch
-            </button>
+        {# ── Actions ── #}
+        <div class="flex items-center justify-between gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
+            <span class="text-sm text-slate-600 dark:text-slate-300" x-show="selectedCount > 0" x-cloak>
+                <span x-text="selectedCount" class="font-semibold"></span> invoice(s) selected
+            </span>
+            <div class="flex items-center gap-3 ml-auto">
+                <a href="/finance/ap/payment-batches" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Create Batch</button>
+            </div>
         </div>
     </form>
 </div>

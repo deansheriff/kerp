@@ -67,7 +67,7 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for cycle in cycles %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group" onclick="window.location='/people/perf/cycles/{{ cycle.cycle_id }}'">
-                        <td class="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-300">
                             {{ cycle.cycle_code }}
                         </td>
                         <td class="px-4 py-3">
@@ -78,10 +78,10 @@
                             <p class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs">{{ cycle.description | truncate(50) }}</p>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ cycle.review_period_start | format_date }} - {{ cycle.review_period_end | format_date }}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ cycle.start_date.strftime("%b %d") }} - {{ cycle.end_date | format_date }}
                         </td>
                         <td class="px-4 py-3 text-sm">

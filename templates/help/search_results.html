@@ -63,14 +63,14 @@
                 <span class="text-slate-500 dark:text-slate-400">{{ article.estimated_minutes }} min</span>
             </div>
             <h3 class="mt-4 text-lg font-semibold text-slate-900 dark:text-white">{{ article.title }}</h3>
-            <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{{ article.summary }}</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ article.summary }}</p>
         </a>
         {% endfor %}
     </div>
     {% else %}
     <div class="card p-8">
         <h3 class="text-lg font-semibold text-slate-900 dark:text-white">No matching help content</h3>
-        <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+        <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
             Try a broader keyword, remove filters, or browse the module hubs to find the nearest workflow guide.
         </p>
         <div class="mt-4 flex flex-wrap gap-2">

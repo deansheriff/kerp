@@ -52,7 +52,7 @@
                     {{ status_badge(program.status.value, size="sm") }}
                 </div>
                 <p class="text-sm font-mono text-slate-500 dark:text-slate-400">{{ program.program_code }}</p>
-                <p class="text-slate-600 dark:text-slate-400">{{ program.training_type | replace('_', ' ') | title }}{% if program.category %} &bull; {{ program.category | replace('_', ' ') | title }}{% endif %}</p>
+                <p class="text-slate-600 dark:text-slate-300">{{ program.training_type | replace('_', ' ') | title }}{% if program.category %} &bull; {{ program.category | replace('_', ' ') | title }}{% endif %}</p>
             </div>
             <div class="text-right">
                 {% if program.duration_hours %}
@@ -167,7 +167,7 @@
             <h3 class="font-medium text-slate-900 dark:text-white">Description</h3>
         </div>
         <div class="card-body">
-            <p class="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ program.description }}</p>
+            <p class="text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ program.description }}</p>
         </div>
     </div>
     {% endif %}
@@ -181,7 +181,7 @@
                 <h3 class="font-medium text-slate-900 dark:text-white">Objectives</h3>
             </div>
             <div class="card-body">
-                <p class="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ program.objectives }}</p>
+                <p class="text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ program.objectives }}</p>
             </div>
         </div>
         {% endif %}
@@ -191,7 +191,7 @@
                 <h3 class="font-medium text-slate-900 dark:text-white">Prerequisites</h3>
             </div>
             <div class="card-body">
-                <p class="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ program.prerequisites }}</p>
+                <p class="text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ program.prerequisites }}</p>
             </div>
         </div>
         {% endif %}
@@ -237,7 +237,7 @@
                         <td class="px-4 py-3">
                             <a href="/people/training/events/{{ event.event_id }}" class="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400">{{ event.event_name }}</a>
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ event.start_date }}{% if event.end_date != event.start_date %} - {{ event.end_date }}{% endif %}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ event.start_date }}{% if event.end_date != event.start_date %} - {{ event.end_date }}{% endif %}</td>
                         <td class="px-4 py-3 text-sm">
                             {{ status_badge(event.status.value, 'sm') }}
                         </td>

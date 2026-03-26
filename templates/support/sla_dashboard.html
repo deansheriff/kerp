@@ -132,7 +132,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ bucket.label }}</span>
-                        <span class="text-sm font-bold {% if loop.last and bucket.count > 0 %}text-rose-600 dark:text-rose-400{% elif loop.index == 3 and bucket.count > 0 %}text-amber-600 dark:text-amber-400{% else %}text-slate-600 dark:text-slate-400{% endif %}">
+                        <span class="text-sm font-bold {% if loop.last and bucket.count > 0 %}text-rose-600 dark:text-rose-400{% elif loop.index == 3 and bucket.count > 0 %}text-amber-600 dark:text-amber-400{% else %}text-slate-600 dark:text-slate-300{% endif %}">
                             {{ bucket.count }}
                         </span>
                     </div>
@@ -174,7 +174,7 @@
                             <span class="font-medium text-slate-900 dark:text-white">{{ team.team_name }}</span>
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">{{ team.total_tickets }}</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">{{ team.total_tickets }}</span>
                         </td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if team.response_compliance_pct >= 90 %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400{% elif team.response_compliance_pct >= 70 %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400{% endif %}">
@@ -187,12 +187,12 @@
                             </span>
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">
+                            <span class="text-sm text-slate-600 dark:text-slate-300">
                                 {% if team.avg_response_hours %}{{ "%.1f"|format(team.avg_response_hours) }}h{% else %}-{% endif %}
                             </span>
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">
+                            <span class="text-sm text-slate-600 dark:text-slate-300">
                                 {% if team.avg_resolution_hours %}{{ "%.1f"|format(team.avg_resolution_hours) }}h{% else %}-{% endif %}
                             </span>
                         </td>
@@ -231,7 +231,7 @@
                             <span class="font-medium text-slate-900 dark:text-white">{{ cat.category_name }}</span>
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">{{ cat.total_tickets }}</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">{{ cat.total_tickets }}</span>
                         </td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if cat.response_compliance_pct >= 90 %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400{% elif cat.response_compliance_pct >= 70 %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400{% endif %}">

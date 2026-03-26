@@ -331,9 +331,9 @@
                                     <div class="text-xs text-slate-500">GL: {{ line.account_code }}</div>
                                     {% endif %}
                                 </td>
-                                <td class="table-cell-amount text-slate-600 dark:text-slate-400">{{ line.quantity }}</td>
-                                <td class="table-cell-amount text-slate-600 dark:text-slate-400">{{ line.unit_price }}</td>
-                                <td class="table-cell-amount text-slate-600 dark:text-slate-400">
+                                <td class="table-cell-amount text-slate-600 dark:text-slate-300">{{ line.quantity }}</td>
+                                <td class="table-cell-amount text-slate-600 dark:text-slate-300">{{ line.unit_price }}</td>
+                                <td class="table-cell-amount text-slate-600 dark:text-slate-300">
                                     {% if line.vat_amount_raw and line.vat_amount_raw > 0 %}
                                     <div>{{ line.vat_amount }}</div>
                                     {% if line.vat_label %}
@@ -425,7 +425,7 @@
                 {{ icon_svg("chat", "h-4 w-4") }}
                 Notes
             </h3>
-            <p class="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ invoice.notes }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ invoice.notes }}</p>
         </div>
         {% endif %}
         {% if invoice.internal_notes %}
@@ -434,7 +434,7 @@
                 {{ icon_svg("lock-closed", "h-4 w-4") }}
                 Internal Notes
             </h3>
-            <p class="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ invoice.internal_notes }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ invoice.internal_notes }}</p>
         </div>
         {% endif %}
     </div>
@@ -504,13 +504,13 @@
                 <tbody>
                     {% for payment in payments %}
                     <tr>
-                        <td class="text-slate-600 dark:text-slate-400">{{ payment.payment_date }}</td>
+                        <td class="text-slate-600 dark:text-slate-300">{{ payment.payment_date }}</td>
                         <td>
                             <a href="/finance/ap/payments/{{ payment.payment_id }}" class="text-primary-600 hover:text-primary-700 dark:text-primary-400">
                                 {{ payment.payment_number }}
                             </a>
                         </td>
-                        <td class="text-slate-600 dark:text-slate-400">{{ payment.payment_method | default("-") }}</td>
+                        <td class="text-slate-600 dark:text-slate-300">{{ payment.payment_method | default("-") }}</td>
                         <td class="table-cell-amount text-emerald-600 dark:text-emerald-400">{{ payment.amount }}</td>
                     </tr>
                     {% else %}
@@ -643,7 +643,7 @@
         </button>
         <div x-show="expanded" x-collapse class="mt-4 space-y-2 text-sm">
             {% if invoice.created_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                     {{ icon_svg("plus", "h-3 w-3") }}
                 </span>
@@ -651,7 +651,7 @@
             </div>
             {% endif %}
             {% if invoice.submitted_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
                     {{ icon_svg("paper-airplane", "h-3 w-3 text-blue-600 dark:text-blue-400") }}
                 </span>
@@ -659,7 +659,7 @@
             </div>
             {% endif %}
             {% if invoice.approved_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                     {{ icon_svg("check", "h-3 w-3 text-emerald-600 dark:text-emerald-400") }}
                 </span>
@@ -667,7 +667,7 @@
             </div>
             {% endif %}
             {% if invoice.posted_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30">
                     {{ icon_svg("document", "h-3 w-3 text-purple-600 dark:text-purple-400") }}
                 </span>
@@ -675,7 +675,7 @@
             </div>
             {% endif %}
             {% if invoice.updated_at and invoice.updated_at != invoice.created_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                     {{ icon_svg("edit", "h-3 w-3") }}
                 </span>

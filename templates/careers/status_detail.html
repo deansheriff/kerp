@@ -9,7 +9,7 @@
             <h1 class="text-2xl font-bold text-slate-900 dark:text-white">
                 Application Status
             </h1>
-            <p class="mt-1 text-slate-600 dark:text-slate-400">
+            <p class="mt-1 text-slate-600 dark:text-slate-300">
                 {{ status.applicant_name }}
             </p>
         </div>
@@ -75,19 +75,19 @@
         <!-- Status Info -->
         <div class="mt-6 rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
             {% if status.status == 'NEW' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Your application has been received and is awaiting review by our recruitment team.
             </p>
             {% elif status.status == 'SCREENING' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Our team is currently reviewing your application and qualifications.
             </p>
             {% elif status.status == 'SHORTLISTED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Congratulations! You've been shortlisted. We'll be in touch soon to schedule an interview.
             </p>
             {% elif status.status == 'INTERVIEW_SCHEDULED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 An interview has been scheduled. Please check your email for details.
                 If you don't receive the email, check your spam folder or contact us
                 {% if org.contact_email %}
@@ -97,36 +97,36 @@
                 {% endif %}
             </p>
             {% elif status.status == 'INTERVIEW_COMPLETED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Thank you for attending the interview. We're currently evaluating all candidates.
             </p>
             {% elif status.status == 'SELECTED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Great news! You've been selected. Our team will contact you with an offer soon.
             </p>
             {% elif status.status == 'OFFER_EXTENDED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 An offer has been extended to you. Please check your email and respond at your earliest convenience.
             </p>
             {% elif status.status == 'OFFER_ACCEPTED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Congratulations on accepting our offer! HR will be in touch with onboarding details.
             </p>
             {% elif status.status == 'HIRED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Welcome to the team! We look forward to working with you.
             </p>
             {% elif status.status == 'REJECTED' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 We appreciate your interest, but we've decided to move forward with other candidates.
                 We encourage you to apply for future positions.
             </p>
             {% elif status.status == 'WITHDRAWN' %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 This application has been withdrawn.
             </p>
             {% else %}
-            <p class="text-sm text-slate-600 dark:text-slate-400">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
                 Your application is being processed. Please check back later for updates.
             </p>
             {% endif %}

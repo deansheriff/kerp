@@ -92,7 +92,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ doc.document_type.value | replace('_', ' ') | title }}
                         </td>
                         <td class="px-4 py-3 text-sm">
@@ -102,7 +102,7 @@
                                 {% elif doc.days_until_expiry <= 30 %}
                                 <span class="text-amber-600 dark:text-amber-400">{{ doc.expiry_date }} ({{ doc.days_until_expiry }}d)</span>
                                 {% else %}
-                                <span class="text-slate-600 dark:text-slate-400">{{ doc.expiry_date }}</span>
+                                <span class="text-slate-600 dark:text-slate-300">{{ doc.expiry_date }}</span>
                                 {% endif %}
                             {% else %}
                             <span class="text-slate-400">-</span>

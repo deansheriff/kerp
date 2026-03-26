@@ -60,11 +60,11 @@
                         {% for category in categories %}
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                             <td class="text-sm font-medium text-slate-900 dark:text-white">{{ category.category_code }}</td>
-                            <td class="text-sm text-slate-600 dark:text-slate-400">{{ category.category_name }}</td>
-                            <td class="text-sm text-slate-600 dark:text-slate-400">{{ category.depreciation_method | replace('_', ' ') | title }}</td>
-                            <td class="table-cell-amount text-slate-600 dark:text-slate-400">{{ category.useful_life_months }}</td>
-                            <td class="table-cell-amount text-slate-600 dark:text-slate-400">{{ category.residual_value_percent }}</td>
-                            <td class="table-cell-amount text-slate-600 dark:text-slate-400">{{ category.capitalization_threshold }}</td>
+                            <td class="text-sm text-slate-600 dark:text-slate-300">{{ category.category_name }}</td>
+                            <td class="text-sm text-slate-600 dark:text-slate-300">{{ category.depreciation_method | replace('_', ' ') | title }}</td>
+                            <td class="table-cell-amount text-slate-600 dark:text-slate-300">{{ category.useful_life_months }}</td>
+                            <td class="table-cell-amount text-slate-600 dark:text-slate-300">{{ category.residual_value_percent }}</td>
+                            <td class="table-cell-amount text-slate-600 dark:text-slate-300">{{ category.capitalization_threshold }}</td>
                             <td>
                                 {{ status_badge('ACTIVE' if category.is_active else 'INACTIVE', 'sm') }}
                             </td>

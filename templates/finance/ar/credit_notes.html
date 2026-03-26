@@ -74,7 +74,7 @@
                 <tbody>
                     {% for cn in credit_notes %}
                     <tr class="group">
-                        <td class="text-slate-600 dark:text-slate-400">{{ cn.credit_note_date }}</td>
+                        <td class="text-slate-600 dark:text-slate-300">{{ cn.credit_note_date }}</td>
                         <td>
                             <a href="/finance/ar/credit-notes/{{ cn.credit_note_id }}" class="font-mono text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors">
                                 {{ cn.credit_note_number }}
@@ -84,7 +84,7 @@
                             <p class="text-sm font-medium text-slate-900 dark:text-white">{{ cn.customer_name }}</p>
                         </td>
                         <td class="text-right font-mono font-medium text-slate-900 dark:text-white">{{ cn.total_amount | default(zero_amount) }}</td>
-                        <td class="text-right font-mono text-slate-600 dark:text-slate-400">{{ cn.amount_applied | default(zero_amount) }}</td>
+                        <td class="text-right font-mono text-slate-600 dark:text-slate-300">{{ cn.amount_applied | default(zero_amount) }}</td>
                         <td class="text-right font-mono font-medium text-slate-900 dark:text-white">{{ cn.balance | default(zero_amount) }}</td>
                         <td class="text-center">
                             {{ status_badge(cn.status | lower | default('draft'), 'sm') }}

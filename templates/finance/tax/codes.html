@@ -78,7 +78,7 @@
                             <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white">{{ code.tax_code }}</span>
                         </td>
                         <td>
-                            <span class="text-sm text-slate-600 dark:text-slate-400">{{ code.tax_name }}</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">{{ code.tax_name }}</span>
                         </td>
                         <td>
                             <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium
@@ -89,10 +89,10 @@
                                 {{ code.tax_type_label }}
                             </span>
                         </td>
-                        <td class="text-right font-mono text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-right font-mono text-sm text-slate-600 dark:text-slate-300">
                             {{ code.tax_rate_display }}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {% if code.applies_to_sales and code.applies_to_purchases %}
                             <span class="text-xs">Sales, Purchases</span>
                             {% elif code.applies_to_sales %}

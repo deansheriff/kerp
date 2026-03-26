@@ -43,7 +43,7 @@
 
     <div class="card p-6">
         <div class="flex items-center gap-4">
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-lg font-semibold text-white">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-600 dark:bg-amber-500 text-lg font-semibold text-white">
                 {{ usage_summary.employee.first_name[0] }}{{ usage_summary.employee.last_name[0] if usage_summary.employee.last_name else '' }}
             </div>
             <div>
@@ -116,7 +116,7 @@
                             <p class="text-xs text-slate-500">{{ rule.rule_code }}</p>
                         </td>
                         <td><span class="badge badge-neutral">{{ rule.scope_type.value | replace('_', ' ') | title }}</span></td>
-                        <td class="text-slate-600 dark:text-slate-400">{{ rule.period_type.value | title }}</td>
+                        <td class="text-slate-600 dark:text-slate-300">{{ rule.period_type.value | title }}</td>
                         <td class="text-right font-mono text-slate-900 dark:text-white">{{ "{:,.2f}".format(rule.limit_amount) }}</td>
                         <td>
                             {{ status_badge(rule.action_type.value) }}
@@ -155,7 +155,7 @@
                 <tbody>
                     {% for eval in usage_summary.recent_evaluations %}
                     <tr>
-                        <td class="text-slate-600 dark:text-slate-400">{{ eval.evaluated_at | format_datetime }}</td>
+                        <td class="text-slate-600 dark:text-slate-300">{{ eval.evaluated_at | format_datetime }}</td>
                         <td class="font-mono text-slate-900 dark:text-white">{{ eval.claim_id | string | truncate(8, True, '') }}</td>
                         <td class="text-right font-mono text-slate-700 dark:text-slate-300">{{ "{:,.2f}".format(eval.claim_amount) }}</td>
                         <td>

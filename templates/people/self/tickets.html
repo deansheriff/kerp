@@ -44,9 +44,9 @@
                         </td>
                         {% set status_value = ticket.status.value if ticket.status is defined and ticket.status.value is defined else ticket.status %}
                         {% set priority_value = ticket.priority.value if ticket.priority is defined and ticket.priority.value is defined else ticket.priority %}
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ status_value }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ priority_value }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ ticket.opening_date }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ status_value }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ priority_value }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ ticket.opening_date }}</td>
                         <td class="px-4 py-3 text-right text-sm space-x-3">
                             {% if "support" in accessible_modules %}
                             <a href="/support/tickets/{{ ticket.ticket_number }}"

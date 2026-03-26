@@ -57,8 +57,8 @@
                         <td class="px-6 py-4">
                             <p class="text-sm font-medium text-slate-900 dark:text-white">{{ task.name }}</p>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400 font-mono">{{ task.task_name }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ task.schedule }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 font-mono">{{ task.task_name }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ task.schedule }}</td>
                         <td class="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 font-mono">{{ task.args | default('-') }}</td>
                         <td class="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 font-mono">{{ task.kwargs | default('-') }}</td>
                         <td class="px-6 py-4">
@@ -74,8 +74,8 @@
                             </span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ task.last_run_at | default('-') }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ task.updated_at | default('-') }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ task.last_run_at | default('-') }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ task.updated_at | default('-') }}</td>
                         <td class="px-6 py-4 text-right">
                             <a href="/admin/tasks/{{ task.task_id }}/edit"
                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 transition-colors">

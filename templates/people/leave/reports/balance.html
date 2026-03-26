@@ -108,7 +108,7 @@
     <div class="card" x-data="{ expanded: false }">
         <div class="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors" @click="expanded = !expanded">
             <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-sm font-semibold text-white">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500 dark:bg-violet-400 text-sm font-semibold text-white">
                     {{ employee.employee_name.split()[0][0] }}{{ employee.employee_name.split()[-1][0] if employee.employee_name.split()|length > 1 else '' }}
                 </div>
                 <div>
@@ -151,9 +151,9 @@
                     {% for balance in employee.leave_balances %}
                     <tr>
                         <td class="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">{{ balance.leave_type_name }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-slate-600 dark:text-slate-400">{{ "{:.1f}".format(balance.allocated) }}</td>
-                        <td class="px-4 py-2 text-sm text-right text-slate-600 dark:text-slate-400">{{ "{:.1f}".format(balance.used) }}</td>
-                        <td class="px-4 py-2 text-sm text-right font-medium {% if balance.balance > 0 %}text-green-600 dark:text-green-400{% elif balance.balance < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-600 dark:text-slate-400{% endif %}">
+                        <td class="px-4 py-2 text-sm text-right text-slate-600 dark:text-slate-300">{{ "{:.1f}".format(balance.allocated) }}</td>
+                        <td class="px-4 py-2 text-sm text-right text-slate-600 dark:text-slate-300">{{ "{:.1f}".format(balance.used) }}</td>
+                        <td class="px-4 py-2 text-sm text-right font-medium {% if balance.balance > 0 %}text-green-600 dark:text-green-400{% elif balance.balance < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-600 dark:text-slate-300{% endif %}">
                             {{ "{:.1f}".format(balance.balance) }}
                         </td>
                         <td class="px-4 py-2">

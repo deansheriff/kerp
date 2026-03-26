@@ -106,10 +106,10 @@
                             </div>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="text-sm text-slate-600 dark:text-slate-400">{{ perm.description or '---' }}</span>
+                            <span class="text-sm text-slate-600 dark:text-slate-300">{{ perm.description or '---' }}</span>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="inline-flex items-center gap-1 text-sm text-slate-600 dark:text-slate-400">
+                            <span class="inline-flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300">
                                 {{ icon_svg("shield-check", "h-4 w-4 text-slate-400") }}
                                 {{ perm.role_count }} role{{ 's' if perm.role_count != 1 else '' }}
                             </span>

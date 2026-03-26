@@ -75,13 +75,13 @@
         <!-- View Toggle -->
         <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-700">
             <button @click="viewMode = 'tree'" type="button"
-                    :class="viewMode === 'tree' ? 'bg-white shadow text-amber-600 dark:bg-slate-600' : 'text-slate-600 dark:text-slate-400'"
+                    :class="viewMode === 'tree' ? 'bg-white shadow text-amber-600 dark:bg-slate-600' : 'text-slate-600 dark:text-slate-300'"
                     class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
                 {{ icon_svg("list-bullet", "h-4 w-4") }}
                 Tree
             </button>
             <button @click="viewMode = 'flat'" type="button"
-                    :class="viewMode === 'flat' ? 'bg-white shadow text-amber-600 dark:bg-slate-600' : 'text-slate-600 dark:text-slate-400'"
+                    :class="viewMode === 'flat' ? 'bg-white shadow text-amber-600 dark:bg-slate-600' : 'text-slate-600 dark:text-slate-300'"
                     class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
                 {{ icon_svg("menu", "h-4 w-4") }}
                 Flat
@@ -199,14 +199,14 @@
                             </td>
                             <td class="px-4 py-4">
                                 {% if task.assigned_to %}
-                                <span class="text-sm text-slate-600 dark:text-slate-400">{{ task.assigned_to.full_name if task.assigned_to.full_name else 'Assigned' }}</span>
+                                <span class="text-sm text-slate-600 dark:text-slate-300">{{ task.assigned_to.full_name if task.assigned_to.full_name else 'Assigned' }}</span>
                                 {% else %}
                                 <span class="text-sm text-slate-400 dark:text-slate-500">Unassigned</span>
                                 {% endif %}
                             </td>
                             <td class="px-4 py-4">
                                 {% if task.due_date %}
-                                <span class="text-sm {{ 'text-red-600 dark:text-red-400' if task.is_overdue else 'text-slate-600 dark:text-slate-400' }}">
+                                <span class="text-sm {{ 'text-red-600 dark:text-red-400' if task.is_overdue else 'text-slate-600 dark:text-slate-300' }}">
                                     {{ task.due_date | format_date }}
                                 </span>
                                 {% else %}
@@ -255,7 +255,7 @@
                             </td>
                             <td class="px-4 py-3">
                                 {% if subtask.assigned_to %}
-                                <span class="text-xs text-slate-600 dark:text-slate-400">{{ subtask.assigned_to.full_name if subtask.assigned_to.full_name else 'Assigned' }}</span>
+                                <span class="text-xs text-slate-600 dark:text-slate-300">{{ subtask.assigned_to.full_name if subtask.assigned_to.full_name else 'Assigned' }}</span>
                                 {% else %}
                                 <span class="text-xs text-slate-400">-</span>
                                 {% endif %}
@@ -317,14 +317,14 @@
                             </td>
                             <td class="px-4 py-4">
                                 {% if task.assigned_to %}
-                                <span class="text-sm text-slate-600 dark:text-slate-400">{{ task.assigned_to.full_name if task.assigned_to.full_name else 'Assigned' }}</span>
+                                <span class="text-sm text-slate-600 dark:text-slate-300">{{ task.assigned_to.full_name if task.assigned_to.full_name else 'Assigned' }}</span>
                                 {% else %}
                                 <span class="text-sm text-slate-400 dark:text-slate-500">Unassigned</span>
                                 {% endif %}
                             </td>
                             <td class="px-4 py-4">
                                 {% if task.due_date %}
-                                <span class="text-sm {{ 'text-red-600 dark:text-red-400' if task.is_overdue else 'text-slate-600 dark:text-slate-400' }}">
+                                <span class="text-sm {{ 'text-red-600 dark:text-red-400' if task.is_overdue else 'text-slate-600 dark:text-slate-300' }}">
                                     {{ task.due_date | format_date }}
                                 </span>
                                 {% else %}

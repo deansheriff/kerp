@@ -16,7 +16,7 @@
 
 {% block header_actions %}
 <a href="/automation/workflows/new"
-   class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-violet-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-violet-500/25 hover:from-violet-700 hover:to-violet-600">
+   class="inline-flex items-center gap-2 rounded-lg bg-violet-600 hover:bg-violet-700 px-4 py-2 text-sm font-medium text-white shadow-lg">
     {{ icon_svg("plus", "h-4 w-4") }}
     New Rule
 </a>
@@ -89,8 +89,8 @@
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs">{{ rule.description }}</p>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ rule.entity_type | replace('_', ' ') | title }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ rule.trigger_event }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ rule.entity_type | replace('_', ' ') | title }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ rule.trigger_event }}</td>
                         <td class="px-6 py-4">
                             {{ status_badge(rule.action_type, size="sm") }}
                         </td>

@@ -77,7 +77,7 @@
                             </td>
                             <td>
                                 <a href="/finance/ap/suppliers/{{ supplier.supplier_id }}" class="group/link flex items-center gap-3">
-                                    <div class="h-9 w-9 rounded-full bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-semibold shadow-sm">
+                                    <div class="h-9 w-9 rounded-full bg-rose-600 dark:bg-rose-500 flex items-center justify-center text-white text-xs font-semibold shadow-sm">
                                         {{ supplier.supplier_name[:2] | upper }}
                                     </div>
                                     <div>
@@ -90,7 +90,7 @@
                                     </div>
                                 </a>
                             </td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-400">{{ supplier.tax_id | default("—") }}</td>
+                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ supplier.tax_id | default("—") }}</td>
                             <td class="hidden sm:table-cell">
                                 <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                     Net {{ supplier.payment_terms_days | default(30) }}
@@ -101,7 +101,7 @@
                                 {{ status_badge('active' if supplier.is_active else 'inactive', 'sm') }}
                             </td>
                             <td class="hidden sm:table-cell">
-                                <div class="text-sm text-slate-600 dark:text-slate-400">
+                                <div class="text-sm text-slate-600 dark:text-slate-300">
                                     {% if supplier.created_at %}
                                     {{ supplier.created_at | format_date }}
                                     {% else %}

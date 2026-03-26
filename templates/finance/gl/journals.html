@@ -91,7 +91,7 @@
                         {% for entry in entries %}
                         <tr class="group">
                             {{ bulk_select_cell(entry.journal_entry_id) }}
-                            <td class="text-slate-600 dark:text-slate-400">{{ entry.entry_date }}</td>
+                            <td class="text-slate-600 dark:text-slate-300">{{ entry.entry_date }}</td>
                             <td>
                                 <a href="/finance/gl/journals/{{ entry.journal_entry_id }}" class="inline-flex items-center gap-2 font-mono text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 transition-colors" data-copy-text="{{ entry.entry_number }}" title="Click to copy entry number">
                                     <span class="h-5 w-0.5 rounded-full bg-teal-400 dark:bg-teal-500 opacity-60"></span>

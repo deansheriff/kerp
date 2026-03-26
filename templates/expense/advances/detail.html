@@ -95,7 +95,7 @@
                 </div>
                 <div class="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
                     <dt class="text-sm text-slate-500 dark:text-slate-400">Amount Refunded</dt>
-                    <dd class="text-sm font-mono tabular-nums text-slate-600 dark:text-slate-400">{{ "{:,.2f}".format(advance.amount_refunded) }}</dd>
+                    <dd class="text-sm font-mono tabular-nums text-slate-600 dark:text-slate-300">{{ "{:,.2f}".format(advance.amount_refunded) }}</dd>
                 </div>
                 <div class="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
                     <dt class="text-sm font-semibold text-slate-900 dark:text-white">Outstanding Balance</dt>
@@ -175,7 +175,7 @@
     {% if advance.notes %}
     <div class="card p-6">
         <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Notes</h3>
-        <p class="text-sm text-slate-600 dark:text-slate-400">{{ advance.notes }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300">{{ advance.notes }}</p>
     </div>
     {% endif %}
 

@@ -177,7 +177,7 @@
                                 <div class="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                                     <div class="h-full bg-violet-500 rounded-full" style="width: {{ src.percentage }}%"></div>
                                 </div>
-                                <span class="text-sm text-slate-600 dark:text-slate-400">{{ src.percentage }}%</span>
+                                <span class="text-sm text-slate-600 dark:text-slate-300">{{ src.percentage }}%</span>
                             </div>
                         </td>
                     </tr>
@@ -208,7 +208,7 @@
     {% if report.sources and report.best_source %}
     <div class="card p-5">
         <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-3">Insights</h3>
-        <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+        <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
             <li class="flex items-start gap-2">
                 {{ icon_svg("check-circle", "h-5 w-5 text-teal-500 flex-shrink-0 mt-0.5") }}
                 <span><strong>{{ report.best_source }}</strong> is your best performing source with the highest hire rate.</span>

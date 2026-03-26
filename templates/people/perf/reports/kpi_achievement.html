@@ -133,7 +133,7 @@
                         {% elif s.status == 'DRAFT' %}bg-slate-400
                         {% elif s.status == 'CANCELLED' %}bg-rose-500
                         {% else %}bg-amber-500{% endif %}"></div>
-                    <span class="text-sm text-slate-600 dark:text-slate-400">{{ s.status | replace('_', ' ') | title }} ({{ s.count }})</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">{{ s.status | replace('_', ' ') | title }} ({{ s.count }})</span>
                 </div>
                 {% endfor %}
             </div>

@@ -45,7 +45,7 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for event in events %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ event.occurred_at }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ event.occurred_at }}</td>
                         <td class="px-6 py-4">
                             <p class="text-sm font-medium text-slate-900 dark:text-white">{{ event.actor_name }}</p>
                             <p class="text-xs text-slate-500 dark:text-slate-400">{{ event.actor_type_label }}</p>
@@ -54,13 +54,13 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4">
-                            <p class="text-sm text-slate-600 dark:text-slate-400">{{ event.action_label }}</p>
+                            <p class="text-sm text-slate-600 dark:text-slate-300">{{ event.action_label }}</p>
                             {% if event.action %}
                             <p class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ event.action }}</p>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4">
-                            <p class="text-sm text-slate-600 dark:text-slate-400">{{ event.entity_label }}</p>
+                            <p class="text-sm text-slate-600 dark:text-slate-300">{{ event.entity_label }}</p>
                             {% if event.entity_id %}
                             <p class="text-xs text-slate-500 dark:text-slate-500 font-mono">{{ event.entity_id }}</p>
                             {% endif %}

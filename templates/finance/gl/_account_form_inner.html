@@ -101,38 +101,38 @@
             </summary>
             <div class="mt-4 grid gap-4 pl-6 sm:grid-cols-2">
                 {% set fd = form_data %}
-                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" name="is_active" id="is_active" value="true" class="rounded"
                            {% if fd %}{% if fd.is_active %}checked{% endif %}{% elif account %}{% if account.is_active %}checked{% endif %}{% else %}checked{% endif %}>
                     Active
                 </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" name="is_posting_allowed" id="is_posting_allowed" value="true" class="rounded"
                            {% if fd %}{% if fd.is_posting_allowed %}checked{% endif %}{% elif account %}{% if account.is_posting_allowed %}checked{% endif %}{% else %}checked{% endif %}>
                     Posting Allowed
                     <span id="posting_hint" class="hidden text-xs text-slate-400"></span>
                 </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" name="is_budgetable" id="is_budgetable" value="true" class="rounded"
                            {% if fd %}{% if fd.is_budgetable %}checked{% endif %}{% elif account and account.is_budgetable %}checked{% endif %}>
                     Budgetable
                 </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" name="is_reconciliation_required" id="is_reconciliation_required" value="true" class="rounded"
                            {% if fd %}{% if fd.is_reconciliation_required %}checked{% endif %}{% elif account and account.is_reconciliation_required %}checked{% endif %}>
                     Reconciliation Required
                 </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" name="is_multi_currency" id="is_multi_currency" value="true" class="rounded"
                            {% if fd %}{% if fd.is_multi_currency %}checked{% endif %}{% elif account and account.is_multi_currency %}checked{% endif %}>
                     Multi-currency
                 </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" name="is_cash_equivalent" id="is_cash_equivalent" value="true" class="rounded"
                            {% if fd %}{% if fd.is_cash_equivalent %}checked{% endif %}{% elif account and account.is_cash_equivalent %}checked{% endif %}>
                     Cash Equivalent <span class="text-xs text-slate-400">(IAS 7)</span>
                 </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <input type="checkbox" name="is_financial_instrument" id="is_financial_instrument" value="true" class="rounded"
                            {% if fd %}{% if fd.is_financial_instrument %}checked{% endif %}{% elif account and account.is_financial_instrument %}checked{% endif %}>
                     Financial Instrument <span class="text-xs text-slate-400">(IFRS 9)</span>

@@ -243,11 +243,11 @@
                             <div class="text-sm font-medium text-slate-900 dark:text-white">{{ rec.employee_name }}</div>
                             <div class="text-xs text-slate-500 dark:text-slate-400">{{ rec.employee_code }}</div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ rec.shift_name }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ rec.shift_name }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ rec.check_in_display if rec.check_in_display is defined else (rec.check_in.strftime("%H:%M") if rec.check_in else "-") }}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ rec.check_out_display if rec.check_out_display is defined else (rec.check_out.strftime("%H:%M") if rec.check_out else "-") }}
                         </td>
                         <td class="px-4 py-3 text-right text-sm text-slate-700 dark:text-slate-300 font-mono">

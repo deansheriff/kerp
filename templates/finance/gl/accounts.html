@@ -96,13 +96,13 @@
                                     {{ account.category | replace('_', ' ') | title }}
                                 </span>
                             </td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-400">{{ account.normal_balance }}</td>
+                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ account.normal_balance }}</td>
                             <td class="text-right font-mono font-medium text-slate-900 dark:text-white">{{ account.balance | default(zero_amount) }}</td>
                             <td class="text-center">
                                 {{ status_badge('active' if account.is_active else 'inactive', 'sm') }}
                             </td>
                             <td class="hidden sm:table-cell">
-                                <div class="text-sm text-slate-600 dark:text-slate-400">
+                                <div class="text-sm text-slate-600 dark:text-slate-300">
                                     {% if account.created_at %}
                                     {{ account.created_at | format_date }}
                                     {% else %}

@@ -201,7 +201,7 @@
         {% if not setting_data %}
         <div class="admin-card p-6">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white font-display mb-4">Common Settings</h2>
-            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Click to auto-fill a suggested setting:</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">Click to auto-fill a suggested setting:</p>
             <div class="grid gap-2" x-data>
                 {% set suggestions = [
                     {'key': 'max_login_attempts', 'domain': 'auth', 'type': 'integer', 'desc': 'Maximum failed login attempts'},

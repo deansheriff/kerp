@@ -42,8 +42,8 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for payment in overdue_payments %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ payment.lease_id }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ payment.payment_date }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ payment.lease_id }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ payment.payment_date }}</td>
                         <td class="px-6 py-4 text-right text-sm font-medium text-slate-900 dark:text-white">{{ payment.total_payment }}</td>
                         <td class="px-6 py-4">{{ status_badge(payment.status) }}</td>
                     </tr>

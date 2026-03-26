@@ -97,13 +97,13 @@
                             <div class="font-medium text-slate-900 dark:text-white">{{ interview.scheduled_from | format_date }}</div>
                             <div class="text-xs text-slate-500 dark:text-slate-400">{{ interview.scheduled_from.strftime('%I:%M %p') }} - {{ interview.interview_type | replace('_', ' ') }}</div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ interview.round.value | replace('_', ' ') | title }}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {{ interview.applicant.full_name if interview.applicant else '-' }}
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                             {% if interview.interviewer %}
                             {{ interview.interviewer.first_name }} {{ interview.interviewer.last_name }}
                             {% else %}

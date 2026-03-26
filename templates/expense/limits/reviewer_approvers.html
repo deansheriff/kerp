@@ -47,14 +47,14 @@
                             {% endif %}
                         </td>
                         <td class="text-right font-mono">{{ "{:,.2f}".format(approver.max_approval_amount) }} {{ approver.currency_code }}</td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {% if approver.last_action_at %}
                                 {{ approver.last_action_at.strftime('%Y-%m-%d %H:%M UTC') }}
                             {% else %}
                                 -
                             {% endif %}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {% if approver.last_reset_at %}
                                 {{ approver.last_reset_at.strftime('%Y-%m-%d %H:%M UTC') }}
                             {% else %}

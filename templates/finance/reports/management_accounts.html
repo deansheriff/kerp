@@ -93,7 +93,7 @@
 
             <!-- Revenue -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Revenue</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Revenue</h3>
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b-2 border-slate-200 dark:border-slate-700">
@@ -127,7 +127,7 @@
 
             <!-- Cost of Sales -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Cost of Sales</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Cost of Sales</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         {% for item in cost_of_sales_items %}
@@ -161,7 +161,7 @@
 
             <!-- Operating Expenses -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Operating Expenses</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Operating Expenses</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         {% for item in opex_items %}
@@ -208,7 +208,7 @@
             <!-- Non-Current Assets -->
             {% if fa_items %}
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Non-Current Assets</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Non-Current Assets</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         {% for item in fa_items %}
@@ -234,7 +234,7 @@
 
             <!-- Current Assets -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Current Assets</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Current Assets</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         {% for item in ca_items %}
@@ -265,7 +265,7 @@
 
             <!-- Equity -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Equity</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Equity</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         {% for item in equity_items %}
@@ -297,7 +297,7 @@
             <!-- Non-Current Liabilities -->
             {% if ncl_items %}
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Non-Current Liabilities</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Non-Current Liabilities</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         {% for item in ncl_items %}
@@ -321,7 +321,7 @@
 
             <!-- Current Liabilities -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Current Liabilities</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Current Liabilities</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         {% for item in cl_items %}
@@ -362,7 +362,7 @@
 
             <!-- Operating Activities -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Cash Flows from Operating Activities</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Cash Flows from Operating Activities</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
@@ -370,39 +370,39 @@
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if operating_profit_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">{{ operating_profit }}</td>
                         </tr>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-6">Depreciation &amp; Amortisation</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-6">Depreciation &amp; Amortisation</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums text-slate-900 dark:text-white w-40">{{ depreciation_charge }}</td>
                         </tr>
                         <tr class="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-6 font-medium italic">Working Capital Changes:</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-6 font-medium italic">Working Capital Changes:</td>
                             <td class="py-2 px-2 w-40"></td>
                         </tr>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-10">(Increase)/Decrease in Trade Receivables</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-10">(Increase)/Decrease in Trade Receivables</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if chg_receivables_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if chg_receivables_raw < 0 %}({{ chg_receivables | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ chg_receivables }}{% endif %}
                             </td>
                         </tr>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-10">(Increase)/Decrease in Inventory</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-10">(Increase)/Decrease in Inventory</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if chg_inventory_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if chg_inventory_raw < 0 %}({{ chg_inventory | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ chg_inventory }}{% endif %}
                             </td>
                         </tr>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-10">(Increase)/Decrease in Other Current Assets</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-10">(Increase)/Decrease in Other Current Assets</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if chg_other_ca_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if chg_other_ca_raw < 0 %}({{ chg_other_ca | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ chg_other_ca }}{% endif %}
                             </td>
                         </tr>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-10">Increase/(Decrease) in Trade Payables</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-10">Increase/(Decrease) in Trade Payables</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if chg_payables_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if chg_payables_raw < 0 %}({{ chg_payables | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ chg_payables }}{% endif %}
                             </td>
                         </tr>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-10">Increase/(Decrease) in Other Current Liabilities</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-10">Increase/(Decrease) in Other Current Liabilities</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if chg_other_cl_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if chg_other_cl_raw < 0 %}({{ chg_other_cl | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ chg_other_cl }}{% endif %}
                             </td>
@@ -421,11 +421,11 @@
 
             <!-- Investing Activities -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Cash Flows from Investing Activities</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Cash Flows from Investing Activities</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-6">Purchase of Property, Plant &amp; Equipment</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-6">Purchase of Property, Plant &amp; Equipment</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if capex_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if capex_raw < 0 %}({{ capex | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ capex }}{% endif %}
                             </td>
@@ -444,17 +444,17 @@
 
             <!-- Financing Activities -->
             <div>
-                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Cash Flows from Financing Activities</h3>
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">Cash Flows from Financing Activities</h3>
                 <table class="w-full text-sm">
                     <tbody>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-6">Net Borrowings Movement</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-6">Net Borrowings Movement</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if chg_ncl_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if chg_ncl_raw < 0 %}({{ chg_ncl | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ chg_ncl }}{% endif %}
                             </td>
                         </tr>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-6">Equity Movements</td>
+                            <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-6">Equity Movements</td>
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if chg_equity_movement_raw < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-900 dark:text-white{% endif %} w-40">
                                 {% if chg_equity_movement_raw < 0 %}({{ chg_equity_movement | replace('-', '') | replace('(', '') | replace(')', '') }}){% else %}{{ chg_equity_movement }}{% endif %}
                             </td>
@@ -481,7 +481,7 @@
                 </div>
                 <div class="flex justify-between items-center py-2 px-4">
                     <span class="text-sm text-slate-500 dark:text-slate-400">Opening Cash &amp; Cash Equivalents</span>
-                    <span class="font-mono tabular-nums text-sm text-slate-600 dark:text-slate-400">{{ ob_cash }}</span>
+                    <span class="font-mono tabular-nums text-sm text-slate-600 dark:text-slate-300">{{ ob_cash }}</span>
                 </div>
                 <div class="flex justify-between items-center py-3 px-4 rounded-lg {% if closing_cash_raw >= 0 %}bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800{% else %}bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800{% endif %}">
                     <span class="font-bold text-slate-900 dark:text-white">Closing Cash &amp; Cash Equivalents</span>
@@ -513,7 +513,7 @@
                     </tr>
                     {% for item in ob_equity_items %}
                     <tr class="border-b border-slate-100 dark:border-slate-800">
-                        <td class="py-2 px-2 text-slate-600 dark:text-slate-400 pl-6">{{ item.account_name }}</td>
+                        <td class="py-2 px-2 text-slate-600 dark:text-slate-300 pl-6">{{ item.account_name }}</td>
                         <td class="py-2 px-2 text-right font-mono tabular-nums text-slate-500 dark:text-slate-400 w-40">{{ item.amount }}</td>
                     </tr>
                     {% endfor %}
@@ -566,7 +566,7 @@
                             <td class="py-2 px-2 text-right font-mono tabular-nums {% if m.net_profit < 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">
                                 {{ m.net_profit_formatted }}
                             </td>
-                            <td class="py-2 px-2 text-right font-mono tabular-nums hidden sm:table-cell {% if m.margin < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-600 dark:text-slate-400{% endif %}">{{ m.margin }}%</td>
+                            <td class="py-2 px-2 text-right font-mono tabular-nums hidden sm:table-cell {% if m.margin < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-600 dark:text-slate-300{% endif %}">{{ m.margin }}%</td>
                         </tr>
                         {% endfor %}
                     </tbody>

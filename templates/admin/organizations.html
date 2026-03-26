@@ -71,11 +71,11 @@
                             <p class="text-sm font-medium text-slate-900 dark:text-white">{{ org.legal_name }}</p>
                             <p class="text-xs text-slate-500 dark:text-slate-400">{{ org.organization_code }}{% if org.trading_name %} - {{ org.trading_name }}{% endif %}</p>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ org.country_code | default('-') }}</td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ org.country_code | default('-') }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                             {{ org.functional_currency }} / {{ org.presentation_currency }}
                         </td>
-                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-300">
                             {{ org.active_users }} / {{ org.total_users }}
                         </td>
                         <td class="px-6 py-4">
@@ -91,7 +91,7 @@
                             </span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ org.created_at }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ org.created_at }}</td>
                         <td class="px-6 py-4 text-right">
                             <a href="/admin/organizations/{{ org.organization_id }}/edit"
                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 transition-colors">

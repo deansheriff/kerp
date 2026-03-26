@@ -192,7 +192,7 @@
 
             {# Description #}
             {% if entry.description %}
-            <p class="mt-3 text-slate-600 dark:text-slate-400">{{ entry.description }}</p>
+            <p class="mt-3 text-slate-600 dark:text-slate-300">{{ entry.description }}</p>
             {% endif %}
 
             {# Journal Dates Row #}
@@ -237,7 +237,7 @@
                                     <div class="font-medium">{{ line.account_code }}</div>
                                     <div class="text-xs text-slate-500">{{ line.account_name }}</div>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                                <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                                     {{ line.description | default("-") }}
                                     {% if line.reference %}
                                     <div class="text-xs text-slate-400">Ref: {{ line.reference }}</div>
@@ -330,7 +330,7 @@
                 {{ icon_svg("chat", "h-4 w-4") }}
                 Notes
             </h3>
-            <p class="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ entry.notes }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ entry.notes }}</p>
         </div>
         {% endif %}
         {% if entry.internal_notes %}
@@ -339,7 +339,7 @@
                 {{ icon_svg("lock-closed", "h-4 w-4") }}
                 Internal Notes
             </h3>
-            <p class="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ entry.internal_notes }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ entry.internal_notes }}</p>
         </div>
         {% endif %}
     </div>
@@ -370,7 +370,7 @@
         </button>
         <div x-show="expanded" x-collapse class="mt-4 space-y-2 text-sm">
             {% if entry.created_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                     {{ icon_svg("plus", "h-3 w-3") }}
                 </span>
@@ -378,7 +378,7 @@
             </div>
             {% endif %}
             {% if entry.approved_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                     {{ icon_svg("check", "h-3 w-3 text-emerald-600 dark:text-emerald-400") }}
                 </span>
@@ -386,7 +386,7 @@
             </div>
             {% endif %}
             {% if entry.posted_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30">
                     {{ icon_svg("document", "h-3 w-3 text-purple-600 dark:text-purple-400") }}
                 </span>
@@ -394,7 +394,7 @@
             </div>
             {% endif %}
             {% if entry.reversed_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
                     {{ icon_svg("reply", "h-3 w-3 text-amber-600 dark:text-amber-400") }}
                 </span>
@@ -402,7 +402,7 @@
             </div>
             {% endif %}
             {% if entry.updated_at and entry.updated_at != entry.created_at %}
-            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                     {{ icon_svg("edit", "h-3 w-3") }}
                 </span>

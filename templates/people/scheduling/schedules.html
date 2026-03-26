@@ -54,7 +54,7 @@
     {% if department_id and schedule_status %}
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-            <span class="text-sm text-slate-600 dark:text-slate-400">Status:</span>
+            <span class="text-sm text-slate-600 dark:text-slate-300">Status:</span>
             {{ status_badge(schedule_status, 'sm') }}
         </div>
         {% if schedule_status == 'DRAFT' %}

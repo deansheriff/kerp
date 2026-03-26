@@ -111,7 +111,7 @@
                 </div>
                 <div class="card-body">
                     {% if cycle.description %}
-                    <p class="text-slate-600 dark:text-slate-400 mb-4">{{ cycle.description }}</p>
+                    <p class="text-slate-600 dark:text-slate-300 mb-4">{{ cycle.description }}</p>
                     {% endif %}
 
                     <dl class="grid grid-cols-2 gap-4 text-sm">
@@ -200,7 +200,7 @@
                                         {{ appraisal.employee.full_name if appraisal.employee else '-' }}
                                     </a>
                                 </td>
-                                <td class="px-4 py-2 text-sm text-slate-600 dark:text-slate-400">
+                                <td class="px-4 py-2 text-sm text-slate-600 dark:text-slate-300">
                                     {{ appraisal.manager.full_name if appraisal.manager else '-' }}
                                 </td>
                                 <td class="px-4 py-2 text-sm">
@@ -260,35 +260,35 @@
                                 <span class="w-2 h-2 rounded-full bg-slate-400"></span>
                                 Draft
                             </span>
-                            <span class="text-slate-600 dark:text-slate-400">{{ stats.draft }}</span>
+                            <span class="text-slate-600 dark:text-slate-300">{{ stats.draft }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="flex items-center gap-2">
                                 <span class="w-2 h-2 rounded-full bg-blue-500"></span>
                                 Self Assessment
                             </span>
-                            <span class="text-slate-600 dark:text-slate-400">{{ stats.self_assessment }}</span>
+                            <span class="text-slate-600 dark:text-slate-300">{{ stats.self_assessment }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="flex items-center gap-2">
                                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                                 Under Review
                             </span>
-                            <span class="text-slate-600 dark:text-slate-400">{{ stats.under_review }}</span>
+                            <span class="text-slate-600 dark:text-slate-300">{{ stats.under_review }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="flex items-center gap-2">
                                 <span class="w-2 h-2 rounded-full bg-purple-500"></span>
                                 Calibration
                             </span>
-                            <span class="text-slate-600 dark:text-slate-400">{{ stats.calibration }}</span>
+                            <span class="text-slate-600 dark:text-slate-300">{{ stats.calibration }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="flex items-center gap-2">
                                 <span class="w-2 h-2 rounded-full bg-green-500"></span>
                                 Completed
                             </span>
-                            <span class="text-slate-600 dark:text-slate-400">{{ stats.completed }}</span>
+                            <span class="text-slate-600 dark:text-slate-300">{{ stats.completed }}</span>
                         </div>
                         {% if stats.cancelled > 0 %}
                         <div class="flex justify-between">
@@ -296,7 +296,7 @@
                                 <span class="w-2 h-2 rounded-full bg-red-500"></span>
                                 Cancelled
                             </span>
-                            <span class="text-slate-600 dark:text-slate-400">{{ stats.cancelled }}</span>
+                            <span class="text-slate-600 dark:text-slate-300">{{ stats.cancelled }}</span>
                         </div>
                         {% endif %}
                     </div>

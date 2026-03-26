@@ -107,14 +107,14 @@
                         <td>
                             <span class="badge badge-neutral">{{ rule.scope_type.value | replace('_', ' ') | title }}</span>
                         </td>
-                        <td class="text-slate-600 dark:text-slate-400">{{ rule.period_type.value | title }}</td>
+                        <td class="text-slate-600 dark:text-slate-300">{{ rule.period_type.value | title }}</td>
                         <td class="text-right font-mono text-slate-900 dark:text-white">
                             {{ "{:,.2f}".format(rule.limit_amount) }}
                         </td>
                         <td>
                             {{ status_badge(rule.action_type.value) }}
                         </td>
-                        <td class="text-center text-slate-600 dark:text-slate-400">{{ rule.priority | replace('_', ' ') | title }}</td>
+                        <td class="text-center text-slate-600 dark:text-slate-300">{{ rule.priority | replace('_', ' ') | title }}</td>
                         <td>
                             {% if rule.is_active %}
                             <span class="badge badge-success">Active</span>

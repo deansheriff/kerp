@@ -65,10 +65,10 @@
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-xs">{{ fp.description }}</p>
                             {% endif %}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {{ fp.customer_type if fp.customer_type else '—' }}
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
                             {{ fp.supplier_type if fp.supplier_type else '—' }}
                         </td>
                         <td class="text-center">
@@ -78,10 +78,10 @@
                             <span class="text-xs text-slate-400">No</span>
                             {% endif %}
                         </td>
-                        <td class="text-right font-mono text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-right font-mono text-sm text-slate-600 dark:text-slate-300">
                             {{ fp.priority }}
                         </td>
-                        <td class="text-center text-sm text-slate-600 dark:text-slate-400">
+                        <td class="text-center text-sm text-slate-600 dark:text-slate-300">
                             <span class="font-mono">{{ fp.tax_map_count }}T</span>
                             <span class="text-slate-300 dark:text-slate-600 mx-1">/</span>
                             <span class="font-mono">{{ fp.account_map_count }}A</span>

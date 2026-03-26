@@ -16,7 +16,7 @@
 
 {% block header_actions %}
 <a href="/automation/templates/new"
-   class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-rose-600 to-rose-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-rose-500/25 hover:from-rose-700 hover:to-rose-600">
+   class="inline-flex items-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-700 px-4 py-2 text-sm font-medium text-white shadow-lg">
     {{ icon_svg("plus", "h-4 w-4") }}
     New Template
 </a>
@@ -60,7 +60,7 @@
         {% for template in templates %}
         <div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-800/50 overflow-hidden">
             <!-- Preview Area -->
-            <div class="relative h-40 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-700 dark:to-slate-800">
+            <div class="relative h-40 bg-slate-100 dark:bg-slate-700">
                 <div class="absolute inset-0 flex items-center justify-center">
                     {{ icon_svg("document", "h-16 w-16 text-slate-300 dark:text-slate-600", stroke_width="1.5") }}
                 </div>
@@ -93,7 +93,7 @@
                     </div>
                 </div>
                 {% if template.description %}
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{{ template.description }}</p>
+                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300 line-clamp-2">{{ template.description }}</p>
                 {% endif %}
                 <div class="mt-4 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
                     <span class="text-xs text-slate-500 dark:text-slate-400">Updated {{ template.updated_at }}</span>

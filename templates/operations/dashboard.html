@@ -109,7 +109,7 @@
                         {% for lot in expiring_lots %}
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                             <td class="px-4 py-2 font-medium text-slate-900 dark:text-white">{{ lot.lot_number }}</td>
-                            <td class="px-4 py-2 text-slate-600 dark:text-slate-400">{{ lot.item.item_name if lot.item else '-' }}</td>
+                            <td class="px-4 py-2 text-slate-600 dark:text-slate-300">{{ lot.item.item_name if lot.item else '-' }}</td>
                             <td class="px-4 py-2 text-right font-mono">{{ lot.quantity_available }}</td>
                             <td class="px-4 py-2 text-amber-600 dark:text-amber-400">{{ lot.expiry_date | format_date if lot.expiry_date else '-' }}</td>
                         </tr>
@@ -165,7 +165,7 @@
                                 <a href="/inventory/transactions/{{ txn.transaction_id }}" class="text-blue-600 hover:underline dark:text-blue-400">{{ txn.reference_number or '-' }}</a>
                             </td>
                             <td class="px-4 py-2 text-right font-mono">{{ txn.quantity }}</td>
-                            <td class="px-4 py-2 text-slate-600 dark:text-slate-400">{{ txn.transaction_date if txn.transaction_date else '-' }}</td>
+                            <td class="px-4 py-2 text-slate-600 dark:text-slate-300">{{ txn.transaction_date if txn.transaction_date else '-' }}</td>
                         </tr>
                         {% else %}
                         <tr>

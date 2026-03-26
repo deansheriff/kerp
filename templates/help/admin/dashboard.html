@@ -58,19 +58,19 @@
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Engagement</h2>
             <div class="mt-4 space-y-4">
                 <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span class="text-sm text-slate-600 dark:text-slate-400">Article Completions</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">Article Completions</span>
                     <span class="font-mono text-lg font-semibold text-slate-900 dark:text-white">{{ completion_count }}</span>
                 </div>
                 <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span class="text-sm text-slate-600 dark:text-slate-400">Helpful Ratings</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">Helpful Ratings</span>
                     <span class="font-mono text-lg font-semibold text-emerald-600 dark:text-emerald-400">{{ feedback_counts.get('helpful', 0) }}</span>
                 </div>
                 <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span class="text-sm text-slate-600 dark:text-slate-400">Not Helpful Ratings</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">Not Helpful Ratings</span>
                     <span class="font-mono text-lg font-semibold text-rose-600 dark:text-rose-400">{{ feedback_counts.get('not_helpful', 0) }}</span>
                 </div>
                 <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span class="text-sm text-slate-600 dark:text-slate-400">Archived Articles</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">Archived Articles</span>
                     <span class="font-mono text-lg font-semibold text-slate-500">{{ status_counts.get('ARCHIVED', 0) }}</span>
                 </div>
             </div>

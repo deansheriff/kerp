@@ -73,15 +73,15 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for setting in settings %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ setting.domain | upper }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ setting.domain | upper }}</td>
                         <td class="px-6 py-4">
                             <p class="text-sm font-medium text-slate-900 dark:text-white">{{ setting.key }}</p>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400 font-mono">{{ setting.value }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 font-mono">{{ setting.value }}</td>
                         <td class="px-6 py-4">
                             {{ status_badge(setting.value_type, size="sm") }}
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                             {{ 'Yes' if setting.is_secret else 'No' }}
                         </td>
                         <td class="px-6 py-4">
@@ -97,7 +97,7 @@
                             </span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ setting.updated_at }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ setting.updated_at }}</td>
                         <td class="px-6 py-4 text-right">
                             <a href="/admin/settings/{{ setting.setting_id }}/edit"
                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 transition-colors">

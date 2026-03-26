@@ -195,8 +195,8 @@
                                 {{ inv.invoice_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ inv.invoice_date }}</td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ inv.due_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ inv.invoice_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ inv.due_date }}</td>
                         <td class="table-cell-amount">{{ inv.total_amount }}</td>
                         <td class="table-cell-amount">{{ inv.balance }}</td>
                         <td>{{ status_badge('OVERDUE' if inv.is_overdue else inv.status, 'sm') }}</td>
@@ -233,10 +233,10 @@
                                 {{ r.payment_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ r.payment_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ r.payment_date }}</td>
                         <td class="table-cell-amount">{{ r.amount }}</td>
                         <td class="text-sm">{{ r.payment_method | replace('_', ' ') | title }}</td>
-                        <td class="text-sm font-mono text-slate-600 dark:text-slate-400">{{ r.reference }}</td>
+                        <td class="text-sm font-mono text-slate-600 dark:text-slate-300">{{ r.reference }}</td>
                         <td>{{ status_badge(r.status, 'sm') }}</td>
                     </tr>
                     {% else %}
@@ -270,8 +270,8 @@
                                 {{ q.quote_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ q.quote_date }}</td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ q.valid_until }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ q.quote_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ q.valid_until }}</td>
                         <td class="table-cell-amount">{{ q.total_amount }}</td>
                         <td>{{ status_badge(q.status, 'sm') }}</td>
                     </tr>
@@ -305,7 +305,7 @@
                                 {{ so.so_number }}
                             </a>
                         </td>
-                        <td class="text-sm text-slate-600 dark:text-slate-400">{{ so.order_date }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ so.order_date }}</td>
                         <td class="table-cell-amount">{{ so.total_amount }}</td>
                         <td>{{ status_badge(so.status, 'sm') }}</td>
                     </tr>

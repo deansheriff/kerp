@@ -92,15 +92,15 @@
                                 </span>
                                 {% endif %}
                             </td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-400">{{ customer.tax_id | default("—") }}</td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-400">Net {{ customer.payment_terms_days | default(30) }}</td>
-                            <td class="text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">{{ customer.credit_limit | default("—") }}</td>
+                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ customer.tax_id | default("—") }}</td>
+                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">Net {{ customer.payment_terms_days | default(30) }}</td>
+                            <td class="text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">{{ customer.credit_limit | default("—") }}</td>
                             <td class="text-right font-mono tabular-nums font-medium text-slate-900 dark:text-white">{{ customer.balance | default("—") }}</td>
                             <td class="text-center">
                                 {{ status_badge('active' if customer.is_active else 'inactive', 'sm') }}
                             </td>
                             <td class="hidden sm:table-cell">
-                                <div class="text-sm text-slate-600 dark:text-slate-400">
+                                <div class="text-sm text-slate-600 dark:text-slate-300">
                                     {% if customer.created_at %}
                                     {{ customer.created_at | format_date }}
                                     {% else %}

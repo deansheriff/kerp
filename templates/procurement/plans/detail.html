@@ -50,10 +50,10 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for item in items %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{{ item.line_number }}</td>
+                        <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ item.line_number }}</td>
                         <td class="px-4 py-3 text-slate-900 dark:text-white">{{ item.description }}</td>
-                        <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{{ item.procurement_method.value }}</td>
-                        <td class="px-4 py-3 text-slate-600 dark:text-slate-400">Q{{ item.planned_quarter }}</td>
+                        <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ item.procurement_method.value }}</td>
+                        <td class="px-4 py-3 text-slate-600 dark:text-slate-300">Q{{ item.planned_quarter }}</td>
                         <td class="px-4 py-3 text-right font-medium font-mono tabular-nums text-slate-900 dark:text-white">{{ "{:,.2f}".format(item.estimated_value) }}</td>
                         <td class="px-4 py-3">{{ status_badge(item.status.value, size="sm") }}</td>
                     </tr>

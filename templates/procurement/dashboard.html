@@ -51,27 +51,17 @@
     </div>
     {% endif %}
 
-    <!-- Summary Stats -->
+    <!-- Summary Stats: hero card + secondary row -->
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="card p-4">
-            <div class="flex items-center gap-3">
-                <div class="card-icon bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                    {{ icon_svg("clipboard") }}
+        <!-- Hero stat: Procurement Plans spans 2 cols -->
+        <div class="card p-5 sm:col-span-2 border-l-4 border-blue-500 dark:border-blue-400">
+            <div class="flex items-center gap-4">
+                <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    {{ icon_svg("clipboard", "h-7 w-7") }}
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ plan_summary.total_plans }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Procurement Plans</p>
-                </div>
-            </div>
-        </div>
-        <div class="card p-4">
-            <div class="flex items-center gap-3">
-                <div class="card-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                    {{ icon_svg("clock") }}
-                </div>
-                <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ pending_req_count }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Pending Requisitions</p>
+                    <p class="text-3xl font-bold text-slate-900 dark:text-white font-display">{{ plan_summary.total_plans }}</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Procurement Plans</p>
                 </div>
             </div>
         </div>
@@ -99,10 +89,26 @@
         </div>
     </div>
 
-    <!-- Pending Requisitions & Active Contracts side-by-side -->
-    <div class="grid gap-6 lg:grid-cols-2">
-        <!-- Pending Requisitions -->
-        <div class="card">
+    {% if pending_req_count > 0 %}
+    <!-- Needs Attention Banner -->
+    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/50 dark:bg-amber-900/20">
+        <div class="flex items-center gap-3">
+            {{ icon_svg("clock", "h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400") }}
+            <p class="text-sm font-medium text-amber-800 dark:text-amber-200">
+                <span class="font-semibold">{{ pending_req_count }} requisition{{ '' if pending_req_count == 1 else 's' }}</span> awaiting approval.
+                <a href="/procurement/requisitions?status=SUBMITTED" class="underline hover:text-amber-900 dark:hover:text-amber-100">Review now</a>
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Activity -->
+    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Activity</h2>
+
+    <!-- Pending Requisitions & Active Contracts: asymmetric layout -->
+    <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Pending Requisitions (wider) -->
+        <div class="lg:col-span-2 card">
             <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Pending Requisitions</h2>
                 <a href="/procurement/requisitions?status=SUBMITTED" class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">View All</a>
@@ -168,10 +174,11 @@
         </div>
     </div>
 
-    <!-- Open RFQs & Recent Plans side-by-side -->
-    <div class="grid gap-6 lg:grid-cols-2">
-        <!-- Open RFQs -->
-        <div class="card">
+    <!-- Sourcing & Vendors -->
+    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Sourcing &amp; Vendors</h2>
+    <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Open RFQs (wider) -->
+        <div class="lg:col-span-2 card">
             <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Open RFQs</h2>
                 <a href="/procurement/rfqs" class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">View All</a>
@@ -212,7 +219,7 @@
                         <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                             {{ icon_svg("user-group", "h-4 w-4 text-blue-600 dark:text-blue-400") }}
                         </div>
-                        <span class="text-sm text-slate-600 dark:text-slate-400">Registered Vendors</span>
+                        <span class="text-sm text-slate-600 dark:text-slate-300">Registered Vendors</span>
                     </div>
                     <span class="text-lg font-bold text-slate-900 dark:text-white">{{ vendor_count | default(0) }}</span>
                 </div>
@@ -221,7 +228,7 @@
                         <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                             {{ icon_svg("check-circle", "h-4 w-4 text-emerald-600 dark:text-emerald-400") }}
                         </div>
-                        <span class="text-sm text-slate-600 dark:text-slate-400">Prequalified</span>
+                        <span class="text-sm text-slate-600 dark:text-slate-300">Prequalified</span>
                     </div>
                     <span class="text-lg font-bold text-slate-900 dark:text-white">{{ prequalified_count | default(0) }}</span>
                 </div>
@@ -230,7 +237,7 @@
                         <div class="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                             {{ icon_svg("clock", "h-4 w-4 text-amber-600 dark:text-amber-400") }}
                         </div>
-                        <span class="text-sm text-slate-600 dark:text-slate-400">Pending Evaluation</span>
+                        <span class="text-sm text-slate-600 dark:text-slate-300">Pending Evaluation</span>
                     </div>
                     <span class="text-lg font-bold text-slate-900 dark:text-white">{{ pending_evaluation_count | default(0) }}</span>
                 </div>
@@ -239,6 +246,7 @@
     </div>
 
     <!-- Quick Actions -->
+    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quick Actions</h2>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <a href="/procurement/plans/new" class="card p-4 hover:border-blue-300 dark:hover:border-blue-700 transition-colors group">
             <div class="flex items-center gap-3">

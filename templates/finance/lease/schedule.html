@@ -51,12 +51,12 @@
                     {% for payment in schedules %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td class="px-4 py-3 text-sm text-slate-900 dark:text-white">#{{ payment.payment_number }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ payment.payment_date }}</td>
-                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-400">{{ payment.total_payment }}</td>
-                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-400">{{ payment.principal_portion }}</td>
-                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-400">{{ payment.interest_portion }}</td>
-                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-400">{{ payment.closing_balance }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ payment.status | replace('_', ' ') | title }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ payment.payment_date }}</td>
+                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-300">{{ payment.total_payment }}</td>
+                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-300">{{ payment.principal_portion }}</td>
+                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-300">{{ payment.interest_portion }}</td>
+                        <td class="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-300">{{ payment.closing_balance }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ payment.status | replace('_', ' ') | title }}</td>
                     </tr>
                     {% else %}
                     <tr>

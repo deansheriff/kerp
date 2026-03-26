@@ -194,7 +194,7 @@
             </div>
 
             {% if credentials %}
-            <div class="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+            <div class="space-y-3 text-sm text-slate-600 dark:text-slate-300">
                 {% for cred in credentials %}
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2">
                     <div class="flex flex-wrap items-center gap-2">
@@ -229,7 +229,7 @@
                     <label class="form-label">Create Local Login</label>
                     <input type="text" name="username" placeholder="Leave blank to use employee email" class="form-input w-full">
                     <input type="password" name="password" placeholder="Leave blank to use default (Dotmac@123)" class="form-input w-full">
-                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                         <input type="checkbox" name="must_change_password" checked>
                         Require password change on first login
                     </label>
@@ -303,7 +303,7 @@
         <div class="card-body px-6 pb-6" x-show="expanded" x-collapse>
             {% if onboarding.status.value == 'PENDING' %}
             <div class="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
-                <span class="text-sm text-slate-600 dark:text-slate-400">Onboarding not yet started</span>
+                <span class="text-sm text-slate-600 dark:text-slate-300">Onboarding not yet started</span>
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/onboarding/start">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-primary btn-sm">Start Onboarding</button>
@@ -650,11 +650,11 @@
                             {% endif %}
                         </div>
                         <div class="flex gap-4 mt-1 text-sm">
-                            <span class="text-slate-600 dark:text-slate-400">
+                            <span class="text-slate-600 dark:text-slate-300">
                                 Base: <span class="font-mono text-slate-900 dark:text-white">{{ "{:,.2f}".format(assignment.base) }}</span>
                             </span>
                             {% if assignment.variable > 0 %}
-                            <span class="text-slate-600 dark:text-slate-400">
+                            <span class="text-slate-600 dark:text-slate-300">
                                 Variable: <span class="font-mono text-slate-900 dark:text-white">{{ "{:,.2f}".format(assignment.variable) }}</span>
                             </span>
                             {% endif %}

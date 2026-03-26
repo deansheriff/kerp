@@ -77,7 +77,7 @@
                         {% for receipt in receipts %}
                         <tr class="group">
                             {{ bulk_select_cell(receipt.receipt_id) }}
-                            <td class="text-slate-600 dark:text-slate-400">{{ receipt.receipt_date }}</td>
+                            <td class="text-slate-600 dark:text-slate-300">{{ receipt.receipt_date }}</td>
                             <td>
                                 <a href="/finance/ar/receipts/{{ receipt.receipt_id }}" class="font-mono text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors">
                                     {{ receipt.receipt_number }}
@@ -91,7 +91,7 @@
                                     {{ receipt.payment_method | replace('_', ' ') | title }}
                                 </span>
                             </td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-400">{{ receipt.reference_number | default("—") }}</td>
+                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ receipt.reference_number | default("—") }}</td>
                             <td class="text-right font-mono font-medium text-slate-900 dark:text-white">{{ receipt.amount | default(zero_amount) }}</td>
                             <td class="text-center">
                                 {{ status_badge(receipt.status | lower | default('draft'), 'sm') }}

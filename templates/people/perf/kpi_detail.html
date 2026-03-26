@@ -78,7 +78,7 @@
                 {% set progress = kpi.achievement_percentage | float if kpi.achievement_percentage else 0 %}
                 {% set bar_color = 'bg-green-500' if progress >= 100 else ('bg-amber-500' if progress >= 70 else 'bg-red-500') %}
                 <div class="flex justify-between text-sm mb-1">
-                    <span class="text-slate-600 dark:text-slate-400">Achievement</span>
+                    <span class="text-slate-600 dark:text-slate-300">Achievement</span>
                     <span class="font-medium text-slate-900 dark:text-white">{{ progress }}%</span>
                 </div>
                 <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
@@ -216,13 +216,13 @@
             {% if kpi.evidence %}
             <div>
                 <h4 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Evidence</h4>
-                <p class="text-slate-600 dark:text-slate-400">{{ kpi.evidence }}</p>
+                <p class="text-slate-600 dark:text-slate-300">{{ kpi.evidence }}</p>
             </div>
             {% endif %}
             {% if kpi.notes %}
             <div>
                 <h4 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Notes</h4>
-                <p class="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{{ kpi.notes }}</p>
+                <p class="text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ kpi.notes }}</p>
             </div>
             {% endif %}
         </div>
