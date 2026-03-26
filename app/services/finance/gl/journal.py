@@ -625,12 +625,18 @@ class JournalService(ListResponseMixin):
                 detail=f"Cannot approve journal with status '{journal.status.value}'",
             )
 
-        # SoD check - creator cannot approve
+        # SoD check - creator cannot approve (when enabled)
         if journal.created_by_user_id == user_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Segregation of duties: creator cannot approve their own journal",
+            from app.services.feature_flags import (
+                FEATURE_REQUIRE_SOD,
+                is_feature_enabled,
             )
+
+            if is_feature_enabled(db, org_id, FEATURE_REQUIRE_SOD):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Segregation of duties: creator cannot approve their own journal",
+                )
 
         journal.status = JournalStatus.APPROVED
         journal.approved_by_user_id = user_id

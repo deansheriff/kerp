@@ -141,7 +141,13 @@ def test_submit_approve_post_void_and_reverse():
     assert submitted.status == JournalStatus.SUBMITTED
 
     journal.status = JournalStatus.SUBMITTED
-    with pytest.raises(HTTPException):
+    with (
+        patch(
+            "app.services.feature_flags.is_feature_enabled",
+            return_value=True,
+        ),
+        pytest.raises(HTTPException),
+    ):
         JournalService.approve_journal(
             db,
             org_id,

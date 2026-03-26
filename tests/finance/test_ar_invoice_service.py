@@ -266,7 +266,13 @@ def test_submit_approve_and_segregation():
 
     invoice.status = InvoiceStatus.SUBMITTED
     invoice.submitted_by_user_id = uuid4()
-    with pytest.raises(HTTPException):
+    with (
+        patch(
+            "app.services.feature_flags.is_feature_enabled",
+            return_value=True,
+        ),
+        pytest.raises(HTTPException),
+    ):
         ARInvoiceService.approve_invoice(
             db, org_id, uuid4(), approved_by_user_id=invoice.submitted_by_user_id
         )

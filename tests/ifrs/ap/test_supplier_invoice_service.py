@@ -260,16 +260,22 @@ class TestApproveSupplierInvoice:
         )
         mock_db.get.return_value = invoice
 
-        with patch("app.services.finance.ap.supplier_invoice.SupplierInvoice"):
-            with patch(
+        with (
+            patch("app.services.finance.ap.supplier_invoice.SupplierInvoice"),
+            patch(
                 "app.services.finance.ap.supplier_invoice.SupplierInvoiceStatus",
                 MockSupplierInvoiceStatus,
-            ):
-                with pytest.raises(HTTPException) as exc:
-                    # Same user tries to approve
-                    SupplierInvoiceService.approve_invoice(
-                        mock_db, org_id, invoice.invoice_id, submitter_id
-                    )
+            ),
+            patch(
+                "app.services.feature_flags.is_feature_enabled",
+                return_value=True,
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            # Same user tries to approve
+            SupplierInvoiceService.approve_invoice(
+                mock_db, org_id, invoice.invoice_id, submitter_id
+            )
 
         assert exc.value.status_code == 400
         assert (

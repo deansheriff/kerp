@@ -179,12 +179,18 @@ class TestApproveSupplierPayment:
         )
         mock_db.get.return_value = payment
 
-        with patch("app.services.finance.ap.supplier_payment.SupplierPayment"):
-            with pytest.raises(ValidationError, match="[Ss]egregation"):
-                # Same user tries to approve
-                SupplierPaymentService.approve_payment(
-                    mock_db, org_id, payment.payment_id, creator_id
-                )
+        with (
+            patch("app.services.finance.ap.supplier_payment.SupplierPayment"),
+            patch(
+                "app.services.feature_flags.is_feature_enabled",
+                return_value=True,
+            ),
+            pytest.raises(ValidationError, match="[Ss]egregation"),
+        ):
+            # Same user tries to approve
+            SupplierPaymentService.approve_payment(
+                mock_db, org_id, payment.payment_id, creator_id
+            )
 
 
 class TestPostSupplierPayment:

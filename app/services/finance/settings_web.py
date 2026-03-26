@@ -662,6 +662,7 @@ class SettingsWebService:
             "enable_inventory": "Track inventory items and stock levels",
             "enable_fixed_assets": "Manage fixed assets and depreciation",
             "enable_leases": "IFRS 16 lease accounting and right-of-use assets",
+            "require_segregation_of_duties": "Require different users for submit and approve on journals, invoices, and payments",
         }
 
         for spec in specs:

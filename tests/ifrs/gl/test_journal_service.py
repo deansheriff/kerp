@@ -335,7 +335,13 @@ class TestApproveJournal:
         )
         mock_db.get.return_value = journal
 
-        with pytest.raises(HTTPException) as exc:
+        with (
+            patch(
+                "app.services.feature_flags.is_feature_enabled",
+                return_value=True,
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
             # Same user who created tries to approve
             JournalService.approve_journal(
                 mock_db, org_id, journal.journal_entry_id, creator_id

@@ -164,7 +164,13 @@ def test_approve_and_post_payment():
     )
     db.get.return_value = payment
 
-    with pytest.raises(ValidationError, match="[Ss]egregation"):
+    with (
+        patch(
+            "app.services.feature_flags.is_feature_enabled",
+            return_value=True,
+        ),
+        pytest.raises(ValidationError, match="[Ss]egregation"),
+    ):
         SupplierPaymentService.approve_payment(
             db, org_id, payment.payment_id, payment.created_by_user_id
         )

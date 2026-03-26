@@ -400,11 +400,17 @@ class SupplierPaymentService(ListResponseMixin):
                 f"Cannot approve payment with status '{payment.status.value}'"
             )
 
-        # Segregation of Duties check
+        # Segregation of Duties check (when enabled)
         if payment.created_by_user_id == user_id:
-            raise ValidationError(
-                "Segregation of duties violation: creator cannot approve"
+            from app.services.feature_flags import (
+                FEATURE_REQUIRE_SOD,
+                is_feature_enabled,
             )
+
+            if is_feature_enabled(db, org_id, FEATURE_REQUIRE_SOD):
+                raise ValidationError(
+                    "Segregation of duties violation: creator cannot approve"
+                )
 
         old_status = payment.status.value
         payment.status = APPaymentStatus.APPROVED

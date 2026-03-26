@@ -944,11 +944,17 @@ class ARInvoiceService(ListResponseMixin):
                 f"Cannot approve invoice with status '{invoice.status.value}'"
             )
 
-        # Segregation of Duties check
+        # Segregation of Duties check (when enabled)
         if invoice.submitted_by_user_id == user_id:
-            raise ValidationError(
-                "Segregation of duties violation: submitter cannot approve"
+            from app.services.feature_flags import (
+                FEATURE_REQUIRE_SOD,
+                is_feature_enabled,
             )
+
+            if is_feature_enabled(db, org_id, FEATURE_REQUIRE_SOD):
+                raise ValidationError(
+                    "Segregation of duties violation: submitter cannot approve"
+                )
 
         invoice.status = InvoiceStatus.APPROVED
         invoice.approved_by_user_id = user_id

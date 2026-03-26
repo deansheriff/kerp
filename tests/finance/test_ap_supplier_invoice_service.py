@@ -262,7 +262,13 @@ def test_submit_approve_post_void_hold_release_record_payment():
 
     invoice.status = SupplierInvoiceStatus.SUBMITTED
     invoice.submitted_by_user_id = uuid4()
-    with pytest.raises(HTTPException):
+    with (
+        patch(
+            "app.services.feature_flags.is_feature_enabled",
+            return_value=True,
+        ),
+        pytest.raises(HTTPException),
+    ):
         SupplierInvoiceService.approve_invoice(
             db, org_id, invoice.invoice_id, invoice.submitted_by_user_id
         )
