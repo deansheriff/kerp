@@ -10,9 +10,26 @@ from sqlalchemy.orm import Session
 from starlette.responses import Response
 
 from app.services.finance.banking.web import banking_web_service
-from app.web.deps import WebAuthContext, get_db, require_finance_access
+from app.templates import templates
+from app.web.deps import (
+    WebAuthContext,
+    base_context,
+    get_db,
+    require_finance_access,
+)
 
 router = APIRouter(prefix="/banking", tags=["banking-web"])
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def banking_landing(
+    request: Request,
+    auth: WebAuthContext = Depends(require_finance_access),
+):
+    """Banking landing page."""
+    context = base_context(request, auth, "Banking", "banking")
+    return templates.TemplateResponse(request, "finance/banking/index.html", context)
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -258,12 +275,7 @@ async def import_statement_submit(
     db: Session = Depends(get_db),
 ):
     """Handle bank statement import submission."""
-    response = await banking_web_service.statement_import_submit_response(
-        request, auth, db
-    )
-    if isinstance(response, RedirectResponse):
-        db.commit()
-    return response
+    return await banking_web_service.statement_import_submit_response(request, auth, db)
 
 
 @router.post("/statements/import/preview", response_class=JSONResponse)
@@ -281,7 +293,7 @@ async def import_statement_preview(
 @router.get("/statements/sample-csv")
 def download_sample_csv(
     _auth: WebAuthContext = Depends(require_finance_access),
-    csv_format: str = Query(default="type", alias="format"),
+    format: str = Query(default="type"),
 ):
     """Download a sample CSV template for bank statement import."""
     from io import BytesIO
@@ -290,7 +302,7 @@ def download_sample_csv(
 
     from app.services.finance.banking import bank_statement_service
 
-    content, filename = bank_statement_service.build_sample_csv(csv_format)
+    content, filename = bank_statement_service.build_sample_csv(format)
     buf = BytesIO(content)
 
     return StreamingResponse(

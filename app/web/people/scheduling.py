@@ -9,7 +9,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.scheduling.web import scheduling_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.templates import templates
+from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
 
 router = APIRouter(prefix="/scheduling", tags=["people-scheduling-web"])
 
@@ -21,6 +22,16 @@ router = APIRouter(prefix="/scheduling", tags=["people-scheduling-web"])
 
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
+def scheduling_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Scheduling landing page."""
+    context = base_context(request, auth, "Scheduling", "scheduling", db=db)
+    return templates.TemplateResponse(request, "people/scheduling/index.html", context)
+
+
 @router.get("/patterns", response_class=HTMLResponse)
 def patterns_list(
     request: Request,

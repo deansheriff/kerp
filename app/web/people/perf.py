@@ -10,9 +10,22 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.perf.web import perf_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.templates import templates
+from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
 
 router = APIRouter(prefix="/perf", tags=["people-perf-web"])
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def perf_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Performance landing page."""
+    context = base_context(request, auth, "Performance", "perf", db=db)
+    return templates.TemplateResponse(request, "people/perf/index.html", context)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

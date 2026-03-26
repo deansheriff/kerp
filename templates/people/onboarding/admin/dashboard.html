@@ -1,5 +1,5 @@
 {% extends "people/base_people.html" %}
-{% from "components/macros.html" import icon_svg, stats_card, empty_state %}
+{% from "components/macros.html" import icon_svg, empty_state %}
 
 {% block page_title %}Onboarding Dashboard{% endblock %}
 
@@ -24,30 +24,65 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-8">
 
     {# Stats Cards #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {{ stats_card("Active Onboardings", active_count, icon="clock", color="blue") }}
-        {{ stats_card("Overdue Tasks", overdue_count, icon="warning", color="rose") }}
-        {{ stats_card("Completed This Month", completed_this_month, icon="check-circle", color="emerald") }}
-        {{ stats_card("Active Templates", template_count, icon="clipboard-check", color="violet") }}
+    <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="card p-6">
+            <div class="mb-4 flex items-center justify-between">
+                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Active Onboardings</span>
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    {{ icon_svg("clock", "h-5 w-5") }}
+                </div>
+            </div>
+            <p class="text-xl font-bold leading-tight text-slate-900 dark:text-white sm:text-2xl lg:text-3xl">{{ active_count }}</p>
+        </div>
+
+        <div class="card p-6">
+            <div class="mb-4 flex items-center justify-between">
+                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Overdue Tasks</span>
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                    {{ icon_svg("warning", "h-5 w-5") }}
+                </div>
+            </div>
+            <p class="text-xl font-bold leading-tight text-slate-900 dark:text-white sm:text-2xl lg:text-3xl">{{ overdue_count }}</p>
+        </div>
+
+        <div class="card p-6">
+            <div class="mb-4 flex items-center justify-between">
+                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Completed This Month</span>
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    {{ icon_svg("check-circle", "h-5 w-5") }}
+                </div>
+            </div>
+            <p class="text-xl font-bold leading-tight text-slate-900 dark:text-white sm:text-2xl lg:text-3xl">{{ completed_this_month }}</p>
+        </div>
+
+        <div class="card p-6">
+            <div class="mb-4 flex items-center justify-between">
+                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Active Templates</span>
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                    {{ icon_svg("clipboard-check", "h-5 w-5") }}
+                </div>
+            </div>
+            <p class="text-xl font-bold leading-tight text-slate-900 dark:text-white sm:text-2xl lg:text-3xl">{{ template_count }}</p>
+        </div>
     </div>
 
     {# Two Column Layout #}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {# Upcoming Starts #}
         <div class="card overflow-hidden">
-            <div class="card-header flex items-center justify-between px-6">
+            <div class="card-header flex items-center justify-between px-5 pt-4">
                 <h2 class="card-title">Upcoming Start Dates</h2>
                 <span class="text-sm text-slate-500 dark:text-slate-400">Next 7 days</span>
             </div>
-            <div class="card-body px-4 pb-4 pt-0">
+            <div class="card-body px-5 pb-6 pt-4">
                 {% if upcoming_starts %}
                 <ul class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for ob in upcoming_starts %}
                     <li>
-                        <a href="/people/hr/onboarding/employees/{{ ob.onboarding_id }}" class="flex flex-col gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors sm:flex-row sm:items-center sm:gap-4">
+                        <a href="/people/hr/onboarding/employees/{{ ob.onboarding_id }}" class="flex flex-col gap-4 px-5 py-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors sm:flex-row sm:items-center sm:gap-5">
                             <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-100 text-sm font-semibold text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
                                 {{ ob.employee.first_name[0] if ob.employee else '?' }}{{ ob.employee.last_name[0] if ob.employee else '?' }}
                             </div>
@@ -86,16 +121,16 @@
 
         {# Recent Completions #}
         <div class="card overflow-hidden">
-            <div class="card-header flex items-center justify-between px-6">
+            <div class="card-header flex items-center justify-between px-5 pt-4">
                 <h2 class="card-title">Recently Completed</h2>
                 <a href="/people/hr/onboarding/employees?status=COMPLETED" class="text-sm text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">View all</a>
             </div>
-            <div class="card-body px-4 pb-4 pt-0">
+            <div class="card-body px-5 pb-6 pt-4">
                 {% if recent_completions %}
                 <ul class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for ob in recent_completions %}
                     <li>
-                        <a href="/people/hr/onboarding/employees/{{ ob.onboarding_id }}" class="flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <a href="/people/hr/onboarding/employees/{{ ob.onboarding_id }}" class="flex items-center gap-5 px-5 py-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                                 {{ icon_svg("check-circle") }}
                             </div>
@@ -120,33 +155,33 @@
 
     {# Quick Actions #}
     <div class="card overflow-hidden">
-        <div class="card-header px-6">
+        <div class="card-header px-5 pt-4">
             <h2 class="card-title">Quick Actions</h2>
         </div>
-        <div class="card-body px-6 pb-6 pt-0">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <a href="/people/hr/onboarding/templates/new" class="flex items-center gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
+        <div class="card-body px-5 pb-6 pt-4">
+            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <a href="/people/hr/onboarding/templates/new" class="flex items-center gap-4 px-5 py-5 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 group-hover:bg-violet-200 dark:group-hover:bg-violet-900/50 transition-colors">
                         {{ icon_svg("plus") }}
                     </div>
                     <span class="font-medium text-slate-700 dark:text-slate-200">New Template</span>
                 </a>
 
-                <a href="/people/hr/onboarding/employees?status=PENDING" class="flex items-center gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
+                <a href="/people/hr/onboarding/employees?status=PENDING" class="flex items-center gap-4 px-5 py-5 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 group-hover:bg-amber-200 dark:group-hover:bg-amber-900/50 transition-colors">
                         {{ icon_svg("clock") }}
                     </div>
                     <span class="font-medium text-slate-700 dark:text-slate-200">Pending Onboardings</span>
                 </a>
 
-                <a href="/people/hr/onboarding/employees?status=IN_PROGRESS" class="flex items-center gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
+                <a href="/people/hr/onboarding/employees?status=IN_PROGRESS" class="flex items-center gap-4 px-5 py-5 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400 group-hover:bg-sky-200 dark:group-hover:bg-sky-900/50 transition-colors">
                         {{ icon_svg("refresh") }}
                     </div>
                     <span class="font-medium text-slate-700 dark:text-slate-200">In Progress</span>
                 </a>
 
-                <a href="/people/hr/onboarding/templates" class="flex items-center gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
+                <a href="/people/hr/onboarding/templates" class="flex items-center gap-4 px-5 py-5 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors group">
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors">
                         {{ icon_svg("clipboard") }}
                     </div>

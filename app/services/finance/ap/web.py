@@ -87,7 +87,26 @@ _format_file_size = format_file_size
 
 
 def _parse_supplier_type(value: str | None) -> SupplierType:
-    return parse_enum_safe(SupplierType, value, SupplierType.VENDOR)
+    parsed = parse_enum_safe(SupplierType, value, SupplierType.VENDOR)
+    return parsed or SupplierType.VENDOR
+
+
+def _require_org_id(auth: WebAuthContext) -> UUID:
+    if auth.organization_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return auth.organization_id
+
+
+def _require_user_id(auth: WebAuthContext) -> UUID:
+    if auth.user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return auth.user_id
+
+
+def _require_person_id(auth: WebAuthContext) -> UUID:
+    if auth.person_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return auth.person_id
 
 
 def _supplier_display_name(supplier: Supplier) -> str:
@@ -571,7 +590,13 @@ class APWebService:
 
         # Use shared audit service for user names
         audit_service = get_audit_service(db)
-        creator_names = audit_service.get_creator_names(suppliers)
+        creator_names = audit_service.get_user_names_batch(
+            [
+                supplier.created_by_user_id
+                for supplier in suppliers
+                if supplier.created_by_user_id is not None
+            ]
+        )
 
         # Calculate balance trends for sparkline charts
         supplier_ids = [s.supplier_id for s in suppliers]
@@ -798,6 +823,7 @@ class APWebService:
         org_id = coerce_uuid(organization_id)
         offset = (page - 1) * limit
         today = date.today()
+        selected_supplier = None
 
         status_value = _parse_invoice_status(status)
         from_date = _parse_date(start_date)
@@ -805,7 +831,11 @@ class APWebService:
 
         conditions: list[Any] = [SupplierInvoice.organization_id == org_id]
         if supplier_id:
-            conditions.append(SupplierInvoice.supplier_id == coerce_uuid(supplier_id))
+            supplier_uuid = coerce_uuid(supplier_id)
+            conditions.append(SupplierInvoice.supplier_id == supplier_uuid)
+            supplier = db.get(Supplier, supplier_uuid)
+            if supplier and supplier.organization_id == org_id:
+                selected_supplier = _supplier_option_view(supplier)
         if status_value:
             conditions.append(SupplierInvoice.status == status_value)
         if from_date:
@@ -920,12 +950,17 @@ class APWebService:
                     "invoice_id": invoice.invoice_id,
                     "invoice_number": invoice.invoice_number,
                     "supplier_name": _supplier_display_name(supplier),
+                    "created_at": _format_date(invoice.created_at),
                     "invoice_date": _format_date(invoice.invoice_date),
                     "due_date": _format_date(invoice.due_date),
                     "total_amount": _format_currency(
                         invoice.total_amount, invoice.currency_code
                     ),
+                    "tax_amount": _format_currency(
+                        invoice.tax_amount, invoice.currency_code
+                    ),
                     "balance": _format_currency(balance, invoice.currency_code),
+                    "purpose": invoice.purpose,
                     "status": _invoice_status_label(invoice.status),
                     "is_overdue": (
                         invoice.due_date < today
@@ -971,6 +1006,7 @@ class APWebService:
         return {
             "invoices": invoices_view,
             "suppliers_list": suppliers_list,
+            "selected_supplier": selected_supplier,
             "stats": stats.__dict__,
             "search": search,
             "supplier_id": supplier_id,
@@ -1516,13 +1552,14 @@ class APWebService:
         ]
 
         # Get bank accounts
-        from app.models.finance.gl.account import Account, IFRSCategory
+        from app.models.finance.gl.account import Account
 
         bank_accounts = db.scalars(
             select(Account)
+            .join(AccountCategory, Account.category_id == AccountCategory.category_id)
             .where(
                 Account.organization_id == org_id,
-                Account.ifrs_category == IFRSCategory.ASSETS,
+                AccountCategory.ifrs_category == IFRSCategory.ASSETS,
                 Account.is_active.is_(True),
             )
             .order_by(Account.account_name)
@@ -1662,10 +1699,10 @@ class APWebService:
             return _format_currency(v, currency)
 
         # Aggregate totals across all suppliers
-        total_current = sum(r.current for r in aging_data)
-        total_30 = sum(r.days_31_60 for r in aging_data)
-        total_60 = sum(r.days_61_90 for r in aging_data)
-        total_90 = sum(r.over_90 for r in aging_data)
+        total_current = sum((r.current for r in aging_data), Decimal("0"))
+        total_30 = sum((r.days_31_60 for r in aging_data), Decimal("0"))
+        total_60 = sum((r.days_61_90 for r in aging_data), Decimal("0"))
+        total_90 = sum((r.over_90 for r in aging_data), Decimal("0"))
         grand_total = total_current + total_30 + total_60 + total_90
         total_invoices = sum(r.invoice_count for r in aging_data)
 
@@ -1964,6 +2001,11 @@ class APWebService:
                 "end_date": end_date,
             },
             labels={"start_date": "From", "end_date": "To"},
+            options={
+                "supplier_id": {
+                    str(s["supplier_id"]): s["supplier_name"] for s in suppliers_list
+                }
+            },
         )
         return {
             "orders": orders_view,
@@ -2349,6 +2391,11 @@ class APWebService:
                 "end_date": end_date,
             },
             labels={"start_date": "From", "end_date": "To"},
+            options={
+                "supplier_id": {
+                    str(s["supplier_id"]): s["supplier_name"] for s in suppliers_list
+                }
+            },
         )
         return {
             "receipts": receipts_view,
@@ -2583,7 +2630,7 @@ class APWebService:
         status: str | None,
         overdue: str | None,
         page: int,
-        limit: int,
+        limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
     ) -> HTMLResponse:
@@ -2659,12 +2706,12 @@ class APWebService:
 
         try:
             input_data = self.build_supplier_input(
-                db, dict(form_data), auth.organization_id
+                db, dict(form_data), _require_org_id(auth)
             )
 
             supplier_service.create_supplier(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
             )
 
@@ -2693,12 +2740,12 @@ class APWebService:
 
         try:
             input_data = self.build_supplier_input(
-                db, dict(form_data), auth.organization_id
+                db, dict(form_data), _require_org_id(auth)
             )
 
             supplier_service.update_supplier(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 supplier_id=UUID(supplier_id),
                 input=input_data,
             )
@@ -2758,6 +2805,7 @@ class APWebService:
         end_date: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
     ) -> HTMLResponse:
@@ -2772,6 +2820,7 @@ class APWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
                 sort=sort,
                 sort_dir=sort_dir,
             )
@@ -2814,13 +2863,13 @@ class APWebService:
             data = dict(form_data)
 
         try:
-            input_data = self.build_invoice_input(db, data, auth.organization_id)
+            input_data = self.build_invoice_input(db, data, _require_org_id(auth))
 
             invoice = supplier_invoice_service.create_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
-                created_by_user_id=auth.person_id,
+                created_by_user_id=_require_person_id(auth),
             )
 
             if "application/json" in content_type:
@@ -2901,7 +2950,7 @@ class APWebService:
         invoice_id: str,
     ) -> HTMLResponse | RedirectResponse:
         """Return the edit invoice form with existing invoice data."""
-        org_id = coerce_uuid(auth.organization_id)
+        org_id = _require_org_id(auth)
         inv_id = coerce_uuid(invoice_id)
 
         invoice = db.get(SupplierInvoice, inv_id)
@@ -2935,10 +2984,10 @@ class APWebService:
             "invoice_date": invoice.invoice_date,
             "due_date": invoice.due_date,
             "currency_code": invoice.currency_code,
-            "vendor_invoice_number": invoice.vendor_invoice_number,
-            "description": invoice.description,
-            "notes": invoice.notes,
-            "internal_notes": invoice.internal_notes,
+            "vendor_invoice_number": invoice.supplier_invoice_number,
+            "description": invoice.purpose,
+            "notes": invoice.purpose,
+            "internal_notes": "",
             "lines": [
                 {
                     "line_id": line.line_id,
@@ -2976,14 +3025,13 @@ class APWebService:
             data = dict(form_data)
 
         try:
-            input_data = self.build_invoice_input(db, data, auth.organization_id)
+            input_data = self.build_invoice_input(db, data, _require_org_id(auth))
 
             invoice = supplier_invoice_service.update_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
                 input=input_data,
-                updated_by_user_id=auth.user_id,
             )
 
             if "application/json" in content_type:
@@ -3022,9 +3070,9 @@ class APWebService:
         try:
             supplier_invoice_service.submit_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                submitted_by_user_id=auth.user_id,
+                submitted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ap/invoices/{invoice_id}?success=Invoice+submitted+for+approval",
@@ -3047,9 +3095,9 @@ class APWebService:
         try:
             supplier_invoice_service.approve_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                approved_by_user_id=auth.user_id,
+                approved_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ap/invoices/{invoice_id}?success=Invoice+approved",
@@ -3072,9 +3120,9 @@ class APWebService:
         try:
             supplier_invoice_service.post_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                posted_by_user_id=auth.user_id,
+                posted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ap/invoices/{invoice_id}?success=Invoice+posted+to+ledger",
@@ -3097,9 +3145,9 @@ class APWebService:
         try:
             supplier_invoice_service.void_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                voided_by_user_id=auth.user_id,
+                voided_by_user_id=_require_user_id(auth),
                 reason="Voided via web interface",
             )
             return RedirectResponse(
@@ -3231,6 +3279,7 @@ class APWebService:
         end_date: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
     ) -> HTMLResponse:
@@ -3245,6 +3294,7 @@ class APWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
                 sort=sort,
                 sort_dir=sort_dir,
             )
@@ -3302,13 +3352,13 @@ class APWebService:
             data = dict(form_data)
 
         try:
-            input_data = self.build_payment_input(db, data, auth.organization_id)
+            input_data = self.build_payment_input(db, data, _require_org_id(auth))
 
             payment = supplier_payment_service.create_payment(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
-                created_by_user_id=auth.person_id,
+                created_by_user_id=_require_person_id(auth),
             )
 
             if "application/json" in content_type:
@@ -3370,7 +3420,7 @@ class APWebService:
         payment_id: str,
     ) -> HTMLResponse | RedirectResponse:
         """Return the edit payment form with existing payment data."""
-        org_id = coerce_uuid(auth.organization_id)
+        org_id = _require_org_id(auth)
         pay_id = coerce_uuid(payment_id)
 
         payment = db.get(SupplierPayment, pay_id)
@@ -3401,7 +3451,7 @@ class APWebService:
             "currency_code": payment.currency_code,
             "amount": payment.amount,
             "reference": payment.reference,
-            "description": payment.description,
+            "description": payment.reference,
             "bank_account_id": payment.bank_account_id,
         }
 
@@ -3458,9 +3508,9 @@ class APWebService:
         try:
             supplier_payment_service.approve_payment(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 payment_id=coerce_uuid(payment_id),
-                approved_by_user_id=auth.user_id,
+                approved_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ap/payments/{payment_id}?success=Payment+approved",
@@ -3483,9 +3533,9 @@ class APWebService:
         try:
             supplier_payment_service.post_payment(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 payment_id=coerce_uuid(payment_id),
-                posted_by_user_id=auth.user_id,
+                posted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ap/payments/{payment_id}?success=Payment+posted+to+ledger",
@@ -3508,9 +3558,9 @@ class APWebService:
         try:
             supplier_payment_service.void_payment(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 payment_id=coerce_uuid(payment_id),
-                voided_by_user_id=auth.user_id,
+                voided_by_user_id=_require_user_id(auth),
                 reason="Voided via web interface",
             )
             return RedirectResponse(
@@ -3530,6 +3580,7 @@ class APWebService:
         status: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
         status_value = None
         if status:
@@ -3538,7 +3589,6 @@ class APWebService:
             except ValueError:
                 status_value = None
 
-        limit = 50
         offset = (page - 1) * limit
         batches = payment_batch_service.list(
             db=db,
@@ -3681,7 +3731,7 @@ class APWebService:
 
             batch = payment_batch_service.create_batch_from_invoice_ids(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 batch_date=batch_date,
                 payment_method=payment_method,
                 bank_account_id=coerce_uuid(bank_account_id),
@@ -3719,6 +3769,7 @@ class APWebService:
         end_date: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
         context = base_context(request, auth, "Purchase Orders", "ap", db=db)
         context.update(
@@ -3731,6 +3782,7 @@ class APWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
             )
         )
         return templates.TemplateResponse(
@@ -3805,15 +3857,15 @@ class APWebService:
         try:
             input_data = purchase_order_service.build_input_from_payload(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 payload=dict(data),
             )
 
             po = purchase_order_service.create_po(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
-                created_by_user_id=auth.person_id,
+                created_by_user_id=_require_person_id(auth),
             )
 
             if "application/json" in content_type:
@@ -3848,8 +3900,9 @@ class APWebService:
         try:
             purchase_order_service.submit_for_approval(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 po_id=UUID(po_id),
+                submitted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/ap/purchase-orders/{po_id}?success=Submitted+for+approval",
@@ -3879,9 +3932,9 @@ class APWebService:
         try:
             purchase_order_service.approve_po(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 po_id=UUID(po_id),
-                approved_by_user_id=auth.person_id,
+                approved_by_user_id=_require_person_id(auth),
             )
             return RedirectResponse(
                 url=f"/ap/purchase-orders/{po_id}?success=Purchase+order+approved",
@@ -3911,7 +3964,7 @@ class APWebService:
         try:
             purchase_order_service.cancel_po(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 po_id=UUID(po_id),
             )
             return RedirectResponse(
@@ -3944,6 +3997,7 @@ class APWebService:
         end_date: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
         context = base_context(request, auth, "Goods Receipts", "ap")
         context.update(
@@ -3957,6 +4011,7 @@ class APWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
             )
         )
         return templates.TemplateResponse(
@@ -4014,15 +4069,15 @@ class APWebService:
         try:
             input_data = goods_receipt_service.build_input_from_payload(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 payload=dict(data),
             )
 
             receipt = goods_receipt_service.create_receipt(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
-                received_by_user_id=auth.person_id,
+                received_by_user_id=_require_person_id(auth),
             )
 
             if "application/json" in content_type:
@@ -4061,7 +4116,7 @@ class APWebService:
         try:
             goods_receipt_service.start_inspection(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 receipt_id=UUID(receipt_id),
             )
             return RedirectResponse(
@@ -4092,7 +4147,7 @@ class APWebService:
         try:
             goods_receipt_service.accept_all(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 receipt_id=UUID(receipt_id),
             )
             return RedirectResponse(
@@ -4159,10 +4214,10 @@ class APWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -4208,10 +4263,10 @@ class APWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -4257,10 +4312,10 @@ class APWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -4306,10 +4361,10 @@ class APWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -4337,7 +4392,7 @@ class APWebService:
         db: Session,
     ) -> RedirectResponse:
         try:
-            supplier = supplier_service.get(db, auth.organization_id, supplier_id)
+            supplier = supplier_service.get(db, _require_org_id(auth), supplier_id)
             if not supplier or supplier.organization_id != auth.organization_id:
                 return RedirectResponse(
                     url=f"/ap/suppliers/{supplier_id}?error=Supplier+not+found",
@@ -4355,10 +4410,10 @@ class APWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -4383,7 +4438,7 @@ class APWebService:
         auth: WebAuthContext,
         db: Session,
     ) -> FileResponse | RedirectResponse:
-        attachment = attachment_service.get(db, auth.organization_id, attachment_id)
+        attachment = attachment_service.get(db, _require_org_id(auth), attachment_id)
 
         if not attachment or attachment.organization_id != auth.organization_id:
             return RedirectResponse(
@@ -4402,7 +4457,7 @@ class APWebService:
         auth: WebAuthContext,
         db: Session,
     ) -> RedirectResponse:
-        attachment = attachment_service.get(db, auth.organization_id, attachment_id)
+        attachment = attachment_service.get(db, _require_org_id(auth), attachment_id)
 
         if not attachment or attachment.organization_id != auth.organization_id:
             return RedirectResponse(
@@ -4412,7 +4467,7 @@ class APWebService:
         entity_type = attachment.entity_type
         entity_id = attachment.entity_id
 
-        attachment_service.delete(db, attachment_id, auth.organization_id)
+        attachment_service.delete(db, attachment_id, _require_org_id(auth))
 
         redirect_map = {
             "SUPPLIER_INVOICE": f"/ap/invoices/{entity_id}",

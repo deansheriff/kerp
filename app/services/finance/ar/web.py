@@ -74,7 +74,26 @@ _format_file_size = format_file_size
 
 
 def _parse_customer_type(value: str | None) -> CustomerType:
-    return parse_enum_safe(CustomerType, value, CustomerType.COMPANY)
+    parsed = parse_enum_safe(CustomerType, value, CustomerType.COMPANY)
+    return parsed or CustomerType.COMPANY
+
+
+def _require_org_id(auth: WebAuthContext) -> UUID:
+    if auth.organization_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return auth.organization_id
+
+
+def _require_user_id(auth: WebAuthContext) -> UUID:
+    if auth.user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return auth.user_id
+
+
+def _require_person_id(auth: WebAuthContext) -> UUID:
+    if auth.person_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return auth.person_id
 
 
 def _customer_display_name(customer: Customer) -> str:
@@ -378,31 +397,35 @@ def _get_accounts(
     )
     if subledger_type:
         query = query.where(Account.subledger_type == subledger_type)
-    return db.scalars(query.order_by(Account.account_code)).all()
+    return list(db.scalars(query.order_by(Account.account_code)).all())
 
 
 def _get_cost_centers(db: Session, organization_id: UUID) -> list[CostCenter]:
-    return db.scalars(
-        select(CostCenter)
-        .where(CostCenter.organization_id == organization_id)
-        .where(CostCenter.is_active.is_(True))
-        .order_by(CostCenter.cost_center_code)
-    ).all()
+    return list(
+        db.scalars(
+            select(CostCenter)
+            .where(CostCenter.organization_id == organization_id)
+            .where(CostCenter.is_active.is_(True))
+            .order_by(CostCenter.cost_center_code)
+        ).all()
+    )
 
 
 def _get_projects(db: Session, organization_id: UUID) -> list[Project]:
-    return db.scalars(
-        select(Project)
-        .options(
-            load_only(
-                Project.project_id,
-                Project.project_code,
-                Project.project_name,
+    return list(
+        db.scalars(
+            select(Project)
+            .options(
+                load_only(
+                    Project.project_id,
+                    Project.project_code,
+                    Project.project_name,
+                )
             )
-        )
-        .where(Project.organization_id == organization_id)
-        .order_by(Project.project_code)
-    ).all()
+            .where(Project.organization_id == organization_id)
+            .order_by(Project.project_code)
+        ).all()
+    )
 
 
 @dataclass
@@ -594,7 +617,7 @@ class ARWebService:
 
         # Use shared audit service for user names
         audit_service = get_audit_service(db)
-        creator_names = audit_service.get_creator_names(customers)
+        creator_names = audit_service.get_creator_names(list(customers))
 
         # Calculate balance trends for sparkline charts
         customer_ids = [c.customer_id for c in customers]
@@ -966,7 +989,11 @@ class ARWebService:
                 "end_date": end_date,
             },
             labels={"start_date": "From", "end_date": "To"},
-            options={"customer_id": {str(c["id"]): c["name"] for c in customers_list}},
+            options={
+                "customer_id": {
+                    str(c["customer_id"]): c["customer_name"] for c in customers_list
+                }
+            },
         )
         return {
             "invoices": invoices_view,
@@ -1269,6 +1296,11 @@ class ARWebService:
                 "end_date": end_date,
             },
             labels={"start_date": "From", "end_date": "To"},
+            options={
+                "customer_id": {
+                    str(c["customer_id"]): c["customer_name"] for c in customers_list
+                }
+            },
         )
         return {
             "receipts": receipts_view,
@@ -1595,10 +1627,10 @@ class ARWebService:
             return _format_currency(v, currency)
 
         # Aggregate totals across all customers
-        total_current = sum(r.current for r in aging_data)
-        total_30 = sum(r.days_31_60 for r in aging_data)
-        total_60 = sum(r.days_61_90 for r in aging_data)
-        total_90 = sum(r.over_90 for r in aging_data)
+        total_current = sum((r.current for r in aging_data), Decimal("0"))
+        total_30 = sum((r.days_31_60 for r in aging_data), Decimal("0"))
+        total_60 = sum((r.days_61_90 for r in aging_data), Decimal("0"))
+        total_90 = sum((r.over_90 for r in aging_data), Decimal("0"))
         grand_total = total_current + total_30 + total_60 + total_90
         total_invoices = sum(r.invoice_count for r in aging_data)
 
@@ -2320,7 +2352,7 @@ class ARWebService:
 
             customer_service.create_customer(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
             )
 
@@ -2352,7 +2384,7 @@ class ARWebService:
 
             customer_service.update_customer(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 customer_id=UUID(customer_id),
                 input=input_data,
             )
@@ -2412,6 +2444,7 @@ class ARWebService:
         start_date: str | None,
         end_date: str | None,
         page: int,
+        limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
     ) -> HTMLResponse:
@@ -2426,6 +2459,7 @@ class ARWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
                 sort=sort,
                 sort_dir=sort_dir,
             )
@@ -2463,9 +2497,9 @@ class ARWebService:
 
             invoice = ar_invoice_service.create_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
-                created_by_user_id=auth.user_id,
+                created_by_user_id=_require_user_id(auth),
             )
 
             if "application/json" in content_type:
@@ -2546,7 +2580,7 @@ class ARWebService:
         invoice_id: str,
     ) -> HTMLResponse | RedirectResponse:
         """Return the edit invoice form with existing invoice data."""
-        org_id = coerce_uuid(auth.organization_id)
+        org_id = _require_org_id(auth)
         inv_id = coerce_uuid(invoice_id)
 
         invoice = db.get(Invoice, inv_id)
@@ -2582,11 +2616,11 @@ class ARWebService:
             "invoice_date": invoice.invoice_date,
             "due_date": invoice.due_date,
             "currency_code": invoice.currency_code,
-            "po_number": invoice.po_number,
+            "po_number": "",
             "description": invoice.notes,
             "notes": invoice.notes,
             "internal_notes": invoice.internal_notes,
-            "terms": invoice.payment_terms,
+            "terms": invoice.notes,
             "cost_center_id": None,  # Would need to pull from first line if needed
             "project_id": None,
             "lines": [
@@ -2632,10 +2666,10 @@ class ARWebService:
 
             invoice = ar_invoice_service.update_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
                 input=input_data,
-                updated_by_user_id=auth.user_id,
+                updated_by_user_id=_require_user_id(auth),
             )
 
             if "application/json" in content_type:
@@ -2674,9 +2708,9 @@ class ARWebService:
         try:
             ar_invoice_service.submit_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                submitted_by_user_id=auth.user_id,
+                submitted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ar/invoices/{invoice_id}?success=Invoice+submitted+for+approval",
@@ -2699,9 +2733,9 @@ class ARWebService:
         try:
             ar_invoice_service.approve_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                approved_by_user_id=auth.user_id,
+                approved_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ar/invoices/{invoice_id}?success=Invoice+approved",
@@ -2724,9 +2758,9 @@ class ARWebService:
         try:
             ar_invoice_service.post_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                posted_by_user_id=auth.user_id,
+                posted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ar/invoices/{invoice_id}?success=Invoice+posted+to+ledger",
@@ -2749,9 +2783,9 @@ class ARWebService:
         try:
             ar_invoice_service.void_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                voided_by_user_id=auth.user_id,
+                voided_by_user_id=_require_user_id(auth),
                 reason="Voided via web interface",
             )
             return RedirectResponse(
@@ -2775,9 +2809,9 @@ class ARWebService:
         try:
             ar_invoice_service.cancel_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(invoice_id),
-                cancelled_by_user_id=auth.user_id,
+                cancelled_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ar/invoices/{invoice_id}?success=Invoice+cancelled.+You+can+now+edit+it.",
@@ -2800,6 +2834,7 @@ class ARWebService:
         start_date: str | None,
         end_date: str | None,
         page: int,
+        limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
     ) -> HTMLResponse:
@@ -2814,6 +2849,7 @@ class ARWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
                 sort=sort,
                 sort_dir=sort_dir,
             )
@@ -2879,9 +2915,9 @@ class ARWebService:
 
             receipt = customer_payment_service.create_payment(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
-                created_by_user_id=auth.user_id,
+                created_by_user_id=_require_user_id(auth),
             )
 
             if "application/json" in content_type:
@@ -2976,10 +3012,10 @@ class ARWebService:
 
             customer_payment_service.update_payment(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 payment_id=UUID(receipt_id),
                 input=input_data,
-                updated_by_user_id=auth.user_id,
+                updated_by_user_id=_require_user_id(auth),
             )
 
             if "application/json" in content_type:
@@ -3022,6 +3058,7 @@ class ARWebService:
         start_date: str | None,
         end_date: str | None,
         page: int,
+        limit: int = 50,
     ) -> HTMLResponse:
         context = base_context(request, auth, "AR Credit Notes", "ar")
         context.update(
@@ -3034,6 +3071,7 @@ class ARWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
             )
         )
         return templates.TemplateResponse(
@@ -3078,9 +3116,9 @@ class ARWebService:
 
             credit_note = ar_invoice_service.create_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
-                created_by_user_id=auth.user_id,
+                created_by_user_id=_require_user_id(auth),
             )
 
             if "application/json" in content_type:
@@ -3161,7 +3199,7 @@ class ARWebService:
         credit_note_id: str,
     ) -> HTMLResponse | RedirectResponse:
         """Return the edit credit note form with existing data."""
-        org_id = coerce_uuid(auth.organization_id)
+        org_id = _require_org_id(auth)
         cn_id = coerce_uuid(credit_note_id)
 
         credit_note = db.get(Invoice, cn_id)
@@ -3206,10 +3244,10 @@ class ARWebService:
 
             credit_note = ar_invoice_service.update_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(credit_note_id),
                 input=input_data,
-                updated_by_user_id=auth.user_id,
+                updated_by_user_id=_require_user_id(auth),
             )
 
             if "application/json" in content_type:
@@ -3251,9 +3289,9 @@ class ARWebService:
         try:
             ar_invoice_service.submit_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(credit_note_id),
-                submitted_by_user_id=auth.user_id,
+                submitted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ar/credit-notes/{credit_note_id}?success=Credit+note+submitted+for+approval",
@@ -3276,9 +3314,9 @@ class ARWebService:
         try:
             ar_invoice_service.approve_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(credit_note_id),
-                approved_by_user_id=auth.user_id,
+                approved_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ar/credit-notes/{credit_note_id}?success=Credit+note+approved",
@@ -3301,9 +3339,9 @@ class ARWebService:
         try:
             ar_invoice_service.post_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(credit_note_id),
-                posted_by_user_id=auth.user_id,
+                posted_by_user_id=_require_user_id(auth),
             )
             return RedirectResponse(
                 url=f"/finance/ar/credit-notes/{credit_note_id}?success=Credit+note+posted+to+ledger",
@@ -3326,9 +3364,9 @@ class ARWebService:
         try:
             ar_invoice_service.void_invoice(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 invoice_id=coerce_uuid(credit_note_id),
-                voided_by_user_id=auth.user_id,
+                voided_by_user_id=_require_user_id(auth),
                 reason="Voided via web interface",
             )
             return RedirectResponse(
@@ -3369,7 +3407,7 @@ class ARWebService:
         db: Session,
     ) -> RedirectResponse:
         try:
-            invoice = ar_invoice_service.get(db, auth.organization_id, invoice_id)
+            invoice = ar_invoice_service.get(db, _require_org_id(auth), invoice_id)
             if not invoice or invoice.organization_id != auth.organization_id:
                 return RedirectResponse(
                     url=f"/ar/invoices/{invoice_id}?error=Invoice+not+found",
@@ -3387,10 +3425,10 @@ class ARWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -3418,7 +3456,9 @@ class ARWebService:
         db: Session,
     ) -> RedirectResponse:
         try:
-            receipt = customer_payment_service.get(db, receipt_id, auth.organization_id)
+            receipt = customer_payment_service.get(
+                db, receipt_id, _require_org_id(auth)
+            )
             if not receipt:
                 return RedirectResponse(
                     url=f"/ar/receipts/{receipt_id}?error=Receipt+not+found",
@@ -3436,10 +3476,10 @@ class ARWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -3468,7 +3508,7 @@ class ARWebService:
     ) -> RedirectResponse:
         try:
             credit_note = ar_invoice_service.get(
-                db, auth.organization_id, credit_note_id
+                db, _require_org_id(auth), credit_note_id
             )
             if not credit_note or credit_note.organization_id != auth.organization_id:
                 return RedirectResponse(
@@ -3487,10 +3527,10 @@ class ARWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -3518,7 +3558,7 @@ class ARWebService:
         db: Session,
     ) -> RedirectResponse:
         try:
-            customer = customer_service.get(db, auth.organization_id, customer_id)
+            customer = customer_service.get(db, _require_org_id(auth), customer_id)
             if not customer or customer.organization_id != auth.organization_id:
                 return RedirectResponse(
                     url=f"/ar/customers/{customer_id}?error=Customer+not+found",
@@ -3536,10 +3576,10 @@ class ARWebService:
 
             attachment_service.save_file(
                 db=db,
-                organization_id=auth.organization_id,
+                organization_id=_require_org_id(auth),
                 input=input_data,
                 file_content=file.file,
-                uploaded_by=auth.person_id,
+                uploaded_by=_require_person_id(auth),
             )
 
             return RedirectResponse(
@@ -3564,7 +3604,7 @@ class ARWebService:
         auth: WebAuthContext,
         db: Session,
     ) -> FileResponse | RedirectResponse:
-        attachment = attachment_service.get(db, auth.organization_id, attachment_id)
+        attachment = attachment_service.get(db, _require_org_id(auth), attachment_id)
 
         if not attachment or attachment.organization_id != auth.organization_id:
             return RedirectResponse(
@@ -3583,7 +3623,7 @@ class ARWebService:
         auth: WebAuthContext,
         db: Session,
     ) -> RedirectResponse:
-        attachment = attachment_service.get(db, auth.organization_id, attachment_id)
+        attachment = attachment_service.get(db, _require_org_id(auth), attachment_id)
 
         if not attachment or attachment.organization_id != auth.organization_id:
             return RedirectResponse(
@@ -3593,7 +3633,7 @@ class ARWebService:
         entity_type = attachment.entity_type
         entity_id = attachment.entity_id
 
-        attachment_service.delete(db, attachment_id, auth.organization_id)
+        attachment_service.delete(db, attachment_id, _require_org_id(auth))
 
         redirect_map = {
             "CUSTOMER_INVOICE": f"/ar/invoices/{entity_id}",

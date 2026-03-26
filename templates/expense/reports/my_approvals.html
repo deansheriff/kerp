@@ -24,31 +24,13 @@
         show_apply_button=true
     ) %}{% endcall %}
 
-    <div id="results-container">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="card p-5">
-            <p class="text-sm text-slate-500 dark:text-slate-400">Approved Claims</p>
-            <p class="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{{ report.approved_count }}</p>
-            <p class="text-xs font-mono text-slate-500 dark:text-slate-400">{{ "{:,.2f}".format(report.approved_total) }}</p>
-        </div>
-        <div class="card p-5">
-            <p class="text-sm text-slate-500 dark:text-slate-400">Rejected Claims</p>
-            <p class="text-2xl font-semibold text-rose-600 dark:text-rose-400">{{ report.rejected_count }}</p>
-            <p class="text-xs font-mono text-slate-500 dark:text-slate-400">{{ "{:,.2f}".format(report.rejected_total) }}</p>
-        </div>
-        <div class="card p-5">
-            <p class="text-sm text-slate-500 dark:text-slate-400">Period Decisions</p>
-            <p class="text-2xl font-semibold text-slate-900 dark:text-white">{{ report.approved_count + report.rejected_count }}</p>
-            {% if weekly_balance %}
-            <p class="text-xs text-slate-500 dark:text-slate-400">Remaining weekly budget</p>
-            <p class="text-sm font-semibold font-mono {% if weekly_balance.remaining < 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">
-                {{ "{:,.2f}".format(weekly_balance.remaining) }}
-            </p>
-            {% else %}
-            <p class="text-xs text-slate-500 dark:text-slate-400">Weekly budget not configured (unlimited).</p>
-            {% endif %}
-        </div>
-    </div>
+    <div id="results-container" class="space-y-8">
+    {% set report_hero_stats = [
+        {"label": "Approved Decisions", "value": report.approved_count, "subtitle": "{:,.2f}".format(report.approved_total), "icon": "check-circle", "icon_bg": "bg-emerald-100 dark:bg-emerald-900/30", "icon_class": "h-6 w-6 text-emerald-600 dark:text-emerald-400", "value_class": "text-emerald-600 dark:text-emerald-400", "subtitle_class": "text-slate-500 dark:text-slate-400 font-mono"},
+        {"label": "Rejected Decisions", "value": report.rejected_count, "subtitle": "{:,.2f}".format(report.rejected_total), "icon": "x-circle", "icon_bg": "bg-rose-100 dark:bg-rose-900/30", "icon_class": "h-6 w-6 text-rose-600 dark:text-rose-400", "value_class": "text-rose-600 dark:text-rose-400", "subtitle_class": "text-slate-500 dark:text-slate-400 font-mono"},
+        {"label": "Period Decisions", "value": report.approved_count + report.rejected_count, "subtitle": weekly_balance.remaining is defined and weekly_balance and "{:,.2f}".format(weekly_balance.remaining) or "Weekly budget unlimited", "icon": "clipboard-check", "icon_bg": "bg-slate-100 dark:bg-slate-800", "icon_class": "h-6 w-6 text-slate-600 dark:text-slate-300", "subtitle_class": weekly_balance.remaining is defined and weekly_balance and (weekly_balance.remaining < 0 and 'text-rose-600 dark:text-rose-400 font-mono' or 'text-emerald-600 dark:text-emerald-400 font-mono') or 'text-slate-500 dark:text-slate-400'}
+    ] %}
+    {% include "expense/reports/_report_hero_stats.html" %}
 
     {% if weekly_balance %}
     <div class="card p-5">

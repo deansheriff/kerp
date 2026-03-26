@@ -442,6 +442,7 @@ class CreditNoteWebService:
         start_date: str | None,
         end_date: str | None,
         page: int,
+        limit: int = 50,
     ) -> HTMLResponse:
         """Render credit note list page."""
         start_date, end_date = normalize_date_range_filters(
@@ -460,6 +461,7 @@ class CreditNoteWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
             )
         )
         return templates.TemplateResponse(

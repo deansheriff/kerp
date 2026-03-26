@@ -232,7 +232,7 @@
         {% set page_title_html %}{% block page_title %}{{ page_title | default("Help & Training") }}{% endblock %}{% endset %}
         {% set breadcrumbs_html %}{% block breadcrumbs %}{% endblock %}{% endset %}
         {% set header_actions_html %}{% block header_actions %}{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="teal", back_fallback=(back_fallback_url | trim)) }}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="teal", back_fallback=(back_fallback_url | trim), launcher_modules=accessible_modules | default([], true), launcher_user=user) }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-main-gradient">

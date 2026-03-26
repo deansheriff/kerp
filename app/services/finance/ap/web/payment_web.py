@@ -210,6 +210,11 @@ class PaymentWebService:
                 "end_date": end_date,
             },
             labels={"start_date": "From", "end_date": "To"},
+            options={
+                "supplier_id": {
+                    str(s["supplier_id"]): s["supplier_name"] for s in suppliers_list
+                }
+            },
         )
         return {
             "payments": payments_view,
@@ -647,6 +652,7 @@ class PaymentWebService:
         end_date: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
     ) -> HTMLResponse:
@@ -662,6 +668,7 @@ class PaymentWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
                 sort=sort,
                 sort_dir=sort_dir,
             )
@@ -999,6 +1006,7 @@ class PaymentWebService:
         status: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
         """Render payment batches list page."""
         status_value = None
@@ -1008,7 +1016,6 @@ class PaymentWebService:
             except ValueError:
                 status_value = None
 
-        limit = 50
         offset = (page - 1) * limit
         batches = payment_batch_service.list(
             db=db,
@@ -1024,6 +1031,7 @@ class PaymentWebService:
                 "batches": batches,
                 "status": status or "",
                 "page": page,
+                "limit": limit,
             }
         )
         return templates.TemplateResponse(

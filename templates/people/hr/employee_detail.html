@@ -1,6 +1,6 @@
 {% extends "people/base_people.html" %}
 
-{% from "components/macros.html" import status_badge, icon_svg, empty_state %}
+{% from "components/macros.html" import status_badge, icon_svg %}
 {% block page_title %}{{ person.first_name }} {{ person.last_name }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -20,7 +20,7 @@
 </a>
 {% if user and user.is_admin %}
 <form method="post" action="/people/hr/employees/bulk-delete" class="inline-block">
-    {{ request.state.csrf_form | safe }}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="employee_ids" value="{{ employee.employee_id }}">
     <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this employee? This will archive the record.');">
         Delete
@@ -47,6 +47,15 @@
                 <p class="text-sm text-slate-400 dark:text-slate-500">{{ employee.employee_code }}</p>
             </div>
             <div>
+                {% set status_colors = {
+                    'DRAFT': 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+                    'ACTIVE': 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+                    'ON_LEAVE': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+                    'SUSPENDED': 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+                    'RESIGNED': 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+                    'TERMINATED': 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+                    'RETIRED': 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
+                } %}
                 {{ status_badge(employee.status.value) }}
             </div>
         </div>
@@ -84,26 +93,26 @@
 
     {# Status Actions #}
     <div class="card">
-        <div class="card-header">
+        <div class="card-header px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">Status Actions</h3>
         </div>
-        <div class="card-body space-y-4">
+        <div class="card-body space-y-4 px-6 pb-6">
             <div class="flex flex-wrap gap-3">
                 {% if employee.status.value != 'ACTIVE' %}
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/activate">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-primary">Activate</button>
                 </form>
                 {% endif %}
                 {% if employee.status.value != 'ON_LEAVE' and employee.status.value != 'TERMINATED' %}
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/on-leave">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-secondary">Set On Leave</button>
                 </form>
                 {% endif %}
                 {% if employee.status.value not in ['SUSPENDED', 'TERMINATED'] %}
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/suspend" class="flex items-center gap-2">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="text" name="reason" placeholder="Reason (optional)" class="form-input w-56">
                     <button type="submit" class="btn btn-secondary">Suspend</button>
                 </form>
@@ -113,7 +122,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {% if employee.status.value != 'RESIGNED' and employee.status.value != 'TERMINATED' %}
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/resign" class="space-y-2">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <label for="resign_date" class="form-label">Resignation Date</label>
                     <div class="flex items-center gap-3">
                         <input type="date" id="resign_date" name="date_of_leaving" class="form-input w-full">
@@ -124,7 +133,7 @@
 
                 {% if employee.status.value != 'TERMINATED' %}
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/terminate" class="space-y-2">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <label for="terminate_date" class="form-label">Termination Date</label>
                     <div class="flex flex-col gap-2">
                         <input type="date" id="terminate_date" name="date_of_leaving" class="form-input w-full">
@@ -136,7 +145,7 @@
 
                 {% if employee.status.value in ['RESIGNED', 'TERMINATED', 'RETIRED'] %}
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/rehire" class="space-y-2">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <label for="rehire_date" class="form-label">Rehire Date</label>
                     <div class="flex flex-col gap-2">
                         <input type="date" id="rehire_date" name="date_of_rejoining" class="form-input w-full">
@@ -151,10 +160,10 @@
 
     {# User Access #}
     <div class="card">
-        <div class="card-header">
+        <div class="card-header px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">User Access</h3>
         </div>
-        <div class="card-body space-y-4">
+        <div class="card-body space-y-4 px-6 pb-6">
             {% if user_access_error %}
             <div class="p-3 rounded-lg bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800">
                 <div class="text-sm text-red-700 dark:text-red-400">{{ user_access_error }}</div>
@@ -169,11 +178,17 @@
                 </div>
                 <div class="flex items-center gap-2">
                     {% if any_active_cred %}
-                    {{ status_badge('ACTIVE', 'sm') }}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                        Login Active
+                    </span>
                     {% elif credentials %}
-                    {{ status_badge('INACTIVE', 'sm') }}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300">
+                        Login Disabled
+                    </span>
                     {% else %}
-                    {{ status_badge('PENDING', 'sm') }}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                        No Credentials
+                    </span>
                     {% endif %}
                 </div>
             </div>
@@ -185,10 +200,14 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="font-medium text-slate-900 dark:text-white">{{ cred.provider.value }}</span>
                         <span class="text-slate-500 dark:text-slate-400">{{ cred.username or '-' }}</span>
-                        {{ status_badge('ACTIVE' if cred.is_active else 'INACTIVE', 'sm') }}
+                        {% if cred.is_active %}
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">active</span>
+                        {% else %}
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300">inactive</span>
+                        {% endif %}
                     </div>
                     <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/credentials/{{ cred.id }}/toggle">
-                        {{ request.state.csrf_form | safe }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         {% if cred.is_active %}
                         <button type="submit" class="btn btn-secondary" onclick="return confirm('Disable this user\\'s login? This will sign them out.');">
                             Disable Login
@@ -206,7 +225,7 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/user-credentials" class="space-y-2">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <label class="form-label">Create Local Login</label>
                     <input type="text" name="username" placeholder="Leave blank to use employee email" class="form-input w-full">
                     <input type="password" name="password" placeholder="Leave blank to use default (Dotmac@123)" class="form-input w-full">
@@ -218,7 +237,7 @@
                 </form>
 
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/link-user" class="space-y-2" x-data="{ open: false, results: [], selectedId: '' }">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="person_id" x-model="selectedId">
                     <label class="form-label">Link Existing User</label>
                     <div class="relative">
@@ -262,9 +281,14 @@
     {# Onboarding Checklist #}
     {% if onboarding %}
     <div class="card" x-data="{ expanded: {{ 'true' if onboarding.status.value != 'COMPLETED' else 'false' }} }">
-        <div class="card-header cursor-pointer flex items-center justify-between" @click="expanded = !expanded">
+        <div class="card-header cursor-pointer flex items-center justify-between px-6 pt-6" @click="expanded = !expanded">
             <div class="flex items-center gap-3">
                 <h3 class="font-medium text-slate-900 dark:text-white">Onboarding Checklist</h3>
+                {% set status_colors = {
+                    'PENDING': 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+                    'IN_PROGRESS': 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+                    'COMPLETED': 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                } %}
                 {{ status_badge(onboarding.status.value, size="sm") }}
             </div>
             <div class="flex items-center gap-2">
@@ -276,12 +300,12 @@
                 </svg>
             </div>
         </div>
-        <div class="card-body" x-show="expanded" x-collapse>
+        <div class="card-body px-6 pb-6" x-show="expanded" x-collapse>
             {% if onboarding.status.value == 'PENDING' %}
             <div class="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
                 <span class="text-sm text-slate-600 dark:text-slate-400">Onboarding not yet started</span>
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/onboarding/start">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-primary btn-sm">Start Onboarding</button>
                 </form>
             </div>
@@ -293,7 +317,7 @@
                 <div class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     {% if onboarding.status.value != 'COMPLETED' %}
                     <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/onboarding/activity/{{ activity.activity_id }}/toggle" class="flex items-center">
-                        {{ request.state.csrf_form | safe }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="completed" value="{{ 'false' if activity.status == 'completed' else 'true' }}">
                         <button type="submit" class="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
                             {% if activity.status == 'completed' %}
@@ -327,17 +351,16 @@
                 {% endfor %}
             </div>
             {% else %}
-            {{ empty_state(
-                title="No activities defined",
-                description="No onboarding activities have been configured for this checklist.",
-                icon="clipboard-check"
-            ) }}
+            <div class="text-center py-6">
+                {{ icon_svg("clipboard-check", "mx-auto h-10 w-10 text-slate-300 dark:text-slate-600") }}
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No activities defined</p>
+            </div>
             {% endif %}
 
             {% if onboarding.status.value == 'IN_PROGRESS' and completed == total and total > 0 %}
             <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end">
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/onboarding/complete">
-                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-primary">
                         {{ icon_svg("check-circle", "h-4 w-4 mr-1.5") }}
                         Complete Onboarding
@@ -351,7 +374,7 @@
     {# No onboarding - offer to create one #}
     {% if employee.status.value == 'DRAFT' %}
     <div class="card">
-        <div class="card-body flex items-center justify-between">
+        <div class="card-body flex items-center justify-between px-6 py-6">
             <div>
                 <h3 class="font-medium text-slate-900 dark:text-white">Onboarding</h3>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">No onboarding checklist assigned yet</p>
@@ -369,10 +392,10 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {# Personal Information #}
         <div class="card">
-            <div class="card-header">
+            <div class="card-header px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Personal Information</h3>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 pb-6">
                 <dl class="space-y-3">
                     <div class="flex justify-between">
                         <dt class="text-slate-500 dark:text-slate-400">Work Email</dt>
@@ -413,10 +436,10 @@
         {# Emergency Contact #}
         {% if employee.emergency_contact_name or employee.emergency_contact_phone %}
         <div class="card">
-            <div class="card-header">
+            <div class="card-header px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Emergency Contact</h3>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 pb-6">
                 <dl class="space-y-3">
                     <div class="flex justify-between">
                         <dt class="text-slate-500 dark:text-slate-400">Contact Name</dt>
@@ -433,10 +456,10 @@
 
         {# Employment Information #}
         <div class="card">
-            <div class="card-header">
+            <div class="card-header px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Employment Information</h3>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 pb-6">
                 <dl class="space-y-3">
                     <div class="flex justify-between">
                         <dt class="text-slate-500 dark:text-slate-400">Department</dt>
@@ -516,10 +539,10 @@
 
         {# Dates #}
         <div class="card">
-            <div class="card-header">
+            <div class="card-header px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Important Dates</h3>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 pb-6">
                 <dl class="space-y-3">
                     <div class="flex justify-between">
                         <dt class="text-slate-500 dark:text-slate-400">Date of Joining</dt>
@@ -546,7 +569,7 @@
         {# Bank Details (Sensitive - masked by default) #}
         {% if employee.bank_name or employee.bank_account_number %}
         <div class="card" x-data="{ showSensitive: false }">
-            <div class="card-header flex items-center justify-between">
+            <div class="card-header flex items-center justify-between px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Bank Details</h3>
                 <button type="button" @click="showSensitive = !showSensitive"
                     class="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1" aria-label="View">
@@ -560,7 +583,7 @@
                     <span x-text="showSensitive ? 'Hide' : 'Show'"></span>
                 </button>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 pb-6">
                 <dl class="space-y-3">
                     <div class="flex justify-between">
                         <dt class="text-slate-500 dark:text-slate-400">Bank Name</dt>
@@ -593,7 +616,7 @@
 
     {# Salary Structure Assignment #}
     <div class="card">
-        <div class="card-header flex items-center justify-between">
+        <div class="card-header flex items-center justify-between px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">Salary Structure</h3>
             <a href="/people/payroll/assignments/new?employee_id={{ employee.employee_id }}"
                class="btn btn-secondary btn-sm">
@@ -601,7 +624,7 @@
                 Assign Structure
             </a>
         </div>
-        <div class="card-body">
+        <div class="card-body px-6 pb-6">
             {% if salary_assignments %}
             <div class="space-y-3">
                 {% for assignment in salary_assignments %}
@@ -613,7 +636,9 @@
                                 {{ assignment.salary_structure.structure_name }}
                             </span>
                             {% if not assignment.to_date %}
-                            {{ status_badge('ACTIVE', 'sm') }}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-800 dark:text-teal-300">
+                                Current
+                            </span>
                             {% endif %}
                         </div>
                         <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -645,20 +670,18 @@
                 {% endfor %}
             </div>
             {% else %}
-            {{ empty_state(
-                title="No salary structure assigned",
-                description="Assign a structure to enable payroll processing",
-                icon="currency",
-                cta_text="Assign Structure",
-                cta_href="/people/payroll/assignments/new?employee_id=" ~ employee.employee_id
-            ) }}
+            <div class="text-center py-6">
+                {{ icon_svg("currency", "mx-auto h-10 w-10 text-slate-300 dark:text-slate-600") }}
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No salary structure assigned</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500">Assign a structure to enable payroll processing</p>
+            </div>
             {% endif %}
         </div>
     </div>
 
     {# Tax Profile #}
     <div class="card">
-        <div class="card-header flex items-center justify-between">
+        <div class="card-header flex items-center justify-between px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">Tax Profile (PAYE)</h3>
             {% if tax_profile %}
             <a href="/people/payroll/tax/profiles/{{ employee.employee_id }}/edit"
@@ -674,7 +697,7 @@
             </a>
             {% endif %}
         </div>
-        <div class="card-body">
+        <div class="card-body px-6 pb-6">
             {% if tax_profile %}
             <dl class="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
@@ -715,13 +738,11 @@
                 {% endif %}
             </dl>
             {% else %}
-            {{ empty_state(
-                title="No tax profile configured",
-                description="Set up a tax profile for PAYE calculation",
-                icon="receipt",
-                cta_text="Set Up Tax Profile",
-                cta_href="/people/payroll/tax/profiles/new?employee_id=" ~ employee.employee_id
-            ) }}
+            <div class="text-center py-6">
+                {{ icon_svg("receipt", "mx-auto h-10 w-10 text-slate-300 dark:text-slate-600") }}
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No tax profile configured</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500">Set up a tax profile for PAYE calculation</p>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -729,10 +750,10 @@
     {# Notes #}
     {% if employee.notes %}
     <div class="card">
-        <div class="card-header">
+        <div class="card-header px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">Notes</h3>
         </div>
-        <div class="card-body">
+        <div class="card-body px-6 pb-6">
             <p class="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{{ employee.notes }}</p>
         </div>
     </div>

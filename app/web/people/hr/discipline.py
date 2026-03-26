@@ -23,8 +23,10 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.discipline.web import discipline_web_service
+from app.templates import templates
 from app.web.deps import (
     WebAuthContext,
+    base_context,
     get_db,
     require_discipline_cases_create,
     require_discipline_cases_read,
@@ -41,6 +43,20 @@ router = APIRouter(prefix="/discipline", tags=["discipline-web"])
 
 
 @router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def discipline_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_discipline_cases_read),
+    db: Session = Depends(get_db),
+):
+    """Discipline landing page."""
+    context = base_context(request, auth, "Discipline", "discipline", db=db)
+    return templates.TemplateResponse(
+        request, "people/hr/discipline/index.html", context
+    )
+
+
+@router.get("/cases", response_class=HTMLResponse)
 def list_cases(
     request: Request,
     status: str | None = None,

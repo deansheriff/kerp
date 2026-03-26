@@ -27,7 +27,9 @@
         active_filters=active_filters | default([]),
         show_search=true,
         search=search | default('', true),
-        search_placeholder="Search contracts..."
+        search_placeholder="Search contracts...",
+        auto_submit=false,
+        show_apply_button=true
     ) %}
         <div>
             <label class="form-label text-xs">Status</label>

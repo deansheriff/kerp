@@ -3,7 +3,9 @@
 
 
 {% block content %}
-<div class="space-y-6">
+<div id="expense-report-view" class="relative space-y-6">
+    {% set current_report_view = "trends" %}
+    {% include "expense/reports/_loading_skeleton.html" %}
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -15,6 +17,8 @@
             Back to Summary
         </a>
     </div>
+
+    {% include "expense/reports/_report_tabs.html" %}
 
     <!-- Period Filter -->
     {# Filters #}
@@ -36,56 +40,13 @@
     {% endcall %}
 
     <div id="results-container" class="space-y-6">
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="card p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
-                    {{ icon_svg("calendar", "h-6 w-6 text-amber-600 dark:text-amber-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Months</p>
-                    <p class="text-2xl font-semibold text-slate-900 dark:text-white">{{ report.months | length }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                    {{ icon_svg("currency", "h-6 w-6 text-blue-600 dark:text-blue-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Total Claimed</p>
-                    <p class="text-2xl font-semibold text-slate-900 dark:text-white font-mono">{{ "{:,.2f}".format(report.total_claimed) }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
-                    {{ icon_svg("check-circle", "h-6 w-6 text-green-600 dark:text-green-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Total Approved</p>
-                    <p class="text-2xl font-semibold text-green-600 dark:text-green-400 font-mono">{{ "{:,.2f}".format(report.total_approved) }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
-                    {{ icon_svg("chart", "h-6 w-6 text-violet-600 dark:text-violet-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Avg Monthly</p>
-                    <p class="text-2xl font-semibold text-slate-900 dark:text-white font-mono">{{ "{:,.2f}".format(report.average_monthly) }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% set report_hero_stats = [
+        {"label": "Months", "value": report.months | length, "icon": "calendar", "icon_bg": "bg-amber-100 dark:bg-amber-900/30", "icon_class": "h-6 w-6 text-amber-600 dark:text-amber-400"},
+        {"label": "Total Claimed", "value": "{:,.2f}".format(report.total_claimed), "icon": "currency", "icon_bg": "bg-blue-100 dark:bg-blue-900/30", "icon_class": "h-6 w-6 text-blue-600 dark:text-blue-400", "value_class": "text-slate-900 dark:text-white font-mono"},
+        {"label": "Reimbursed", "value": "{:,.2f}".format(report.total_approved), "icon": "check-circle", "icon_bg": "bg-green-100 dark:bg-green-900/30", "icon_class": "h-6 w-6 text-green-600 dark:text-green-400", "value_class": "text-green-600 dark:text-green-400 font-mono"},
+        {"label": "Avg Monthly", "value": "{:,.2f}".format(report.average_monthly), "icon": "chart", "icon_bg": "bg-violet-100 dark:bg-violet-900/30", "icon_class": "h-6 w-6 text-violet-600 dark:text-violet-400", "value_class": "text-slate-900 dark:text-white font-mono"}
+    ] %}
+    {% include "expense/reports/_report_hero_stats.html" %}
 
     <!-- Visual Chart (Bar Chart using CSS) -->
     <div class="card">
@@ -145,7 +106,7 @@
                         <th scope="col" class="px-5 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Month</th>
                         <th scope="col" class="px-5 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Claims</th>
                         <th scope="col" class="px-5 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Claimed</th>
-                        <th scope="col" class="px-5 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Approved</th>
+                        <th scope="col" class="px-5 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Reimbursed</th>
                         <th scope="col" class="px-5 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">vs Avg</th>
                     </tr>
                 </thead>
@@ -207,18 +168,6 @@
         {% endif %}
     </div>
 
-    <!-- Quick Links -->
-    <div class="flex gap-4">
-        <a href="/expense/reports/summary" class="btn btn-secondary">
-            View Summary
-        </a>
-        <a href="/expense/reports/by-category" class="btn btn-secondary">
-            View by Category
-        </a>
-        <a href="/expense/reports/by-employee" class="btn btn-secondary">
-            View by Employee
-        </a>
-    </div>
     </div>
 </div>
 {% endblock %}

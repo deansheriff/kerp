@@ -40,7 +40,9 @@
         active_filters=active_filters if active_filters else [],
         date_range=true,
         start_date=start_date_iso | default('', true),
-        end_date=end_date_iso | default('', true)
+        end_date=end_date_iso | default('', true),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
     <div>
             <div class="flex-1 min-w-[200px]">

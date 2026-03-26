@@ -1,427 +1,206 @@
 {% extends "expense/base_expense.html" %}
-{% from "components/macros.html" import stats_card, empty_state, section_card, status_badge, icon_svg %}
+{% from "components/macros.html" import status_badge %}
 
 {% block page_title %}Expense Dashboard{% endblock %}
 
 {% block content %}
+{% set dashboard_title = "Expense Dashboard" %}
+{% set dashboard_subtitle = "Spend overview across claims, advances, cards, and compliance" %}
+{% set hero_stats = [
+    {
+        "label": "Total Claims",
+        "value": stats.total_claims | default(0),
+        "icon": "document",
+        "color": "amber",
+        "subtitle": "%s avg per claim" | format(stats.avg_claim_amount | default(currency_zero))
+    },
+    {
+        "label": "Total Amount",
+        "value": stats.total_amount | default(currency_zero),
+        "icon": "currency",
+        "color": "amber",
+        "subtitle": "Claims submitted in selected period"
+    },
+    {
+        "label": "Pending Approval",
+        "value": stats.pending_approval | default(0),
+        "icon": "clock",
+        "color": "amber",
+        "subtitle": "%s total" | format(stats.pending_amount | default(currency_zero))
+    },
+    {
+        "label": "Reimbursed",
+        "value": stats.reimbursed_amount | default(currency_zero),
+        "icon": "check-circle",
+        "color": "emerald",
+        "subtitle": "%s claims paid" | format(stats.reimbursed_count | default(0))
+    }
+] %}
+
 <div class="space-y-8 dashboard-expense">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-white font-display">Expense Dashboard</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">Expense claims and reimbursements overview</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <form method="get" class="flex items-center gap-3">
-                <label for="period-filter" class="text-sm text-slate-500 dark:text-slate-400">Period</label>
-                <select id="period-filter" name="period" class="form-select" onchange="this.form.submit()">
-                    <option value="month" {% if selected_period == 'month' %}selected{% endif %}>This Month</option>
-                    <option value="quarter" {% if selected_period == 'quarter' %}selected{% endif %}>This Quarter</option>
-                    <option value="year" {% if selected_period == 'year' %}selected{% endif %}>This Year</option>
-                    <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All Time</option>
-                </select>
-            </form>
-            <a href="/expense/claims/new" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm hover:from-amber-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-all duration-200">
-                {{ icon_svg("plus", "h-4 w-4") }}
-                New Claim
-            </a>
-        </div>
-    </div>
+    {% include "expense/_dashboard_header.html" %}
+    {% set hero_stats_testid = "dashboard-stats" %}
+    {% include "expense/_hero_stats.html" %}
 
-    <!-- Hero Stats -->
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="dashboard-stats">
-        {{ stats_card("Total Claims", stats.total_claims | default(0), icon="document", color="amber", trend=stats.claims_trend if stats.claims_trend else none) }}
-        {{ stats_card("Total Amount", stats.total_amount | default(currency_zero), icon="currency", color="amber", subtitle="%s avg per claim" | format(stats.avg_claim_amount | default(currency_zero))) }}
-        {{ stats_card("Pending Approval", stats.pending_approval | default(0), icon="clock", color="amber", subtitle="%s total" | format(stats.pending_amount | default(currency_zero))) }}
-        {{ stats_card("Reimbursed", stats.reimbursed_amount | default(currency_zero), icon="check-circle", color="emerald", subtitle="%s claims paid" | format(stats.reimbursed_count | default(0))) }}
-    </div>
-
-    <!-- Divider -->
     <div class="divider-expense"></div>
 
-    <!-- Charts Row 1: Expense Trend & Category Distribution -->
     <div class="grid gap-6 lg:grid-cols-2">
-        <!-- Expense Trend Chart -->
-        <div class="stagger-in card p-6" style="animation-delay: 50ms;">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Expense Trend</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Monthly expense claims</p>
-                </div>
-                <div class="flex items-center gap-4 text-xs">
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                        <span class="text-slate-600 dark:text-slate-400">Submitted</span>
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                        <span class="text-slate-600 dark:text-slate-400">Reimbursed</span>
-                    </span>
-                </div>
+        <div class="card p-6">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Action Required</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">The next queues finance and reviewers should clear.</p>
             </div>
-            {% if chart_data.expense_trend %}
-            <div class="h-64">
-                <canvas data-chart="trendLine" data-chart-config='{{ {
-                    "labels": chart_data.expense_trend | map(attribute="month") | list,
-                    "datasets": [
-                        {"label": "Submitted", "data": chart_data.expense_trend | map(attribute="submitted") | list, "color": "rgba(251, 191, 36, 1)", "fill": "rgba(251, 191, 36, 0.1)"},
-                        {"label": "Reimbursed", "data": chart_data.expense_trend | map(attribute="reimbursed") | list, "color": "rgba(16, 185, 129, 1)", "fill": "rgba(16, 185, 129, 0.1)"}
-                    ]
-                } | tojson }}'></canvas>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <a href="/expense/claims/list?status=SUBMITTED" class="rounded-xl border border-amber-200 bg-amber-50/80 p-4 transition hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-900/10">
+                    <p class="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">Claims to Review</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.claims_to_review | default(0) }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ stats.pending_amount | default(currency_zero) }} waiting</p>
+                </a>
+                <a href="/expense/advances" class="rounded-xl border border-violet-200 bg-violet-50/80 p-4 transition hover:border-violet-300 dark:border-violet-900/40 dark:bg-violet-900/10">
+                    <p class="text-xs uppercase tracking-wide text-violet-700 dark:text-violet-300">Advances to Approve</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.advances_to_approve | default(0) }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ stats.outstanding_advances | default(currency_zero) }} exposed</p>
+                </a>
+                <a href="/expense/claims/list?status=APPROVED" class="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 transition hover:border-emerald-300 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                    <p class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Ready to Reimburse</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.ready_for_payment | default(0) }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ stats.reimbursed_amount | default(currency_zero) }} reimbursed in period</p>
+                </a>
+                <a href="/expense/cards" class="rounded-xl border border-sky-200 bg-sky-50/80 p-4 transition hover:border-sky-300 dark:border-sky-900/40 dark:bg-sky-900/10">
+                    <p class="text-xs uppercase tracking-wide text-sky-700 dark:text-sky-300">Card Exceptions</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.unreconciled_count | default(0) }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ stats.unreconciled_amount | default(currency_zero) }} to reconcile</p>
+                </a>
             </div>
-            {% else %}
-            {{ empty_state("No expense data", "Submit claims to see trends") }}
-            {% endif %}
         </div>
 
-        <!-- Category Distribution -->
-        <div class="stagger-in card p-6" style="animation-delay: 100ms;">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Expense by Category</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Distribution by expense type</p>
+        <div class="card p-6">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Operational Health</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Process issues that slow reimbursement and closing.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Missing Receipts</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.missing_receipts | default(0) }}</p>
+                </div>
+                <div class="rounded-xl border border-rose-200 bg-rose-50/80 p-4 dark:border-rose-900/40 dark:bg-rose-900/10">
+                    <p class="text-xs uppercase tracking-wide text-rose-700 dark:text-rose-300">Policy Violations</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.policy_violations | default(0) }}</p>
+                </div>
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                    <p class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Compliance Rate</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.compliance_rate | default(0) }}%</p>
+                </div>
+                <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
+                    <p class="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">Active Advances</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.active_advances | default(0) }}</p>
                 </div>
             </div>
-            {% if chart_data.category_distribution %}
-            <div class="h-64 flex items-center justify-center">
-                <canvas data-chart="donut" data-chart-config='{{ {
-                    "labels": chart_data.category_distribution | map(attribute="category") | list,
-                    "data": chart_data.category_distribution | map(attribute="amount") | list
-                } | tojson }}'></canvas>
-            </div>
-            {% else %}
-            {{ empty_state("No category data", "Categorize expenses to see distribution") }}
-            {% endif %}
         </div>
     </div>
 
-    <!-- Charts Row 2: Top Spenders & Status Breakdown -->
     <div class="grid gap-6 lg:grid-cols-3">
-        <!-- Top Spenders -->
-        <div class="stagger-in card p-6" style="animation-delay: 150ms;">
-            <div class="mb-6">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Top Spenders</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400">By expense amount</p>
+        <div class="card p-5">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Approval Queue</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">The next reimbursement tasks waiting on action.</p>
             </div>
-            {% if chart_data.top_spenders %}
-            <div class="h-56">
-                <canvas data-chart="horizontalBar" data-chart-config='{{ {
-                    "labels": chart_data.top_spenders | map(attribute="name") | list,
-                    "data": chart_data.top_spenders | map(attribute="amount") | list,
-                    "color": "rgba(251, 191, 36, 0.85)"
-                } | tojson }}'></canvas>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Claims to Review</span>
+                    <span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">{{ stats.claims_to_review | default(0) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Advances to Approve</span>
+                    <span class="rounded-full bg-violet-100 px-2 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">{{ stats.advances_to_approve | default(0) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Ready for Payment</span>
+                    <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{{ stats.ready_for_payment | default(0) }}</span>
+                </div>
             </div>
-            {% else %}
-            {{ empty_state("No spender data", "Submit claims to see rankings") }}
-            {% endif %}
+            <a href="/expense/claims?status=pending" class="mt-4 block rounded-lg py-2 text-center text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20">Review Pending Claims &rarr;</a>
         </div>
 
-        <!-- Status Breakdown -->
-        <div class="stagger-in card p-6" style="animation-delay: 200ms;">
-            <div class="mb-6">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Claim Status</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400">Current period breakdown</p>
+        <div class="card p-5">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Cash Advances</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Current exposure and settlements.</p>
             </div>
-            {% if chart_data.status_breakdown %}
-            <div class="h-56 flex items-center justify-center">
-                <canvas data-chart="donut" data-chart-config='{{ {
-                    "labels": chart_data.status_breakdown | map(attribute="status") | list,
-                    "data": chart_data.status_breakdown | map(attribute="count") | list,
-                    "colors": ["rgba(251, 191, 36, 0.85)", "rgba(16, 185, 129, 0.85)", "rgba(239, 68, 68, 0.85)", "rgba(59, 130, 246, 0.85)"]
-                } | tojson }}'></canvas>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Active Advances</span>
+                    <span class="font-medium text-slate-900 dark:text-white">{{ stats.active_advances | default(0) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Outstanding Amount</span>
+                    <span class="font-medium text-amber-600 dark:text-amber-400">{{ stats.outstanding_advances | default(currency_zero) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Settled This Month</span>
+                    <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ stats.settled_advances | default(currency_zero) }}</span>
+                </div>
             </div>
-            {% else %}
-            {{ empty_state("No status data", "Submit claims to see status") }}
-            {% endif %}
+            <a href="/expense/advances" class="mt-4 block rounded-lg py-2 text-center text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20">View All Advances &rarr;</a>
         </div>
 
-        <!-- Department Spending -->
-        <div class="stagger-in card p-6" style="animation-delay: 250ms;">
-            <div class="mb-6">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Department Spending</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400">Expenses by department</p>
+        <div class="card p-5">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Policy Compliance</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">A high-level read on process quality.</p>
             </div>
-            {% if chart_data.department_spending %}
-            <div class="h-56">
-                <canvas data-chart="horizontalBar" data-chart-config='{{ {
-                    "labels": chart_data.department_spending | map(attribute="department") | list,
-                    "data": chart_data.department_spending | map(attribute="amount") | list,
-                    "color": "rgba(249, 115, 22, 0.85)"
-                } | tojson }}'></canvas>
-            </div>
-            {% else %}
-            {{ empty_state("No department data", "Department spending will appear here") }}
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Main Content Grid -->
-    <div class="grid gap-8 lg:grid-cols-3">
-        <!-- Left Column - Quick Actions & Summary -->
-        <div class="space-y-8">
-            <!-- Quick Actions -->
-            <div class="stagger-in" style="animation-delay: 300ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Quick Actions</span>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Compliance Rate</span>
+                    <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ stats.compliance_rate | default(0) }}%</span>
                 </div>
-                <div class="space-y-2" data-testid="dashboard-quick-actions">
-                    <a href="/expense/claims/new" class="cmd-action">
-                        <span class="cmd-action-key">C</span>
-                        <span class="cmd-action-label">New Expense Claim</span>
-                        <span class="cmd-action-hint">Claims</span>
-                    </a>
-                    <a href="/expense/advances/new" class="cmd-action">
-                        <span class="cmd-action-key">A</span>
-                        <span class="cmd-action-label">Request Cash Advance</span>
-                        <span class="cmd-action-hint">Advances</span>
-                    </a>
-                    <a href="/expense/cards" class="cmd-action">
-                        <span class="cmd-action-key">D</span>
-                        <span class="cmd-action-label">View Card Transactions</span>
-                        <span class="cmd-action-hint">Cards</span>
-                    </a>
-                    <a href="/expense/categories" class="cmd-action">
-                        <span class="cmd-action-key">G</span>
-                        <span class="cmd-action-label">Manage Categories</span>
-                        <span class="cmd-action-hint">Config</span>
-                    </a>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Policy Violations</span>
+                    <span class="font-medium text-rose-600 dark:text-rose-400">{{ stats.policy_violations | default(0) }}</span>
                 </div>
-            </div>
-
-            <!-- Approval Queue -->
-            <div class="stagger-in" style="animation-delay: 350ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Approval Queue</span>
-                </div>
-                <div class="card p-5">
-                    <div class="flex items-center justify-between mb-4">
-                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Pending Actions</span>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-slate-500 dark:text-slate-400">Claims to Review</span>
-                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                {{ stats.claims_to_review | default(0) }}
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-slate-500 dark:text-slate-400">Advances to Approve</span>
-                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                                {{ stats.advances_to_approve | default(0) }}
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-slate-500 dark:text-slate-400">Ready for Payment</span>
-                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                {{ stats.ready_for_payment | default(0) }}
-                            </span>
-                        </div>
-                    </div>
-                    <a href="/expense/claims?status=pending" class="block mt-4 text-center text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 py-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">
-                        Review Pending Claims &rarr;
-                    </a>
-                </div>
-            </div>
-
-            <!-- Cash Advance Summary -->
-            <div class="stagger-in" style="animation-delay: 375ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Cash Advances</span>
-                </div>
-                <div class="card p-5">
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-slate-500 dark:text-slate-400">Active Advances</span>
-                            <span class="font-medium text-slate-900 dark:text-white">{{ stats.active_advances | default(0) }}</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-slate-500 dark:text-slate-400">Outstanding Amount</span>
-                            <span class="font-medium text-amber-600 dark:text-amber-400">{{ stats.outstanding_advances | default(currency_zero) }}</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-slate-500 dark:text-slate-400">Settled This Month</span>
-                            <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ stats.settled_advances | default(currency_zero) }}</span>
-                        </div>
-                    </div>
-                    <a href="/expense/advances" class="block mt-4 text-center text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 py-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">
-                        View All Advances &rarr;
-                    </a>
-                </div>
-            </div>
-
-            <!-- Policy Compliance -->
-            <div class="stagger-in" style="animation-delay: 400ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Policy Compliance</span>
-                </div>
-                <div class="card p-5">
-                    <div class="flex items-center justify-between mb-4">
-                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Compliance Rate</span>
-                        <span class="text-lg font-semibold text-emerald-600 dark:text-emerald-400">{{ stats.compliance_rate | default(0) }}%</span>
-                    </div>
-                    <div class="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-4">
-                        <div class="bg-emerald-500 h-full rounded-full" style="width: {{ stats.compliance_rate | default(0) }}%"></div>
-                    </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between text-slate-500 dark:text-slate-400">
-                            <span>Policy Violations</span>
-                            <span class="text-rose-600 dark:text-rose-400 font-medium">{{ stats.policy_violations | default(0) }}</span>
-                        </div>
-                        <div class="flex justify-between text-slate-500 dark:text-slate-400">
-                            <span>Missing Receipts</span>
-                            <span class="text-amber-600 dark:text-amber-400 font-medium">{{ stats.missing_receipts | default(0) }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Column - Recent Claims & Lists -->
-        <div class="lg:col-span-2 space-y-8">
-            <!-- Recent Claims -->
-            <div class="stagger-in" style="animation-delay: 300ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Recent Claims</span>
-                </div>
-                <div class="card" data-testid="dashboard-recent-claims">
-                    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
-                        <span class="text-sm font-medium text-slate-500 dark:text-slate-400">
-                            Latest {{ recent_claims | length | default(0) }} claims
-                        </span>
-                        <a href="/expense/claims/list" class="text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 transition-colors">
-                            View all &rarr;
-                        </a>
-                    </div>
-                    <div class="divide-y divide-slate-100 dark:divide-slate-700/60">
-                        {% for claim in recent_claims %}
-                        <a href="/expense/claims/{{ claim.id }}" class="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                                {{ icon_svg("document", "h-5 w-5 text-amber-600 dark:text-amber-400") }}
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ claim.title }}</p>
-                                    {{ status_badge(claim.status if claim.status else 'DRAFT', 'sm') }}
-                                </div>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ claim.employee_name }} &bull; {{ claim.category | replace('_', ' ') | title }}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-semibold font-mono tabular-nums text-slate-900 dark:text-white">{{ claim.amount }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ claim.date }}</p>
-                            </div>
-                        </a>
-                        {% else %}
-                        <div class="py-12">
-                            {{ empty_state("No recent claims", "Submit an expense claim to get started") }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Monthly Comparison -->
-            <div class="stagger-in" style="animation-delay: 350ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Category Comparison</span>
-                </div>
-                <div class="card p-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <div>
-                            <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Monthly Category Breakdown</h3>
-                            <p class="text-sm text-slate-500 dark:text-slate-400">Last 6 months by category</p>
-                        </div>
-                    </div>
-                    {% if chart_data.category_trend %}
-                    <div class="h-64">
-                        <canvas data-chart="groupedBar" data-chart-config='{{ {
-                            "labels": chart_data.category_trend.months | list,
-                            "datasets": chart_data.category_trend.categories | list
-                        } | tojson }}'></canvas>
-                    </div>
-                    {% else %}
-                    {{ empty_state("No category trend data", "More data needed for trends") }}
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Corporate Cards Summary -->
-            <div class="stagger-in" style="animation-delay: 400ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Corporate Cards</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Card Usage -->
-                    <div class="card p-5">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                {{ icon_svg("credit-card", "h-5 w-5 text-blue-600 dark:text-blue-400") }}
-                            </div>
-                            <div>
-                                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Card Spend</h4>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">This month</p>
-                            </div>
-                        </div>
-                        <div class="text-2xl font-semibold text-slate-900 dark:text-white mb-2">
-                            {{ stats.card_spend_month | default(currency_zero) }}
-                        </div>
-                        <div class="text-sm text-slate-500 dark:text-slate-400">
-                            {{ stats.card_transactions | default(0) }} transactions
-                        </div>
-                    </div>
-
-                    <!-- Unreconciled -->
-                    <div class="card p-5">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="h-10 w-10 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
-                                {{ icon_svg("exclamation-circle", "h-5 w-5 text-rose-600 dark:text-rose-400") }}
-                            </div>
-                            <div>
-                                <h4 class="text-sm font-semibold text-slate-900 dark:text-white">Unreconciled</h4>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">Needs attention</p>
-                            </div>
-                        </div>
-                        <div class="text-2xl font-semibold text-rose-600 dark:text-rose-400 mb-2">
-                            {{ stats.unreconciled_amount | default(currency_zero) }}
-                        </div>
-                        <div class="text-sm text-slate-500 dark:text-slate-400">
-                            {{ stats.unreconciled_count | default(0) }} transactions
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Links -->
-            <div class="stagger-in" style="animation-delay: 450ms;">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <a href="/expense/claims" class="card card-hover p-4 text-center">
-                        <div class="text-slate-400 dark:text-slate-500 mb-2">
-                            {{ icon_svg("document", "h-6 w-6 mx-auto", stroke_width="1.5") }}
-                        </div>
-                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">All Claims</span>
-                    </a>
-                    <a href="/expense/advances" class="card card-hover p-4 text-center">
-                        <div class="text-slate-400 dark:text-slate-500 mb-2">
-                            {{ icon_svg("currency", "h-6 w-6 mx-auto", stroke_width="1.5") }}
-                        </div>
-                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Advances</span>
-                    </a>
-                    <a href="/expense/cards" class="card card-hover p-4 text-center">
-                        <div class="text-slate-400 dark:text-slate-500 mb-2">
-                            {{ icon_svg("credit-card", "h-6 w-6 mx-auto", stroke_width="1.5") }}
-                        </div>
-                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Cards</span>
-                    </a>
-                    <a href="/expense/categories" class="card card-hover p-4 text-center">
-                        <div class="text-slate-400 dark:text-slate-500 mb-2">
-                            {{ icon_svg("tag", "h-6 w-6 mx-auto", stroke_width="1.5") }}
-                        </div>
-                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Categories</span>
-                    </a>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Missing Receipts</span>
+                    <span class="font-medium text-slate-900 dark:text-white">{{ stats.missing_receipts | default(0) }}</span>
                 </div>
             </div>
         </div>
     </div>
 
-    {# ── Coach Insight Cards ──────────────────────────────── #}
-    {% include "components/_coach_cards.html" %}
+    <div class="grid gap-6 lg:grid-cols-2">
+        <div class="card p-5">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Corporate Cards</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Current month card activity.</p>
+            </div>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Spend This Month</span>
+                    <span class="font-medium text-slate-900 dark:text-white">{{ stats.card_spend_month | default(currency_zero) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Transactions</span>
+                    <span class="font-medium text-slate-900 dark:text-white">{{ stats.card_transactions | default(0) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-5">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Reconciliation</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Unmatched transactions needing review.</p>
+            </div>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Unreconciled Count</span>
+                    <span class="font-medium text-slate-900 dark:text-white">{{ stats.unreconciled_count | default(0) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-500 dark:text-slate-400">Unreconciled Amount</span>
+                    <span class="font-medium text-amber-600 dark:text-amber-400">{{ stats.unreconciled_amount | default(currency_zero) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

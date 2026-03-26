@@ -232,6 +232,11 @@ class InvoiceWebService:
                 "end_date": end_date,
             },
             labels={"start_date": "From", "end_date": "To"},
+            options={
+                "customer_id": {
+                    str(c["customer_id"]): c["customer_name"] for c in customers_list
+                }
+            },
         )
         return {
             "invoices": invoices_view,
@@ -570,6 +575,7 @@ class InvoiceWebService:
         start_date: str | None,
         end_date: str | None,
         page: int,
+        limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
     ) -> HTMLResponse:
@@ -590,6 +596,7 @@ class InvoiceWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
                 sort=sort,
                 sort_dir=sort_dir,
             )

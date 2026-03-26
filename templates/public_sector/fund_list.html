@@ -1,13 +1,14 @@
 {% extends "public_sector/base_public_sector.html" %}
 
 {% from "components/macros.html" import status_badge, icon_svg, pagination, compact_filters, filter_select_field %}
-{% block page_title %}Funds{% endblock %}
+{% block page_title %}Fund Register{% endblock %}
 
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex">
         <li><a href="/public-sector/" class="hover:text-primary-600 dark:hover:text-primary-400">Public Sector</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">Funds</span></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="/public-sector/funds" class="hover:text-primary-600 dark:hover:text-primary-400">Funds</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">Fund Register</span></li>
     </ol>
 </nav>
 {% endblock %}
@@ -31,7 +32,7 @@
     {% endif %}
 
     {% call(filter_attrs) compact_filters(
-        base_url="/public-sector/funds",
+        base_url="/public-sector/funds/register",
         active_filters=active_filters,
         auto_submit=false,
         show_apply_button=true

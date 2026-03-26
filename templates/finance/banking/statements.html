@@ -69,7 +69,9 @@
         search_placeholder="Search description, reference, payee...",
         date_range=true,
         start_date=start_date | default('', true),
-        end_date=end_date | default('', true)
+        end_date=end_date | default('', true),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
     {% call filter_custom_select_field("account_id", "Bank Account", filter_attrs ~ ' data-testid="bank-statements-account"') %}
         {% for acc in accounts %}

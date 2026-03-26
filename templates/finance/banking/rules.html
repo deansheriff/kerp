@@ -48,7 +48,9 @@
     {% call(filter_attrs) compact_filters(
         base_url="/finance/banking/rules",
         active_filters=active_filters | default([]),
-        show_search=false
+        show_search=false,
+        auto_submit=false,
+        show_apply_button=true
     ) %}
         {{ filter_select_field("rule_type", "Type", rule_type, rule_types, "data-testid='rules-type' " ~ filter_attrs, "All Types", true) }}
     {% endcall %}

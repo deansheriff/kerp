@@ -113,46 +113,26 @@
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fund Management</span>
             </div>
 
-            <!-- Funds -->
-            <div x-data="{ open: activeModule === 'ps_funds' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'ps_funds' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
-                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
-                    {{ icon_svg("folder", "h-5 w-5 flex-shrink-0 text-cyan-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Funds</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/public-sector/funds" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Fund Register</a>
-                    <a href="/public-sector/appropriations" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Appropriations</a>
-                    <a href="/public-sector/virements" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Virements</a>
-                    <a href="/public-sector/available-balance" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Available Balance</a>
-                </div>
-            </div>
+            <a href="/public-sector/funds"
+               :aria-current="activeModule === 'ps_funds' ? 'page' : false"
+               :class="activeModule === 'ps_funds' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
+               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
+                {{ icon_svg("folder", "h-5 w-5 flex-shrink-0 text-cyan-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Funds</span>
+            </a>
 
             <!-- Section Divider: Commitments -->
             <div class="pt-4 pb-2" x-show="!sidebarCollapsed" x-cloak>
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Commitments</span>
             </div>
 
-            <!-- Commitment Register -->
-            <div x-data="{ open: activeModule === 'ps_commitments' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'ps_commitments' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
-                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
-                    {{ icon_svg("document", "h-5 w-5 flex-shrink-0 text-cyan-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Commitments</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/public-sector/commitments" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Commitment Register</a>
-                    <a href="/public-sector/budget-comparison" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Budget Comparison</a>
-                </div>
-            </div>
+            <a href="/public-sector/commitments"
+               :aria-current="activeModule === 'ps_commitments' ? 'page' : false"
+               :class="activeModule === 'ps_commitments' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
+               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
+                {{ icon_svg("document", "h-5 w-5 flex-shrink-0 text-cyan-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Commitments</span>
+            </a>
 
             <!-- Section Divider: Shared Modules -->
             <div class="pt-4 pb-2" x-show="!sidebarCollapsed" x-cloak>
@@ -208,7 +188,7 @@
         {% set page_title_html %}{% block page_title %}{{ page_title | default("Dashboard") }}{% endblock %}{% endset %}
         {% set breadcrumbs_html %}{% block breadcrumbs %}{% endblock %}{% endset %}
         {% set header_actions_html %}{% block header_actions %}{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="cyan", back_fallback=(back_fallback_url | trim)) }}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="cyan", back_fallback=(back_fallback_url | trim), launcher_modules=accessible_modules | default([], true), launcher_user=user) }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-dashboard">

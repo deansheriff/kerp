@@ -13,8 +13,10 @@ from sqlalchemy.orm import Session
 from app.services.inventory.material_request_web import MaterialRequestWebService
 from app.services.inventory.web import inv_web_service
 from app.services.operations.inv_web import operations_inv_web_service
+from app.templates import templates
 from app.web.deps import (
     WebAuthContext,
+    base_context,
     get_db,
     require_any_web_permission,
     require_inventory_access,
@@ -23,6 +25,30 @@ from app.web.deps import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/inventory", tags=["inventory-web"])
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def inventory_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Inventory landing page."""
+    context = base_context(request, auth, "Inventory", "inventory", db=db)
+    return templates.TemplateResponse(request, "inventory/index.html", context)
+
+
+@router.get("/quick-entry", response_class=HTMLResponse)
+@router.get("/quick-entry/", response_class=HTMLResponse)
+def inventory_quick_entry(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Inventory quick entry landing page."""
+    context = base_context(request, auth, "Quick Entry", "quick-entry", db=db)
+    return templates.TemplateResponse(request, "inventory/quick_entry.html", context)
 
 
 @router.get("/items", response_class=HTMLResponse)

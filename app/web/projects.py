@@ -472,6 +472,20 @@ def _ensure_task_code(db: Session, org_id, task):
 
 
 @router.get("", response_class=HTMLResponse)
+def projects_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_projects_access),
+    db: Session = Depends(get_db),
+):
+    """Projects landing page."""
+    context = {
+        "request": request,
+        **base_context(request, auth, "Projects", "projects", db=db),
+    }
+    return templates.TemplateResponse(request, "projects/index.html", context)
+
+
+@router.get("/all", response_class=HTMLResponse)
 def list_projects(
     request: Request,
     auth: WebAuthContext = Depends(require_projects_access),
@@ -527,7 +541,7 @@ def list_projects(
 
     context = {
         "request": request,
-        **base_context(request, auth, "Projects", "projects", db=db),
+        **base_context(request, auth, "All Projects", "projects", db=db),
         "projects": projects,
         "total": total,
         "page": page,

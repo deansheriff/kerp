@@ -26,16 +26,18 @@
     {# Filters #}
     {% call(filter_attrs) compact_filters(
         base_url="/finance/sales-orders",
-        active_filters=active_filters if active_filters else [],
+        active_filters=active_filters | default([]),
         date_range=true,
         start_date=filter_start_date | default('', true),
-        end_date=filter_end_date | default('', true)
+        end_date=filter_end_date | default('', true),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
     {{ filter_select_field("status", "Status", filter_status, statuses, filter_attrs, "All Statuses") }}
     {{ filter_entity_select_field("customer_id", "Customer", filter_customer_id, customers, "id", "name", filter_attrs) }}
     {% endcall %}
 
-    <div id="results-container" class="space-y-6">
+    <div id="results-container">
     <!-- Status Summary -->
     <div class="grid gap-4 sm:grid-cols-3 lg:grid-cols-9">
         <div class="card p-4">

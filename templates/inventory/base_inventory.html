@@ -86,7 +86,7 @@
 
         <!-- Logo/Brand -->
         {% with
-            brand_href="/inventory/items",
+            brand_href="/inventory",
             module_label="Inventory",
             module_pill_class="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
             module_logo_bg="from-emerald-500 to-teal-600",
@@ -111,51 +111,21 @@
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Inventory</span>
             </div>
 
-            <!-- Inventory Module -->
-            <div x-data="{ open: ['items','categories','warehouses','transactions','material_requests','counts','boms','price_lists','lots','inv_reports'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :aria-current="['items','categories','warehouses','transactions','material_requests','counts','boms','price_lists','lots','inv_reports'].includes(activeModule) ? 'true' : false"
-                        :class="['items','categories','warehouses','transactions','material_requests','counts','boms','price_lists','lots','inv_reports'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("box", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Inventory</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/inventory/items" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Items</a>
-                    <a href="/inventory/categories" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Categories</a>
-                    <a href="/inventory/warehouses" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Warehouses</a>
-                    <a href="/inventory/transactions" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Transactions</a>
-                    <a href="/inventory/counts" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Stock Counts</a>
-                    <a href="/inventory/boms" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Bill of Materials</a>
-                    <a href="/inventory/price-lists" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Price Lists</a>
-                    <a href="/inventory/lots" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Lots & Serials</a>
-                    <a href="/inventory/material-requests" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Material Requests</a>
-                    <a href="/inventory/reports" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reports</a>
-                </div>
-            </div>
+            <a href="/inventory"
+               :aria-current="['inventory','items','categories','warehouses','transactions','material_requests','counts','boms','price_lists','lots','inv_reports'].includes(activeModule) ? 'page' : false"
+               :class="['inventory','items','categories','warehouses','transactions','material_requests','counts','boms','price_lists','lots','inv_reports'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("box", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Inventory</span>
+            </a>
 
-            <!-- Transaction Shortcuts -->
-            <div x-data="{ open: activeModule === 'inv-transactions' }">
-                <button @click="open = !open"
-                        :aria-current="activeModule === 'inv-transactions' ? 'true' : false"
-                        :class="activeModule === 'inv-transactions' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("switch-horizontal", "h-5 w-5 flex-shrink-0 text-emerald-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Quick Entry</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/inventory/transactions/receipt/new" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Receipt</a>
-                    <a href="/inventory/transactions/issue/new" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Issue</a>
-                    <a href="/inventory/transactions/transfer/new" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Transfer</a>
-                    <a href="/inventory/transactions/adjustment/new" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Adjustment</a>
-                </div>
-            </div>
+            <a href="/inventory/quick-entry"
+               :aria-current="['quick-entry','inv-transactions','transactions'].includes(activeModule) ? 'page' : false"
+               :class="['quick-entry','inv-transactions','transactions'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("switch-horizontal", "h-5 w-5 flex-shrink-0 text-emerald-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Quick Entry</span>
+            </a>
 
             <!-- Fixed Assets Module -->
             {% if "finance" in accessible_modules %}
@@ -163,23 +133,13 @@
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fixed Assets</span>
             </div>
 
-            <div x-data="{ open: ['fa','fa_assets','fa_categories','fa_depreciation'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :aria-current="['fa','fa_assets','fa_categories','fa_depreciation'].includes(activeModule) ? 'true' : false"
-                        :class="['fa','fa_assets','fa_categories','fa_depreciation'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("building", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Fixed Assets</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/fixed-assets/assets" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Assets</a>
-                    <a href="/fixed-assets/categories" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Categories</a>
-                    <a href="/fixed-assets/depreciation" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Depreciation</a>
-                </div>
-            </div>
+            <a href="/fixed-assets"
+               :aria-current="['fa','fa_assets','fa_categories','fa_depreciation'].includes(activeModule) ? 'page' : false"
+               :class="['fa','fa_assets','fa_categories','fa_depreciation'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("building", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Fixed Assets</span>
+            </a>
             {% endif %}
 
 
@@ -199,7 +159,7 @@
         {% set page_title_html %}{% block page_title %}{{ page_title | default("Inventory") }}{% endblock %}{% endset %}
         {% set breadcrumbs_html %}{% block breadcrumbs %}{% endblock %}{% endset %}
         {% set header_actions_html %}{% block header_actions %}{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="emerald") }}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="emerald", launcher_modules=accessible_modules | default([], true), launcher_user=user) }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-dashboard">

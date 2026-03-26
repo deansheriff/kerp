@@ -27,6 +27,20 @@ router = APIRouter(tags=["public-sector-commitments"])
 
 
 @router.get("/commitments", response_class=HTMLResponse)
+@router.get("/commitments/", response_class=HTMLResponse)
+def commitments_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_public_sector_access),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Commitments landing page."""
+    context = base_context(request, auth, "Commitments", "ps_commitments", db=db)
+    return templates.TemplateResponse(
+        request, "public_sector/commitments_index.html", context
+    )
+
+
+@router.get("/commitments/register", response_class=HTMLResponse)
 def list_commitments(
     request: Request,
     fund_id: str | None = None,

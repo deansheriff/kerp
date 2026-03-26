@@ -14,7 +14,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-8">
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -45,10 +45,10 @@
         show_apply_button=true
     ) %}{% endcall %}
 
-    <div id="results-container">
+    <div id="results-container" class="space-y-8">
     <!-- Job Openings Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="card p-5">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card p-6">
             <div class="flex items-center gap-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
                     {{ icon_svg("briefcase", "h-6 w-6 text-violet-600 dark:text-violet-400") }}
@@ -60,7 +60,7 @@
             </div>
         </div>
 
-        <div class="card p-5">
+        <div class="card p-6">
             <div class="flex items-center gap-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
                     {{ icon_svg("building", "h-6 w-6 text-blue-600 dark:text-blue-400") }}
@@ -72,7 +72,7 @@
             </div>
         </div>
 
-        <div class="card p-5">
+        <div class="card p-6">
             <div class="flex items-center gap-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
                     {{ icon_svg("check-circle", "h-6 w-6 text-green-600 dark:text-green-400") }}
@@ -86,8 +86,8 @@
     </div>
 
     <!-- Applicants Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="card p-5">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="card p-6">
             <div class="flex items-center gap-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
                     {{ icon_svg("user-group", "h-6 w-6 text-slate-600 dark:text-slate-400") }}
@@ -99,7 +99,7 @@
             </div>
         </div>
 
-        <div class="card p-5">
+        <div class="card p-6">
             <div class="flex items-center gap-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
                     {{ icon_svg("clock", "h-6 w-6 text-amber-600 dark:text-amber-400") }}
@@ -111,7 +111,7 @@
             </div>
         </div>
 
-        <div class="card p-5">
+        <div class="card p-6">
             <div class="flex items-center gap-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-900/30">
                     {{ icon_svg("chat-bubble", "h-6 w-6 text-purple-600 dark:text-purple-400") }}
@@ -123,7 +123,7 @@
             </div>
         </div>
 
-        <div class="card p-5">
+        <div class="card p-6">
             <div class="flex items-center gap-4">
                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-100 dark:bg-teal-900/30">
                     {{ icon_svg("check-circle", "h-6 w-6 text-teal-600 dark:text-teal-400") }}
@@ -137,8 +137,8 @@
     </div>
 
     <!-- Hire Rate -->
-    <div class="card p-6">
-        <div class="text-center mb-4">
+    <div class="card p-8">
+        <div class="text-center mb-5">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-2">Overall Hire Rate</h2>
             <p class="text-5xl font-bold
                 {% if report.hire_rate >= 20 %}text-green-600 dark:text-green-400
@@ -156,10 +156,10 @@
     <!-- Status Breakdown -->
     {% if report.status_breakdown %}
     <div class="card">
-        <div class="border-b border-slate-200 dark:border-slate-700 px-5 py-4">
+        <div class="border-b border-slate-200 dark:border-slate-700 px-6 py-5">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Applicant Status Breakdown</h2>
         </div>
-        <div class="p-5">
+        <div class="px-6 py-6">
             <div class="flex h-8 rounded-lg overflow-hidden">
                 {% for s in report.status_breakdown %}
                 {% set colors = {
@@ -179,7 +179,7 @@
                 <div class="{{ colors.get(s.status, 'bg-slate-400') }} transition-all" style="width: {{ s.percentage }}%" title="{{ s.status | replace('_', ' ') | title }}: {{ s.count }}"></div>
                 {% endfor %}
             </div>
-            <div class="flex flex-wrap items-center justify-center gap-4 mt-4">
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-4">
                 {% for s in report.status_breakdown %}
                 {% set colors = {
                     'NEW': 'bg-slate-400',
@@ -208,29 +208,29 @@
     <!-- Top Job Openings -->
     {% if report.top_openings %}
     <div class="card">
-        <div class="border-b border-slate-200 dark:border-slate-700 px-5 py-4">
+        <div class="border-b border-slate-200 dark:border-slate-700 px-6 py-5">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Top Positions by Applicants</h2>
         </div>
         <div class="table-container">
             <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                 <thead>
                     <tr class="bg-slate-50 dark:bg-slate-800/50">
-                        <th scope="col" class="px-5 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Position</th>
-                        <th scope="col" class="px-5 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Applicants</th>
-                        <th scope="col" class="px-5 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Interest Level</th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Position</th>
+                        <th scope="col" class="px-6 py-4 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Applicants</th>
+                        <th scope="col" class="px-6 py-4 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Interest Level</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% set max_applicants = report.top_openings[0].applicant_count if report.top_openings else 1 %}
                     {% for opening in report.top_openings %}
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td class="px-5 py-3">
+                        <td class="px-6 py-4">
                             <a href="/people/recruit/jobs/{{ opening.job_opening_id }}" class="font-medium text-slate-900 dark:text-white hover:text-violet-600">
                                 {{ opening.job_title }}
                             </a>
                         </td>
-                        <td class="px-5 py-3 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">{{ opening.applicant_count }}</td>
-                        <td class="px-5 py-3">
+                        <td class="px-6 py-4 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">{{ opening.applicant_count }}</td>
+                        <td class="px-6 py-4">
                             <div class="flex items-center justify-end gap-2">
                                 <div class="w-24 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                                     {% set bar_width = (opening.applicant_count / max_applicants * 100) if max_applicants > 0 else 0 %}
@@ -253,8 +253,8 @@
     {% endif %}
 
     <!-- Quick Actions -->
-    <div class="card p-5">
-        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Quick Actions</h3>
+    <div class="card p-6">
+        <h3 class="mb-5 text-lg font-semibold text-slate-900 dark:text-white">Quick Actions</h3>
         <div class="flex flex-wrap gap-3">
             <a href="/people/recruit/jobs/new" class="btn btn-primary">
                 {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
@@ -267,7 +267,7 @@
     </div>
 
     <!-- Quick Links -->
-    <div class="flex gap-4">
+    <div class="flex flex-wrap gap-4">
         <a href="/people/recruit/reports/pipeline" class="btn btn-secondary">Pipeline</a>
         <a href="/people/recruit/reports/time-to-hire" class="btn btn-secondary">Time to Hire</a>
         <a href="/people/recruit/reports/sources" class="btn btn-secondary">Source Analysis</a>

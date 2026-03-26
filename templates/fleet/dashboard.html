@@ -1,7 +1,7 @@
 {% extends "modules/base_modules.html" %}
-{% from "components/macros.html" import status_badge, icon_svg, stats_card %}
+{% from "components/macros.html" import icon_svg %}
 
-{% block page_title %}Fleet Dashboard{% endblock %}
+{% block page_title %}Fleet{% endblock %}
 
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
@@ -20,211 +20,81 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6 stagger-in">
-    {# ── Zero-state onboarding ──────────────────────────────────── #}
-    {% if (summary.total_vehicles | default(0)) == 0 %}
-    <div class="card p-6 border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10">
-        <div class="flex items-start gap-4">
-            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                {{ icon_svg("switch-horizontal", "h-6 w-6") }}
-            </div>
-            <div class="flex-1">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Welcome to Fleet Management</h2>
-                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Set up your fleet in three steps:</p>
-                <ol class="mt-4 space-y-3">
-                    <li class="flex items-center gap-3">
-                        <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">1</span>
-                        <span class="text-sm text-slate-700 dark:text-slate-200"><a href="/fleet/vehicles/new" class="font-medium text-amber-600 hover:underline dark:text-amber-400">Add your first vehicle</a> &mdash; register make, model, and plate number</span>
-                    </li>
-                    <li class="flex items-center gap-3">
-                        <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">2</span>
-                        <span class="text-sm text-slate-700 dark:text-slate-200"><a href="/fleet/maintenance/new" class="font-medium text-amber-600 hover:underline dark:text-amber-400">Schedule maintenance</a> &mdash; track service history and upcoming work</span>
-                    </li>
-                    <li class="flex items-center gap-3">
-                        <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">3</span>
-                        <span class="text-sm text-slate-700 dark:text-slate-200"><a href="/fleet/fuel/new" class="font-medium text-amber-600 hover:underline dark:text-amber-400">Record fuel purchases</a> &mdash; monitor consumption and costs</span>
-                    </li>
-                </ol>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Fleet Summary Stats -->
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {{ stats_card("Total Vehicles", summary.total_vehicles, icon="switch-horizontal", color="teal") }}
-        {{ stats_card("Available", summary.available_vehicles if summary.available_vehicles else 0, icon="check-circle", color="emerald") }}
-        {{ stats_card("In Maintenance", summary.in_maintenance if summary.in_maintenance else 0, icon="cog", color="amber") }}
-        {{ stats_card("Assigned", summary.assigned_vehicles if summary.assigned_vehicles else 0, icon="user", color="violet") }}
-        {{ stats_card("Out of Service", summary.out_of_service if summary.out_of_service else 0, icon="exclamation-circle", color="rose") }}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Fleet</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose a fleet category to continue.</p>
     </div>
 
-    <div class="grid gap-6 lg:grid-cols-2">
-        <!-- Upcoming Maintenance -->
-        <div class="card">
-            <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Upcoming Maintenance</h2>
-                <a href="/fleet/maintenance" class="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300">View All</a>
-            </div>
-            <div class="divide-y divide-slate-100 dark:divide-slate-800">
-                {% for record in upcoming_maintenance %}
-                <div class="flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                        {{ icon_svg("cog", "h-5 w-5 text-amber-600 dark:text-amber-400") }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ record.vehicle.registration_number }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ record.maintenance_type }} - {{ record.description[:50] }}{% if record.description|length > 50 %}...{% endif %}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm font-medium text-slate-900 dark:text-white">{{ record.scheduled_date.strftime('%b %d') }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Scheduled</p>
-                    </div>
-                </div>
-                {% else %}
-                <div class="p-8 text-center">
-                    {{ icon_svg("check-circle", "mx-auto h-12 w-12 text-slate-300 dark:text-slate-600", stroke_width="1.5") }}
-                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No upcoming maintenance scheduled</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Expiring Documents -->
-        <div class="card">
-            <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Expiring Documents</h2>
-                <a href="/fleet/documents?expiring_soon=true" class="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300">View All</a>
-            </div>
-            <div class="divide-y divide-slate-100 dark:divide-slate-800">
-                {% for doc in expiring_documents %}
-                <div class="flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
-                        {{ icon_svg("document", "h-5 w-5 text-rose-600 dark:text-rose-400") }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ doc.vehicle.registration_number }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ doc.document_type | replace('_', ' ') | title }} - {{ doc.document_number }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm font-medium {% if doc.is_expired %}text-rose-600 dark:text-rose-400{% else %}text-amber-600 dark:text-amber-400{% endif %}">{{ doc.expiry_date | format_date }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{% if doc.is_expired %}Expired{% else %}Expires{% endif %}</p>
-                    </div>
-                </div>
-                {% else %}
-                <div class="p-8 text-center">
-                    {{ icon_svg("check-circle", "mx-auto h-12 w-12 text-slate-300 dark:text-slate-600", stroke_width="1.5") }}
-                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">All documents are valid</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    <div class="grid gap-6 lg:grid-cols-2">
-        <!-- Recent Incidents -->
-        <div class="card">
-            <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Recent Incidents</h2>
-                <a href="/fleet/incidents" class="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300">View All</a>
-            </div>
-            <div class="divide-y divide-slate-100 dark:divide-slate-800">
-                {% for incident in recent_incidents %}
-                <a href="/fleet/incidents/{{ incident.incident_id }}" class="flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 rounded-lg {% if incident.severity == 'critical' %}bg-rose-100 dark:bg-rose-900/30{% elif incident.severity == 'high' %}bg-orange-100 dark:bg-orange-900/30{% else %}bg-amber-100 dark:bg-amber-900/30{% endif %} flex items-center justify-center">
-                        {{ icon_svg("warning", "h-5 w-5 {% if incident.severity == 'critical' %}text-rose-600 dark:text-rose-400{% elif incident.severity == 'high' %}text-orange-600 dark:text-orange-400{% else %}text-amber-600 dark:text-amber-400{% endif %}") }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ incident.vehicle.registration_number }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ incident.incident_type | replace('_', ' ') | title }}</p>
-                    </div>
-                    <div class="text-right">
-                        {{ status_badge(incident.status, 'sm') }}
-                    </div>
-                </a>
-                {% else %}
-                <div class="p-8 text-center">
-                    {{ icon_svg("check-circle", "mx-auto h-12 w-12 text-slate-300 dark:text-slate-600", stroke_width="1.5") }}
-                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No recent incidents</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Pending Reservations -->
-        <div class="card">
-            <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Pending Reservations</h2>
-                <a href="/fleet/reservations?status=pending" class="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300">View All</a>
-            </div>
-            <div class="divide-y divide-slate-100 dark:divide-slate-800">
-                {% for reservation in pending_reservations %}
-                <a href="/fleet/reservations/{{ reservation.reservation_id }}" class="flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                        {{ icon_svg("calendar", "h-5 w-5 text-violet-600 dark:text-violet-400") }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ reservation.vehicle.registration_number }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ reservation.employee.first_name }} {{ reservation.employee.last_name }} - {{ reservation.purpose[:30] }}{% if reservation.purpose|length > 30 %}...{% endif %}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm font-medium text-slate-900 dark:text-white">{{ reservation.start_datetime.strftime('%b %d') }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ reservation.start_datetime.strftime('%H:%M') }}</p>
-                    </div>
-                </a>
-                {% else %}
-                <div class="p-8 text-center">
-                    {{ icon_svg("check-circle", "mx-auto h-12 w-12 text-slate-300 dark:text-slate-600", stroke_width="1.5") }}
-                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No pending reservations</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <a href="/fleet/vehicles/new" class="card p-4 hover:border-amber-300 dark:hover:border-amber-700 transition-colors group">
-            <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 group-hover:scale-110 transition-transform">
-                    {{ icon_svg("plus") }}
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/fleet/vehicles" class="card p-5 transition-colors hover:border-amber-200 hover:bg-amber-50/40 dark:hover:border-amber-800 dark:hover:bg-amber-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
+                    {{ icon_svg("switch-horizontal", "h-5 w-5") }}
                 </div>
                 <div>
-                    <p class="font-medium text-slate-900 dark:text-white">Add Vehicle</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Register new vehicle</p>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Vehicles</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage vehicle records, assignments, and imports.</p>
                 </div>
             </div>
         </a>
-        <a href="/fleet/maintenance/new" class="card p-4 hover:border-amber-300 dark:hover:border-amber-700 transition-colors group">
-            <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 group-hover:scale-110 transition-transform">
-                    {{ icon_svg("cog") }}
+
+        <a href="/fleet/maintenance" class="card p-5 transition-colors hover:border-amber-200 hover:bg-amber-50/40 dark:hover:border-amber-800 dark:hover:bg-amber-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    {{ icon_svg("cog", "h-5 w-5") }}
                 </div>
                 <div>
-                    <p class="font-medium text-slate-900 dark:text-white">Schedule Maintenance</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Create work order</p>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Maintenance</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track maintenance schedules, service history, and work records.</p>
                 </div>
             </div>
         </a>
-        <a href="/fleet/fuel/new" class="card p-4 hover:border-amber-300 dark:hover:border-amber-700 transition-colors group">
-            <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                    {{ icon_svg("fire") }}
+
+        <a href="/fleet/fuel" class="card p-5 transition-colors hover:border-amber-200 hover:bg-amber-50/40 dark:hover:border-amber-800 dark:hover:bg-amber-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    {{ icon_svg("fire", "h-5 w-5") }}
                 </div>
                 <div>
-                    <p class="font-medium text-slate-900 dark:text-white">Record Fuel</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Log fuel purchase</p>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Fuel Logs</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Monitor fuel usage, costs, and consumption trends.</p>
                 </div>
             </div>
         </a>
-        <a href="/fleet/incidents/new" class="card p-4 hover:border-amber-300 dark:hover:border-amber-700 transition-colors group">
-            <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 group-hover:scale-110 transition-transform">
-                    {{ icon_svg("warning") }}
+
+        <a href="/fleet/incidents" class="card p-5 transition-colors hover:border-amber-200 hover:bg-amber-50/40 dark:hover:border-amber-800 dark:hover:bg-amber-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                    {{ icon_svg("warning", "h-5 w-5") }}
                 </div>
                 <div>
-                    <p class="font-medium text-slate-900 dark:text-white">Report Incident</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Log vehicle incident</p>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Incidents</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review accidents, damage reports, and follow-up actions.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/fleet/reservations" class="card p-5 transition-colors hover:border-amber-200 hover:bg-amber-50/40 dark:hover:border-amber-800 dark:hover:bg-amber-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                    {{ icon_svg("calendar", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Reservations</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage booking requests, schedules, and vehicle availability.</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="/fleet/documents" class="card p-5 transition-colors hover:border-amber-200 hover:bg-amber-50/40 dark:hover:border-amber-800 dark:hover:bg-amber-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                    {{ icon_svg("document-text", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Documents</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track registrations, insurance, permits, and expiry dates.</p>
                 </div>
             </div>
         </a>

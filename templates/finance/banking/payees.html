@@ -37,7 +37,9 @@
         active_filters=active_filters | default([]),
         show_search=true,
         search=search | default('', true),
-        search_placeholder="Search payees..."
+        search_placeholder="Search payees...",
+        auto_submit=false,
+        show_apply_button=true
     ) %}
         {{ filter_select_field("payee_type", "Type", payee_type, payee_types, filter_attrs, "All Types", true) }}
     {% endcall %}

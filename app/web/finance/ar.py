@@ -182,6 +182,7 @@ def list_invoices(
     start_date: str | None = None,
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = None,
     sort_dir: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
@@ -189,17 +190,18 @@ def list_invoices(
 ):
     """AR invoices list page."""
     return ar_web_service.list_invoices_response(
-        request,
-        auth,
-        db,
-        search,
-        customer_id,
-        status,
-        start_date,
-        end_date,
-        page,
-        sort,
-        sort_dir,
+        request=request,
+        auth=auth,
+        db=db,
+        search=search,
+        customer_id=customer_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit,
+        sort=sort,
+        sort_dir=sort_dir,
     )
 
 
@@ -397,6 +399,7 @@ def list_receipts(
     start_date: str | None = None,
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = None,
     sort_dir: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
@@ -404,17 +407,18 @@ def list_receipts(
 ):
     """AR receipts list page."""
     return ar_web_service.list_receipts_response(
-        request,
-        auth,
-        db,
-        search,
-        customer_id,
-        status,
-        start_date,
-        end_date,
-        page,
-        sort,
-        sort_dir,
+        request=request,
+        auth=auth,
+        db=db,
+        search=search,
+        customer_id=customer_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit,
+        sort=sort,
+        sort_dir=sort_dir,
     )
 
 
@@ -541,20 +545,22 @@ def list_credit_notes(
     start_date: str | None = None,
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db),
 ):
     """AR credit notes list page."""
     return ar_web_service.list_credit_notes_response(
-        request,
-        auth,
-        db,
-        search,
-        customer_id,
-        status,
-        start_date,
-        end_date,
-        page,
+        request=request,
+        auth=auth,
+        db=db,
+        search=search,
+        customer_id=customer_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit,
     )
 
 

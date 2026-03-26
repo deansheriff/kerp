@@ -13,7 +13,13 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.services.finance.rpt.web import reports_web_service
-from app.web.deps import WebAuthContext, get_db, require_finance_access
+from app.templates import templates
+from app.web.deps import (
+    WebAuthContext,
+    base_context,
+    get_db,
+    require_finance_access,
+)
 
 router = APIRouter(prefix="/reports", tags=["reports-web"])
 
@@ -45,10 +51,10 @@ def reports_dashboard(
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db),
 ):
-    """Reports dashboard/hub page."""
-    return reports_web_service.dashboard_response(
-        request, auth, start_date, end_date, db
-    )
+    """Reports landing page."""
+    context = base_context(request, auth, "Reports", "reports", db=db)
+    context.update({"start_date": start_date, "end_date": end_date})
+    return templates.TemplateResponse(request, "finance/reports/index.html", context)
 
 
 @router.get("/trial-balance", response_class=HTMLResponse)

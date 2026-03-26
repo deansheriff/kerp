@@ -86,7 +86,7 @@
            class="app-sidebar flex flex-col overflow-hidden border-r border-slate-200 bg-white transition-all duration-300 ease-in-out dark:border-slate-800 dark:bg-slate-900">
 
         <!-- Logo/Brand -->
-        {% set people_brand_href = '/people' if 'people' in modules else ('/people/hr/discipline' if 'discipline' in modules else '/people/self/attendance') %}
+        {% set people_brand_href = '/people' if 'people' in modules else ('/people/hr/discipline' if 'discipline' in modules else '/people/self') %}
         {% set people_module_label = 'People' if 'people' in modules else ('Discipline' if 'discipline' in modules else 'Self Service') %}
         {% with
             brand_href=people_brand_href,
@@ -116,220 +116,94 @@
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Manage</span>
             </div>
 
-            <div x-data="{ open: ['employees','departments','designations','employment-types','grades','locations','skills','competencies','job-descriptions','onboarding','handbook','info-changes'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['employees','departments','designations','employment-types','grades','locations','skills','competencies','job-descriptions','onboarding','handbook','info-changes'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("user", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Human Resources</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/hr/employees" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Employees</a>
-                    <a href="/people/hr/info-changes" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Info Change Requests</a>
-                    <a href="/people/hr/departments" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Departments</a>
-                    <a href="/people/hr/designations" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Designations</a>
-                    <a href="/people/hr/employment-types" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Employment Types</a>
-                    <a href="/people/hr/grades" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Employee Grades</a>
-                    <a href="/people/hr/locations" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Branches</a>
-                    <a href="/people/hr/skills" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Skills Catalog</a>
-                    <a href="/people/hr/competencies" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Competencies</a>
-                    <a href="/people/hr/job-descriptions" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Job Descriptions</a>
-                    <a href="/people/hr/onboarding/dashboard" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Onboarding</a>
-                    <a href="/people/hr/handbook" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Handbook</a>
-                </div>
-            </div>
+            <a href="/people/hr"
+               :aria-current="['hr','employees','departments','designations','employment-types','grades','locations','skills','competencies','job-descriptions','onboarding','handbook','info-changes'].includes(activeModule) ? 'page' : false"
+               :class="['hr','employees','departments','designations','employment-types','grades','locations','skills','competencies','job-descriptions','onboarding','handbook','info-changes'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("user", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Human Resources</span>
+            </a>
 
-            <div x-data="{ open: ['payslips','structures','components','payroll','loans'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['payslips','structures','components','payroll','loans'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("document", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Payroll</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/payroll/slips" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Salary Slips</a>
-                    <a href="/people/payroll/components" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Salary Components</a>
-                    <a href="/people/payroll/structures" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Salary Structures</a>
-                    <a href="/people/payroll/assignments" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Salary Assignments</a>
-                    <a href="/people/payroll/runs" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Payroll Runs</a>
-                    <a href="/people/payroll/loans" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Loans & Advances</a>
-                    <a href="/people/payroll/reports/summary" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reports</a>
-                </div>
-            </div>
+            <a href="/people/payroll"
+               :aria-current="['payroll','payslips','structures','components','loans'].includes(activeModule) ? 'page' : false"
+               :class="['payroll','payslips','structures','components','loans'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("document", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Payroll</span>
+            </a>
 
-            <div x-data="{ open: activeModule === 'leave' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'leave' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("calendar", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Leave</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/leave" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Overview</a>
-                    <a href="/people/leave/types" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Leave Types</a>
-                    <a href="/people/leave/applications" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Applications</a>
-                    <a href="/people/leave/allocations" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Allocations</a>
-                    <a href="/people/leave/holidays" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Holiday Lists</a>
-                    <a href="/people/leave/reports/balance" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reports</a>
-                </div>
-            </div>
+            <a href="/people/leave"
+               :aria-current="activeModule === 'leave' ? 'page' : false"
+               :class="activeModule === 'leave' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("calendar", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Leave</span>
+            </a>
 
-            <div x-data="{ open: ['attendance','attendance-requests'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['attendance','attendance-requests'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("clock", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Attendance</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/attendance" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Attendance Records</a>
-                    <a href="/people/attendance/requests" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Requests</a>
-                    <a href="/people/attendance/shifts" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Shift Types</a>
-                    <a href="/people/attendance/reports/summary" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reports</a>
-                </div>
-            </div>
+            <a href="/people/attendance"
+               :aria-current="['attendance','attendance-requests'].includes(activeModule) ? 'page' : false"
+               :class="['attendance','attendance-requests'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("clock", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Attendance</span>
+            </a>
 
-            <div x-data="{ open: activeModule === 'recruit' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'recruit' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7V6a2 2 0 00-2-2h-4a2 2 0 00-2 2v1M5 9h14v9a2 2 0 01-2 2H7a2 2 0 01-2-2V9z"/>
-                    </svg>
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Recruitment</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/recruit/jobs" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Job Openings</a>
-                    <a href="/people/recruit/applicants" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Applicants</a>
-                    <a href="/people/recruit/interviews" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Interviews</a>
-                    <a href="/people/recruit/offers" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Job Offers</a>
-                    <a href="/people/recruit/reports/overview" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reports</a>
-                </div>
-            </div>
+            <a href="/people/recruit"
+               :aria-current="activeModule === 'recruit' ? 'page' : false"
+               :class="activeModule === 'recruit' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7V6a2 2 0 00-2-2h-4a2 2 0 00-2 2v1M5 9h14v9a2 2 0 01-2 2H7a2 2 0 01-2-2V9z"/>
+                </svg>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Recruitment</span>
+            </a>
 
-            <div x-data="{ open: activeModule === 'training' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'training' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422A12.083 12.083 0 0112 21.5c-2.24 0-4.32-.65-6.16-1.922L12 14z"/>
-                    </svg>
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Training</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/training/programs" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Programs</a>
-                    <a href="/people/training/events" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Events</a>
-                    <a href="/people/training/reports/completion" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reports</a>
-                </div>
-            </div>
+            <a href="/people/training"
+               :aria-current="activeModule === 'training' ? 'page' : false"
+               :class="activeModule === 'training' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422A12.083 12.083 0 0112 21.5c-2.24 0-4.32-.65-6.16-1.922L12 14z"/>
+                </svg>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Training</span>
+            </a>
 
-            <div x-data="{ open: ['scheduling','scheduling-patterns','scheduling-assignments','scheduling-schedules','scheduling-swaps'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['scheduling','scheduling-patterns','scheduling-assignments','scheduling-schedules','scheduling-swaps'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("calendar", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Scheduling</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/scheduling/patterns" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Shift Patterns</a>
-                    <a href="/people/scheduling/assignments" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Assignments</a>
-                    <a href="/people/scheduling/schedules" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Schedules</a>
-                    <a href="/people/scheduling/swaps" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Swap Requests</a>
-                </div>
-            </div>
+            <a href="/people/scheduling"
+               :aria-current="['scheduling','scheduling-patterns','scheduling-assignments','scheduling-schedules','scheduling-swaps'].includes(activeModule) ? 'page' : false"
+               :class="['scheduling','scheduling-patterns','scheduling-assignments','scheduling-schedules','scheduling-swaps'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("calendar", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Scheduling</span>
+            </a>
 
-            <div x-data="{ open: ['perf','perf-cycles','perf-templates','perf-scorecards'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['perf','perf-cycles','perf-templates','perf-scorecards'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a1 1 0 012 0v16a1 1 0 01-2 0V4zM4 10a1 1 0 011-1h3a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V10zm14-4a1 1 0 011-1h3a1 1 0 011 1v14a1 1 0 01-1 1h-3a1 1 0 01-1-1V6z"/>
-                    </svg>
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Performance</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/perf/cycles" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Review Cycles</a>
-                    <a href="/people/perf/appraisals" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Appraisals</a>
-                    <a href="/people/perf/goals" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Goals & KPIs</a>
-                    <a href="/people/perf/kras" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Key Result Areas</a>
-                    <a href="/people/perf/feedback" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Feedback</a>
-                    <a href="/people/perf/scorecards" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Scorecards</a>
-                    <a href="/people/perf/templates" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Templates</a>
-                    <a href="/people/perf/reports/ratings" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reports</a>
-                </div>
-            </div>
+            <a href="/people/perf"
+               :aria-current="['perf','perf-cycles','perf-templates','perf-scorecards'].includes(activeModule) ? 'page' : false"
+               :class="['perf','perf-cycles','perf-templates','perf-scorecards'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a1 1 0 012 0v16a1 1 0 01-2 0V4zM4 10a1 1 0 011-1h3a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V10zm14-4a1 1 0 011-1h3a1 1 0 011 1v14a1 1 0 01-1 1h-3a1 1 0 01-1-1V6z"/>
+                </svg>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Performance</span>
+            </a>
 
-            <div x-data="{ open: activeModule === 'discipline' || activeModule === 'hr-discipline' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'discipline' || activeModule === 'hr-discipline' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("warning", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Discipline</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/hr/discipline" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Cases</a>
-                    <a href="/people/hr/discipline/new" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">New Case</a>
-                </div>
-            </div>
+            <a href="/people/hr/discipline"
+               :aria-current="activeModule === 'discipline' || activeModule === 'hr-discipline' ? 'page' : false"
+               :class="activeModule === 'discipline' || activeModule === 'hr-discipline' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("warning", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Discipline</span>
+            </a>
 
-            <div x-data="{ open: ['self-attendance','self-leave','self-payslips','self-expenses','self-tax-info','self-discipline','self-team-leave','self-team-expenses','self-team-discipline'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['self-attendance','self-leave','self-payslips','self-expenses','self-tax-info','self-discipline','self-team-leave','self-team-expenses','self-team-discipline'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.104-.895 2-2 2s-2-.896-2-2 .895-2 2-2 2 .896 2 2zm0 0c0 1.104.895 2 2 2s2-.896 2-2-.895-2-2-2-2 .896-2 2zm9 1c0 4.418-4.03 8-9 8s-9-3.582-9-8 4.03-8 9-8 9 3.582 9 8z"/>
-                    </svg>
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Self Service</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/people/self/attendance" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">My Attendance</a>
-                    <a href="/people/self/leave" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">My Leave</a>
-                    <a href="/people/self/payslips" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">My Payslips</a>
-                    <a href="/people/self/expenses" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">My Expenses</a>
-                    <a href="/people/self/tax-info" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">My Info</a>
-                    <a href="/people/self/discipline" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">My Discipline Cases</a>
-                    {% if can_team_leave %}
-                    <a href="/people/self/team/leave" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Team Leave</a>
-                    {% endif %}
-                    {% if can_team_expenses %}
-                    <a href="/people/self/team/expenses" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Team Expenses</a>
-                    {% endif %}
-                    {% if 'discipline' in modules %}
-                    <a href="/people/self/team/discipline" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Team Discipline</a>
-                    {% endif %}
-                </div>
-            </div>
+            <a href="/people/self"
+               :aria-current="['self','self-attendance','self-leave','self-payslips','self-expenses','self-tax-info','self-discipline','self-team-leave','self-team-expenses','self-team-discipline'].includes(activeModule) ? 'page' : false"
+               :class="['self','self-attendance','self-leave','self-payslips','self-expenses','self-tax-info','self-discipline','self-team-leave','self-team-expenses','self-team-discipline'].includes(activeModule) ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.104-.895 2-2 2s-2-.896-2-2 .895-2 2-2 2 .896 2 2zm0 0c0 1.104.895 2 2 2s2-.896 2-2-.895-2-2-2-2 .896-2 2zm9 1c0 4.418-4.03 8-9 8s-9-3.582-9-8 4.03-8 9-8 9 3.582 9 8z"/>
+                </svg>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Self Service</span>
+            </a>
 
 
             {% with current_module=switch_module %}
@@ -346,81 +220,12 @@
             </a>
             {% endif %}
 
-            <!-- Self Service Navigation -->
-            <a href="/people/self/attendance"
-               :class="activeModule === 'self-attendance' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+            <a href="/people/self"
+               :class="['self','self-attendance','self-leave','self-payslips','self-expenses','self-tax-info','self-discipline','self-team-leave','self-team-expenses','self-team-discipline'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all mb-2">
-                {{ icon_svg("clock", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>My Attendance</span>
-            </a>
-
-            <a href="/people/self/leave"
-               :class="activeModule === 'self-leave' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("calendar", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>My Leave</span>
-            </a>
-
-            <a href="/people/self/payslips"
-               :class="activeModule === 'self-payslips' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("document", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>My Payslips</span>
-            </a>
-
-            <a href="/people/self/expenses"
-               :class="activeModule === 'self-expenses' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("cash", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>My Expenses</span>
-            </a>
-
-            <a href="/people/self/tax-info"
-               :class="activeModule === 'self-tax-info' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("currency", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>My Info</span>
-            </a>
-
-            <a href="/people/self/discipline"
-               :class="activeModule === 'self-discipline' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("warning", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>My Discipline Cases</span>
-            </a>
-
-            {% if has_team_approvals %}
-            <div class="pt-2 pb-3" x-show="!sidebarCollapsed" x-cloak>
-                <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Approvals</span>
-            </div>
-
-            {% if can_team_leave %}
-            <a href="/people/self/team/leave"
-               :class="activeModule === 'self-team-leave' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
                 {{ icon_svg("user", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Team Leave</span>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Self Service</span>
             </a>
-            {% endif %}
-
-            {% if can_team_expenses %}
-            <a href="/people/self/team/expenses"
-               :class="activeModule === 'self-team-expenses' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("check", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Team Expenses</span>
-            </a>
-            {% endif %}
-
-            {% if 'discipline' in modules %}
-            <a href="/people/self/team/discipline"
-               :class="activeModule === 'self-team-discipline' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("warning", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Team Discipline</span>
-            </a>
-            {% endif %}
-            {% endif %}
 
 
             {% with current_module=switch_module %}
@@ -441,7 +246,7 @@
         {% set page_title_html %}{% block page_title %}{{ page_title | default("People") }}{% endblock %}{% endset %}
         {% set breadcrumbs_html %}{% block breadcrumbs %}{% endblock %}{% endset %}
         {% set header_actions_html %}{% block header_actions %}{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="violet", back_fallback=(back_fallback_url | trim)) }}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="violet", back_fallback=(back_fallback_url | trim), launcher_modules=accessible_modules | default([], true), launcher_user=user) }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-dashboard">

@@ -13,9 +13,22 @@ from sqlalchemy.orm import Session
 
 from app.services.people.payroll.web import payroll_web_service
 from app.services.people.payroll.web.loan_web import loan_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.templates import templates
+from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
 
 router = APIRouter(prefix="/payroll", tags=["payroll-web"])
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def payroll_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Payroll landing page."""
+    context = base_context(request, auth, "Payroll", "payroll", db=db)
+    return templates.TemplateResponse(request, "people/payroll/index.html", context)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

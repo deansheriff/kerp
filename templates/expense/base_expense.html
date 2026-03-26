@@ -169,54 +169,13 @@
                 <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Expense Reviewer</span>
             </a>
 
-            <!-- Section Divider: Reports -->
-            <div class="pt-4 pb-2" x-show="!sidebarCollapsed" x-cloak>
-                <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Reports</span>
-            </div>
-
-            <!-- Summary Report -->
-            <a href="/expense/reports/summary"
-               :aria-current="activeModule === 'reports-summary' ? 'page' : false"
-               :class="activeModule === 'reports-summary' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+            <!-- Reports -->
+            <a href="/expense/reports"
+               :aria-current="activeModule === 'reports' ? 'page' : false"
+               :class="activeModule === 'reports' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
                 {{ icon_svg("document-report", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Summary</span>
-            </a>
-
-            <!-- By Category Report -->
-            <a href="/expense/reports/by-category"
-               :aria-current="activeModule === 'reports-category' ? 'page' : false"
-               :class="activeModule === 'reports-category' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("tag", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>By Category</span>
-            </a>
-
-            <!-- By Employee Report -->
-            <a href="/expense/reports/by-employee"
-               :aria-current="activeModule === 'reports-employee' ? 'page' : false"
-               :class="activeModule === 'reports-employee' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("user-group", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>By Employee</span>
-            </a>
-
-            <!-- Trends Report -->
-            <a href="/expense/reports/trends"
-               :aria-current="activeModule === 'reports-trends' ? 'page' : false"
-               :class="activeModule === 'reports-trends' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("trending-up", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Trends</span>
-            </a>
-
-            <!-- My Approvals Report -->
-            <a href="/expense/reports/my-approvals"
-               :aria-current="activeModule === 'reports-my-approvals' ? 'page' : false"
-               :class="activeModule === 'reports-my-approvals' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                {{ icon_svg("clipboard-check", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>My Approvals</span>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Reports</span>
             </a>
 
 
@@ -237,7 +196,7 @@
         {% set page_title_html %}{% block page_title %}{{ page_title | default("Expenses") }}{% endblock %}{% endset %}
         {% set breadcrumbs_html %}{% block breadcrumbs %}{% endblock %}{% endset %}
         {% set header_actions_html %}{% block header_actions %}{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="amber", back_fallback=(back_fallback_url | trim)) }}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="amber", back_fallback=(back_fallback_url | trim), launcher_modules=accessible_modules | default([], true), launcher_user=user) }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-dashboard">

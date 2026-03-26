@@ -455,6 +455,7 @@ class GoodsReceiptWebService:
         end_date: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
         """Render goods receipts list page."""
         context = base_context(request, auth, "Goods Receipts", "ap")
@@ -469,6 +470,7 @@ class GoodsReceiptWebService:
                 start_date=start_date,
                 end_date=end_date,
                 page=page,
+                limit=limit,
             )
         )
         return templates.TemplateResponse(

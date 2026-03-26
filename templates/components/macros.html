@@ -1140,6 +1140,9 @@ if (typeof window.searchAutosuggest === 'undefined') {
 {% set caller_attrs = (
     'hx-get="' ~ base_url ~ '" hx-trigger="change" hx-target="#' ~ target_id ~ '" hx-select="#' ~ target_id ~ '" hx-push-url="true" hx-include="closest form"'
 ) if auto_submit else "" %}
+{% set form_attrs = (
+    'hx-get="' ~ base_url ~ '" hx-target="#' ~ target_id ~ '" hx-select="#' ~ target_id ~ '" hx-push-url="true" hx-indicator="closest [data-live-search]"'
+) if (not auto_submit and show_apply_button) else "" %}
 <div class="card" data-compact-filters data-live-search
      x-data='{ open: {{ "true" if filter_count > 0 else "false" }} }'>
 
@@ -1213,6 +1216,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
        class="px-4 py-4">
 
     <form method="get" action="{{ base_url }}"
+          {{ form_attrs | safe }}
           class="space-y-4">
 
       {# Optional search input #}
@@ -1752,7 +1756,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
    {% from "components/macros.html" import topbar %}
    {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="teal") }}
    ============================================ #}
-{% macro topbar(page_title_html, breadcrumbs_html="", header_actions_html="", left_actions_html="", accent="teal", back_fallback="/dashboard", search_breakpoint="sm", show_search=true) %}
+{% macro topbar(page_title_html, breadcrumbs_html="", header_actions_html="", left_actions_html="", accent="teal", back_fallback="/dashboard", search_breakpoint="sm", show_search=true, launcher_modules=[], launcher_user=None) %}
 {% set accent_map = {
   'teal': {'hover': 'hover:border-teal-400', 'hover_dark': 'dark:hover:border-teal-500'},
   'violet': {'hover': 'hover:border-violet-400', 'hover_dark': 'dark:hover:border-violet-500'},
@@ -1835,7 +1839,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
         <span class="hidden sm:inline">Back</span>
       </button>
       {% endif %}
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <h1 class="topbar-title-responsive truncate text-xl font-semibold text-slate-900 dark:text-white font-display" data-testid="page-title">
           {{ page_title_html | safe }}
         </h1>
@@ -1843,6 +1847,9 @@ if (typeof window.searchAutosuggest === 'undefined') {
           {{ breadcrumbs_html | safe }}
         </div>
       </div>
+      {{ left_actions_html | safe }}
+    </div>
+    <div class="topbar-actions flex flex-wrap items-center justify-end gap-2 sm:gap-3" x-ref="topbarActions">
       {% if show_search %}
       <button @click="window.dispatchEvent(new CustomEvent('open-command-palette'))"
               x-show="showSearchControl && viewportWidth >= 640"
@@ -1857,9 +1864,6 @@ if (typeof window.searchAutosuggest === 'undefined') {
         </kbd>
       </button>
       {% endif %}
-      {{ left_actions_html | safe }}
-    </div>
-    <div class="topbar-actions flex flex-wrap items-center justify-end gap-2 sm:gap-3" x-ref="topbarActions">
       {{ header_actions_html | safe }}
       <button @click="darkMode = !darkMode"
               class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"
@@ -1934,6 +1938,9 @@ if (typeof window.searchAutosuggest === 'undefined') {
           </div>
         </div>
       </div>
+      {% with accessible_modules=launcher_modules, user=launcher_user %}
+        {% include "partials/_module_launcher.html" %}
+      {% endwith %}
     </div>
   </div>
 </header>

@@ -25,7 +25,7 @@
 
     {# Filters #}
     {% call(filter_attrs) compact_filters(
-        base_url="/people/hr/info-changes",
+        base_url="/people/hr/info-change-requests",
         active_filters=active_filters | default([])
     ) %}
     <div>
@@ -52,8 +52,9 @@
     </div>
     {% endcall %}
 
-    <div id="results-container">
     {% if requests %}
+    <div id="results-container">
+
     <div class="card overflow-hidden">
         <div class="table-container">
             <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
@@ -90,12 +91,13 @@
             </table>
         </div>
     </div>
-    {{ pagination(page=page, total_pages=total_pages, total_count=total_count, limit=limit, filters={'status': status if status else '', 'change_type': change_type if change_type else ''}) }}
+    {{ pagination(page=page, total_pages=total_pages, total_count=total_count, limit=limit, filters={'status': status|default(''), 'change_type': change_type|default('')}) }}
+    </div>
+
     {% else %}
     <div class="card p-8 text-center">
         <p class="text-slate-500 dark:text-slate-400">No change requests found.</p>
     </div>
     {% endif %}
-    </div>
 </div>
 {% endblock %}

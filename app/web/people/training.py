@@ -10,9 +10,22 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.training.web import training_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.templates import templates
+from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
 
 router = APIRouter(prefix="/training", tags=["people-training-web"])
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def training_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Training landing page."""
+    context = base_context(request, auth, "Training", "training", db=db)
+    return templates.TemplateResponse(request, "people/training/index.html", context)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

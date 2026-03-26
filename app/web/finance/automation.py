@@ -34,43 +34,9 @@ def automation_dashboard(
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db),
 ):
-    """Automation dashboard page."""
+    """Automation landing page."""
     context = base_context(request, auth, "Automation", "automation")
-
-    # Get counts for overview
-    recurring_ctx = automation_web_service.list_recurring_context(
-        db, str(auth.organization_id), page_size=5
-    )
-    workflows_ctx = automation_web_service.list_workflows_context(
-        db, str(auth.organization_id)
-    )
-    fields_ctx = automation_web_service.list_custom_fields_context(
-        db, str(auth.organization_id)
-    )
-    templates_ctx = automation_web_service.list_templates_context(
-        db, str(auth.organization_id)
-    )
-
-    context.update(
-        {
-            "recurring_count": recurring_ctx["total"],
-            "active_recurring": len(
-                [t for t in recurring_ctx["templates"] if t["is_active"]]
-            ),
-            "workflow_count": workflows_ctx["total"],
-            "active_workflows": len(
-                [r for r in workflows_ctx["rules"] if r["is_active"]]
-            ),
-            "custom_fields_count": fields_ctx["total"],
-            "templates_count": templates_ctx["total"],
-            "recent_recurring": recurring_ctx["templates"][:5],
-            "recent_workflows": workflows_ctx["rules"][:5],
-        }
-    )
-
-    return templates.TemplateResponse(
-        request, "finance/automation/dashboard.html", context
-    )
+    return templates.TemplateResponse(request, "finance/automation/index.html", context)
 
 
 # =============================================================================

@@ -1,5 +1,5 @@
 {% extends "finance/base_finance.html" %}
-{% from "components/macros.html" import status_badge, empty_state, compact_filters, icon_svg, pagination %}
+{% from "components/macros.html" import empty_state, compact_filters, icon_svg, pagination %}
 
 
 {% block page_title %}Payment Batches{% endblock %}
@@ -8,6 +8,8 @@
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/finance/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Finance</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/finance/ap" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Accounts Payable</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Payment Batches</span></li>
     </ol>
 </nav>
@@ -25,7 +27,9 @@
     {# Filters #}
     {% call(filter_attrs) compact_filters(
         base_url="/finance/ap/payment-batches",
-        active_filters=active_filters if active_filters else []
+        active_filters=active_filters | default([]),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
     <div>
             <select name="status"
@@ -58,7 +62,7 @@
                     {% for batch in batches %}
                     <tr>
                         <td class="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
-                            {{ batch.batch_date.strftime('%d %b %Y') if batch.batch_date else '—' }}
+                            {{ batch.batch_date }}
                         </td>
                         <td class="whitespace-nowrap font-mono text-sm text-slate-700 dark:text-slate-200">
                             {{ batch.batch_number }}
@@ -66,11 +70,11 @@
                         <td class="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
                             {{ batch.payment_method | replace('_', ' ') | title }}
                         </td>
-                        <td class="text-right font-mono tabular-nums">
-                            {{ "{:,.2f}".format(batch.total_amount) if batch.total_amount else '0.00' }} {{ batch.currency_code }}
+                        <td class="table-cell-amount">
+                            {{ batch.total_amount }} {{ batch.currency_code }}
                         </td>
-                        <td class="whitespace-nowrap text-center">
-                            {{ status_badge(batch.status.value if batch.status else '', 'sm') }}
+                        <td class="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+                            {{ batch.status.value if batch.status else '' }}
                         </td>
                     </tr>
                     {% else %}

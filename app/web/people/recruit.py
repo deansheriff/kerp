@@ -10,7 +10,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.recruit.web import recruit_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.templates import templates
+from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
 
 router = APIRouter(prefix="/recruit", tags=["people-recruit-web"])
 
@@ -20,9 +21,16 @@ router = APIRouter(prefix="/recruit", tags=["people-recruit-web"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@router.get("", include_in_schema=False)
-def recruit_root() -> RedirectResponse:
-    return RedirectResponse(url="/people/recruit/jobs")
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def recruit_root(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Recruitment landing page."""
+    context = base_context(request, auth, "Recruitment", "recruit", db=db)
+    return templates.TemplateResponse(request, "people/recruit/index.html", context)
 
 
 @router.get("/job-openings", include_in_schema=False)

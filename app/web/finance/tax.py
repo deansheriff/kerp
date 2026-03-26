@@ -10,9 +10,21 @@ from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from app.services.finance.tax.web import tax_web_service
-from app.web.deps import WebAuthContext, get_db, require_finance_access
+from app.templates import templates
+from app.web.deps import WebAuthContext, base_context, get_db, require_finance_access
 
 router = APIRouter(prefix="/tax", tags=["tax-web"])
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def tax_landing(
+    request: Request,
+    auth: WebAuthContext = Depends(require_finance_access),
+):
+    """Tax landing page."""
+    context = base_context(request, auth, "Tax", "tax")
+    return templates.TemplateResponse(request, "finance/tax/index.html", context)
 
 
 @router.get("/jurisdictions", response_class=HTMLResponse)
@@ -21,11 +33,17 @@ def list_jurisdictions(
     auth: WebAuthContext = Depends(require_finance_access),
     country_code: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Tax jurisdictions list page."""
     return tax_web_service.list_jurisdictions_response(
-        request, auth, country_code, page, db
+        request=request,
+        auth=auth,
+        country_code=country_code,
+        page=page,
+        limit=limit,
+        db=db,
     )
 
 
@@ -37,6 +55,7 @@ def list_tax_codes(
     jurisdiction_id: str | None = None,
     is_active: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Tax codes list page."""
@@ -48,12 +67,13 @@ def list_tax_codes(
         active_filter = False
 
     return tax_web_service.list_tax_codes_response(
-        request,
-        auth,
-        tax_type,
-        jurisdiction_id,
-        page,
-        db,
+        request=request,
+        auth=auth,
+        tax_type=tax_type,
+        jurisdiction_id=jurisdiction_id,
+        page=page,
+        limit=limit,
+        db=db,
         is_active=active_filter,
     )
 
@@ -121,18 +141,20 @@ def list_tax_periods(
     status: str | None = None,
     year: int | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Tax periods list page."""
     return tax_web_service.list_tax_periods_response(
-        request,
-        auth,
-        jurisdiction_id,
-        frequency,
-        status,
-        year,
-        page,
-        db,
+        request=request,
+        auth=auth,
+        jurisdiction_id=jurisdiction_id,
+        frequency=frequency,
+        status=status,
+        year=year,
+        page=page,
+        limit=limit,
+        db=db,
     )
 
 
@@ -155,11 +177,19 @@ def list_tax_returns(
     return_type: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Tax returns list page."""
     return tax_web_service.list_tax_returns_response(
-        request, auth, period_id, return_type, status, page, db
+        request=request,
+        auth=auth,
+        period_id=period_id,
+        return_type=return_type,
+        status=status,
+        page=page,
+        limit=limit,
+        db=db,
     )
 
 

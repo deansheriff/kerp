@@ -39,7 +39,7 @@
     {{ period_shortcuts(mode="range") }}
     {% endcall %}
 
-    <div id="results-container">
+    <div id="results-container" class="space-y-8">
     <!-- Summary Cards -->
     <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <!-- Output Tax (Collected) -->
@@ -142,7 +142,7 @@
     <!-- Quick Links -->
     <div class="card p-6">
         <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Tax Management</h3>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <a href="/finance/tax/jurisdictions" class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

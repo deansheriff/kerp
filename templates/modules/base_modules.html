@@ -128,27 +128,13 @@
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fleet</span>
             </div>
 
-            <!-- Fleet Management Module -->
-            <div x-data="{ open: ['fleet','fleet_vehicles','fleet_maintenance','fleet_fuel','fleet_incidents','fleet_reservations','fleet_documents'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['fleet','fleet_vehicles','fleet_maintenance','fleet_fuel','fleet_incidents','fleet_reservations','fleet_documents'].includes(activeModule) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("switch-horizontal", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Fleet</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/fleet" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Dashboard</a>
-                    <a href="/fleet/vehicles" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Vehicles</a>
-                    <a href="/fleet/maintenance" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Maintenance</a>
-                    <a href="/fleet/fuel" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Fuel Logs</a>
-                    <a href="/fleet/incidents" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Incidents</a>
-                    <a href="/fleet/reservations" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Reservations</a>
-                    <a href="/fleet/documents" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Documents</a>
-                </div>
-            </div>
+            <a href="/fleet"
+               :aria-current="activeModule === 'fleet' ? 'page' : false"
+               :class="activeModule === 'fleet' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("switch-horizontal", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Fleet</span>
+            </a>
             {% endif %}
 
 
@@ -157,28 +143,13 @@
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Projects</span>
             </div>
 
-            <!-- Project Management Module -->
-            <div x-data="{ open: ['projects','tasks','gantt','team','milestones','time'].includes(activeModule) }">
-                <button @click="open = !open"
-                        :class="['projects','tasks','gantt','team','milestones','time'].includes(activeModule) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
-                        class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
-                    {{ icon_svg("clipboard-list", "h-5 w-5 flex-shrink-0") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Projects</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/projects" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">All Projects</a>
-                    <a href="/projects?status=active" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">Active Projects</a>
-                    <a href="/projects/new" class="block rounded-lg px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300 transition-colors">
-                        <span class="flex items-center gap-2">
-                            {{ icon_svg("plus", "h-4 w-4") }}
-                            New Project
-                        </span>
-                    </a>
-                </div>
-            </div>
+            <a href="/projects"
+               :aria-current="activeModule === 'projects' ? 'page' : false"
+               :class="activeModule === 'projects' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
+                {{ icon_svg("clipboard-list", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Projects</span>
+            </a>
 
 
             {% with current_module="operations" %}
@@ -198,7 +169,7 @@
         {% set page_title_html %}{% block page_title %}{{ page_title | default("Operations") }}{% endblock %}{% endset %}
         {% set breadcrumbs_html %}{% block breadcrumbs %}{% endblock %}{% endset %}
         {% set header_actions_html %}{% block header_actions %}{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="indigo", back_fallback=(back_fallback_url | trim)) }}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, accent="indigo", back_fallback=(back_fallback_url | trim), launcher_modules=accessible_modules | default([], true), launcher_user=user) }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-dashboard">

@@ -596,6 +596,54 @@ def create_expense(
 
 
 # =============================================================================
+# Expense Reports
+# =============================================================================
+
+
+@router.get("/reports", response_class=HTMLResponse)
+def expense_reports_hub(
+    request: Request,
+    auth: WebAuthContext = Depends(require_expense_access),
+    db: Session = Depends(get_db),
+):
+    """Expense reports hub page."""
+    context = base_context(request, auth, "Expense Reports", "reports", db=db)
+    context["report_links"] = [
+        {
+            "title": "Summary",
+            "description": "Track overall claim counts, totals, and status distribution.",
+            "href": "/expense/reports/summary",
+            "icon": "document-report",
+        },
+        {
+            "title": "By Category",
+            "description": "See spend patterns across expense categories and policy areas.",
+            "href": "/expense/reports/by-category",
+            "icon": "tag",
+        },
+        {
+            "title": "By Employee",
+            "description": "Compare claim activity and approved amounts by employee.",
+            "href": "/expense/reports/by-employee",
+            "icon": "user-group",
+        },
+        {
+            "title": "Trends",
+            "description": "Review monthly expense movement and average claim patterns.",
+            "href": "/expense/reports/trends",
+            "icon": "trending-up",
+        },
+        {
+            "title": "My Approvals",
+            "description": "Review your approval decisions and approval workload history.",
+            "href": "/expense/reports/my-approvals",
+            "icon": "clipboard-check",
+        },
+    ]
+    return templates.TemplateResponse(request, "expense/reports/index.html", context)
+
+
+# =============================================================================
 # Expense Detail
 # =============================================================================
 
@@ -747,11 +795,6 @@ def void_expense(
     except Exception:
         logger.exception("Failed to void expense %s", expense_id)
     return RedirectResponse(f"/expense/{expense_id}", status_code=303)
-
-
-# =============================================================================
-# Expense Reports
-# =============================================================================
 
 
 @router.get("/reports/summary", response_class=HTMLResponse)

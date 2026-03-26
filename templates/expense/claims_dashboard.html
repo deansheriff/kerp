@@ -1,332 +1,197 @@
 {% extends "expense/base_expense.html" %}
-{% from "components/macros.html" import empty_state, icon_svg, status_badge %}
+{% from "components/macros.html" import empty_state, status_badge %}
 
 {% block page_title %}Expense Claims{% endblock %}
 
 {% block content %}
+{% set dashboard_title = "Expense Claims" %}
+{% set dashboard_subtitle = "A work queue for reviewing, approving, and paying claims" %}
+{% set hero_stats = [
+    {
+        "label": "Pending Review",
+        "value": stats.pending_count if stats.pending_count is not none else 0,
+        "icon": "clock",
+        "color": "amber",
+        "subtitle": "%s waiting" | format(stats.pending_amount if stats.pending_amount is not none else currency_zero)
+    },
+    {
+        "label": "Approved Queue",
+        "value": stats.approved_count if stats.approved_count is not none else 0,
+        "icon": "check-circle",
+        "color": "blue",
+        "subtitle": "Ready for payment"
+    },
+    {
+        "label": "Rejected Claims",
+        "value": stats.rejected_count if stats.rejected_count is not none else 0,
+        "icon": "x-circle",
+        "color": "rose",
+        "subtitle": "%s rejection rate" | format(stats.rejection_rate if stats.rejection_rate is not none else 0)
+    },
+    {
+        "label": "Reimbursed Claims",
+        "value": stats.paid_count if stats.paid_count is not none else 0,
+        "icon": "currency",
+        "color": "emerald",
+        "subtitle": "%s reimbursed" | format(stats.paid_amount if stats.paid_amount is not none else currency_zero)
+    }
+] %}
+
 <div class="space-y-8 dashboard-expense">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-white font-display">Expense Claims</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">Track and manage employee expense reimbursements</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <form method="get" class="flex items-center gap-3">
-                <label for="period-filter" class="text-sm text-slate-500 dark:text-slate-400">Period</label>
-                <select id="period-filter" name="period" class="form-select" onchange="this.form.submit()">
-                    <option value="month" {% if selected_period == 'month' %}selected{% endif %}>This Month</option>
-                    <option value="quarter" {% if selected_period == 'quarter' %}selected{% endif %}>This Quarter</option>
-                    <option value="year" {% if selected_period == 'year' %}selected{% endif %}>This Year</option>
-                    <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All Time</option>
-                </select>
-            </form>
-            <a href="/expense/claims/new" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-sm hover:from-amber-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-all duration-200">
-                {{ icon_svg("plus", "h-4 w-4") }}
-                New Claim
-            </a>
-        </div>
-    </div>
+    {% include "expense/_dashboard_header.html" %}
+    {% set hero_stats_testid = "claims-dashboard-stats" %}
+    {% include "expense/_hero_stats.html" %}
 
-    <!-- Hero Stats -->
-    <div class="stagger-in expense-stat-grid" style="animation-delay: 0ms;" data-testid="claims-dashboard-stats">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            <!-- Total Claims -->
-            <a href="/expense/claims/list" class="stat-hero hover:shadow-lg transition-shadow">
-                <div class="stat-hero-icon stat-hero-icon-expense">
-                    {{ icon_svg("document") }}
-                </div>
-                <span class="stat-hero-label">Total Claims</span>
-                <span class="stat-hero-value">{{ stats.total_claims if stats.total_claims is not none else 0 }}</span>
-                <span class="stat-hero-trend text-slate-500 dark:text-slate-400">
-                    {{ stats.this_period_claims if stats.this_period_claims is not none else 0 }} this period
-                </span>
-            </a>
-
-            <!-- Total Amount Claimed -->
-            <a href="/expense/claims/list" class="stat-hero hover:shadow-lg transition-shadow">
-                <div class="stat-hero-icon stat-hero-icon-expense">
-                    {{ icon_svg("currency") }}
-                </div>
-                <span class="stat-hero-label">Amount Claimed</span>
-                <span class="stat-hero-value">{{ stats.total_amount if stats.total_amount is not none else currency_zero }}</span>
-                <span class="stat-hero-trend text-amber-600 dark:text-amber-400">
-                    {{ stats.avg_claim if stats.avg_claim is not none else currency_zero }} avg
-                </span>
-            </a>
-
-            <!-- Pending Review -->
-            <a href="/expense/claims/list?status=SUBMITTED" class="stat-hero hover:shadow-lg transition-shadow">
-                <div class="stat-hero-icon stat-hero-icon-expense">
-                    {{ icon_svg("clock") }}
-                </div>
-                <span class="stat-hero-label">Pending Review</span>
-                <span class="stat-hero-value">{{ stats.pending_count if stats.pending_count is not none else 0 }}</span>
-                <span class="stat-hero-trend text-amber-600 dark:text-amber-400">
-                    {{ stats.pending_amount if stats.pending_amount is not none else currency_zero }} total
-                </span>
-            </a>
-
-            <!-- Approved/Paid -->
-            <a href="/expense/claims/list?status=PAID" class="stat-hero hover:shadow-lg transition-shadow">
-                <div class="stat-hero-icon stat-hero-icon-expense">
-                    {{ icon_svg("check-circle") }}
-                </div>
-                <span class="stat-hero-label">Reimbursed</span>
-                <span class="stat-hero-value">{{ stats.paid_amount if stats.paid_amount is not none else currency_zero }}</span>
-                <span class="stat-hero-trend text-emerald-600 dark:text-emerald-400">
-                    {{ stats.paid_count if stats.paid_count is not none else 0 }} claims paid
-                </span>
-            </a>
-        </div>
-    </div>
-
-    <!-- Divider -->
     <div class="divider-expense"></div>
 
-    <!-- Charts Row 1: Claims Trend & Status Distribution -->
-    <div class="grid gap-6 lg:grid-cols-2">
-        <!-- Claims Trend Chart -->
-        <div class="stagger-in card p-6" style="animation-delay: 50ms;">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Claims Trend</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Submissions vs reimbursements over time</p>
-                </div>
-                <div class="flex items-center gap-4 text-xs">
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                        <span class="text-slate-600 dark:text-slate-400">Submitted</span>
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                        <span class="text-slate-600 dark:text-slate-400">Paid</span>
-                    </span>
-                </div>
+    <div class="grid gap-6 lg:grid-cols-3">
+        <div class="card p-6">
+            <div class="mb-4">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Claims Action Queue</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Prioritize the claims that are blocking workflow.</p>
             </div>
-            {% if chart_data.claims_trend %}
-            <div class="h-64">
-                <canvas data-chart="trendLine" data-chart-config='{{ {
-                    "labels": chart_data.claims_trend | map(attribute="month") | list,
-                    "datasets": [
-                        {"label": "Submitted", "data": chart_data.claims_trend | map(attribute="submitted") | list, "color": "rgba(251, 191, 36, 1)", "fill": "rgba(251, 191, 36, 0.1)"},
-                        {"label": "Paid", "data": chart_data.claims_trend | map(attribute="paid") | list, "color": "rgba(16, 185, 129, 1)", "fill": "rgba(16, 185, 129, 0.1)"}
-                    ]
-                } | tojson }}'></canvas>
-            </div>
-            {% else %}
-            {{ empty_state("No trend data", "Submit claims to see trends") }}
-            {% endif %}
-        </div>
-
-        <!-- Status Distribution -->
-        <div class="stagger-in card p-6" style="animation-delay: 100ms;">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Status Distribution</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Claims by current status</p>
-                </div>
-            </div>
-            {% if chart_data.status_distribution %}
-            <div class="h-64 flex items-center justify-center">
-                <canvas data-chart="donut" data-chart-config='{{ {
-                    "labels": chart_data.status_distribution | map(attribute="status") | list,
-                    "data": chart_data.status_distribution | map(attribute="count") | list,
-                    "colors": ["rgba(100, 116, 139, 0.85)", "rgba(251, 191, 36, 0.85)", "rgba(139, 92, 246, 0.85)", "rgba(59, 130, 246, 0.85)", "rgba(239, 68, 68, 0.85)", "rgba(16, 185, 129, 0.85)"]
-                } | tojson }}'></canvas>
-            </div>
-            {% else %}
-            {{ empty_state("No status data", "Submit claims to see distribution") }}
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Charts Row 2: Category & Department -->
-    <div class="grid gap-6 lg:grid-cols-2">
-        <!-- Category Breakdown -->
-        <div class="stagger-in card p-6" style="animation-delay: 150ms;">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">By Category</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Expense amounts by category</p>
-                </div>
-            </div>
-            {% if chart_data.category_breakdown %}
-            <div class="h-64">
-                <canvas data-chart="horizontalBar" data-chart-config='{{ {
-                    "labels": chart_data.category_breakdown | map(attribute="category") | list,
-                    "data": chart_data.category_breakdown | map(attribute="amount") | list,
-                    "color": "rgba(251, 191, 36, 0.85)"
-                } | tojson }}'></canvas>
-            </div>
-            {% else %}
-            {{ empty_state("No category data", "Categorize claims to see breakdown") }}
-            {% endif %}
-        </div>
-
-        <!-- Department Spending -->
-        <div class="stagger-in card p-6" style="animation-delay: 200ms;">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">By Department</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Claims by department</p>
-                </div>
-            </div>
-            {% if chart_data.department_breakdown %}
-            <div class="h-64">
-                <canvas data-chart="horizontalBar" data-chart-config='{{ {
-                    "labels": chart_data.department_breakdown | map(attribute="department") | list,
-                    "data": chart_data.department_breakdown | map(attribute="amount") | list,
-                    "color": "rgba(249, 115, 22, 0.85)"
-                } | tojson }}'></canvas>
-            </div>
-            {% else %}
-            {{ empty_state("No department data", "Department spending will appear here") }}
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Main Content Grid -->
-    <div class="grid gap-8 lg:grid-cols-3">
-        <!-- Left Column - Quick Stats & Actions -->
-        <div class="space-y-6">
-            <!-- Top Claimants -->
-            <div class="stagger-in card p-6" style="animation-delay: 250ms;">
-                <div class="mb-4">
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Top Claimants</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Highest expense submitters</p>
-                </div>
-                {% if chart_data.top_claimants %}
-                <div class="h-48">
-                    <canvas data-chart="horizontalBar" data-chart-config='{{ {
-                        "labels": chart_data.top_claimants | map(attribute="name") | list,
-                        "data": chart_data.top_claimants | map(attribute="amount") | list,
-                        "color": "rgba(139, 92, 246, 0.85)"
-                    } | tojson }}'></canvas>
-                </div>
-                {% else %}
-                {{ empty_state("No claimant data", "Submit claims to see rankings") }}
-                {% endif %}
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="stagger-in" style="animation-delay: 300ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Quick Actions</span>
-                </div>
-                <div class="space-y-2">
-                    <a href="/expense/claims/new" class="cmd-action">
-                        <span class="cmd-action-key">N</span>
-                        <span class="cmd-action-label">New Expense Claim</span>
-                        <span class="cmd-action-hint">Create</span>
-                    </a>
-                    <a href="/expense/claims/list?status=SUBMITTED" class="cmd-action">
-                        <span class="cmd-action-key">R</span>
-                        <span class="cmd-action-label">Review Pending Claims</span>
-                        <span class="cmd-action-hint">{{ stats.pending_count if stats.pending_count is not none else 0 }}</span>
-                    </a>
-                    <a href="/expense/claims/list?status=APPROVED" class="cmd-action">
-                        <span class="cmd-action-key">P</span>
-                        <span class="cmd-action-label">Process Payments</span>
-                        <span class="cmd-action-hint">{{ stats.approved_count if stats.approved_count is not none else 0 }}</span>
-                    </a>
-                    <a href="/expense/claims/list" class="cmd-action">
-                        <span class="cmd-action-key">A</span>
-                        <span class="cmd-action-label">View All Claims</span>
-                        <span class="cmd-action-hint">List</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Processing Stats -->
-            <div class="stagger-in card p-5" style="animation-delay: 350ms;">
-                <h4 class="text-sm font-semibold text-slate-900 dark:text-white mb-4">Processing Overview</h4>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-slate-500 dark:text-slate-400">Avg Processing Time</span>
-                        <span class="font-medium text-slate-900 dark:text-white">{{ stats.avg_processing_days if stats.avg_processing_days is not none else 0 }} days</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-slate-500 dark:text-slate-400">Approval Rate</span>
-                        <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ stats.approval_rate if stats.approval_rate is not none else 0 }}%</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-slate-500 dark:text-slate-400">Rejection Rate</span>
-                        <span class="font-medium text-rose-600 dark:text-rose-400">{{ stats.rejection_rate if stats.rejection_rate is not none else 0 }}%</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-slate-500 dark:text-slate-400">Claims This Month</span>
-                        <span class="font-medium text-amber-600 dark:text-amber-400">{{ stats.this_month_count if stats.this_month_count is not none else 0 }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Column - Recent Claims -->
-        <div class="lg:col-span-2 space-y-6">
-            <!-- Recent Claims -->
-            <div class="stagger-in" style="animation-delay: 250ms;">
-                <div class="section-label">
-                    <span class="section-label-text">Recent Claims</span>
-                </div>
-                <div class="card" data-testid="recent-claims">
-                    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
-                        <span class="text-sm font-medium text-slate-500 dark:text-slate-400">
-                            Latest {{ (recent_claims | length) if recent_claims else 0 }} claims
-                        </span>
-                        <a href="/expense/claims/list" class="text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 transition-colors">
-                            View all &rarr;
-                        </a>
-                    </div>
-                    <div class="divide-y divide-slate-100 dark:divide-slate-700/60">
-                        {% for claim in recent_claims %}
-                        <a href="/expense/claims/{{ claim.id }}" class="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                                {{ icon_svg("document", "h-5 w-5 text-amber-600 dark:text-amber-400") }}
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ claim.title }}</p>
-                                    {{ status_badge(claim.status if claim.status else 'DRAFT', 'sm') }}
-                                </div>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ claim.employee_name }} &bull; {{ claim.claim_number }}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-semibold font-mono tabular-nums text-slate-900 dark:text-white">{{ claim.amount }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ claim.date }}</p>
-                            </div>
-                        </a>
-                        {% else %}
-                        <div class="py-12">
-                            {{ empty_state("No recent claims", "Submit an expense claim to get started") }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Amount by Month Chart -->
-            <div class="stagger-in card p-6" style="animation-delay: 300ms;">
-                <div class="flex items-center justify-between mb-6">
+            <div class="space-y-3">
+                <a href="/expense/claims/list?status=SUBMITTED" class="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 transition hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-900/10">
                     <div>
-                        <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Monthly Amounts</h3>
-                        <p class="text-sm text-slate-500 dark:text-slate-400">Claim amounts over the past 6 months</p>
+                        <p class="text-sm font-medium text-slate-900 dark:text-white">Pending Review</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Claims waiting for approval</p>
                     </div>
-                </div>
-                {% if chart_data.monthly_amounts %}
-                <div class="h-56">
-                    <canvas data-chart="groupedBar" data-chart-config='{{ {
-                        "labels": chart_data.monthly_amounts | map(attribute="month") | list,
-                        "datasets": [
-                            {"label": "Claimed", "data": chart_data.monthly_amounts | map(attribute="claimed") | list, "color": "rgba(251, 191, 36, 0.85)"},
-                            {"label": "Paid", "data": chart_data.monthly_amounts | map(attribute="paid") | list, "color": "rgba(16, 185, 129, 0.85)"}
-                        ]
-                    } | tojson }}'></canvas>
-                </div>
-                {% else %}
-                {{ empty_state("No monthly data", "More data needed for trends") }}
-                {% endif %}
+                    <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">{{ stats.pending_count if stats.pending_count is not none else 0 }}</span>
+                </a>
+                <a href="/expense/claims/list?status=APPROVED" class="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 transition hover:border-blue-300 dark:border-blue-900/40 dark:bg-blue-900/10">
+                    <div>
+                        <p class="text-sm font-medium text-slate-900 dark:text-white">Approved for Payment</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Claims ready for finance payout</p>
+                    </div>
+                    <span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">{{ stats.approved_count if stats.approved_count is not none else 0 }}</span>
+                </a>
+                <a href="/expense/claims/list?status=REJECTED" class="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 transition hover:border-rose-300 dark:border-rose-900/40 dark:bg-rose-900/10">
+                    <div>
+                        <p class="text-sm font-medium text-slate-900 dark:text-white">Rejected Claims</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Claims needing correction</p>
+                    </div>
+                    <span class="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">{{ stats.rejected_count if stats.rejected_count is not none else 0 }}</span>
+                </a>
             </div>
         </div>
+
+        <div class="card p-6 lg:col-span-2">
+            <div class="mb-6">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Action Required</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">The next steps to move claims through reimbursement.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <a href="/expense/claims/list?status=SUBMITTED" class="rounded-xl border border-amber-200 bg-amber-50/80 p-4 transition hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-900/10">
+                    <p class="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">Pending Review</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.pending_count if stats.pending_count is not none else 0 }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ stats.pending_amount if stats.pending_amount is not none else currency_zero }} waiting</p>
+                </a>
+                <a href="/expense/claims/list?status=APPROVED" class="rounded-xl border border-blue-200 bg-blue-50/80 p-4 transition hover:border-blue-300 dark:border-blue-900/40 dark:bg-blue-900/10">
+                    <p class="text-xs uppercase tracking-wide text-blue-700 dark:text-blue-300">Approved Queue</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.approved_count if stats.approved_count is not none else 0 }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Ready for reimbursement</p>
+                </a>
+                <a href="/expense/claims/list?status=REJECTED" class="rounded-xl border border-rose-200 bg-rose-50/80 p-4 transition hover:border-rose-300 dark:border-rose-900/40 dark:bg-rose-900/10">
+                    <p class="text-xs uppercase tracking-wide text-rose-700 dark:text-rose-300">Rejected Claims</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.rejected_count if stats.rejected_count is not none else 0 }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ stats.rejection_rate if stats.rejection_rate is not none else 0 }}% rejection rate</p>
+                </a>
+                <a href="/expense/claims/list?status=PAID" class="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 transition hover:border-emerald-300 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                    <p class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Reimbursed Claims</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.paid_count if stats.paid_count is not none else 0 }}</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ stats.paid_amount if stats.paid_amount is not none else currency_zero }} reimbursed</p>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        <div class="card p-6">
+            <div class="mb-6">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Processing Overview</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Workflow efficiency and decision quality.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Avg Processing Time</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.avg_processing_days if stats.avg_processing_days is not none else 0 }} days</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Approval Rate</p>
+                    <p class="mt-2 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{{ stats.approval_rate if stats.approval_rate is not none else 0 }}%</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Rejection Rate</p>
+                    <p class="mt-2 text-2xl font-semibold text-rose-600 dark:text-rose-400">{{ stats.rejection_rate if stats.rejection_rate is not none else 0 }}%</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Claims This Month</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.this_month_count if stats.this_month_count is not none else 0 }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <div class="mb-6">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Workflow Shortcuts</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Jump directly to the next queue.</p>
+            </div>
+            <div class="space-y-2">
+                <a href="/expense/claims/new" class="cmd-action">
+                    <span class="cmd-action-key">N</span>
+                    <span class="cmd-action-label">Create New Claim</span>
+                    <span class="cmd-action-hint">New</span>
+                </a>
+                <a href="/expense/claims/list?status=SUBMITTED" class="cmd-action">
+                    <span class="cmd-action-key">R</span>
+                    <span class="cmd-action-label">Review Pending Claims</span>
+                    <span class="cmd-action-hint">{{ stats.pending_count if stats.pending_count is not none else 0 }}</span>
+                </a>
+                <a href="/expense/claims/list?status=APPROVED" class="cmd-action">
+                    <span class="cmd-action-key">P</span>
+                    <span class="cmd-action-label">Prepare Reimbursements</span>
+                    <span class="cmd-action-hint">{{ stats.approved_count if stats.approved_count is not none else 0 }}</span>
+                </a>
+                <a href="/expense/claims/list?status=PAID" class="cmd-action">
+                    <span class="cmd-action-key">H</span>
+                    <span class="cmd-action-label">Review Reimbursements</span>
+                    <span class="cmd-action-hint">{{ stats.paid_count if stats.paid_count is not none else 0 }}</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white font-display">Recent Claims Requiring Attention</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Latest requests and their current workflow state.</p>
+            </div>
+            <a href="/expense/claims/list" class="text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400">View all &rarr;</a>
+        </div>
+        {% if recent_claims %}
+        <div class="space-y-3">
+            {% for claim in recent_claims %}
+            <a href="/expense/claims/{{ claim.id }}" class="block rounded-xl border border-slate-200 bg-white/60 p-4 transition hover:border-amber-300 hover:bg-amber-50/40 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-amber-700 dark:hover:bg-amber-900/10">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                        <div class="mb-1 flex items-center gap-2">
+                            <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ claim.title }}</p>
+                            {{ status_badge(claim.status, size="sm") }}
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ claim.employee_name }}{% if claim.claim_number %} • {{ claim.claim_number }}{% endif %}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ claim.amount }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ claim.date }}</p>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        {{ empty_state("No recent claims", "New claims will appear here") }}
+        {% endif %}
     </div>
 </div>
 {% endblock %}

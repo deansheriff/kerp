@@ -34,7 +34,9 @@
         active_filters=active_filters | default([]),
         show_search=true,
         search=search | default('', true),
-        search_placeholder="Search accounts by code or name..."
+        search_placeholder="Search accounts by code or name...",
+        auto_submit=false,
+        show_apply_button=true
     ) %}
         {{ filter_select_field("category", "Category", category, [
             {"value": "ASSET", "label": "Assets"},

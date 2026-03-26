@@ -479,8 +479,8 @@ class TaxWebService:
         country_code: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
-        limit = 50
         offset = (page - 1) * limit
 
         jurisdictions = tax_jurisdiction_service.list(
@@ -497,6 +497,7 @@ class TaxWebService:
                 "jurisdictions": jurisdictions,
                 "country_code": country_code,
                 "page": page,
+                "limit": limit,
             }
         )
 
@@ -512,9 +513,9 @@ class TaxWebService:
         jurisdiction_id: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
         is_active: bool | None = None,
     ) -> HTMLResponse:
-        limit = 50
         offset = (page - 1) * limit
 
         # Convert tax_type string to enum if provided
@@ -593,8 +594,8 @@ class TaxWebService:
         year: int | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
-        limit = 50
         offset = (page - 1) * limit
 
         status_value = None
@@ -632,6 +633,7 @@ class TaxWebService:
                 "status": status,
                 "year": year,
                 "page": page,
+                "limit": limit,
                 "active_filters": active_filters,
             }
         )
@@ -666,8 +668,8 @@ class TaxWebService:
         status: str | None,
         page: int,
         db: Session,
+        limit: int = 50,
     ) -> HTMLResponse:
-        limit = 50
         offset = (page - 1) * limit
 
         org_id = coerce_uuid(auth.organization_id)

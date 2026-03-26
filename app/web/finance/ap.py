@@ -283,23 +283,25 @@ def list_invoices(
     start_date: str | None = None,
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = None,
     sort_dir: str | None = None,
     db: Session = Depends(get_db),
 ):
     """AP invoices list page."""
     return ap_web_service.list_invoices_response(
-        request,
-        auth,
-        search,
-        supplier_id,
-        status,
-        start_date,
-        end_date,
-        page,
-        db,
-        sort,
-        sort_dir,
+        request=request,
+        auth=auth,
+        search=search,
+        supplier_id=supplier_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit,
+        db=db,
+        sort=sort,
+        sort_dir=sort_dir,
     )
 
 
@@ -506,23 +508,25 @@ def list_payments(
     start_date: str | None = None,
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = None,
     sort_dir: str | None = None,
     db: Session = Depends(get_db),
 ):
     """AP payments list page."""
     return ap_web_service.list_payments_response(
-        request,
-        auth,
-        search,
-        supplier_id,
-        status,
-        start_date,
-        end_date,
-        page,
-        db,
-        sort,
-        sort_dir,
+        request=request,
+        auth=auth,
+        search=search,
+        supplier_id=supplier_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit,
+        db=db,
+        sort=sort,
+        sort_dir=sort_dir,
     )
 
 
@@ -687,10 +691,13 @@ def list_payment_batches(
     auth: WebAuthContext = Depends(require_web_permission("ap:payment_batches:read")),
     status: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Payment batches list page."""
-    return ap_web_service.list_payment_batches_response(request, auth, status, page, db)
+    return ap_web_service.list_payment_batches_response(
+        request=request, auth=auth, status=status, page=page, limit=limit, db=db
+    )
 
 
 @router.get("/payment-batches/new", response_class=HTMLResponse)
@@ -728,19 +735,21 @@ def list_purchase_orders(
     start_date: str | None = None,
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Purchase orders list page."""
     return ap_web_service.list_purchase_orders_response(
-        request,
-        auth,
-        search,
-        supplier_id,
-        status,
-        start_date,
-        end_date,
-        page,
-        db,
+        request=request,
+        auth=auth,
+        search=search,
+        supplier_id=supplier_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit,
+        db=db,
     )
 
 
@@ -859,20 +868,22 @@ def list_goods_receipts(
     start_date: str | None = None,
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Goods receipts list page."""
     return ap_web_service.list_goods_receipts_response(
-        request,
-        auth,
-        search,
-        supplier_id,
-        po_id,
-        status,
-        start_date,
-        end_date,
-        page,
-        db,
+        request=request,
+        auth=auth,
+        search=search,
+        supplier_id=supplier_id,
+        po_id=po_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit,
+        db=db,
     )
 
 

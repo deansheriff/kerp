@@ -2,7 +2,9 @@
 {% from "components/macros.html" import compact_filters, icon_svg %}
 
 {% block content %}
-<div class="space-y-6">
+<div id="expense-report-view" class="relative space-y-6">
+    {% set current_report_view = "summary" %}
+    {% include "expense/reports/_loading_skeleton.html" %}
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -15,6 +17,8 @@
         </a>
     </div>
 
+    {% include "expense/reports/_report_tabs.html" %}
+
     {% call(filter_attrs) compact_filters(
         base_url="/expense/reports/summary",
         active_filters=active_filters | default([]),
@@ -26,59 +30,14 @@
     ) %}{% endcall %}
 
     <div id="results-container" class="space-y-6">
-    <!-- Summary Cards -->
     {% set date_params = "start_date=" ~ start_date ~ "&end_date=" ~ end_date %}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <a href="/expense/claims/list?{{ date_params }}" class="card card-hover p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
-                    {{ icon_svg("document", "h-6 w-6 text-amber-600 dark:text-amber-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Total Claims</p>
-                    <p class="text-2xl font-semibold text-slate-900 dark:text-white">{{ report.total_claims }}</p>
-                </div>
-            </div>
-        </a>
-
-        <a href="/expense/claims/list?{{ date_params }}" class="card card-hover p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                    {{ icon_svg("currency", "h-6 w-6 text-blue-600 dark:text-blue-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Total Claimed</p>
-                    <p class="text-2xl font-semibold text-slate-900 dark:text-white font-mono">{{ "{:,.2f}".format(report.total_claimed) }}</p>
-                </div>
-            </div>
-        </a>
-
-        <a href="/expense/claims/list?{{ date_params }}&status=APPROVED" class="card card-hover p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
-                    {{ icon_svg("check-circle", "h-6 w-6 text-green-600 dark:text-green-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Approved</p>
-                    <p class="text-2xl font-semibold text-green-600 dark:text-green-400 font-mono">{{ "{:,.2f}".format(report.approved_amount) }}</p>
-                    <p class="text-xs text-slate-500">{{ report.approved_count }} claims</p>
-                </div>
-            </div>
-        </a>
-
-        <a href="/expense/claims/list?{{ date_params }}&status=REJECTED" class="card card-hover p-5">
-            <div class="flex items-center gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-900/30">
-                    {{ icon_svg("x-circle", "h-6 w-6 text-rose-600 dark:text-rose-400") }}
-                </div>
-                <div>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Rejected</p>
-                    <p class="text-2xl font-semibold text-rose-600 dark:text-rose-400">{{ report.rejected_count }}</p>
-                    <p class="text-xs text-slate-500">claims</p>
-                </div>
-            </div>
-        </a>
-    </div>
+    {% set report_hero_stats = [
+        {"label": "Total Claims", "value": report.total_claims, "icon": "document", "icon_bg": "bg-amber-100 dark:bg-amber-900/30", "icon_class": "h-6 w-6 text-amber-600 dark:text-amber-400"},
+        {"label": "Total Claimed", "value": "{:,.2f}".format(report.total_claimed), "icon": "currency", "icon_bg": "bg-blue-100 dark:bg-blue-900/30", "icon_class": "h-6 w-6 text-blue-600 dark:text-blue-400", "value_class": "text-slate-900 dark:text-white font-mono"},
+        {"label": "Reimbursed", "value": "{:,.2f}".format(report.approved_amount), "subtitle": report.approved_count ~ " claims", "icon": "check-circle", "icon_bg": "bg-green-100 dark:bg-green-900/30", "icon_class": "h-6 w-6 text-green-600 dark:text-green-400", "value_class": "text-green-600 dark:text-green-400 font-mono"},
+        {"label": "Rejected", "value": report.rejected_count, "subtitle": "claims", "icon": "x-circle", "icon_bg": "bg-rose-100 dark:bg-rose-900/30", "icon_class": "h-6 w-6 text-rose-600 dark:text-rose-400", "value_class": "text-rose-600 dark:text-rose-400"}
+    ] %}
+    {% include "expense/reports/_report_hero_stats.html" %}
 
     <!-- Status Breakdown -->
     <div class="card">
@@ -145,18 +104,5 @@
         {% endif %}
     </div>
 
-    <!-- Quick Links -->
-    <div class="flex gap-4">
-        <a href="/expense/reports/by-category?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
-            View by Category
-        </a>
-        <a href="/expense/reports/by-employee?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-secondary">
-            View by Employee
-        </a>
-        <a href="/expense/reports/trends" class="btn btn-secondary">
-            View Trends
-        </a>
-    </div>
-    </div>
 </div>
 {% endblock %}

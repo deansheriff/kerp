@@ -14,75 +14,18 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">Leave</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">Track leave policies, allocations, and applications.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-            <a href="/people/leave/types" class="btn btn-secondary">Leave Types</a>
-            <a href="/people/leave/applications" class="btn btn-secondary">Applications</a>
-            <a href="/people/leave/allocations" class="btn btn-secondary">Allocations</a>
-            <a href="/people/leave/holidays" class="btn btn-secondary">Holiday Lists</a>
-        </div>
-    </div>
-
-    <div class="grid gap-4 sm:grid-cols-3">
-        <div class="card p-5">
-            <p class="text-sm text-slate-500 dark:text-slate-400">Pending Applications</p>
-            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.pending_applications }}</p>
-        </div>
-        <div class="card p-5">
-            <p class="text-sm text-slate-500 dark:text-slate-400">On Leave Today</p>
-            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.on_leave_today }}</p>
-        </div>
-        <div class="card p-5">
-            <p class="text-sm text-slate-500 dark:text-slate-400">Applications This Month</p>
-            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stats.applications_this_month }}</p>
-        </div>
-    </div>
-
+<div class="space-y-6 page-enter">
     <div class="card p-6">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quick links</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Jump into the most-used leave workflows.</p>
-        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <a href="/people/leave/types" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">Manage Leave Types</a>
-            <a href="/people/leave/allocations" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">Allocate Leave</a>
-            <a href="/people/leave/applications" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">Review Applications</a>
-            <a href="/people/leave/holidays" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">Holiday Lists</a>
-        </div>
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Leave</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose a leave category to continue.</p>
     </div>
 
-    <div class="card p-6">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Reports</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Analyze leave data with detailed reports.</p>
-        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <a href="/people/leave/reports/balance" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">
-                <div class="flex items-center gap-2">
-                    {{ icon_svg("chart", "h-5 w-5 text-teal-500") }}
-                    Balance Report
-                </div>
-            </a>
-            <a href="/people/leave/reports/usage" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">
-                <div class="flex items-center gap-2">
-                    {{ icon_svg("pie-chart", "h-5 w-5 text-blue-500") }}
-                    Usage Analysis
-                </div>
-            </a>
-            <a href="/people/leave/reports/calendar" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">
-                <div class="flex items-center gap-2">
-                    {{ icon_svg("calendar", "h-5 w-5 text-amber-500") }}
-                    Leave Calendar
-                </div>
-            </a>
-            <a href="/people/leave/reports/trends" class="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60">
-                <div class="flex items-center gap-2">
-                    {{ icon_svg("trending-up", "h-5 w-5 text-violet-500") }}
-                    Trends Report
-                </div>
-            </a>
-        </div>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/people/leave/types" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">{{ icon_svg("tag", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Leave Types</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage leave policies, rules, and entitlement types.</p></div></div></a>
+        <a href="/people/leave/applications" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">{{ icon_svg("document-text", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Applications</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review submitted leave requests and approval status.</p></div></div></a>
+        <a href="/people/leave/allocations" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">{{ icon_svg("calendar", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Allocations</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Assign balances and annual leave entitlements to employees.</p></div></div></a>
+        <a href="/people/leave/holidays" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">{{ icon_svg("calendar", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Holiday Lists</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Maintain public holidays and working calendar exceptions.</p></div></div></a>
+        <a href="/people/leave/reports/balance" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20"><div class="flex items-start gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">{{ icon_svg("chart", "h-5 w-5") }}</div><div><h3 class="text-base font-semibold text-slate-900 dark:text-white">Reports</h3><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open leave balance, usage, calendar, and trend reports.</p></div></div></a>
     </div>
 </div>
 {% endblock %}

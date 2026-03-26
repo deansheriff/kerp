@@ -74,10 +74,10 @@
     {# Status Actions #}
     {% if opening.status.value in ['DRAFT', 'OPEN', 'ON_HOLD', 'CLOSED'] %}
     <div class="card">
-        <div class="card-header">
+        <div class="card-header px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">Actions</h3>
         </div>
-        <div class="card-body">
+        <div class="card-body px-6 pb-6">
             <div class="flex flex-wrap gap-3">
                 {% if opening.status.value == 'DRAFT' %}
                 <form method="post" action="/people/recruit/jobs/{{ opening.job_opening_id }}/publish">
@@ -117,10 +117,10 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {# Job Information #}
         <div class="card">
-            <div class="card-header">
+            <div class="card-header px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Job Information</h3>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 pb-6">
                 <dl class="space-y-3">
                     <div class="flex justify-between">
                         <dt class="text-slate-500 dark:text-slate-400">Employment Type</dt>
@@ -150,10 +150,10 @@
 
         {# Salary & Dates #}
         <div class="card">
-            <div class="card-header">
+            <div class="card-header px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Compensation & Timeline</h3>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 pb-6">
                 <dl class="space-y-3">
                     {% if opening.min_salary or opening.max_salary %}
                     <div class="flex justify-between">
@@ -183,10 +183,10 @@
     {# Description #}
     {% if opening.description %}
     <div class="card">
-        <div class="card-header">
+        <div class="card-header px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">Job Description</h3>
         </div>
-        <div class="card-body">
+        <div class="card-body px-6 pb-6">
             <div class="prose prose-slate dark:prose-invert max-w-none">
                 <p class="whitespace-pre-wrap">{{ opening.description }}</p>
             </div>
@@ -197,10 +197,10 @@
     {# Requirements #}
     {% if opening.required_skills or opening.preferred_skills or opening.education_requirements %}
     <div class="card">
-        <div class="card-header">
+        <div class="card-header px-6 pt-6">
             <h3 class="font-medium text-slate-900 dark:text-white">Requirements</h3>
         </div>
-        <div class="card-body space-y-4">
+        <div class="card-body px-6 pb-6 space-y-4">
             {% if opening.required_skills %}
             <div>
                 <h4 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Required Skills</h4>
@@ -226,13 +226,13 @@
     {# Applicants Summary #}
     {% if applicants_count is defined %}
     <div class="card">
-        <div class="card-header flex items-center justify-between">
+        <div class="card-header px-6 pt-6 flex items-center justify-between">
             <h3 class="font-medium text-slate-900 dark:text-white">Applicants</h3>
             <a href="/people/recruit/applicants?job_opening_id={{ opening.job_opening_id }}" class="text-sm text-teal-600 hover:text-teal-700 dark:text-teal-400">
                 View All
             </a>
         </div>
-        <div class="card-body">
+        <div class="card-body px-6 pb-6">
             <p class="text-3xl font-bold text-slate-900 dark:text-white">{{ applicants_count }}</p>
             <p class="text-sm text-slate-500 dark:text-slate-400">Total applicants</p>
         </div>

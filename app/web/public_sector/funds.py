@@ -26,6 +26,20 @@ router = APIRouter(tags=["public-sector-funds"])
 
 
 @router.get("/funds", response_class=HTMLResponse)
+@router.get("/funds/", response_class=HTMLResponse)
+def funds_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_public_sector_access),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Funds landing page."""
+    context = base_context(request, auth, "Funds", "ps_funds", db=db)
+    return templates.TemplateResponse(
+        request, "public_sector/funds_index.html", context
+    )
+
+
+@router.get("/funds/register", response_class=HTMLResponse)
 def list_funds(
     request: Request,
     status: str | None = None,

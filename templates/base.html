@@ -118,9 +118,7 @@
                 <div class="flex items-center gap-3 text-sm">
                     {% if user and user.is_authenticated %}
                         <!-- Authenticated User Menu -->
-                        <a href="/dashboard" class="btn btn-secondary">
-                            Open dashboard
-                        </a>
+                        {% include "partials/_module_launcher.html" %}
                         <div x-data="{ open: false }" class="relative">
                             <button @click="open = !open" @click.outside="open = false"
                                     class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-700">
@@ -149,13 +147,19 @@
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                                     </svg>
-                                    Admin Users
+                                    Users
                                 </a>
                                 {% endif %}
                                 <a href="/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
                                     {{ icon_svg("user", "h-4 w-4") }}
                                     Profile
                                 </a>
+                                {% if "self_service" in accessible_modules | default([], true) %}
+                                <a href="/people/self" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+                                    {{ icon_svg("clipboard", "h-4 w-4") }}
+                                    Self Service
+                                </a>
+                                {% endif %}
                                 <div class="my-1 border-t border-slate-100 dark:border-slate-700"></div>
                                 <a href="/logout" class="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
                                     {{ icon_svg("logout", "h-4 w-4") }}

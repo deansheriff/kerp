@@ -35,7 +35,9 @@
         active_filters=active_filters | default([]),
         date_range=true,
         start_date=start_date | default('', true),
-        end_date=end_date | default('', true)
+        end_date=end_date | default('', true),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
     {% call filter_custom_select_field("account_id", "Account", "data-testid='bank-reconciliations-account' " ~ filter_attrs) %}
     {% for acc in accounts %}

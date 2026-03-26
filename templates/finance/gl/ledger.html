@@ -46,7 +46,9 @@
         search_placeholder="Description, reference...",
         date_range=true,
         start_date=start_date | default('', true),
-        end_date=end_date | default('', true)
+        end_date=end_date | default('', true),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
         {% call filter_custom_select_field("account_id", "Account", filter_attrs) %}
         {% for account in accounts %}

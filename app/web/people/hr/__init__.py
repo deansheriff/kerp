@@ -12,7 +12,12 @@ This package provides HTML template routes for HR functionality:
 - discipline: Disciplinary case management
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from app.templates import templates
+from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
 
 from .competencies import router as competencies_router
 from .discipline import router as discipline_router
@@ -29,6 +34,19 @@ from .skills import router as skills_router
 
 # Main HR router that includes all sub-routers
 router = APIRouter(prefix="/hr", tags=["hr-web"])
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def hr_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Human Resources landing page."""
+    context = base_context(request, auth, "Human Resources", "hr", db=db)
+    return templates.TemplateResponse(request, "people/hr/index.html", context)
+
 
 # Include all sub-routers
 router.include_router(employees_router)

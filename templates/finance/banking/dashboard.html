@@ -43,7 +43,7 @@
     <div class="grid gap-6 lg:grid-cols-3">
         <!-- Account Balances -->
         <div class="lg:col-span-2 card">
-            <div class="card-header flex items-center justify-between">
+            <div class="card-header px-6 pt-6 flex items-center justify-between">
                 <h3 class="text-base font-semibold text-slate-900 dark:text-white">Account Balances</h3>
                 <a href="/finance/banking/accounts" class="text-sm text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors">View all</a>
             </div>
@@ -94,11 +94,11 @@
 
         <!-- Reconciliation Status -->
         <div class="card">
-            <div class="card-header">
+            <div class="card-header px-6 pt-6">
                 <h3 class="text-base font-semibold text-slate-900 dark:text-white">Reconciliation Status</h3>
             </div>
-            <div class="p-5 space-y-4">
-                <a href="/finance/banking/reconciliations?status=draft" class="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <div class="card-body px-6 pb-6 space-y-4">
+                <a href="/finance/banking/reconciliations?status=draft" class="flex items-center justify-between rounded-lg px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                     <div class="flex items-center gap-3">
                         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
                             {{ icon_svg("document", "h-4 w-4 text-slate-500 dark:text-slate-400") }}
@@ -107,7 +107,7 @@
                     </div>
                     <span class="text-sm font-semibold font-mono text-slate-900 dark:text-white">{{ recon_draft if recon_draft is not none else 0 }}</span>
                 </a>
-                <a href="/finance/banking/reconciliations?status=rejected" class="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <a href="/finance/banking/reconciliations?status=rejected" class="flex items-center justify-between rounded-lg px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                     <div class="flex items-center gap-3">
                         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 dark:bg-rose-900/30">
                             {{ icon_svg("warning", "h-4 w-4 text-rose-500 dark:text-rose-400") }}
@@ -116,7 +116,7 @@
                     </div>
                     <span class="text-sm font-semibold font-mono text-slate-900 dark:text-white">{{ recon_rejected if recon_rejected is not none else 0 }}</span>
                 </a>
-                <a href="/finance/banking/reconciliations?status=pending_review" class="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <a href="/finance/banking/reconciliations?status=pending_review" class="flex items-center justify-between rounded-lg px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                     <div class="flex items-center gap-3">
                         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-900/30">
                             {{ icon_svg("warning", "h-4 w-4 text-amber-500 dark:text-amber-400") }}
@@ -125,7 +125,7 @@
                     </div>
                     <span class="text-sm font-semibold font-mono text-slate-900 dark:text-white">{{ recon_pending_review if recon_pending_review is not none else 0 }}</span>
                 </a>
-                <a href="/finance/banking/reconciliations?status=approved" class="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <a href="/finance/banking/reconciliations?status=approved" class="flex items-center justify-between rounded-lg px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                     <div class="flex items-center gap-3">
                         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/30">
                             {{ icon_svg("check-circle", "h-4 w-4 text-emerald-500 dark:text-emerald-400") }}
@@ -140,7 +140,7 @@
 
     <!-- Recent Transactions -->
     <div class="card">
-        <div class="card-header flex items-center justify-between">
+        <div class="card-header px-6 pt-6 flex items-center justify-between">
             <h3 class="text-base font-semibold text-slate-900 dark:text-white">Recent Transactions</h3>
             <a href="/finance/banking/statements" class="text-sm text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors">View all</a>
         </div>
@@ -200,7 +200,7 @@
 
     <!-- Quick Actions -->
     <div class="grid gap-4 sm:grid-cols-3">
-        <a href="/finance/banking/statements/import" class="card card-hover p-5 flex items-center gap-4">
+        <a href="/finance/banking/statements/import" class="card card-hover p-6 flex items-center gap-4">
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
                 {{ icon_svg("upload", "h-5 w-5 text-blue-600 dark:text-blue-400") }}
             </span>
@@ -209,7 +209,7 @@
                 <p class="text-xs text-slate-500 dark:text-slate-400">Upload a bank statement file</p>
             </div>
         </a>
-        <a href="/finance/banking/reconciliations/new" class="card card-hover p-5 flex items-center gap-4">
+        <a href="/finance/banking/reconciliations/new" class="card card-hover p-6 flex items-center gap-4">
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/30">
                 {{ icon_svg("check-circle", "h-5 w-5 text-emerald-600 dark:text-emerald-400") }}
             </span>
@@ -218,7 +218,7 @@
                 <p class="text-xs text-slate-500 dark:text-slate-400">Start reconciling an account</p>
             </div>
         </a>
-        <a href="/finance/banking/accounts/new" class="card card-hover p-5 flex items-center gap-4">
+        <a href="/finance/banking/accounts/new" class="card card-hover p-6 flex items-center gap-4">
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-900/30">
                 {{ icon_svg("plus", "h-5 w-5 text-teal-600 dark:text-teal-400") }}
             </span>

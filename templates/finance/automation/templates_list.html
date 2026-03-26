@@ -29,7 +29,9 @@
         {# Filters #}
         {% call(filter_attrs) compact_filters(
             base_url="/finance/automation/templates-list",
-            active_filters=active_filters | default([])
+            active_filters=active_filters | default([]),
+            auto_submit=false,
+            show_apply_button=true
         ) %}
         <div>
             <select name="template_type"
@@ -49,6 +51,7 @@
             </select>
         </div>
         {% endcall %}
+    </div>
 
     <div id="results-container">
     <!-- Templates Grid -->

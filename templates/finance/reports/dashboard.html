@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-8">
+<div class="max-w-[90rem] mx-auto space-y-12 xl:space-y-14">
     <!-- Period Filter -->
     {% call(filter_attrs) compact_filters(
         base_url="/finance/reports",
@@ -26,147 +26,170 @@
     ) %}
     {% endcall %}
 
-    <div id="results-container">
+    <div id="results-container" class="space-y-12 xl:space-y-14">
     <div class="px-1">
         <p class="text-sm text-slate-500 dark:text-slate-400">Period: <span class="font-medium text-slate-700 dark:text-slate-300">{{ key_metrics.period_name }}</span></p>
     </div>
 
     <!-- Key Metrics Summary Cards -->
-    <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="grid gap-6 sm:grid-cols-2 xl:gap-7 2xl:gap-8 lg:grid-cols-2 2xl:grid-cols-4">
         <!-- Total Assets -->
-        <a href="/finance/reports/balance-sheet" class="card card-hover p-5 group">
-            <div class="flex items-center justify-between mb-3">
+        <a href="/finance/reports/balance-sheet" class="card card-hover p-6 xl:p-7 group min-h-[11rem]">
+            <div class="flex items-start justify-between gap-4 mb-5">
                 <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Assets</span>
                 <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     {{ icon_svg("collection") }}
                 </div>
             </div>
-            <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums">{{ key_metrics.total_assets }}</p>
-            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1 group-hover:text-teal-500 transition-colors">View Statement of Financial Position</p>
+            <div class="space-y-3">
+                <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums leading-tight">{{ key_metrics.total_assets }}</p>
+                <p class="text-xs leading-5 text-slate-400 dark:text-slate-500 group-hover:text-teal-500 transition-colors">View Statement of Financial Position</p>
+            </div>
         </a>
 
         <!-- Total Liabilities -->
-        <a href="/finance/reports/balance-sheet" class="card card-hover p-5 group">
-            <div class="flex items-center justify-between mb-3">
+        <a href="/finance/reports/balance-sheet" class="card card-hover p-6 xl:p-7 group min-h-[11rem]">
+            <div class="flex items-start justify-between gap-4 mb-5">
                 <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Liabilities</span>
                 <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
                     {{ icon_svg("receipt") }}
                 </div>
             </div>
-            <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums">{{ key_metrics.total_liabilities }}</p>
-            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1 group-hover:text-teal-500 transition-colors">View Statement of Financial Position</p>
+            <div class="space-y-3">
+                <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums leading-tight">{{ key_metrics.total_liabilities }}</p>
+                <p class="text-xs leading-5 text-slate-400 dark:text-slate-500 group-hover:text-teal-500 transition-colors">View Statement of Financial Position</p>
+            </div>
         </a>
 
         <!-- Net Income -->
-        <a href="/finance/reports/income-statement" class="card card-hover p-5 group">
-            <div class="flex items-center justify-between mb-3">
+        <a href="/finance/reports/income-statement" class="card card-hover p-6 xl:p-7 group min-h-[11rem]">
+            <div class="flex items-start justify-between gap-4 mb-5">
                 <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Net Income</span>
                 <div class="flex h-9 w-9 items-center justify-center rounded-lg {% if key_metrics.is_profit %}bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400{% else %}bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400{% endif %}">
                     {{ icon_svg("trending-up") }}
                 </div>
             </div>
-            <p class="text-2xl font-bold {% if key_metrics.is_profit %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %} font-mono tabular-nums">{{ key_metrics.net_income }}</p>
-            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1 group-hover:text-teal-500 transition-colors">View Statement of Profit or Loss</p>
+            <div class="space-y-3">
+                <p class="text-2xl font-bold {% if key_metrics.is_profit %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %} font-mono tabular-nums leading-tight">{{ key_metrics.net_income }}</p>
+                <p class="text-xs leading-5 text-slate-400 dark:text-slate-500 group-hover:text-teal-500 transition-colors">View Statement of Profit or Loss</p>
+            </div>
         </a>
 
         <!-- Total Equity -->
-        <a href="/finance/reports/balance-sheet" class="card card-hover p-5 group">
-            <div class="flex items-center justify-between mb-3">
+        <a href="/finance/reports/balance-sheet" class="card card-hover p-6 xl:p-7 group min-h-[11rem]">
+            <div class="flex items-start justify-between gap-4 mb-5">
                 <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Equity</span>
                 <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
                     {{ icon_svg("scale") }}
                 </div>
             </div>
-            <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums">{{ key_metrics.total_equity }}</p>
-            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1 group-hover:text-teal-500 transition-colors">View Statement of Financial Position</p>
+            <div class="space-y-3">
+                <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums leading-tight">{{ key_metrics.total_equity }}</p>
+                <p class="text-xs leading-5 text-slate-400 dark:text-slate-500 group-hover:text-teal-500 transition-colors">View Statement of Financial Position</p>
+            </div>
         </a>
     </section>
 
     <!-- P&L and AP/AR Summary Row -->
-    <section class="grid gap-6 lg:grid-cols-3">
+    <section class="grid gap-8 xl:gap-10 lg:grid-cols-2">
         <!-- P&L Summary with Mini Chart -->
-        <div class="card p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold text-slate-900 dark:text-white">Profit &amp; loss summary</h3>
+        <div class="card p-8 xl:p-10 min-h-[25rem] lg:col-span-2">
+            <div class="flex items-start justify-between gap-4 mb-6">
+                <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Performance</p>
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Profit &amp; loss summary</h3>
+                </div>
                 <a href="/finance/reports/income-statement" class="text-sm text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">View report</a>
             </div>
 
-            <!-- Revenue vs Expenses Visual Bar -->
-            <div class="mb-4">
-                <div class="flex items-center gap-3 mb-2">
-                    <div class="flex-1">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-500 dark:text-slate-400">Revenue</span>
-                            <span class="font-mono text-emerald-600 dark:text-emerald-400">{{ key_metrics.total_revenue }}</span>
-                        </div>
-                        <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all" style="width: 100%"></div>
-                        </div>
-                    </div>
+            <div class="grid gap-8 xl:gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Net {{ 'Income' if key_metrics.is_profit else 'Loss' }}</p>
+                    <p class="mt-3 text-4xl xl:text-5xl font-bold font-mono tabular-nums leading-none {% if key_metrics.is_profit %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ key_metrics.net_income }}</p>
+                    <p class="mt-5 max-w-xl text-sm leading-7 text-slate-500 dark:text-slate-400">
+                        Revenue at {{ key_metrics.total_revenue }}, expenses at {{ key_metrics.total_expenses }} for the selected period.
+                    </p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <div class="flex-1">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-500 dark:text-slate-400">Expenses</span>
-                            <span class="font-mono text-rose-600 dark:text-rose-400">{{ key_metrics.total_expenses }}</span>
-                        </div>
-                        <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            {% set expense_pct = (key_metrics.total_expenses_raw / key_metrics.total_revenue_raw * 100) if key_metrics.total_revenue_raw > 0 else 0 %}
-                            <div class="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full transition-all" style="width: {{ [expense_pct, 100] | min }}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Net Result -->
-            <div class="flex items-center justify-between py-3 rounded-lg {% if key_metrics.is_profit %}bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20{% else %}bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-900/20 dark:to-pink-900/20{% endif %} px-4 -mx-2">
-                <div class="flex items-center gap-2">
-                    {% if key_metrics.is_profit %}
-                    {{ icon_svg("trending-up", "h-5 w-5 text-emerald-500") }}
-                    {% else %}
-                    {{ icon_svg("trending-down", "h-5 w-5 text-rose-500") }}
-                    {% endif %}
-                    <span class="text-sm font-semibold text-slate-900 dark:text-white">Net {{ 'Income' if key_metrics.is_profit else 'Loss' }}</span>
+                <div class="space-y-5 rounded-3xl border border-slate-100 bg-slate-50/80 p-6 xl:p-7 dark:border-slate-800 dark:bg-slate-900/60">
+                    <div>
+                        <div class="flex justify-between text-sm mb-3">
+                            <span class="text-slate-500 dark:text-slate-400">Revenue</span>
+                            <span class="font-mono text-slate-700 dark:text-slate-200">{{ key_metrics.total_revenue }}</span>
+                        </div>
+                        <div class="h-3 bg-white dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-3">
+                            <span class="text-slate-500 dark:text-slate-400">Expenses</span>
+                            <span class="font-mono text-slate-700 dark:text-slate-200">{{ key_metrics.total_expenses }}</span>
+                        </div>
+                        <div class="h-3 bg-white dark:bg-slate-800 rounded-full overflow-hidden">
+                            {% set expense_pct = (key_metrics.total_expenses_raw / key_metrics.total_revenue_raw * 100) if key_metrics.total_revenue_raw > 0 else 0 %}
+                            <div class="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full" style="width: {{ [expense_pct, 100] | min }}%"></div>
+                        </div>
+                    </div>
                 </div>
-                <span class="font-mono font-bold text-lg {% if key_metrics.is_profit %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ key_metrics.net_income }}</span>
             </div>
         </div>
 
         <!-- AP Summary with Mini Aging Chart -->
-        <a href="/finance/reports/ap-aging" class="card card-hover p-6 group">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold text-slate-900 dark:text-white">Accounts Payable</h3>
+        <a href="/finance/reports/ap-aging" class="card card-hover p-8 xl:p-10 group min-h-[22rem] flex flex-col">
+            <div class="flex items-start justify-between gap-4 mb-6">
+                <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Liabilities</p>
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Accounts Payable</h3>
+                </div>
                 <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
                     {{ icon_svg("banknotes", "h-4 w-4") }}
                 </div>
             </div>
-            <div class="space-y-3">
+            <div class="flex-1 flex flex-col gap-6">
                 <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono">{{ key_metrics.ap_total }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Total Outstanding</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Outstanding</p>
+                    <p class="mt-3 text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white font-mono leading-none">{{ key_metrics.ap_total }}</p>
+                </div>
+
+                <div class="rounded-3xl border border-slate-100 bg-slate-50/80 p-6 xl:p-7 dark:border-slate-800 dark:bg-slate-900/60">
+                    <div class="h-3 rounded-full bg-white dark:bg-slate-800 overflow-hidden">
+                        <div class="h-full w-2/3 rounded-full bg-gradient-to-r from-rose-500 to-pink-500"></div>
+                    </div>
+                    <p class="mt-5 text-sm leading-7 text-slate-500 dark:text-slate-400">Supplier liabilities still pending settlement.</p>
                 </div>
             </div>
-            <p class="text-xs text-slate-400 mt-4 group-hover:text-teal-500 transition-colors flex items-center gap-1">
+            <p class="text-xs text-slate-400 mt-6 group-hover:text-teal-500 transition-colors flex items-center gap-1">
                 View aging report
                 {{ icon_svg("chevron-right", "h-3 w-3") }}
             </p>
         </a>
 
         <!-- AR Summary with Mini Aging Chart -->
-        <a href="/finance/reports/ar-aging" class="card card-hover p-6 group">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold text-slate-900 dark:text-white">Accounts Receivable</h3>
+        <a href="/finance/reports/ar-aging" class="card card-hover p-8 xl:p-10 group min-h-[22rem] flex flex-col">
+            <div class="flex items-start justify-between gap-4 mb-6">
+                <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Receivables</p>
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Accounts Receivable</h3>
+                </div>
                 <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
                     {{ icon_svg("credit-card", "h-4 w-4") }}
                 </div>
             </div>
-            <div class="space-y-3">
+            <div class="flex-1 flex flex-col gap-6">
                 <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-mono">{{ key_metrics.ar_total }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Total Outstanding</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Outstanding</p>
+                    <p class="mt-3 text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white font-mono leading-none">{{ key_metrics.ar_total }}</p>
+                </div>
+
+                <div class="rounded-3xl border border-slate-100 bg-slate-50/80 p-6 xl:p-7 dark:border-slate-800 dark:bg-slate-900/60">
+                    <div class="h-3 rounded-full bg-white dark:bg-slate-800 overflow-hidden">
+                        <div class="h-full w-3/5 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500"></div>
+                    </div>
+                    <p class="mt-5 text-sm leading-7 text-slate-500 dark:text-slate-400">Customer balances still open across the selected period.</p>
                 </div>
             </div>
-            <p class="text-xs text-slate-400 mt-4 group-hover:text-teal-500 transition-colors flex items-center gap-1">
+            <p class="text-xs text-slate-400 mt-6 group-hover:text-teal-500 transition-colors flex items-center gap-1">
                 View aging report
                 {{ icon_svg("chevron-right", "h-3 w-3") }}
             </p>
@@ -174,141 +197,93 @@
     </section>
 
     <!-- Tax and Expense Summary Row -->
-    <section class="grid gap-6 lg:grid-cols-2">
+    <section class="grid gap-8 xl:gap-10 lg:grid-cols-2">
         <!-- Tax Summary with Visual -->
-        <a href="/finance/reports/tax-summary" class="card card-hover p-6 group">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold text-slate-900 dark:text-white">Tax Position</h3>
+        <a href="/finance/reports/tax-summary" class="card card-hover p-8 xl:p-10 group min-h-[24rem]">
+            <div class="flex items-start justify-between gap-4 mb-6">
+                <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Compliance</p>
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Tax Position</h3>
+                </div>
                 <div class="flex h-8 w-8 items-center justify-center rounded-lg {% if key_metrics.is_tax_payable %}bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400{% else %}bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400{% endif %}">
                     {{ icon_svg("receipt", "h-4 w-4") }}
                 </div>
             </div>
-            <div class="space-y-4">
-                <!-- Net Tax with Visual Indicator -->
-                <div class="flex items-center gap-4">
-                    <div class="flex-1">
-                        <p class="text-2xl font-bold {% if key_metrics.is_tax_payable %}text-amber-600 dark:text-amber-400{% else %}text-blue-600 dark:text-blue-400{% endif %} font-mono">{{ key_metrics.net_tax }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'Net Payable' if key_metrics.is_tax_payable else 'Net Refundable' }}</p>
-                    </div>
-                    <!-- Mini Tax Balance Indicator -->
-                    <div class="flex flex-col items-center">
-                        <div class="relative w-16 h-16">
-                            <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor"
-                                        class="text-slate-100 dark:text-slate-800" stroke-width="3"/>
-                                {% set tax_ratio = (key_metrics.output_tax_raw / (key_metrics.output_tax_raw + key_metrics.input_tax_raw) * 100) if (key_metrics.output_tax_raw + key_metrics.input_tax_raw) > 0 else 50 %}
-                                <circle cx="18" cy="18" r="14" fill="none"
-                                        class="{% if key_metrics.is_tax_payable %}text-amber-500{% else %}text-blue-500{% endif %}"
-                                        stroke="currentColor" stroke-width="3"
-                                        stroke-dasharray="{{ tax_ratio * 0.88 }}, 88"
-                                        stroke-linecap="round"/>
-                            </svg>
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                {% if key_metrics.is_tax_payable %}
-                                {{ icon_svg("arrow-up", "h-5 w-5 text-amber-500") }}
-                                {% else %}
-                                {{ icon_svg("arrow-down", "h-5 w-5 text-blue-500") }}
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+            <div class="space-y-6">
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ 'Net Payable' if key_metrics.is_tax_payable else 'Net Refundable' }}</p>
+                    <p class="mt-3 text-4xl xl:text-5xl font-bold {% if key_metrics.is_tax_payable %}text-amber-600 dark:text-amber-400{% else %}text-blue-600 dark:text-blue-400{% endif %} font-mono leading-none">{{ key_metrics.net_tax }}</p>
                 </div>
 
-                <!-- Output vs Input Tax Bars -->
-                <div class="space-y-2">
+                <div class="space-y-5 rounded-3xl border border-slate-100 bg-slate-50/80 p-6 xl:p-7 dark:border-slate-800 dark:bg-slate-900/60">
                     <div class="flex items-center gap-3">
-                        <span class="text-xs text-slate-500 dark:text-slate-400 w-16">Output</span>
-                        <div class="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <span class="text-sm text-slate-500 dark:text-slate-400 w-16">Output</span>
+                        <div class="flex-1 h-3 bg-white dark:bg-slate-800 rounded-full overflow-hidden">
                             <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" style="width: 100%"></div>
                         </div>
-                        <span class="text-xs font-mono text-emerald-600 dark:text-emerald-400 w-20 text-right">{{ key_metrics.output_tax }}</span>
+                        <span class="text-sm font-mono text-slate-700 dark:text-slate-200 w-24 text-right">{{ key_metrics.output_tax }}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="text-xs text-slate-500 dark:text-slate-400 w-16">Input</span>
-                        <div class="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <span class="text-sm text-slate-500 dark:text-slate-400 w-16">Input</span>
+                        <div class="flex-1 h-3 bg-white dark:bg-slate-800 rounded-full overflow-hidden">
                             {% set input_pct = (key_metrics.input_tax_raw / key_metrics.output_tax_raw * 100) if key_metrics.output_tax_raw > 0 else 0 %}
                             <div class="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full" style="width: {{ [input_pct, 100] | min }}%"></div>
                         </div>
-                        <span class="text-xs font-mono text-rose-600 dark:text-rose-400 w-20 text-right">{{ key_metrics.input_tax }}</span>
+                        <span class="text-sm font-mono text-slate-700 dark:text-slate-200 w-24 text-right">{{ key_metrics.input_tax }}</span>
                     </div>
                 </div>
 
                 {% if key_metrics.overdue_tax_periods > 0 %}
-                <div class="flex items-center gap-2 py-2 px-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 animate-pulse">
+                <div class="flex items-center gap-2 py-4 px-5 rounded-2xl bg-rose-50 dark:bg-rose-900/20">
                     {{ icon_svg("warning", "h-4 w-4 text-rose-500") }}
                     <span class="text-xs font-medium text-rose-700 dark:text-rose-300">{{ key_metrics.overdue_tax_periods }} overdue tax period{{ 's' if key_metrics.overdue_tax_periods > 1 else '' }}</span>
                 </div>
                 {% endif %}
             </div>
-            <p class="text-xs text-slate-400 mt-4 group-hover:text-teal-500 transition-colors flex items-center gap-1">
+            <p class="text-xs text-slate-400 mt-6 group-hover:text-teal-500 transition-colors flex items-center gap-1">
                 View Tax Summary
                 {{ icon_svg("chevron-right", "h-3 w-3") }}
             </p>
         </a>
 
         <!-- Expense Summary with Visual -->
-        <a href="/finance/reports/expense-summary" class="card card-hover p-6 group">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold text-slate-900 dark:text-white">Expenses</h3>
+        <a href="/finance/reports/expense-summary" class="card card-hover p-8 xl:p-10 group min-h-[24rem]">
+            <div class="flex items-start justify-between gap-4 mb-6">
+                <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Spend</p>
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Expenses</h3>
+                </div>
                 <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
                     {{ icon_svg("banknotes", "h-4 w-4") }}
                 </div>
             </div>
-            <div class="space-y-4">
-                <div class="flex items-center gap-4">
-                    <div class="flex-1">
-                        <p class="text-2xl font-bold text-rose-600 dark:text-rose-400 font-mono">{{ key_metrics.total_expenses }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Total for Period</p>
-                    </div>
-                    <!-- Expense Ratio Indicator -->
-                    <div class="relative w-16 h-16">
-                        <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                            <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor"
-                                    class="text-slate-100 dark:text-slate-800" stroke-width="3"/>
-                            {% set expense_ratio = (key_metrics.total_expenses_raw / key_metrics.total_revenue_raw * 100) if key_metrics.total_revenue_raw > 0 else 0 %}
-                            <circle cx="18" cy="18" r="14" fill="none"
-                                    class="{% if expense_ratio > 100 %}text-rose-500{% elif expense_ratio > 80 %}text-amber-500{% else %}text-emerald-500{% endif %}"
-                                    stroke="currentColor" stroke-width="3"
-                                    stroke-dasharray="{{ ([expense_ratio, 100] | min) * 0.88 }}, 88"
-                                    stroke-linecap="round"/>
-                        </svg>
-                        <div class="absolute inset-0 flex items-center justify-center">
-                            <span class="text-xs font-bold {% if expense_ratio > 100 %}text-rose-600 dark:text-rose-400{% elif expense_ratio > 80 %}text-amber-600 dark:text-amber-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">
-                                {{ "%.0f"|format(expense_ratio) }}%
-                            </span>
-                        </div>
-                    </div>
+            <div class="space-y-6">
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total for Period</p>
+                    <p class="mt-3 text-4xl xl:text-5xl font-bold text-rose-600 dark:text-rose-400 font-mono leading-none">{{ key_metrics.total_expenses }}</p>
                 </div>
 
-                <!-- Expense vs Revenue Comparison -->
-                <div class="space-y-2">
+                <div class="space-y-5 rounded-3xl border border-slate-100 bg-slate-50/80 p-6 xl:p-7 dark:border-slate-800 dark:bg-slate-900/60">
                     <div class="flex items-center gap-3">
-                        <span class="text-xs text-slate-500 dark:text-slate-400 w-16">Revenue</span>
-                        <div class="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <span class="text-sm text-slate-500 dark:text-slate-400 w-16">Revenue</span>
+                        <div class="flex-1 h-3 bg-white dark:bg-slate-800 rounded-full overflow-hidden">
                             <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" style="width: 100%"></div>
                         </div>
-                        <span class="text-xs font-mono text-emerald-600 dark:text-emerald-400 w-20 text-right">{{ key_metrics.total_revenue }}</span>
+                        <span class="text-sm font-mono text-slate-700 dark:text-slate-200 w-24 text-right">{{ key_metrics.total_revenue }}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="text-xs text-slate-500 dark:text-slate-400 w-16">Expenses</span>
-                        <div class="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <span class="text-sm text-slate-500 dark:text-slate-400 w-16">Expenses</span>
+                        <div class="flex-1 h-3 bg-white dark:bg-slate-800 rounded-full overflow-hidden">
                             {% set exp_pct = (key_metrics.total_expenses_raw / key_metrics.total_revenue_raw * 100) if key_metrics.total_revenue_raw > 0 else 0 %}
                             <div class="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full" style="width: {{ [exp_pct, 100] | min }}%"></div>
                         </div>
-                        <span class="text-xs font-mono text-rose-600 dark:text-rose-400 w-20 text-right">{{ key_metrics.total_expenses }}</span>
+                        <span class="text-sm font-mono text-slate-700 dark:text-slate-200 w-24 text-right">{{ key_metrics.total_expenses }}</span>
                     </div>
                 </div>
 
-                <!-- Profit Margin Indicator -->
-                <div class="flex items-center justify-between py-2 px-3 rounded-lg {% if key_metrics.is_profit %}bg-emerald-50 dark:bg-emerald-900/20{% else %}bg-rose-50 dark:bg-rose-900/20{% endif %}">
-                    <span class="text-xs text-slate-600 dark:text-slate-400">Margin</span>
-                    {% set margin = ((key_metrics.total_revenue_raw - key_metrics.total_expenses_raw) / key_metrics.total_revenue_raw * 100) if key_metrics.total_revenue_raw > 0 else 0 %}
-                    <span class="text-sm font-mono font-semibold {% if margin > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">
-                        {{ "%.1f"|format(margin) }}%
-                    </span>
-                </div>
+                <p class="text-sm leading-7 text-slate-500 dark:text-slate-400">Expense load relative to revenue for the selected reporting period.</p>
             </div>
-            <p class="text-xs text-slate-400 mt-4 group-hover:text-teal-500 transition-colors flex items-center gap-1">
+            <p class="text-xs text-slate-400 mt-6 group-hover:text-teal-500 transition-colors flex items-center gap-1">
                 View Expense Summary
                 {{ icon_svg("chevron-right", "h-3 w-3") }}
             </p>
@@ -318,9 +293,9 @@
     <!-- Standard Reports Grid -->
     <section>
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4 font-display">Standard reports</h2>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-6 xl:gap-7 sm:grid-cols-2 lg:grid-cols-3">
             {% for report in standard_reports %}
-            <a href="{{ report.url }}" class="card card-hover p-5 group">
+            <a href="{{ report.url }}" class="card card-hover p-6 group">
                 <div class="flex items-start gap-4">
                     <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-teal-50 to-emerald-50 text-teal-600 dark:from-teal-900/30 dark:to-emerald-900/30 dark:text-teal-400 group-hover:from-teal-100 group-hover:to-emerald-100 dark:group-hover:from-teal-900/50 dark:group-hover:to-emerald-900/50 transition-colors">
                         {% if report.icon == 'scale' %}
@@ -358,9 +333,9 @@
 
     <!-- Custom Reports Section -->
     {% if financial_statements or operational_reports or compliance_reports %}
-    <section class="grid gap-6 lg:grid-cols-3">
+    <section class="grid gap-8 xl:gap-9 lg:grid-cols-3">
         <!-- Financial Statements -->
-        <div class="card p-6">
+        <div class="card p-7">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     {{ icon_svg("document-report") }}
@@ -382,7 +357,7 @@
         </div>
 
         <!-- Operational Reports -->
-        <div class="card p-6">
+        <div class="card p-7">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
                     {{ icon_svg("building") }}
@@ -404,7 +379,7 @@
         </div>
 
         <!-- Compliance Reports -->
-        <div class="card p-6">
+        <div class="card p-7">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
                     {{ icon_svg("shield-check") }}

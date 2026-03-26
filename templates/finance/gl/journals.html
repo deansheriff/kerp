@@ -38,7 +38,9 @@
         search_placeholder="Search entries by number or description...",
         date_range=true,
         start_date=start_date | default('', true),
-        end_date=end_date | default('', true)
+        end_date=end_date | default('', true),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
         {{ filter_select_field("status", "Status", status, [
             {"value": "DRAFT", "label": "Draft"},

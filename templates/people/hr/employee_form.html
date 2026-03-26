@@ -15,7 +15,7 @@
 
 {% block content %}
 {% set can_edit_person = can_edit_person if can_edit_person is defined else false %}
-<div class="max-w-2xl">
+<div class="w-full max-w-none">
     {# Error alert #}
     {% if error %}
     <div class="mb-6 p-4 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-900/20 dark:border-rose-800">
@@ -43,120 +43,196 @@
     </div>
     {% endif %}
 
-    <form id="employee-form" method="post" action="/people/hr/employees/{% if employee %}{{ employee.employee_id }}/edit{% else %}new{% endif %}" class="space-y-6">
+    <form id="employee-form" method="post" action="/people/hr/employees/{% if employee %}{{ employee.employee_id }}/edit{% else %}new{% endif %}" class="space-y-6"
+        x-data='{
+            activeTab: "personal",
+            loadingTab: null,
+            switchTab(tab) {
+                if (this.activeTab === tab || this.loadingTab) return;
+                this.loadingTab = tab;
+                window.setTimeout(() => {
+                    this.activeTab = tab;
+                    this.loadingTab = null;
+                }, 220);
+            }
+        }'>
         {{ request.state.csrf_form | safe }}
 
-        {# Personal Information (Person fields - for new employees or display only for existing) #}
-        <div class="card">
-            <div class="card-header px-6 pt-6">
-                <h3 class="font-medium text-slate-900 dark:text-white">Personal Information</h3>
+        {% set nigeria_states = nigeria_states if nigeria_states is defined else [
+            "Abia",
+            "Adamawa",
+            "Akwa Ibom",
+            "Anambra",
+            "Bauchi",
+            "Bayelsa",
+            "Benue",
+            "Borno",
+            "Cross River",
+            "Delta",
+            "Ebonyi",
+            "Edo",
+            "Ekiti",
+            "Enugu",
+            "Gombe",
+            "Imo",
+            "Jigawa",
+            "Kaduna",
+            "Kano",
+            "Katsina",
+            "Kebbi",
+            "Kogi",
+            "Kwara",
+            "Lagos",
+            "Nasarawa",
+            "Niger",
+            "Ogun",
+            "Ondo",
+            "Osun",
+            "Oyo",
+            "Plateau",
+            "Rivers",
+            "Sokoto",
+            "Taraba",
+            "Yobe",
+            "Zamfara",
+            "FCT",
+        ] %}
+        {% set tin_value = form_data.tin | default(tax_profile.tin if tax_profile else '', true) %}
+        {% set tax_state_value = form_data.tax_state | default(tax_profile.tax_state if tax_profile else '', true) %}
+        {% set rsa_pin_value = form_data.rsa_pin | default(tax_profile.rsa_pin if tax_profile else '', true) %}
+        {% set selected_pfa = form_data.pfa_code | default(tax_profile.pfa_code if tax_profile else '', true) %}
+        {% set pension_rate_value = form_data.pension_rate | default(tax_profile.pension_rate if tax_profile else '', true) %}
+        {% set nhf_value = form_data.nhf_number | default(tax_profile.nhf_number if tax_profile else '', true) %}
+        {% set pfa_choices = pfas if pfas is defined else [] %}
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <button type="button" @click="switchTab('personal')"
+                    :class="activeTab === 'personal' && !loadingTab ? 'bg-violet-600 text-white shadow-sm' : 'bg-transparent text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                    class="rounded-xl px-4 py-3 text-left text-sm font-medium transition">
+                    <span class="block">Personal Information</span>
+                    <span class="mt-1 block text-xs" :class="activeTab === 'personal' && !loadingTab ? 'text-violet-100' : 'text-slate-500 dark:text-slate-400'">Profile and emergency details</span>
+                </button>
+                <button type="button" @click="switchTab('employment')"
+                    :class="activeTab === 'employment' && !loadingTab ? 'bg-violet-600 text-white shadow-sm' : 'bg-transparent text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                    class="rounded-xl px-4 py-3 text-left text-sm font-medium transition">
+                    <span class="block">Employment Details</span>
+                    <span class="mt-1 block text-xs" :class="activeTab === 'employment' && !loadingTab ? 'text-violet-100' : 'text-slate-500 dark:text-slate-400'">Job setup and banking</span>
+                </button>
+                <button type="button" @click="switchTab('statutory')"
+                    :class="activeTab === 'statutory' && !loadingTab ? 'bg-violet-600 text-white shadow-sm' : 'bg-transparent text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                    class="rounded-xl px-4 py-3 text-left text-sm font-medium transition">
+                    <span class="block">Tax, Pension & NHF</span>
+                    <span class="mt-1 block text-xs" :class="activeTab === 'statutory' && !loadingTab ? 'text-violet-100' : 'text-slate-500 dark:text-slate-400'">Statutory payroll data</span>
+                </button>
             </div>
-            <div class="card-body space-y-4 px-6 pb-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="first_name" class="form-label{% if not employee %} required{% endif %}">First Name <span class="text-rose-500">*</span></label>
-                        <input type="text" name="first_name" id="first_name"
-                            value="{{ person.first_name if person else form_data.first_name | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.first_name %}border-red-500{% endif %}"{% endif %}>
-                        {% if errors.first_name %}
-                        <p class="text-sm text-red-500 mt-1">{{ errors.first_name }}</p>
-                        {% endif %}
-                    </div>
-                    <div>
-                        <label for="last_name" class="form-label{% if not employee %} required{% endif %}">Last Name <span class="text-rose-500">*</span></label>
-                        <input type="text" name="last_name" id="last_name"
-                            value="{{ person.last_name if person else form_data.last_name | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.last_name %}border-red-500{% endif %}"{% endif %}>
-                        {% if errors.last_name %}
-                        <p class="text-sm text-red-500 mt-1">{{ errors.last_name }}</p>
-                        {% endif %}
+        </div>
+
+        <template x-if="loadingTab">
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <div class="card">
+                    <div class="card-body space-y-5 px-6 py-6 animate-pulse">
+                        <div class="h-6 w-40 rounded bg-slate-200 dark:bg-slate-700"></div>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div class="h-11 rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+                            <div class="h-11 rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+                            <div class="h-11 rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+                            <div class="h-11 rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+                        </div>
+                        <div class="h-24 rounded-xl bg-slate-200 dark:bg-slate-800"></div>
                     </div>
                 </div>
-                <div>
-                    <label for="email" class="form-label{% if not employee %} required{% endif %}">Email <span class="text-rose-500">*</span></label>
-                    <input type="email" name="email" id="email"
-                        value="{{ person.email if person else form_data.email | default('', true) }}"
-                        {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.email %}border-red-500{% endif %}"{% endif %}>
-                    {% if errors.email %}
-                    <p class="text-sm text-red-500 mt-1">{{ errors.email }}</p>
-                    {% endif %}
-                    {% if employee and not can_edit_person %}
-                    <p class="text-xs text-slate-500 mt-1">Personal info is managed in the Person record.</p>
-                    {% endif %}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="phone" class="form-label">Phone</label>
-                        <input type="text" name="phone" id="phone"
-                            value="{{ person.phone if person else form_data.phone | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
-                    </div>
-                    <div>
-                        <label for="date_of_birth" class="form-label">Date of Birth</label>
-                        <input type="date" name="date_of_birth" id="date_of_birth"
-                            value="{{ person.date_of_birth.isoformat() if person and person.date_of_birth else form_data.date_of_birth | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                <div class="card">
+                    <div class="card-body space-y-5 px-6 py-6 animate-pulse">
+                        <div class="h-6 w-32 rounded bg-slate-200 dark:bg-slate-700"></div>
+                        <div class="h-11 rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+                        <div class="h-11 rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+                        <div class="h-11 rounded-lg bg-slate-200 dark:bg-slate-800"></div>
                     </div>
                 </div>
-                <div>
-                    <label for="gender" class="form-label">Gender</label>
-                    <select name="gender" id="gender" class="form-input w-full" {% if employee and not can_edit_person %}disabled{% endif %}>
-                        <option value="">Select gender</option>
-                        {% for g in genders %}
-                        <option value="{{ g }}"
-                            {{ 'selected' if (person and person.gender.value == g) or (form_data.gender == g) }}>
-                            {{ g | replace('_', ' ') | title }}
-                        </option>
-                        {% endfor %}
-                    </select>
+            </div>
+        </template>
+
+        <div x-show="!loadingTab && activeTab === 'personal'" x-cloak class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div class="card h-fit">
+                <div class="card-header px-6 pt-6">
+                    <h3 class="font-medium text-slate-900 dark:text-white">Personal Information</h3>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="address_line1" class="form-label">Address Line 1</label>
-                        <input type="text" name="address_line1" id="address_line1"
-                            value="{{ person.address_line1 if person else form_data.address_line1 | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                <div class="card-body space-y-4 px-6 pb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="first_name" class="form-label{% if not employee %} required{% endif %}">First Name <span class="text-rose-500">*</span></label>
+                            <input type="text" name="first_name" id="first_name"
+                                value="{{ person.first_name if person else form_data.first_name | default('', true) }}"
+                                {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.first_name %}border-red-500{% endif %}"{% endif %}>
+                            {% if errors.first_name %}<p class="text-sm text-red-500 mt-1">{{ errors.first_name }}</p>{% endif %}
+                        </div>
+                        <div>
+                            <label for="last_name" class="form-label{% if not employee %} required{% endif %}">Last Name <span class="text-rose-500">*</span></label>
+                            <input type="text" name="last_name" id="last_name"
+                                value="{{ person.last_name if person else form_data.last_name | default('', true) }}"
+                                {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.last_name %}border-red-500{% endif %}"{% endif %}>
+                            {% if errors.last_name %}<p class="text-sm text-red-500 mt-1">{{ errors.last_name }}</p>{% endif %}
+                        </div>
                     </div>
-                    <div>
-                        <label for="address_line2" class="form-label">Address Line 2</label>
-                        <input type="text" name="address_line2" id="address_line2"
-                            value="{{ person.address_line2 if person else form_data.address_line2 | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="email" class="form-label{% if not employee %} required{% endif %}">Email <span class="text-rose-500">*</span></label>
+                            <input type="email" name="email" id="email"
+                                value="{{ person.email if person else form_data.email | default('', true) }}"
+                                {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}required class="form-input w-full {% if errors.email %}border-red-500{% endif %}"{% endif %}>
+                            {% if errors.email %}<p class="text-sm text-red-500 mt-1">{{ errors.email }}</p>{% endif %}
+                            {% if employee and not can_edit_person %}<p class="text-xs text-slate-500 mt-1">Personal info is managed in the Person record.</p>{% endif %}
+                        </div>
+                        <div>
+                            <label for="phone" class="form-label">Phone</label>
+                            <input type="text" name="phone" id="phone"
+                                value="{{ person.phone if person else form_data.phone | default('', true) }}"
+                                {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="date_of_birth" class="form-label">Date of Birth</label><input type="date" name="date_of_birth" id="date_of_birth" value="{{ person.date_of_birth.isoformat() if person and person.date_of_birth else form_data.date_of_birth | default('', true) }}" {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}></div>
+                        <div><label for="gender" class="form-label">Gender</label><select name="gender" id="gender" class="form-input w-full" {% if employee and not can_edit_person %}disabled{% endif %}><option value="">Select gender</option>{% for g in genders %}<option value="{{ g }}" {{ 'selected' if (person and person.gender.value == g) or (form_data.gender == g) }}>{{ g | replace('_', ' ') | title }}</option>{% endfor %}</select></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="address_line1" class="form-label">Address Line 1</label><input type="text" name="address_line1" id="address_line1" value="{{ person.address_line1 if person else form_data.address_line1 | default('', true) }}" {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}></div>
+                        <div><label for="address_line2" class="form-label">Address Line 2</label><input type="text" name="address_line2" id="address_line2" value="{{ person.address_line2 if person else form_data.address_line2 | default('', true) }}" {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="city" class="form-label">City</label><input type="text" name="city" id="city" value="{{ person.city if person else form_data.city | default('', true) }}" {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}></div>
+                        <div><label for="region" class="form-label">State/Region</label><input type="text" name="region" id="region" value="{{ person.region if person else form_data.region | default('', true) }}" {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="postal_code" class="form-label">Postal Code</label><input type="text" name="postal_code" id="postal_code" value="{{ person.postal_code if person else form_data.postal_code | default('', true) }}" {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}></div>
+                        <div><label for="country_code" class="form-label">Country Code</label><input type="text" name="country_code" id="country_code" value="{{ person.country_code if person else form_data.country_code | default('', true) }}" {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full" placeholder="US"{% endif %}></div>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="city" class="form-label">City</label>
-                        <input type="text" name="city" id="city"
-                            value="{{ person.city if person else form_data.city | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
-                    </div>
-                    <div>
-                        <label for="region" class="form-label">State/Region</label>
-                        <input type="text" name="region" id="region"
-                            value="{{ person.region if person else form_data.region | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
-                    </div>
+            </div>
+            <div class="card h-fit" x-data="{ expanded: {{ 'true' if employee and (employee.personal_email or employee.emergency_contact_name) else 'false' }} }">
+                <div class="card-header cursor-pointer flex items-center justify-between px-6 pt-6" @click="expanded = !expanded">
+                    <h3 class="font-medium text-slate-900 dark:text-white">Personal Contact & Emergency</h3>
+                    <div class="flex items-center gap-2"><span class="text-slate-400 text-sm">(Optional)</span><svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="postal_code" class="form-label">Postal Code</label>
-                        <input type="text" name="postal_code" id="postal_code"
-                            value="{{ person.postal_code if person else form_data.postal_code | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full"{% endif %}>
+                <div class="card-body space-y-4 px-6 pb-6" x-show="expanded" x-collapse>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Personal contact info separate from work email/phone on Person record.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="personal_email" class="form-label">Personal Email</label><input type="email" name="personal_email" id="personal_email" value="{{ employee.personal_email if employee else form_data.personal_email | default('', true) }}" class="form-input w-full" placeholder="personal@example.com"></div>
+                        <div><label for="personal_phone" class="form-label">Personal Phone</label><input type="text" name="personal_phone" id="personal_phone" value="{{ employee.personal_phone if employee else form_data.personal_phone | default('', true) }}" class="form-input w-full" placeholder="+234 xxx xxx xxxx"></div>
                     </div>
-                    <div>
-                        <label for="country_code" class="form-label">Country Code</label>
-                        <input type="text" name="country_code" id="country_code"
-                            value="{{ person.country_code if person else form_data.country_code | default('', true) }}"
-                            {% if employee and not can_edit_person %}readonly class="form-input w-full bg-slate-50 dark:bg-slate-800"{% else %}class="form-input w-full" placeholder="US"{% endif %}>
+                    <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <p class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Emergency Contact</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label for="emergency_contact_name" class="form-label">Contact Name</label><input type="text" name="emergency_contact_name" id="emergency_contact_name" value="{{ employee.emergency_contact_name if employee else form_data.emergency_contact_name | default('', true) }}" class="form-input w-full" placeholder="Full name"></div>
+                            <div><label for="emergency_contact_phone" class="form-label">Contact Phone</label><input type="text" name="emergency_contact_phone" id="emergency_contact_phone" value="{{ employee.emergency_contact_phone if employee else form_data.emergency_contact_phone | default('', true) }}" class="form-input w-full" placeholder="+234 xxx xxx xxxx"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {# Employee Information #}
-        <div class="card">
+        <div x-show="!loadingTab && activeTab === 'employment'" x-cloak class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div class="card h-fit">
             <div class="card-header px-6 pt-6">
                 <h3 class="font-medium text-slate-900 dark:text-white">Employment Details</h3>
             </div>
@@ -376,238 +452,56 @@
                     <textarea name="notes" id="notes" rows="3" class="form-input w-full">{{ employee.notes if employee else form_data.notes | default('', true) }}</textarea>
                 </div>
             </div>
-        </div>
-
-        {# Personal Contact & Emergency (collapsible) #}
-        <div class="card" x-data="{ expanded: {{ 'true' if employee and (employee.personal_email or employee.emergency_contact_name) else 'false' }} }">
-            <div class="card-header cursor-pointer flex items-center justify-between px-6 pt-6" @click="expanded = !expanded">
-                <h3 class="font-medium text-slate-900 dark:text-white">Personal Contact & Emergency</h3>
-                <div class="flex items-center gap-2">
+                </div>
+            <div class="card h-fit" x-data="{ expanded: {{ 'true' if employee and employee.bank_name else 'false' }} }">
+                <div class="card-header cursor-pointer flex items-center justify-between px-6 pt-6" @click="expanded = !expanded">
+                    <h3 class="font-medium text-slate-900 dark:text-white">Bank Details</h3>
                     <span class="text-slate-400 text-sm">(Optional)</span>
-                    <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
                 </div>
-            </div>
-            <div class="card-body space-y-4 px-6 pb-6" x-show="expanded" x-collapse>
-                <p class="text-sm text-slate-500 dark:text-slate-400">Personal contact info separate from work email/phone on Person record.</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="personal_email" class="form-label">Personal Email</label>
-                        <input type="email" name="personal_email" id="personal_email"
-                            value="{{ employee.personal_email if employee else form_data.personal_email | default('', true) }}"
-                            class="form-input w-full"
-                            placeholder="personal@example.com">
-                    </div>
-                    <div>
-                        <label for="personal_phone" class="form-label">Personal Phone</label>
-                        <input type="text" name="personal_phone" id="personal_phone"
-                            value="{{ employee.personal_phone if employee else form_data.personal_phone | default('', true) }}"
-                            class="form-input w-full"
-                            placeholder="+234 xxx xxx xxxx">
-                    </div>
-                </div>
-                <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
-                    <p class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Emergency Contact</p>
+                <div class="card-body space-y-4 px-6 pb-6" x-show="expanded" x-collapse>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label for="emergency_contact_name" class="form-label">Contact Name</label>
-                            <input type="text" name="emergency_contact_name" id="emergency_contact_name"
-                                value="{{ employee.emergency_contact_name if employee else form_data.emergency_contact_name | default('', true) }}"
-                                class="form-input w-full"
-                                placeholder="Full name">
+                        <div><label for="bank_name" class="form-label">Bank Name</label><input type="text" name="bank_name" id="bank_name" value="{{ employee.bank_name if employee else form_data.bank_name | default('', true) }}" class="form-input w-full"></div>
+                        <div><label for="bank_account_name" class="form-label">Account Name</label><input type="text" name="bank_account_name" id="bank_account_name" value="{{ employee.bank_account_name if employee else form_data.bank_account_name | default('', true) }}" class="form-input w-full"></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="bank_account_number" class="form-label">Account Number</label><input type="text" name="bank_account_number" id="bank_account_number" value="{{ employee.bank_account_number if employee else form_data.bank_account_number | default('', true) }}" class="form-input w-full font-mono"></div>
+                        <div><label for="bank_branch_code" class="form-label">Bank Code / Sort Code</label><input type="text" name="bank_branch_code" id="bank_branch_code" value="{{ employee.bank_branch_code if employee else form_data.bank_branch_code | default('', true) }}" class="form-input w-full font-mono"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="!loadingTab && activeTab === 'statutory'" x-cloak class="space-y-6">
+            <div class="card h-fit">
+                <div class="card-header px-6 pt-6">
+                    <h3 class="font-medium text-slate-900 dark:text-white">Tax, Pension & NHF</h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Statutory payroll details for tax, retirement, and housing deductions.</p>
+                </div>
+                <div class="card-body space-y-8 px-6 pb-6">
+                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">Keep these values aligned with current payroll and compliance records.{% if not can_edit_tax %}<div class="text-xs text-slate-500 mt-1">Only HR staff with <code>people:write</code> can update this section.</div>{% endif %}</div>
+                    <div class="grid grid-cols-1 gap-8 xl:grid-cols-2">
+                        <div class="space-y-5">
+                            <div><h4 class="text-sm font-medium text-slate-900 dark:text-white">Tax Identification</h4><p class="text-sm text-slate-500 dark:text-slate-400">TIN and tax state for PAYE filings.</p></div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 md:gap-x-8 gap-y-5">
+                                <div><label for="tin" class="form-label">Tax Identification Number (TIN)</label><input type="text" name="tin" id="tin" value="{{ tin_value }}" placeholder="12345678-0001" class="form-input font-mono placeholder-slate-400/70 dark:placeholder-slate-500/70" style="width: 14rem;"></div>
+                                <div><label for="tax_state" class="form-label">Tax State</label><select name="tax_state" id="tax_state" class="form-select" style="width: 14rem;"><option value="">Select state</option>{% for state in nigeria_states %}<option value="{{ state }}" {{ 'selected' if tax_state_value == state }}>{{ state }}</option>{% endfor %}</select><p class="text-xs text-slate-500 dark:text-slate-400 mt-1">State where PAYE returns are remitted.</p></div>
+                            </div>
                         </div>
-                        <div>
-                            <label for="emergency_contact_phone" class="form-label">Contact Phone</label>
-                            <input type="text" name="emergency_contact_phone" id="emergency_contact_phone"
-                                value="{{ employee.emergency_contact_phone if employee else form_data.emergency_contact_phone | default('', true) }}"
-                                class="form-input w-full"
-                                placeholder="+234 xxx xxx xxxx">
+                        <div class="space-y-5">
+                            <div><h4 class="text-sm font-medium text-slate-900 dark:text-white">Pension Information</h4><p class="text-sm text-slate-500 dark:text-slate-400">RSA PIN and pension rate.</p></div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div><label for="rsa_pin" class="form-label">RSA PIN</label><input type="text" name="rsa_pin" id="rsa_pin" value="{{ rsa_pin_value }}" placeholder="PEN100012345678" class="form-input font-mono placeholder-slate-400/70 dark:placeholder-slate-500/70" style="width: 14rem;"><p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Retirement Savings Account PIN from the employee's PFA.</p></div>
+                                <div><label for="pfa_code" class="form-label">Pension Fund Administrator (PFA)</label><select name="pfa_code" id="pfa_code" class="form-select" style="width: 14rem;"><option value="">Select PFA</option>{% for pfa in pfa_choices %}<option value="{{ pfa.pfa_code }}" {{ 'selected' if selected_pfa == pfa.pfa_code }}>{{ pfa.pfa_name }}{% if pfa.short_name %} ({{ pfa.short_name }}){% endif %}</option>{% endfor %}</select></div>
+                            </div>
+                            <div><label for="pension_rate" class="form-label">Pension Rate</label><input type="number" name="pension_rate" id="pension_rate" value="{{ pension_rate_value }}" step="0.0001" min="0" class="form-input" style="width: 14rem;"><p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter as a decimal (e.g., 0.08 for 8%).</p></div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        {# Bank Details (optional) #}
-        <div class="card" x-data="{ expanded: {{ 'true' if employee and employee.bank_name else 'false' }} }">
-            <div class="card-header cursor-pointer flex items-center justify-between px-6 pt-6" @click="expanded = !expanded">
-                <h3 class="font-medium text-slate-900 dark:text-white">Bank Details</h3>
-                <span class="text-slate-400 text-sm">(Optional)</span>
-            </div>
-            <div class="card-body space-y-4 px-6 pb-6" x-show="expanded" x-collapse>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="bank_name" class="form-label">Bank Name</label>
-                        <input type="text" name="bank_name" id="bank_name"
-                            value="{{ employee.bank_name if employee else form_data.bank_name | default('', true) }}"
-                            class="form-input w-full">
+                    <div class="border-t border-slate-200 pt-6 dark:border-slate-700">
+                        <div class="max-w-xl space-y-5">
+                            <div><h4 class="text-sm font-medium text-slate-900 dark:text-white">National Housing Fund (NHF)</h4><p class="text-sm text-slate-500 dark:text-slate-400">FMBN registration number.</p></div>
+                            <div><label for="nhf_number" class="form-label">NHF Number</label><input type="text" name="nhf_number" id="nhf_number" value="{{ nhf_value }}" placeholder="NHF12345678" class="form-input font-mono placeholder-slate-400/70 dark:placeholder-slate-500/70" style="width: 14rem;"><p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter the employee's NHF registration number if available.</p></div>
+                        </div>
                     </div>
-                    <div>
-                        <label for="bank_account_name" class="form-label">Account Name</label>
-                        <input type="text" name="bank_account_name" id="bank_account_name"
-                            value="{{ employee.bank_account_name if employee else form_data.bank_account_name | default('', true) }}"
-                            class="form-input w-full">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="bank_account_number" class="form-label">Account Number</label>
-                        <input type="text" name="bank_account_number" id="bank_account_number"
-                            value="{{ employee.bank_account_number if employee else form_data.bank_account_number | default('', true) }}"
-                            class="form-input w-full font-mono">
-                    </div>
-                    <div>
-                        <label for="bank_branch_code" class="form-label">Bank Code / Sort Code</label>
-                        <input type="text" name="bank_branch_code" id="bank_branch_code"
-                            value="{{ employee.bank_branch_code if employee else form_data.bank_branch_code | default('', true) }}"
-                            class="form-input w-full font-mono">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {% set nigeria_states = nigeria_states if nigeria_states is defined else [
-            "Abia",
-            "Adamawa",
-            "Akwa Ibom",
-            "Anambra",
-            "Bauchi",
-            "Bayelsa",
-            "Benue",
-            "Borno",
-            "Cross River",
-            "Delta",
-            "Ebonyi",
-            "Edo",
-            "Ekiti",
-            "Enugu",
-            "Gombe",
-            "Imo",
-            "Jigawa",
-            "Kaduna",
-            "Kano",
-            "Katsina",
-            "Kebbi",
-            "Kogi",
-            "Kwara",
-            "Lagos",
-            "Nasarawa",
-            "Niger",
-            "Ogun",
-            "Ondo",
-            "Osun",
-            "Oyo",
-            "Plateau",
-            "Rivers",
-            "Sokoto",
-            "Taraba",
-            "Yobe",
-            "Zamfara",
-            "FCT",
-        ] %}
-        {% set tin_value = form_data.tin | default(tax_profile.tin if tax_profile else '', true) %}
-        {% set tax_state_value = form_data.tax_state | default(tax_profile.tax_state if tax_profile else '', true) %}
-        {% set rsa_pin_value = form_data.rsa_pin | default(tax_profile.rsa_pin if tax_profile else '', true) %}
-        {% set selected_pfa = form_data.pfa_code | default(tax_profile.pfa_code if tax_profile else '', true) %}
-        {% set pension_rate_value = form_data.pension_rate | default(tax_profile.pension_rate if tax_profile else '', true) %}
-        {% set nhf_value = form_data.nhf_number | default(tax_profile.nhf_number if tax_profile else '', true) %}
-        {% set pfa_choices = pfas if pfas is defined else [] %}
-
-        <div class="card">
-            <div class="card-header px-6 pt-6">
-                <h3 class="font-medium text-slate-900 dark:text-white">Tax Identification</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400">TIN and tax state for PAYE filings.</p>
-            </div>
-            <div class="card-body space-y-4 px-6 pb-6">
-                <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
-                    Update these values whenever the employee's tax residency changes.
-                    {% if not can_edit_tax %}
-                    <div class="text-xs text-slate-500 mt-1">Only HR staff with <code>people:write</code> can update this section.</div>
-                    {% endif %}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="tin" class="form-label">Tax Identification Number (TIN)</label>
-                        <input type="text" name="tin" id="tin"
-                            value="{{ tin_value }}"
-                            placeholder="12345678-0001"
-                            class="form-input w-full font-mono placeholder-slate-400/70 dark:placeholder-slate-500/70">
-                    </div>
-                    <div>
-                        <label for="tax_state" class="form-label">Tax State</label>
-                        <select name="tax_state" id="tax_state" class="form-input w-full">
-                            <option value="">Select state</option>
-                            {% for state in nigeria_states %}
-                            <option value="{{ state }}" {{ 'selected' if tax_state_value == state }}>
-                                {{ state }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">State where PAYE returns are remitted.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header px-6 pt-6">
-                <h3 class="font-medium text-slate-900 dark:text-white">Pension Information</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400">RSA PIN and pension rate.</p>
-            </div>
-            <div class="card-body space-y-4 px-6 pb-6">
-                <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
-                    Use this section to keep retirement deductions aligned with payroll.
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="rsa_pin" class="form-label">RSA PIN</label>
-                        <input type="text" name="rsa_pin" id="rsa_pin"
-                            value="{{ rsa_pin_value }}"
-                            placeholder="PEN100012345678"
-                            class="form-input w-full font-mono placeholder-slate-400/70 dark:placeholder-slate-500/70">
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Retirement Savings Account PIN from the employee's PFA.</p>
-                    </div>
-                    <div>
-                        <label for="pfa_code" class="form-label">Pension Fund Administrator (PFA)</label>
-                        <select name="pfa_code" id="pfa_code" class="form-select w-full">
-                            <option value="">Select PFA</option>
-                            {% for pfa in pfa_choices %}
-                            <option value="{{ pfa.pfa_code }}" {{ 'selected' if selected_pfa == pfa.pfa_code }}>
-                                {{ pfa.pfa_name }}{% if pfa.short_name %} ({{ pfa.short_name }}){% endif %}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label for="pension_rate" class="form-label">Pension Rate</label>
-                    <input type="number" name="pension_rate" id="pension_rate"
-                        value="{{ pension_rate_value }}"
-                        step="0.0001"
-                        min="0"
-                        class="form-input w-full">
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter as a decimal (e.g., 0.08 for 8%).</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header px-6 pt-6">
-                <h3 class="font-medium text-slate-900 dark:text-white">National Housing Fund (NHF)</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400">FMBN registration number.</p>
-            </div>
-            <div class="card-body space-y-4 px-6 pb-6">
-                <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
-                    Keep the NHF number in sync with payroll deductions.
-                </div>
-                <div class="max-w-md">
-                    <label for="nhf_number" class="form-label">NHF Number</label>
-                    <input type="text" name="nhf_number" id="nhf_number"
-                        value="{{ nhf_value }}"
-                        placeholder="NHF12345678"
-                        class="form-input w-full font-mono placeholder-slate-400/70 dark:placeholder-slate-500/70">
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter the employee's NHF registration number if available.</p>
                 </div>
             </div>
         </div>

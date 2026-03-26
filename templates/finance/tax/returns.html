@@ -34,7 +34,9 @@
     {# Filters #}
     {% call(filter_attrs) compact_filters(
         base_url="/finance/tax/returns",
-        active_filters=active_filters | default([])
+        active_filters=active_filters | default([]),
+        auto_submit=false,
+        show_apply_button=true
     ) %}
     <div>
             <select name="return_type" class="form-select w-full" {{ filter_attrs }}>

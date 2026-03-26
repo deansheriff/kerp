@@ -36,7 +36,9 @@
         active_filters=active_filters | default([]),
         show_search=true,
         search=search | default('', true),
-        search_placeholder="Search bank accounts by name or number..."
+        search_placeholder="Search bank accounts by name or number...",
+        auto_submit=false,
+        show_apply_button=true
     ) %}
         {{ filter_select_field("status", "Status", status, [
             {"value": "active", "label": "Active"},

@@ -63,6 +63,25 @@ def dashboard_redirect(
     return RedirectResponse(url="/", status_code=302)
 
 
+@router.get("/gov-erp", tags=["web"], response_class=HTMLResponse)
+def gov_erp_module_select(
+    request: Request,
+    auth: WebAuthContext = Depends(require_web_auth),
+):
+    """Government ERP module selector."""
+    brand = brand_context()
+    return templates.TemplateResponse(
+        request,
+        "module_select_gov.html",
+        {
+            "title": f"{brand['name']} | Gov ERP",
+            "brand": brand,
+            "user": auth.user,
+            "accessible_modules": auth.accessible_modules,
+        },
+    )
+
+
 @router.get("/help", tags=["web"], response_class=HTMLResponse)
 def help_center(
     request: Request,

@@ -29,6 +29,15 @@ from app.web.deps import base_context
 
 class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
     @staticmethod
+    def _safe_iso_date(value: str | None) -> date_type | None:
+        if not value:
+            return None
+        try:
+            return date_type.fromisoformat(value)
+        except ValueError:
+            return None
+
+    @staticmethod
     def categories_list_response(
         request: Request, auth, db, search: str | None, is_active: str | None, page: int
     ) -> HTMLResponse:
@@ -357,19 +366,34 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
         request: Request, auth, db, start_date: str | None, end_date: str | None
     ) -> HTMLResponse:
         org_id = coerce_uuid(auth.organization_id)
+        parsed_start = ExpenseCategoriesReportsWebMixin._safe_iso_date(start_date)
+        parsed_end = ExpenseCategoriesReportsWebMixin._safe_iso_date(end_date)
         report_data = ExpenseService(db).get_expense_summary_report(
             org_id,
-            start_date=date_type.fromisoformat(start_date) if start_date else None,
-            end_date=date_type.fromisoformat(end_date) if end_date else None,
+            start_date=parsed_start,
+            end_date=parsed_end,
         )
         context = base_context(request, auth, "Expense Summary Report", "expense")
         context.update(
             {
                 "report": report_data,
-                "start_date": start_date or report_data["start_date"].isoformat(),
-                "end_date": end_date or report_data["end_date"].isoformat(),
+                "start_date": (
+                    parsed_start.isoformat()
+                    if parsed_start
+                    else report_data["start_date"].isoformat()
+                ),
+                "end_date": (
+                    parsed_end.isoformat()
+                    if parsed_end
+                    else report_data["end_date"].isoformat()
+                ),
                 "active_filters": build_active_filters(
-                    params={"start_date": start_date, "end_date": end_date},
+                    params={
+                        "start_date": parsed_start.isoformat()
+                        if parsed_start
+                        else None,
+                        "end_date": parsed_end.isoformat() if parsed_end else None,
+                    },
                     labels={"start_date": "From", "end_date": "To"},
                 ),
             }
@@ -383,19 +407,34 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
         request: Request, auth, db, start_date: str | None, end_date: str | None
     ) -> HTMLResponse:
         org_id = coerce_uuid(auth.organization_id)
+        parsed_start = ExpenseCategoriesReportsWebMixin._safe_iso_date(start_date)
+        parsed_end = ExpenseCategoriesReportsWebMixin._safe_iso_date(end_date)
         report_data = ExpenseService(db).get_expense_by_category_report(
             org_id,
-            start_date=date_type.fromisoformat(start_date) if start_date else None,
-            end_date=date_type.fromisoformat(end_date) if end_date else None,
+            start_date=parsed_start,
+            end_date=parsed_end,
         )
         context = base_context(request, auth, "Expense by Category Report", "expense")
         context.update(
             {
                 "report": report_data,
-                "start_date": start_date or report_data["start_date"].isoformat(),
-                "end_date": end_date or report_data["end_date"].isoformat(),
+                "start_date": (
+                    parsed_start.isoformat()
+                    if parsed_start
+                    else report_data["start_date"].isoformat()
+                ),
+                "end_date": (
+                    parsed_end.isoformat()
+                    if parsed_end
+                    else report_data["end_date"].isoformat()
+                ),
                 "active_filters": build_active_filters(
-                    params={"start_date": start_date, "end_date": end_date},
+                    params={
+                        "start_date": parsed_start.isoformat()
+                        if parsed_start
+                        else None,
+                        "end_date": parsed_end.isoformat() if parsed_end else None,
+                    },
                     labels={"start_date": "From", "end_date": "To"},
                 ),
             }
@@ -418,11 +457,16 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
         org_id = coerce_uuid(auth.organization_id)
         svc = ExpenseService(db)
         org_svc = OrganizationService(db, org_id)
-        parsed_dept = coerce_uuid(department_id) if department_id else None
+        parsed_start = ExpenseCategoriesReportsWebMixin._safe_iso_date(start_date)
+        parsed_end = ExpenseCategoriesReportsWebMixin._safe_iso_date(end_date)
+        try:
+            parsed_dept = coerce_uuid(department_id) if department_id else None
+        except Exception:
+            parsed_dept = None
         report_data = svc.get_expense_by_employee_report(
             org_id,
-            start_date=date_type.fromisoformat(start_date) if start_date else None,
-            end_date=date_type.fromisoformat(end_date) if end_date else None,
+            start_date=parsed_start,
+            end_date=parsed_end,
             department_id=parsed_dept,
         )
         departments = org_svc.list_departments(
@@ -433,9 +477,17 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
             {
                 "report": report_data,
                 "departments": departments,
-                "start_date": start_date or report_data["start_date"].isoformat(),
-                "end_date": end_date or report_data["end_date"].isoformat(),
-                "department_id": department_id,
+                "start_date": (
+                    parsed_start.isoformat()
+                    if parsed_start
+                    else report_data["start_date"].isoformat()
+                ),
+                "end_date": (
+                    parsed_end.isoformat()
+                    if parsed_end
+                    else report_data["end_date"].isoformat()
+                ),
+                "department_id": str(parsed_dept) if parsed_dept else None,
             }
         )
         return templates.TemplateResponse(
@@ -465,8 +517,8 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
         svc = ExpenseService(db)
         limit_svc = ExpenseLimitService(db)
 
-        parsed_start = date_type.fromisoformat(start_date) if start_date else None
-        parsed_end = date_type.fromisoformat(end_date) if end_date else None
+        parsed_start = ExpenseCategoriesReportsWebMixin._safe_iso_date(start_date)
+        parsed_end = ExpenseCategoriesReportsWebMixin._safe_iso_date(end_date)
 
         report_data = (
             svc.get_my_approvals_report(
@@ -553,10 +605,23 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
             {
                 "report": report_data,
                 "weekly_balance": weekly_balance,
-                "start_date": start_date or report_data["start_date"].isoformat(),
-                "end_date": end_date or report_data["end_date"].isoformat(),
+                "start_date": (
+                    parsed_start.isoformat()
+                    if parsed_start
+                    else report_data["start_date"].isoformat()
+                ),
+                "end_date": (
+                    parsed_end.isoformat()
+                    if parsed_end
+                    else report_data["end_date"].isoformat()
+                ),
                 "active_filters": build_active_filters(
-                    params={"start_date": start_date, "end_date": end_date},
+                    params={
+                        "start_date": parsed_start.isoformat()
+                        if parsed_start
+                        else None,
+                        "end_date": parsed_end.isoformat() if parsed_end else None,
+                    },
                     labels={"start_date": "From", "end_date": "To"},
                 ),
             }

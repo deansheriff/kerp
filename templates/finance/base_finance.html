@@ -32,10 +32,7 @@
                     const href = (link.getAttribute('href') || '').split('?')[0];
                     if (!href) return;
                     const segments = href.split('/').filter(Boolean);
-                    const isActive = path === href || (segments.length >= 2 && path.startsWith(href + '/'));
-                    /* Treat /statements/import (form) as belonging to /statements/imports (list) */
-                    const isImportFormOfList = href.endsWith('/imports') && path === href.replace(/s$/, '');
-                    if (isActive || isImportFormOfList) {
+                    if (path === href || (segments.length >= 2 && path.startsWith(href + '/'))) {
                         link.classList.remove('text-slate-600', 'dark:text-slate-400');
                         link.classList.add('text-teal-800', 'bg-teal-50/50', 'font-medium', 'dark:text-teal-200', 'dark:bg-teal-900/20');
                         link.setAttribute('aria-current', 'page');
@@ -162,42 +159,22 @@
             </a>
 
             <!-- Fixed Assets Module -->
-            <div x-data="{ open: activeModule === 'fa' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'fa' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
-                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
-                    {{ icon_svg("building", "h-5 w-5 flex-shrink-0 text-violet-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Fixed Assets</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/fixed-assets/assets" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Assets</a>
-                    <a href="/fixed-assets/depreciation" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Depreciation</a>
-                </div>
-            </div>
+            <a href="/fixed-assets"
+               :aria-current="activeModule === 'fa' ? 'page' : null"
+               :class="activeModule === 'fa' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
+               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
+                {{ icon_svg("building", "h-5 w-5 flex-shrink-0 text-violet-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Fixed Assets</span>
+            </a>
 
             <!-- Tax Module -->
-            <div x-data="{ open: activeModule === 'tax' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'tax' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
-                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
-                    {{ icon_svg("receipt", "h-5 w-5 flex-shrink-0 text-red-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Tax</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/finance/tax/jurisdictions" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Jurisdictions</a>
-                    <a href="/finance/tax/codes" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Tax Codes</a>
-                    <a href="/finance/tax/periods" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Tax Periods</a>
-                    <a href="/finance/tax/returns" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Tax Returns</a>
-                    <a href="/finance/tax/deferred" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Deferred Tax</a>
-                    <a href="/finance/tax/fiscal-positions" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Fiscal Positions</a>
-                </div>
-            </div>
+            <a href="/finance/tax"
+               :aria-current="activeModule === 'tax' ? 'page' : null"
+               :class="activeModule === 'tax' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
+               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
+                {{ icon_svg("receipt", "h-5 w-5 flex-shrink-0 text-red-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Tax</span>
+            </a>
 
             <!-- Section Divider: Treasury -->
             <div class="pt-4 pb-2" x-show="!sidebarCollapsed" x-cloak>
@@ -205,28 +182,13 @@
             </div>
 
             <!-- Banking Module -->
-            <div x-data="{ open: activeModule === 'banking' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'banking' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
-                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
-                    {{ icon_svg("credit-card", "h-5 w-5 flex-shrink-0 text-blue-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Banking</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/finance/banking/dashboard" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Dashboard</a>
-                    <a href="/finance/banking/accounts" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Bank Accounts</a>
-                    <a href="/finance/banking/statements" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Transactions</a>
-                    <a href="/finance/banking/statements/imports" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Imports</a>
-                    <a href="/finance/banking/reconciliations" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Reconciliations</a>
-                    <a href="/finance/banking/rules" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Transaction Rules</a>
-                    <a href="/finance/banking/settings" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Auto-Match Rules</a>
-                    <a href="/finance/banking/match-rules" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Match Rules</a>
-                    <a href="/finance/banking/payees" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Payees</a>
-                </div>
-            </div>
+            <a href="/finance/banking"
+               :aria-current="activeModule === 'banking' ? 'page' : null"
+               :class="activeModule === 'banking' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
+               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
+                {{ icon_svg("credit-card", "h-5 w-5 flex-shrink-0 text-blue-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Banking</span>
+            </a>
 
             <!-- Section Divider: Reporting -->
             <div class="pt-4 pb-2" x-show="!sidebarCollapsed" x-cloak>
@@ -234,35 +196,13 @@
             </div>
 
             <!-- Reports Module -->
-            <div x-data="{ open: activeModule === 'reports' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'reports' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
-                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
-                    {{ icon_svg("document-report", "h-5 w-5 flex-shrink-0 text-indigo-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Reports</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/finance/reports" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">All Reports</a>
-                    <a href="/finance/reports/trial-balance" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Trial Balance</a>
-                    <a href="/finance/reports/income-statement" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Statement of Profit or Loss</a>
-                    <a href="/finance/reports/balance-sheet" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Statement of Financial Position</a>
-                    <a href="/finance/reports/general-ledger" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">General Ledger</a>
-                    <a href="/finance/reports/ap-aging" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">AP Aging</a>
-                    <a href="/finance/reports/ar-aging" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">AR Aging</a>
-                    <a href="/finance/reports/tax-summary" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Tax Summary</a>
-                    <a href="/finance/reports/expense-summary" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Expenses</a>
-                    <a href="/finance/reports/cash-flow" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Cash Flow</a>
-                    <a href="/finance/reports/cash-flow/ias7" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Cash Flow (IAS 7)</a>
-                    <a href="/finance/reports/changes-in-equity" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Changes in Equity</a>
-                    <a href="/finance/reports/budget-vs-actual" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Budget vs Actual</a>
-                    <a href="/finance/reports/management-accounts" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Management Accounts</a>
-                    <a href="/finance/reports/analysis" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Analysis (Pivot)</a>
-                    <a href="/finance/reports/inventory-valuation-reconciliation" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Inventory Valuation Reconciliation</a>
-                </div>
-            </div>
+            <a href="/finance/reports"
+               :aria-current="activeModule === 'reports' ? 'page' : null"
+               :class="activeModule === 'reports' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
+               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
+                {{ icon_svg("document-report", "h-5 w-5 flex-shrink-0 text-indigo-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Reports</span>
+            </a>
 
             <!-- Section Divider: Automation -->
             <div class="pt-4 pb-2" x-show="!sidebarCollapsed" x-cloak>
@@ -270,24 +210,13 @@
             </div>
 
             <!-- Automation Module -->
-            <div x-data="{ open: activeModule === 'automation' }">
-                <button @click="open = !open"
-                        :class="activeModule === 'automation' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
-                        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
-                    {{ icon_svg("refresh", "h-5 w-5 flex-shrink-0 text-purple-500") }}
-                    <span x-show="!sidebarCollapsed" class="flex-1 truncate text-left" x-cloak>Automation</span>
-                    <svg x-show="!sidebarCollapsed" class="h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="open && !sidebarCollapsed" x-collapse x-cloak class="ml-8 mt-1 space-y-0.5">
-                    <a href="/automation" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Overview</a>
-                    <a href="/automation/recurring" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Recurring Transactions</a>
-                    <a href="/automation/workflows" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Workflow Rules</a>
-                    <a href="/automation/fields" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Custom Fields</a>
-                    <a href="/automation/templates" class="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors">Document Templates</a>
-                </div>
-            </div>
+            <a href="/automation"
+               :aria-current="activeModule === 'automation' ? 'page' : null"
+               :class="activeModule === 'automation' ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'"
+               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all">
+                {{ icon_svg("refresh", "h-5 w-5 flex-shrink-0 text-purple-500") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Automation</span>
+            </a>
 
             {% with current_module="finance" %}
                 {% include "partials/_module_switcher.html" %}
@@ -310,7 +239,7 @@
         {% set topbar_left_actions_html %}{% block topbar_left_actions %}{% endblock %}{% endset %}
         {% set topbar_search_breakpoint %}{% block topbar_search_breakpoint %}sm{% endblock %}{% endset %}
         {% set show_topbar_search %}{% block show_topbar_search %}true{% endblock %}{% endset %}
-        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, topbar_left_actions_html, accent="teal", back_fallback=(back_fallback_url | trim), search_breakpoint=(topbar_search_breakpoint | trim), show_search=(show_topbar_search | trim | lower) == 'true') }}
+        {{ topbar(page_title_html, breadcrumbs_html, header_actions_html, topbar_left_actions_html, accent="teal", back_fallback=(back_fallback_url | trim), search_breakpoint=(topbar_search_breakpoint | trim), show_search=(show_topbar_search | trim | lower) == 'true', launcher_modules=accessible_modules | default([], true), launcher_user=user) }}
 
         <!-- Page Content -->
         <main id="main-content" class="min-h-[calc(100vh-4rem)] bg-dashboard">

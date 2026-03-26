@@ -58,7 +58,7 @@
         {% endif %}
 
         {% if "people" in modules %}
-        <a href="/people/hr/employees" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-violet-500/20">
+        <a href="/people" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-violet-500/20">
           <div class="flex items-center gap-3">
             <img src="/static/img/illustrations/module-people.png" alt="" aria-hidden="true" class="h-11 w-11 rounded-xl object-contain" loading="lazy">
             <div>
@@ -68,38 +68,6 @@
           </div>
           <div class="mt-4 flex items-center text-sm font-medium text-violet-600 group-hover:text-violet-700 dark:text-violet-300 dark:group-hover:text-violet-200">
             Open People
-            {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
-          </div>
-        </a>
-        {% endif %}
-
-        {% if "discipline" in modules %}
-        <a href="/people/hr/discipline" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-rose-300 hover:shadow-lg hover:shadow-rose-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-rose-500/20">
-          <div class="flex items-center gap-3">
-            <img src="/static/img/illustrations/module-people.png" alt="" aria-hidden="true" class="h-11 w-11 rounded-xl object-contain" loading="lazy">
-            <div>
-              <div class="text-base font-semibold text-slate-900 dark:text-white">Discipline</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">Disciplinary cases and workflow actions</div>
-            </div>
-          </div>
-          <div class="mt-4 flex items-center text-sm font-medium text-rose-600 group-hover:text-rose-700 dark:text-rose-300 dark:group-hover:text-rose-200">
-            Open Discipline
-            {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
-          </div>
-        </a>
-        {% endif %}
-
-        {% if "self_service" in modules %}
-        <a href="/people/self/attendance" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-emerald-500/20">
-          <div class="flex items-center gap-3">
-            <img src="/static/img/illustrations/module-people.png" alt="" aria-hidden="true" class="h-11 w-11 rounded-xl object-contain" loading="lazy">
-            <div>
-              <div class="text-base font-semibold text-slate-900 dark:text-white">Self Service</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">My attendance, leave, payslips, expenses, tickets, tasks</div>
-            </div>
-          </div>
-          <div class="mt-4 flex items-center text-sm font-medium text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300 dark:group-hover:text-emerald-200">
-            Open Self Service
             {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
           </div>
         </a>
@@ -121,33 +89,17 @@
         </a>
         {% endif %}
 
-        {% if "fleet" in modules %}
-        <a href="/fleet" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-orange-500/20">
+        {% if "fleet" in modules or "support" in modules %}
+        <a href="/operations/dashboard" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-amber-500/20">
           <div class="flex items-center gap-3">
             <img src="/static/img/illustrations/module-inventory.png" alt="" aria-hidden="true" class="h-11 w-11 rounded-xl object-contain" loading="lazy">
             <div>
-              <div class="text-base font-semibold text-slate-900 dark:text-white">Fleet</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">Vehicles, maintenance, and fuel logs</div>
+              <div class="text-base font-semibold text-slate-900 dark:text-white">Operations</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">Fleet, support, and operational workspaces</div>
             </div>
           </div>
-          <div class="mt-4 flex items-center text-sm font-medium text-orange-600 group-hover:text-orange-700 dark:text-orange-300 dark:group-hover:text-orange-200">
-            Open Fleet
-            {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
-          </div>
-        </a>
-        {% endif %}
-
-        {% if "support" in modules %}
-        <a href="/support/tickets" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-rose-300 hover:shadow-lg hover:shadow-rose-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-rose-500/20">
-          <div class="flex items-center gap-3">
-            <img src="/static/img/illustrations/module-support.png" alt="" aria-hidden="true" class="h-11 w-11 rounded-xl object-contain" loading="lazy">
-            <div>
-              <div class="text-base font-semibold text-slate-900 dark:text-white">Support</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">Tickets, SLAs, and helpdesk workflows</div>
-            </div>
-          </div>
-          <div class="mt-4 flex items-center text-sm font-medium text-rose-600 group-hover:text-rose-700 dark:text-rose-300 dark:group-hover:text-rose-200">
-            Open Support
+          <div class="mt-4 flex items-center text-sm font-medium text-amber-600 group-hover:text-amber-700 dark:text-amber-300 dark:group-hover:text-amber-200">
+            Open Operations
             {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
           </div>
         </a>
@@ -164,38 +116,6 @@
           </div>
           <div class="mt-4 flex items-center text-sm font-medium text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300 dark:group-hover:text-emerald-200">
             Open Procurement
-            {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
-          </div>
-        </a>
-        {% endif %}
-
-        {% if "projects" in modules %}
-        <a href="/projects" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-blue-500/20">
-          <div class="flex items-center gap-3">
-            <img src="/static/img/illustrations/module-projects.png" alt="" aria-hidden="true" class="h-11 w-11 rounded-xl object-contain" loading="lazy">
-            <div>
-              <div class="text-base font-semibold text-slate-900 dark:text-white">Projects</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">Tasks, time entries, and milestones</div>
-            </div>
-          </div>
-          <div class="mt-4 flex items-center text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-300 dark:group-hover:text-blue-200">
-            Open Projects
-            {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
-          </div>
-        </a>
-        {% endif %}
-
-        {% if "coach" in modules %}
-        <a href="/coach/" class="group rounded-xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-teal-300 hover:shadow-lg hover:shadow-teal-500/10 hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:shadow-teal-500/20">
-          <div class="flex items-center gap-3">
-            <img src="/static/img/illustrations/module-coach.png" alt="" aria-hidden="true" class="h-11 w-11 rounded-xl object-contain" loading="lazy">
-            <div>
-              <div class="text-base font-semibold text-slate-900 dark:text-white">Coach</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">Insights, recommendations, and weekly digests</div>
-            </div>
-          </div>
-          <div class="mt-4 flex items-center text-sm font-medium text-teal-600 group-hover:text-teal-700 dark:text-teal-300 dark:group-hover:text-teal-200">
-            Open Coach
             {{ icon_svg("arrow-right", "ml-2 h-4 w-4 transition-transform group-hover:translate-x-1") }}
           </div>
         </a>
@@ -239,6 +159,7 @@
         No modules are enabled for your account yet. Contact an administrator to get access.
       </div>
       {% endif %}
+
     </div>
   </section>
 </main>

@@ -15,6 +15,17 @@ from app.web.deps import WebAuthContext, base_context, get_db, require_finance_a
 router = APIRouter(prefix="/fixed-assets", tags=["fa-web"])
 
 
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def fa_landing(
+    request: Request,
+    auth: WebAuthContext = Depends(require_finance_access),
+):
+    """Fixed assets landing page."""
+    context = base_context(request, auth, "Fixed Assets", "fa")
+    return templates.TemplateResponse(request, "fixed_assets/index.html", context)
+
+
 # =============================================================================
 # Assets
 # =============================================================================

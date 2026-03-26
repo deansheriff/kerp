@@ -40,7 +40,7 @@
     {{ period_shortcuts(mode="range") }}
     {% endcall %}
 
-    <div id="results-container">
+    <div id="results-container" class="space-y-8">
     <!-- Summary Row: Total + Donut Chart -->
     <div class="grid gap-6 lg:grid-cols-3">
         <!-- Total Expenses Card -->
@@ -192,7 +192,7 @@
     <!-- Quick Links -->
     <div class="card p-6">
         <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Related reports</h3>
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-5 sm:grid-cols-3">
             <a href="/finance/reports/income-statement" class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                     {{ icon_svg("trending-up") }}
