@@ -50,11 +50,14 @@ def upgrade() -> None:
         sa.text(
             """
             INSERT INTO domain_settings
-                (domain_setting_id, domain, key, value_type, value_json,
+                (id, domain, key, value_type, value_json,
+                 is_secret, is_active, scope,
                  organization_id, created_at, updated_at)
             VALUES
                 (:setting_id, 'features', 'require_segregation_of_duties',
-                 'boolean', 'false', NULL, :now, :now)
+                 'boolean', 'false',
+                 false, true, 'GLOBAL',
+                 NULL, :now, :now)
             ON CONFLICT DO NOTHING
             """
         ).bindparams(

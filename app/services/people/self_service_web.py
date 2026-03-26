@@ -18,7 +18,6 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 from starlette.datastructures import UploadFile
 
-from app.models.finance.core_org.pfa_directory import PFADirectory
 from app.models.people.attendance import Attendance, AttendanceStatus
 from app.models.people.exp import (
     ExpenseClaim,
@@ -53,6 +52,7 @@ from app.services.people.hr.employee_types import EmployeeFilters
 from app.services.people.hr.info_change_service import InfoChangeService
 from app.services.people.leave import LeaveService
 from app.services.people.payroll.paye_calculator import PAYECalculator
+from app.services.people.payroll.pfa_directory import PFADirectoryService
 from app.services.people.scheduling import SchedulingService, SwapService
 from app.services.settings.bank_directory import OrgBankDirectoryService
 from app.templates import templates
@@ -642,13 +642,7 @@ class SelfServiceWebService:
         )
 
         banks = BankDirectoryService(db).list_active_banks()
-        pfas = list(
-            db.scalars(
-                select(PFADirectory)
-                .where(PFADirectory.is_active.is_(True))
-                .order_by(PFADirectory.pfa_name)
-            ).all()
-        )
+        pfas = PFADirectoryService(db).list_active_pfas()
 
         info_change_service = InfoChangeService(db)
         has_pending = info_change_service.has_pending_request(org_id, employee_id)
