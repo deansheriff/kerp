@@ -164,6 +164,14 @@ async def lifespan(app: FastAPI):
 
         # Seed default settings for all domains
         seed_all_settings(db)
+
+        # Register payroll lifecycle event handlers so posted runs/slips
+        # can create notifications and queue payslip emails.
+        from app.services.people.payroll.event_handlers import (
+            register_payroll_handlers,
+        )
+
+        register_payroll_handlers()
     finally:
         db.close()
     yield
