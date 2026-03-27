@@ -941,11 +941,7 @@ class PayrollReadinessService:
                 )
             )
             needs_review = True
-        elif (
-            not is_contract_staff
-            and tax_profile is not None
-            and not tax_profile.tin
-        ):
+        elif not is_contract_staff and tax_profile is not None and not tax_profile.tin:
             issues.append(
                 PayrollReadinessIssue(
                     issue_type=PayrollIssueType.MISSING_TIN,

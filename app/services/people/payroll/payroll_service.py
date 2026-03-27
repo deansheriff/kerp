@@ -10,7 +10,6 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import cast
 from uuid import UUID
 
 from sqlalchemy import func, literal_column, or_, select
@@ -127,7 +126,7 @@ class PayrollService:
     ) -> str:
         if currency_code:
             return currency_code
-        return cast(str, org_context_service.get_functional_currency(self.db, org_id))
+        return org_context_service.get_functional_currency(self.db, org_id)
 
     # =========================================================================
     # Salary Components
