@@ -28,24 +28,12 @@
             </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <a href="/people/payroll/runs/new?clone_from={{ entry.entry_id }}" class="btn btn-secondary" title="Create a new run using this one as a template">
+            <a href="/people/payroll/runs/{{ entry.entry_id }}/copy" class="btn btn-secondary" title="Create a new run using this one as a template">
                 <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2M8 16h8a2 2 0 002-2v-5m-4 7v2m0 0h2m-2 0h-2"/>
                 </svg>
                 Clone Run
             </a>
-            <a href="/people/payroll/runs/{{ entry.entry_id }}/variance" class="btn btn-ghost" title="Compare this run with the previous period">
-                <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 15l4-4 3 3 5-7"/>
-                </svg>
-                Variance
-            </a>
-            {% if entry.salary_slips_created and entry.status.value in ["DRAFT", "SLIPS_CREATED"] %}
-            <a href="/people/payroll/runs/{{ entry.entry_id }}/adjustments" class="btn btn-ghost" title="Apply one-time adjustments to all slips">
-                {{ icon_svg("plus", "h-4 w-4 mr-1") }}
-                Bulk Adjustments
-            </a>
-            {% endif %}
             {% if entry.status.value == "DRAFT" %}
             <form method="post" action="/people/payroll/runs/{{ entry.entry_id }}/generate"
                   hx-post="/people/payroll/runs/{{ entry.entry_id }}/generate"
@@ -70,19 +58,6 @@
                 <button type="submit" class="btn btn-danger">Delete</button>
             </form>
             {% elif entry.status.value == "SLIPS_CREATED" %}
-            <form method="post" action="/people/payroll/runs/{{ entry.entry_id }}/submit-and-approve"
-                  hx-post="/people/payroll/runs/{{ entry.entry_id }}/submit-and-approve"
-                  hx-target="#run-content"
-                  hx-swap="outerHTML"
-                  hx-confirm="Submit and approve all {{ slips | length }} salary slips?"
-                  class="inline"
-                  title="Submits and approves in one action (requires approver role)">
-                {{ request.state.csrf_form | safe }}
-                <button type="submit" class="btn btn-primary" data-loading-disable>
-                    {{ icon_svg("check-circle", "h-4 w-4 mr-1") }}
-                    Submit &amp; Approve
-                </button>
-            </form>
             <form method="post" action="/people/payroll/runs/{{ entry.entry_id }}/submit"
                   hx-post="/people/payroll/runs/{{ entry.entry_id }}/submit"
                   hx-target="#run-content"
@@ -159,7 +134,7 @@
         {% if entry.status.value == "DRAFT" %}
         Next step: generate salary slips to move this run to approval.
         {% elif entry.status.value == "SLIPS_CREATED" %}
-        Next step: submit slips for approval, or use “Submit &amp; Approve” if you’re the approver.
+        Next step: submit slips for approval.
         {% elif entry.status.value == "SUBMITTED" %}
         Next step: approve the run to auto-post to GL.
         {% elif entry.status.value == "APPROVED" %}
@@ -172,7 +147,7 @@
 
     {% if entry.status.value == "SLIPS_CREATED" %}
     <div class="text-xs text-slate-500 dark:text-slate-400">
-        “Submit Only” sends slips for approval. “Submit &amp; Approve” completes both steps in one action.
+        Submitted runs stay editable until they are approved and posted.
     </div>
     {% endif %}
 
