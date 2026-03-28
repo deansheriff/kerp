@@ -12,8 +12,12 @@ from sqlalchemy.orm import Session
 from app.services.people.perf.web import perf_web_service
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.people.pms import router as pms_router
 
 router = APIRouter(prefix="/perf", tags=["people-perf-web"])
+
+# PMS (OHCSF) sub-routes at /people/perf/pms/*
+router.include_router(pms_router)
 
 
 @router.get("", response_class=HTMLResponse)

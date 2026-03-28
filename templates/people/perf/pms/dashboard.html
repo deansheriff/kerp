@@ -1,0 +1,194 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import stats_card, empty_state, icon_svg %}
+{% from "components/_badges.html" import status_badge %}
+
+{% block page_title %}PMS Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">PMS Dashboard</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    <a href="/people/perf/pms/contracts/new" class="btn btn-primary" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+        {{ icon_svg("plus", "h-4 w-4") }}
+        New Contract
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+
+    {% if not active_cycle %}
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3">
+        <div class="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400">
+            {{ icon_svg("warning", "h-4 w-4") }}
+        </div>
+        <div>
+            <p class="font-semibold text-amber-700 dark:text-amber-400">No Active Appraisal Cycle</p>
+            <p class="text-sm text-amber-600 dark:text-amber-300 mt-0.5">Create and activate an annual appraisal cycle to begin PMS tracking.</p>
+            <a href="/people/perf/cycles/new" class="mt-2 inline-block text-sm font-medium text-amber-700 dark:text-amber-400 underline hover:no-underline">Create a cycle</a>
+        </div>
+    </div>
+    {% else %}
+
+    {# Active cycle header #}
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white font-display">{{ active_cycle.cycle_name }}</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                {{ active_cycle.review_period_start.strftime("%d %b %Y") if active_cycle.review_period_start else "" }}
+                –
+                {{ active_cycle.review_period_end.strftime("%d %b %Y") if active_cycle.review_period_end else "" }}
+                &nbsp;·&nbsp;
+                {{ status_badge(active_cycle.status.value, "sm") }}
+            </p>
+        </div>
+        <a href="/people/perf/cycles/{{ active_cycle.cycle_id }}" class="btn btn-secondary text-sm">
+            {{ icon_svg("external-link", "h-4 w-4") }}
+            View Cycle
+        </a>
+    </div>
+
+    {# KPI stat cards #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {{ stats_card(
+            label="Contracts Signed",
+            value=(compliance.contracts_signed if compliance.contracts_signed is not none else 0) ~ " / " ~ (compliance.contracts_total if compliance.contracts_total is not none else 0),
+            icon="document",
+            color="teal",
+            href="/people/perf/pms/contracts"
+        ) }}
+        {{ stats_card(
+            label="Monthly Reviews",
+            value=(compliance.reviews_completed if compliance.reviews_completed is not none else 0) ~ " / " ~ (compliance.reviews_expected if compliance.reviews_expected is not none else 0),
+            icon="check-circle",
+            color="blue",
+            href="/people/perf/pms/reviews"
+        ) }}
+        {{ stats_card(
+            label="Appraisals Done",
+            value=(compliance.appraisals_completed if compliance.appraisals_completed is not none else 0) ~ " / " ~ (compliance.appraisals_total if compliance.appraisals_total is not none else 0),
+            icon="users",
+            color="emerald",
+            href="/people/perf/appraisals"
+        ) }}
+        {{ stats_card(
+            label="Appeals / PIPs",
+            value=(compliance.appeals_pending if compliance.appeals_pending is not none else 0) ~ " / " ~ (compliance.pips_active if compliance.pips_active is not none else 0),
+            icon="warning",
+            color="amber",
+            href="/people/perf/pms/appeals"
+        ) }}
+    </div>
+
+    {# Rating Distribution #}
+    {% if rating_distribution and rating_distribution.ratings and rating_distribution.total > 0 %}
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-base font-semibold text-slate-900 dark:text-white">Rating Distribution</h2>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ rating_distribution.total }} completed appraisal{{ "s" if rating_distribution.total != 1 else "" }}</span>
+        </div>
+        <div class="p-6">
+            <div class="space-y-4">
+                {% for r in rating_distribution.ratings %}
+                {% if r.count > 0 %}
+                <div class="flex items-center gap-3">
+                    <span class="w-24 text-sm text-slate-600 dark:text-slate-400 text-right shrink-0">{{ r.label }}</span>
+                    <div class="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-6 overflow-hidden">
+                        <div class="h-6 rounded-full bg-violet-500 dark:bg-violet-400 flex items-center justify-end pr-2 transition-all"
+                             style="width: {{ r.percentage if r.percentage else 0 }}%">
+                            {% if r.percentage and r.percentage > 8 %}
+                            <span class="text-xs text-white font-medium">{{ r.count }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="w-14 text-right text-sm font-mono tabular-nums text-slate-600 dark:text-slate-400 shrink-0">{{ r.percentage if r.percentage else 0 }}%</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Quick links #}
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <a href="/people/perf/pms/contracts" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
+                    {{ icon_svg("document", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Performance Contracts</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage employee performance agreements and signatures.</p>
+                </div>
+            </div>
+        </a>
+        <a href="/people/perf/pms/reviews" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    {{ icon_svg("calendar", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Monthly Reviews</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track quarterly and monthly performance check-ins.</p>
+                </div>
+            </div>
+        </a>
+        <a href="/people/perf/pms/appeals" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                    {{ icon_svg("warning", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Appeals</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review and resolve appraisal outcome appeals.</p>
+                </div>
+            </div>
+        </a>
+        <a href="/people/perf/pms/pips" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    {{ icon_svg("trending-up", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Improvement Plans</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage PIPs for underperforming employees.</p>
+                </div>
+            </div>
+        </a>
+        <a href="/people/perf/pms/institutional" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                    {{ icon_svg("building", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Institutional Performance</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track organisation-level performance targets and results.</p>
+                </div>
+            </div>
+        </a>
+        <a href="/people/perf/pms/reports" class="card p-5 transition-colors hover:border-violet-200 hover:bg-violet-50/40 dark:hover:border-violet-800 dark:hover:bg-violet-900/20">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    {{ icon_svg("chart", "h-5 w-5") }}
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">PMS Reports</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">OHCSF compliance reports: ratings, trends, and more.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
