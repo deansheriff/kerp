@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.services.people.perf.contract_service import (
+    ContractAuthorizationError,
     ContractNotFoundError,
     ContractServiceError,
     ContractStatusError,
@@ -243,6 +244,8 @@ class TestSignEmployee:
         c.status = ContractStatus.PENDING_SIGNATURE
         c.organization_id = uuid.uuid4()
         c.contract_id = uuid.uuid4()
+        c.employee_id = uuid.uuid4()
+        c.supervisor_id = uuid.uuid4()
         return c
 
     def test_sets_employee_signed_date(self) -> None:
@@ -250,9 +253,13 @@ class TestSignEmployee:
         db = MagicMock()
         service = PerformanceContractService(db)
         contract = self._make_contract()
-        db.scalar.return_value = contract
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.employee_id)]
 
-        service.sign_employee(contract.organization_id, contract.contract_id)
+        service.sign_employee(
+            contract.organization_id,
+            contract.contract_id,
+            actor_person_id=uuid.uuid4(),
+        )
 
         assert contract.employee_signed_date == date.today()
 
@@ -263,9 +270,13 @@ class TestSignEmployee:
         service = PerformanceContractService(db)
         # supervisor already signed
         contract = self._make_contract(supervisor_signed=True)
-        db.scalar.return_value = contract
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.employee_id)]
 
-        service.sign_employee(contract.organization_id, contract.contract_id)
+        service.sign_employee(
+            contract.organization_id,
+            contract.contract_id,
+            actor_person_id=uuid.uuid4(),
+        )
 
         assert contract.status == ContractStatus.ACTIVE
 
@@ -275,11 +286,28 @@ class TestSignEmployee:
         db = MagicMock()
         service = PerformanceContractService(db)
         contract = self._make_contract(supervisor_signed=False)
-        db.scalar.return_value = contract
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.employee_id)]
 
-        service.sign_employee(contract.organization_id, contract.contract_id)
+        service.sign_employee(
+            contract.organization_id,
+            contract.contract_id,
+            actor_person_id=uuid.uuid4(),
+        )
 
         assert contract.status == ContractStatus.PENDING_SIGNATURE
+
+    def test_rejects_non_employee_signer(self) -> None:
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        contract = self._make_contract()
+        db.scalar.side_effect = [contract, None]
+
+        with pytest.raises(ContractAuthorizationError, match="employee-sign"):
+            service.sign_employee(
+                contract.organization_id,
+                contract.contract_id,
+                actor_person_id=uuid.uuid4(),
+            )
 
 
 class TestSignSupervisor:
@@ -298,15 +326,21 @@ class TestSignSupervisor:
         c.status = ContractStatus.PENDING_SIGNATURE
         c.organization_id = uuid.uuid4()
         c.contract_id = uuid.uuid4()
+        c.employee_id = uuid.uuid4()
+        c.supervisor_id = uuid.uuid4()
         return c
 
     def test_sets_supervisor_signed_date(self) -> None:
         db = MagicMock()
         service = PerformanceContractService(db)
         contract = self._make_contract()
-        db.scalar.return_value = contract
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.supervisor_id)]
 
-        service.sign_supervisor(contract.organization_id, contract.contract_id)
+        service.sign_supervisor(
+            contract.organization_id,
+            contract.contract_id,
+            actor_person_id=uuid.uuid4(),
+        )
 
         assert contract.supervisor_signed_date == date.today()
 
@@ -316,9 +350,13 @@ class TestSignSupervisor:
         db = MagicMock()
         service = PerformanceContractService(db)
         contract = self._make_contract(employee_signed=True)
-        db.scalar.return_value = contract
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.supervisor_id)]
 
-        service.sign_supervisor(contract.organization_id, contract.contract_id)
+        service.sign_supervisor(
+            contract.organization_id,
+            contract.contract_id,
+            actor_person_id=uuid.uuid4(),
+        )
 
         assert contract.status == ContractStatus.ACTIVE
 
@@ -328,11 +366,28 @@ class TestSignSupervisor:
         db = MagicMock()
         service = PerformanceContractService(db)
         contract = self._make_contract(employee_signed=False)
-        db.scalar.return_value = contract
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.supervisor_id)]
 
-        service.sign_supervisor(contract.organization_id, contract.contract_id)
+        service.sign_supervisor(
+            contract.organization_id,
+            contract.contract_id,
+            actor_person_id=uuid.uuid4(),
+        )
 
         assert contract.status == ContractStatus.PENDING_SIGNATURE
+
+    def test_rejects_non_supervisor_signer(self) -> None:
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        contract = self._make_contract()
+        db.scalar.side_effect = [contract, None]
+
+        with pytest.raises(ContractAuthorizationError, match="supervisor-sign"):
+            service.sign_supervisor(
+                contract.organization_id,
+                contract.contract_id,
+                actor_person_id=uuid.uuid4(),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -482,3 +537,339 @@ class TestAmendContract:
                 new_objectives=bad_objectives,
                 amendment_reason="Bad",
             )
+
+
+# ---------------------------------------------------------------------------
+# create_contract — sequencing gate and input validation
+# ---------------------------------------------------------------------------
+
+
+class TestCreateContract:
+    """Test create_contract including the institutional sequencing gate."""
+
+    _SENTINEL = object()  # distinct from None
+
+    def _make_employee(self, *, department_id=_SENTINEL):
+        from types import SimpleNamespace
+
+        dept = uuid.uuid4() if department_id is self._SENTINEL else department_id
+        return SimpleNamespace(
+            employee_id=uuid.uuid4(),
+            department_id=dept,
+        )
+
+    def _make_inst_perf(self):
+        """Return a minimal institutional performance record (non-DRAFT)."""
+        from app.models.people.perf.pms_enums import InstitutionalPerfStatus
+
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            status=InstitutionalPerfStatus.APPRAISED,
+        )
+
+    def _base_kwargs(self, org_id, employee_id):
+        return dict(
+            org_id=org_id,
+            cycle_id=uuid.uuid4(),
+            employee_id=employee_id,
+            supervisor_id=uuid.uuid4(),
+            contract_code="PC-2026-001",
+            contract_type="INDIVIDUAL",
+            objectives=VALID_OBJECTIVES,
+        )
+
+    def test_create_contract_succeeds_with_valid_data(self) -> None:
+        """Happy path: institutional goals exist, valid objectives, contract created."""
+        db = MagicMock()
+        service = PerformanceContractService(db)
+
+        org_id = uuid.uuid4()
+        employee = self._make_employee()
+        inst_perf = self._make_inst_perf()
+
+        db.scalar.side_effect = [employee, inst_perf]
+        added = []
+        db.add.side_effect = lambda obj: added.append(obj)
+
+        result = service.create_contract(**self._base_kwargs(org_id, employee.employee_id))
+
+        assert len(added) == 1
+        db.flush.assert_called_once()
+        # Returned contract is the object that was added
+        assert result is added[0]
+
+    def test_create_contract_blocked_without_institutional_goals(self) -> None:
+        """Sequencing gate: raises when no approved institutional performance exists."""
+        db = MagicMock()
+        service = PerformanceContractService(db)
+
+        org_id = uuid.uuid4()
+        employee = self._make_employee()
+
+        # Second scalar call returns None → no institutional perf record
+        db.scalar.side_effect = [employee, None]
+
+        with pytest.raises(ContractValidationError, match="Departmental goals must be agreed"):
+            service.create_contract(**self._base_kwargs(org_id, employee.employee_id))
+
+        db.add.assert_not_called()
+
+    def test_create_contract_skips_gate_when_no_department(self) -> None:
+        """Sequencing gate is skipped when employee has no department_id."""
+        db = MagicMock()
+        service = PerformanceContractService(db)
+
+        org_id = uuid.uuid4()
+        # Employee with no department
+        employee = self._make_employee(department_id=None)
+
+        # Provide a sentinel second value so the list is not exhausted if SQLAlchemy
+        # model construction triggers any unexpected scalar call; the gate block itself
+        # must NOT call scalar because department_id is None.
+        db.scalar.side_effect = [employee, None]
+        added = []
+        db.add.side_effect = lambda obj: added.append(obj)
+
+        result = service.create_contract(**self._base_kwargs(org_id, employee.employee_id))
+
+        assert len(added) == 1
+        assert result is added[0]
+        # Gate must not have fired a second db.scalar call — only 1 call consumed
+        assert db.scalar.call_count == 1
+
+    def test_create_contract_validates_objectives_weight(self) -> None:
+        """Objective validation runs after the sequencing gate passes."""
+        db = MagicMock()
+        service = PerformanceContractService(db)
+
+        org_id = uuid.uuid4()
+        employee = self._make_employee()
+        inst_perf = self._make_inst_perf()
+
+        db.scalar.side_effect = [employee, inst_perf]
+
+        bad_objectives = [
+            {"title": "A", "weight": 20},
+            {"title": "B", "weight": 20},
+            {"title": "C", "weight": 20},  # total = 60, not 70
+        ]
+
+        with pytest.raises(ContractValidationError, match="70"):
+            service.create_contract(
+                **{**self._base_kwargs(org_id, employee.employee_id), "objectives": bad_objectives}
+            )
+
+        db.add.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Status guards on sign_employee / sign_supervisor / countersign
+# ---------------------------------------------------------------------------
+
+
+class TestContractStatusGuards:
+    """Test that signing methods reject contracts in terminal/invalid states."""
+
+    def _make_contract_with_status(self, status):
+        from app.models.people.perf.performance_contract import PerformanceContract
+
+        c = MagicMock(spec=PerformanceContract)
+        c.organization_id = uuid.uuid4()
+        c.contract_id = uuid.uuid4()
+        c.employee_id = uuid.uuid4()
+        c.supervisor_id = uuid.uuid4()
+        c.employee_signed_date = None
+        c.supervisor_signed_date = None
+        c.status = status
+        return c
+
+    def test_sign_employee_rejects_completed_contract(self) -> None:
+        """sign_employee raises ContractStatusError on COMPLETED contracts."""
+        from app.models.people.perf.pms_enums import ContractStatus
+
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        contract = self._make_contract_with_status(ContractStatus.COMPLETED)
+        # First scalar → contract (from get_contract), second → employee lookup
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.employee_id)]
+
+        with pytest.raises(ContractStatusError):
+            service.sign_employee(
+                contract.organization_id,
+                contract.contract_id,
+                actor_person_id=uuid.uuid4(),
+            )
+
+    def test_sign_supervisor_rejects_cancelled_contract(self) -> None:
+        """sign_supervisor raises ContractStatusError on CANCELLED contracts."""
+        from app.models.people.perf.pms_enums import ContractStatus
+
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        contract = self._make_contract_with_status(ContractStatus.CANCELLED)
+        db.scalar.side_effect = [contract, MagicMock(employee_id=contract.supervisor_id)]
+
+        with pytest.raises(ContractStatusError):
+            service.sign_supervisor(
+                contract.organization_id,
+                contract.contract_id,
+                actor_person_id=uuid.uuid4(),
+            )
+
+    def test_countersign_rejects_active_contract(self) -> None:
+        """countersign raises ContractStatusError when contract is already ACTIVE."""
+        from app.models.people.perf.pms_enums import ContractStatus
+
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        contract = self._make_contract_with_status(ContractStatus.ACTIVE)
+        db.scalar.return_value = contract
+
+        with pytest.raises(ContractStatusError):
+            service.countersign(
+                contract.organization_id,
+                contract.contract_id,
+                uuid.uuid4(),
+            )
+
+
+# ---------------------------------------------------------------------------
+# amend_contract — additional cases
+# ---------------------------------------------------------------------------
+
+
+class TestAmendContractAdditional:
+    """Additional amendment tests beyond those in TestAmendContract."""
+
+    def _make_active_contract(self) -> MagicMock:
+        from app.models.people.perf.performance_contract import PerformanceContract
+        from app.models.people.perf.pms_enums import ContractStatus
+
+        c = MagicMock(spec=PerformanceContract)
+        c.contract_id = uuid.uuid4()
+        c.organization_id = uuid.uuid4()
+        c.status = ContractStatus.ACTIVE
+        c.contract_code = "PC-2026-002"
+        c.cycle_id = uuid.uuid4()
+        c.employee_id = uuid.uuid4()
+        c.supervisor_id = uuid.uuid4()
+        c.contract_type = "INDIVIDUAL"
+        c.competency_ids = []
+        c.development_plan = None
+        return c
+
+    def test_amend_creates_new_version_with_draft_status(self) -> None:
+        """Amendment creates a new contract with DRAFT status."""
+        from app.models.people.perf.pms_enums import ContractStatus
+
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        original = self._make_active_contract()
+        db.scalar.return_value = original
+
+        added = []
+        db.add.side_effect = lambda obj: added.append(obj)
+
+        service.amend_contract(
+            original.organization_id,
+            original.contract_id,
+            new_objectives=make_objectives(3),
+            amendment_reason="Mid-year restructure",
+        )
+
+        assert len(added) == 1
+        new_contract = added[0]
+        assert new_contract.status == ContractStatus.DRAFT
+
+    def test_amend_sets_original_to_amended(self) -> None:
+        """After amendment, the original contract status becomes AMENDED."""
+        from app.models.people.perf.pms_enums import ContractStatus
+
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        original = self._make_active_contract()
+        db.scalar.return_value = original
+
+        db.add.side_effect = lambda obj: None  # discard
+
+        service.amend_contract(
+            original.organization_id,
+            original.contract_id,
+            new_objectives=make_objectives(3),
+            amendment_reason="Restructure",
+        )
+
+        assert original.status == ContractStatus.AMENDED
+
+
+# ---------------------------------------------------------------------------
+# check_30_day_requirement
+# ---------------------------------------------------------------------------
+
+
+class TestCheck30DayRequirement:
+    """Test the 30-day contract requirement check."""
+
+    def _make_employee(self, *, days_ago: int, employee_code: str = "EMP-001"):
+        from datetime import timedelta
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            employee_id=uuid.uuid4(),
+            employee_code=employee_code,
+            date_of_joining=date.today() - timedelta(days=days_ago),
+        )
+
+    def _mock_scalars(self, db: MagicMock, employees: list) -> None:
+        """Configure db.scalars(stmt).all() to return the given employee list."""
+        scalars_result = MagicMock()
+        scalars_result.all.return_value = employees
+        db.scalars.return_value = scalars_result
+
+    def test_finds_employees_without_contracts(self) -> None:
+        """Employees who joined within 30 days and have no active contract are flagged."""
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        org_id = uuid.uuid4()
+
+        emp = self._make_employee(days_ago=10, employee_code="EMP-010")
+
+        self._mock_scalars(db, [emp])
+        # scalar() returns None → no active contract found
+        db.scalar.return_value = None
+
+        result = service.check_30_day_requirement(org_id)
+
+        assert len(result) == 1
+        assert result[0]["employee_id"] == emp.employee_id
+        assert result[0]["employee_code"] == "EMP-010"
+        assert result[0]["days_since_joining"] == 10
+
+    def test_skips_employees_with_active_contracts(self) -> None:
+        """Employees with an active contract are not included in the result."""
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        org_id = uuid.uuid4()
+
+        emp = self._make_employee(days_ago=15, employee_code="EMP-015")
+
+        self._mock_scalars(db, [emp])
+        # scalar() returns a truthy contract_id → employee has a contract
+        db.scalar.return_value = uuid.uuid4()
+
+        result = service.check_30_day_requirement(org_id)
+
+        assert result == []
+
+    def test_returns_empty_when_no_recent_employees(self) -> None:
+        """Returns an empty list when there are no recently joined employees."""
+        db = MagicMock()
+        service = PerformanceContractService(db)
+        org_id = uuid.uuid4()
+
+        self._mock_scalars(db, [])
+
+        result = service.check_30_day_requirement(org_id)
+
+        assert result == []
