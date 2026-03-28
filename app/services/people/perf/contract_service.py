@@ -263,6 +263,10 @@ class PerformanceContractService:
         Otherwise sets status to PENDING_SIGNATURE.
         """
         contract = self.get_contract(org_id, contract_id)
+        if contract.status not in (ContractStatus.DRAFT, ContractStatus.PENDING_SIGNATURE):
+            raise ContractStatusError(
+                contract.status.value, "PENDING_SIGNATURE"
+            )
         contract.employee_signed_date = date.today()
 
         if contract.supervisor_signed_date is not None:
@@ -288,6 +292,10 @@ class PerformanceContractService:
         Otherwise sets status to PENDING_SIGNATURE.
         """
         contract = self.get_contract(org_id, contract_id)
+        if contract.status not in (ContractStatus.DRAFT, ContractStatus.PENDING_SIGNATURE):
+            raise ContractStatusError(
+                contract.status.value, "PENDING_SIGNATURE"
+            )
         contract.supervisor_signed_date = date.today()
 
         if contract.employee_signed_date is not None:

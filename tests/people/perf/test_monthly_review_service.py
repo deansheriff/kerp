@@ -126,6 +126,7 @@ class TestGetReview:
 class TestCreateReview:
     def setup_method(self) -> None:
         self.db = MagicMock()
+        self.db.scalar.return_value = None  # no duplicate by default
         self.service = MonthlyReviewService(self.db)
 
     def test_rejects_non_first_of_month(self) -> None:

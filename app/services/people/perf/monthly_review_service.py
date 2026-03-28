@@ -153,6 +153,19 @@ class MonthlyReviewService:
                 f"(got {review_month}). Use date(year, month, 1)."
             )
 
+        # Check one per employee per month
+        existing = self.db.scalar(
+            select(MonthlyReview).where(
+                MonthlyReview.organization_id == org_id,
+                MonthlyReview.employee_id == employee_id,
+                MonthlyReview.review_month == review_month,
+            )
+        )
+        if existing:
+            raise MonthlyReviewValidationError(
+                f"A review already exists for this employee for {review_month.strftime('%B %Y')}"
+            )
+
         review = MonthlyReview(
             organization_id=org_id,
             employee_id=employee_id,

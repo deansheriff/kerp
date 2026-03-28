@@ -346,6 +346,24 @@ class PIPService:
                 pip_id,
             )
 
+        # Create audit trail
+        from app.models.people.perf.appraisal_outcome_action import AppraisalOutcomeAction
+        from app.models.people.perf.pms_enums import OutcomeActionStatus, OutcomeActionType
+
+        if pip.appraisal_id:
+            action = AppraisalOutcomeAction(
+                organization_id=pip.organization_id,
+                appraisal_id=pip.appraisal_id,
+                action_type=OutcomeActionType.PIP,
+                description=f"PIP {pip.pip_code}: {outcome.value}",
+                actioned_date=date.today(),
+                reference_id=pip.pip_id,
+                reference_type="pip",
+                status=OutcomeActionStatus.COMPLETED,
+                notes=notes,
+            )
+            self.db.add(action)
+
         self.db.flush()
         return pip
 

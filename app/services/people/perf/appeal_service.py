@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -387,6 +388,20 @@ class AppraisalAppealService:
 
         if decision in (AppealDecision.UPHELD, AppealDecision.PARTIALLY_UPHELD):
             appeal.adjusted_rating = adjusted_rating
+
+        # Update the original appraisal if rating was adjusted
+        if adjusted_rating is not None:
+            from app.models.people.perf.appraisal import Appraisal
+            from app.services.people.perf.scoring_engine import OHCSFScoringEngine
+
+            appraisal = self.db.scalar(
+                select(Appraisal).where(Appraisal.appraisal_id == appeal.appraisal_id)
+            )
+            if appraisal:
+                engine = OHCSFScoringEngine()
+                _, label = engine.score_to_rating(Decimal(str(adjusted_rating)))
+                appraisal.final_rating = adjusted_rating
+                appraisal.rating_label = label
 
         self.db.flush()
         logger.info(
