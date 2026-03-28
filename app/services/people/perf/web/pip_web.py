@@ -14,10 +14,14 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.models.people.perf.pms_enums import PIPCauseCategory, PIPStatus
+from app.models.people.perf.pms_enums import PIPCauseCategory, PIPOutcome, PIPStatus
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.people.perf.pip_service import (
+    PIPNotFoundError,
     PIPService,
+    PIPServiceError,
+    PIPStatusError,
+    PIPValidationError,
 )
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
@@ -241,4 +245,166 @@ class PIPWebService:
             )
             return templates.TemplateResponse(
                 request, "people/perf/pms/pip_form.html", context
+            )
+
+    async def activate_pip_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        pip_id: str,
+    ) -> RedirectResponse:
+        """Activate a PIP."""
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            svc = PIPService(db)
+            svc.activate_pip(org_id, coerce_uuid(pip_id))
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
+            )
+        except (PIPStatusError, PIPNotFoundError, PIPValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to activate PIP %s", pip_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error=An+unexpected+error+occurred",
+                status_code=303,
+            )
+
+    async def extend_pip_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        pip_id: str,
+    ) -> RedirectResponse:
+        """Extend a PIP end date."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            new_end_str = str(form_data.get("new_end_date", "")).strip()
+            new_end = parse_date(new_end_str)
+            if not new_end:
+                raise PIPValidationError("New end date is required")
+            reason = str(form_data.get("reason", "")).strip()
+            if not reason:
+                raise PIPValidationError("Reason is required")
+            svc = PIPService(db)
+            svc.grant_extension(
+                org_id,
+                coerce_uuid(pip_id),
+                new_end_date=new_end,
+                reason=reason,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
+            )
+        except (PIPStatusError, PIPNotFoundError, PIPValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to extend PIP %s", pip_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error=An+unexpected+error+occurred",
+                status_code=303,
+            )
+
+    async def record_review_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        pip_id: str,
+    ) -> RedirectResponse:
+        """Record a PIP interval review."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            review_date_str = str(form_data.get("review_date", "")).strip()
+            review_date = parse_date(review_date_str)
+            if not review_date:
+                raise PIPValidationError("Review date is required")
+            notes = str(form_data.get("notes", "")).strip()
+            if not notes:
+                raise PIPValidationError("Notes are required")
+            progress_status = str(form_data.get("progress_status", "")).strip()
+            if not progress_status:
+                raise PIPValidationError("Progress status is required")
+            svc = PIPService(db)
+            svc.record_review(
+                org_id,
+                coerce_uuid(pip_id),
+                review_date=review_date,
+                notes=notes,
+                progress_status=progress_status,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
+            )
+        except (PIPStatusError, PIPNotFoundError, PIPValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to record review for PIP %s", pip_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error=An+unexpected+error+occurred",
+                status_code=303,
+            )
+
+    async def complete_pip_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        pip_id: str,
+    ) -> RedirectResponse:
+        """Complete a PIP with an outcome."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            outcome_str = str(form_data.get("outcome", "")).strip()
+            if not outcome_str:
+                raise PIPValidationError("Outcome is required")
+            try:
+                outcome = PIPOutcome(outcome_str)
+            except ValueError as exc:
+                raise PIPValidationError(f"Invalid outcome value: {outcome_str}") from exc
+            notes = str(form_data.get("notes", "")).strip()
+            if not notes:
+                raise PIPValidationError("Notes are required")
+            svc = PIPService(db)
+            svc.complete_pip(
+                org_id,
+                coerce_uuid(pip_id),
+                outcome=outcome,
+                notes=notes,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
+            )
+        except (PIPStatusError, PIPNotFoundError, PIPValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to complete PIP %s", pip_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/pips/{pip_id}?error=An+unexpected+error+occurred",
+                status_code=303,
             )

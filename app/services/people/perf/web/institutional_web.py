@@ -16,7 +16,10 @@ from sqlalchemy.orm import Session
 from app.models.people.perf.pms_enums import InstitutionalPerfStatus, InstitutionType
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.people.perf.institutional_service import (
+    InstitutionalPerfNotFoundError,
     InstitutionalPerformanceService,
+    InstitutionalServiceError,
+    InstitutionalValidationError,
 )
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
@@ -324,4 +327,96 @@ class InstitutionalWebService:
             )
             return templates.TemplateResponse(
                 request, "people/perf/pms/institutional_form.html", context
+            )
+
+    async def score_institutional_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        inst_perf_id: str,
+    ) -> RedirectResponse:
+        """Score criteria for an institutional performance record."""
+        import json
+
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            scores_raw = str(form_data.get("criteria_scores_json", "{}")).strip()
+            try:
+                criteria_scores = json.loads(scores_raw)
+            except json.JSONDecodeError as exc:
+                raise InstitutionalValidationError(
+                    "Criteria scores data is not valid JSON"
+                ) from exc
+            svc = InstitutionalPerformanceService(db)
+            svc.score_criteria(
+                org_id, coerce_uuid(inst_perf_id), criteria_scores=criteria_scores
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/institutional/{inst_perf_id}?saved=1",
+                status_code=303,
+            )
+        except (InstitutionalPerfNotFoundError, InstitutionalValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/institutional/{inst_perf_id}?error={e}",
+                status_code=303,
+            )
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "Failed to score criteria for institutional record %s", inst_perf_id
+            )
+            return RedirectResponse(
+                url=f"/people/perf/pms/institutional/{inst_perf_id}?error=An+unexpected+error+occurred",
+                status_code=303,
+            )
+
+    async def reconcile_institutional_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        inst_perf_id: str,
+    ) -> RedirectResponse:
+        """Reconcile institutional performance with employee ratings."""
+        from decimal import Decimal
+
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            notes = str(form_data.get("notes", "")).strip()
+            if not notes:
+                raise InstitutionalValidationError("Notes are required")
+            adjusted_str = str(form_data.get("adjusted_composite", "")).strip()
+            adjusted_composite = Decimal(adjusted_str) if adjusted_str else None
+            svc = InstitutionalPerformanceService(db)
+            svc.reconcile_with_employee_ratings(
+                org_id,
+                coerce_uuid(inst_perf_id),
+                reconciled_by_id=coerce_uuid(auth.person_id),
+                notes=notes,
+                adjusted_composite=adjusted_composite,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/institutional/{inst_perf_id}?saved=1",
+                status_code=303,
+            )
+        except (InstitutionalPerfNotFoundError, InstitutionalValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/institutional/{inst_perf_id}?error={e}",
+                status_code=303,
+            )
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "Failed to reconcile institutional record %s", inst_perf_id
+            )
+            return RedirectResponse(
+                url=f"/people/perf/pms/institutional/{inst_perf_id}?error=An+unexpected+error+occurred",
+                status_code=303,
             )

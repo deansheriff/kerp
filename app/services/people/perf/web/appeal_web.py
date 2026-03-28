@@ -13,9 +13,12 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.models.people.perf.pms_enums import AppealStatus
+from app.models.people.perf.pms_enums import AppealDecision, AppealStatus
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.people.perf.appeal_service import (
+    AppealNotFoundError,
+    AppealServiceError,
+    AppealValidationError,
     AppraisalAppealService,
 )
 from app.templates import templates
@@ -253,4 +256,158 @@ class AppealWebService:
             )
             return templates.TemplateResponse(
                 request, "people/perf/pms/appeal_form.html", context
+            )
+
+    async def assign_mediator_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appeal_id: str,
+    ) -> RedirectResponse:
+        """Assign a mediator to an appeal."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            mediator_id_str = str(form_data.get("mediator_id", "")).strip()
+            if not mediator_id_str:
+                raise AppealValidationError("Mediator is required")
+            svc = AppraisalAppealService(db)
+            svc.assign_mediator(
+                org_id,
+                coerce_uuid(appeal_id),
+                mediator_id=coerce_uuid(mediator_id_str),
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
+            )
+        except (AppealNotFoundError, AppealValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to assign mediator for appeal %s", appeal_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error=An+unexpected+error+occurred",
+                status_code=303,
+            )
+
+    async def record_mediation_outcome_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appeal_id: str,
+    ) -> RedirectResponse:
+        """Record the outcome of mediation for an appeal."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            outcome = str(form_data.get("outcome", "")).strip()
+            if not outcome:
+                raise AppealValidationError("Outcome is required")
+            resolved_str = str(form_data.get("resolved", "")).strip().lower()
+            resolved = resolved_str in ("true", "1", "yes")
+            svc = AppraisalAppealService(db)
+            svc.record_mediation_outcome(
+                org_id,
+                coerce_uuid(appeal_id),
+                outcome=outcome,
+                resolved=resolved,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
+            )
+        except (AppealNotFoundError, AppealValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to record mediation outcome for appeal %s", appeal_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error=An+unexpected+error+occurred",
+                status_code=303,
+            )
+
+    async def record_committee_decision_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appeal_id: str,
+    ) -> RedirectResponse:
+        """Record an appeal committee decision."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            decision_str = str(form_data.get("decision", "")).strip()
+            if not decision_str:
+                raise AppealValidationError("Decision is required")
+            try:
+                decision = AppealDecision(decision_str)
+            except ValueError as exc:
+                raise AppealValidationError(f"Invalid decision value: {decision_str}") from exc
+            notes = str(form_data.get("notes", "")).strip()
+            if not notes:
+                raise AppealValidationError("Notes are required")
+            adjusted_rating_str = str(form_data.get("adjusted_rating", "")).strip()
+            adjusted_rating = int(adjusted_rating_str) if adjusted_rating_str else None
+            svc = AppraisalAppealService(db)
+            svc.record_committee_decision(
+                org_id,
+                coerce_uuid(appeal_id),
+                decision=decision,
+                notes=notes,
+                adjusted_rating=adjusted_rating,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
+            )
+        except (AppealNotFoundError, AppealValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to record committee decision for appeal %s", appeal_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error=An+unexpected+error+occurred",
+                status_code=303,
+            )
+
+    async def communicate_decision_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appeal_id: str,
+    ) -> RedirectResponse:
+        """Communicate the final decision on an appeal to the appellant."""
+        org_id = coerce_uuid(auth.organization_id)
+        try:
+            svc = AppraisalAppealService(db)
+            svc.communicate_decision(org_id, coerce_uuid(appeal_id))
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
+            )
+        except (AppealNotFoundError, AppealValidationError) as e:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to communicate decision for appeal %s", appeal_id)
+            return RedirectResponse(
+                url=f"/people/perf/pms/appeals/{appeal_id}?error=An+unexpected+error+occurred",
+                status_code=303,
             )

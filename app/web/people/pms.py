@@ -308,24 +308,9 @@ async def activate_pip(
     db: Session = Depends(get_db),
 ):
     """Activate a PIP."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.pip_web import PIPWebService
 
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.pip_service import PIPService
-
-    org_id = coerce_uuid(auth.organization_id)
-    svc = PIPService(db)
-    try:
-        svc.activate_pip(org_id, coerce_uuid(pip_id))
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
-        )
+    return await PIPWebService().activate_pip_response(request, auth, db, pip_id)
 
 
 @router.post("/pips/{pip_id}/extend", response_class=HTMLResponse)
@@ -336,33 +321,9 @@ async def extend_pip(
     db: Session = Depends(get_db),
 ):
     """Extend a PIP end date."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.pip_web import PIPWebService
 
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.pip_service import PIPService
-    from app.services.people.perf.web.base import parse_date
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = PIPService(db)
-    try:
-        new_end_str = str(form_data.get("new_end_date", "")).strip()
-        new_end = parse_date(new_end_str)
-        if not new_end:
-            raise ValueError("New end date is required")
-        reason = str(form_data.get("reason", "")).strip()
-        if not reason:
-            raise ValueError("Reason is required")
-        svc.grant_extension(org_id, coerce_uuid(pip_id), new_end_date=new_end, reason=reason)
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
-        )
+    return await PIPWebService().extend_pip_response(request, auth, db, pip_id)
 
 
 @router.post("/pips/{pip_id}/record-review", response_class=HTMLResponse)
@@ -373,42 +334,9 @@ async def pip_record_review(
     db: Session = Depends(get_db),
 ):
     """Record a PIP interval review."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.pip_web import PIPWebService
 
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.pip_service import PIPService
-    from app.services.people.perf.web.base import parse_date
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = PIPService(db)
-    try:
-        review_date_str = str(form_data.get("review_date", "")).strip()
-        review_date = parse_date(review_date_str)
-        if not review_date:
-            raise ValueError("Review date is required")
-        notes = str(form_data.get("notes", "")).strip()
-        if not notes:
-            raise ValueError("Notes are required")
-        progress_status = str(form_data.get("progress_status", "")).strip()
-        if not progress_status:
-            raise ValueError("Progress status is required")
-        svc.record_review(
-            org_id,
-            coerce_uuid(pip_id),
-            review_date=review_date,
-            notes=notes,
-            progress_status=progress_status,
-        )
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
-        )
+    return await PIPWebService().record_review_response(request, auth, db, pip_id)
 
 
 @router.post("/pips/{pip_id}/complete", response_class=HTMLResponse)
@@ -419,41 +347,9 @@ async def complete_pip(
     db: Session = Depends(get_db),
 ):
     """Complete a PIP with an outcome."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.pip_web import PIPWebService
 
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.pip_service import PIPService
-    from app.models.people.perf.pms_enums import PIPOutcome
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = PIPService(db)
-    try:
-        outcome_str = str(form_data.get("outcome", "")).strip()
-        if not outcome_str:
-            raise ValueError("Outcome is required")
-        try:
-            outcome = PIPOutcome(outcome_str)
-        except ValueError as exc:
-            raise ValueError(f"Invalid outcome value: {outcome_str}") from exc
-        notes = str(form_data.get("notes", "")).strip()
-        if not notes:
-            raise ValueError("Notes are required")
-        svc.complete_pip(
-            org_id,
-            coerce_uuid(pip_id),
-            outcome=outcome,
-            notes=notes,
-        )
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/pips/{pip_id}?error={e}", status_code=303
-        )
+    return await PIPWebService().complete_pip_response(request, auth, db, pip_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -528,32 +424,9 @@ async def assign_mediator(
     db: Session = Depends(get_db),
 ):
     """Assign a mediator to an appeal."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.appeal_web import AppealWebService
 
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.appeal_service import AppraisalAppealService
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = AppraisalAppealService(db)
-    try:
-        mediator_id_str = str(form_data.get("mediator_id", "")).strip()
-        if not mediator_id_str:
-            raise ValueError("Mediator is required")
-        svc.assign_mediator(
-            org_id,
-            coerce_uuid(appeal_id),
-            mediator_id=coerce_uuid(mediator_id_str),
-        )
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
-        )
+    return await AppealWebService().assign_mediator_response(request, auth, db, appeal_id)
 
 
 @router.post("/appeals/{appeal_id}/mediation-outcome", response_class=HTMLResponse)
@@ -564,35 +437,11 @@ async def record_mediation_outcome(
     db: Session = Depends(get_db),
 ):
     """Record the outcome of mediation for an appeal."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.appeal_web import AppealWebService
 
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.appeal_service import AppraisalAppealService
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = AppraisalAppealService(db)
-    try:
-        outcome = str(form_data.get("outcome", "")).strip()
-        if not outcome:
-            raise ValueError("Outcome is required")
-        resolved_str = str(form_data.get("resolved", "")).strip().lower()
-        resolved = resolved_str in ("true", "1", "yes")
-        svc.record_mediation_outcome(
-            org_id,
-            coerce_uuid(appeal_id),
-            outcome=outcome,
-            resolved=resolved,
-        )
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
-        )
+    return await AppealWebService().record_mediation_outcome_response(
+        request, auth, db, appeal_id
+    )
 
 
 @router.post("/appeals/{appeal_id}/committee-decision", response_class=HTMLResponse)
@@ -603,44 +452,11 @@ async def record_committee_decision(
     db: Session = Depends(get_db),
 ):
     """Record an appeal committee decision."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.appeal_web import AppealWebService
 
-    from app.services.common import coerce_uuid
-    from app.models.people.perf.pms_enums import AppealDecision
-    from app.services.people.perf.appeal_service import AppraisalAppealService
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = AppraisalAppealService(db)
-    try:
-        decision_str = str(form_data.get("decision", "")).strip()
-        if not decision_str:
-            raise ValueError("Decision is required")
-        try:
-            decision = AppealDecision(decision_str)
-        except ValueError as exc:
-            raise ValueError(f"Invalid decision value: {decision_str}") from exc
-        notes = str(form_data.get("notes", "")).strip()
-        if not notes:
-            raise ValueError("Notes are required")
-        adjusted_rating_str = str(form_data.get("adjusted_rating", "")).strip()
-        adjusted_rating = int(adjusted_rating_str) if adjusted_rating_str else None
-        svc.record_committee_decision(
-            org_id,
-            coerce_uuid(appeal_id),
-            decision=decision,
-            notes=notes,
-            adjusted_rating=adjusted_rating,
-        )
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
-        )
+    return await AppealWebService().record_committee_decision_response(
+        request, auth, db, appeal_id
+    )
 
 
 @router.post("/appeals/{appeal_id}/communicate", response_class=HTMLResponse)
@@ -651,24 +467,11 @@ async def communicate_appeal_decision(
     db: Session = Depends(get_db),
 ):
     """Communicate the final decision on an appeal to the appellant."""
-    from fastapi.responses import RedirectResponse
+    from app.services.people.perf.web.appeal_web import AppealWebService
 
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.appeal_service import AppraisalAppealService
-
-    org_id = coerce_uuid(auth.organization_id)
-    svc = AppraisalAppealService(db)
-    try:
-        svc.communicate_decision(org_id, coerce_uuid(appeal_id))
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/appeals/{appeal_id}?error={e}", status_code=303
-        )
+    return await AppealWebService().communicate_decision_response(
+        request, auth, db, appeal_id
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -747,35 +550,11 @@ async def score_institutional(
     db: Session = Depends(get_db),
 ):
     """Score criteria for an institutional performance record."""
-    import json
+    from app.services.people.perf.web.institutional_web import InstitutionalWebService
 
-    from fastapi.responses import RedirectResponse
-
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.institutional_service import (
-        InstitutionalPerformanceService,
+    return await InstitutionalWebService().score_institutional_response(
+        request, auth, db, inst_perf_id
     )
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = InstitutionalPerformanceService(db)
-    try:
-        scores_raw = str(form_data.get("criteria_scores_json", "{}")).strip()
-        try:
-            criteria_scores = json.loads(scores_raw)
-        except json.JSONDecodeError as exc:
-            raise ValueError("Criteria scores data is not valid JSON") from exc
-        svc.score_criteria(org_id, coerce_uuid(inst_perf_id), criteria_scores=criteria_scores)
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/institutional/{inst_perf_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/institutional/{inst_perf_id}?error={e}",
-            status_code=303,
-        )
 
 
 @router.post("/institutional/{inst_perf_id}/reconcile", response_class=HTMLResponse)
@@ -786,41 +565,11 @@ async def reconcile_institutional(
     db: Session = Depends(get_db),
 ):
     """Reconcile institutional performance with employee ratings."""
-    from decimal import Decimal
+    from app.services.people.perf.web.institutional_web import InstitutionalWebService
 
-    from fastapi.responses import RedirectResponse
-
-    from app.services.common import coerce_uuid
-    from app.services.people.perf.institutional_service import (
-        InstitutionalPerformanceService,
+    return await InstitutionalWebService().reconcile_institutional_response(
+        request, auth, db, inst_perf_id
     )
-
-    form_data = await request.form()
-    org_id = coerce_uuid(auth.organization_id)
-    svc = InstitutionalPerformanceService(db)
-    try:
-        notes = str(form_data.get("notes", "")).strip()
-        if not notes:
-            raise ValueError("Notes are required")
-        adjusted_str = str(form_data.get("adjusted_composite", "")).strip()
-        adjusted_composite = Decimal(adjusted_str) if adjusted_str else None
-        svc.reconcile_with_employee_ratings(
-            org_id,
-            coerce_uuid(inst_perf_id),
-            reconciled_by_id=coerce_uuid(auth.person_id),
-            notes=notes,
-            adjusted_composite=adjusted_composite,
-        )
-        db.commit()
-        return RedirectResponse(
-            url=f"/people/perf/pms/institutional/{inst_perf_id}?saved=1", status_code=303
-        )
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/people/perf/pms/institutional/{inst_perf_id}?error={e}",
-            status_code=303,
-        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
