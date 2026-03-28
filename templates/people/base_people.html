@@ -187,6 +187,69 @@
                 <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Performance</span>
             </a>
 
+            {% if pms_ohcsf_enabled is defined and pms_ohcsf_enabled %}
+            <!-- PMS (OHCSF) Section -->
+            <div x-data="{ pmsOpen: ['pms-dashboard','pms-contracts','pms-reviews','pms-institutional','pms-objectives','pms-pips','pms-appeals','pms-reports'].includes('{{ active_module | default('') }}') }"
+                 x-show="!sidebarCollapsed" x-cloak>
+                <button @click="pmsOpen = !pmsOpen"
+                        type="button"
+                        class="flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 font-medium text-slate-600 transition-all hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50"
+                        :class="pmsOpen ? 'text-violet-700 dark:text-violet-300' : ''"
+                        :aria-expanded="pmsOpen">
+                    <svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <span class="flex-1 truncate text-left">PMS (OHCSF)</span>
+                    <svg class="h-4 w-4 flex-shrink-0 transition-transform duration-200"
+                         :class="pmsOpen ? 'rotate-180' : ''"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="pmsOpen"
+                     x-transition:enter="transition-all duration-200 ease-out"
+                     x-transition:enter-start="opacity-0 -translate-y-1"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     x-transition:leave="transition-all duration-150 ease-in"
+                     x-transition:leave-start="opacity-100 translate-y-0"
+                     x-transition:leave-end="opacity-0 -translate-y-1"
+                     class="ml-8 mt-0.5 space-y-0.5">
+                    <a href="/people/perf/pms/dashboard"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        Dashboard
+                    </a>
+                    <a href="/people/perf/pms/contracts"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        Contracts
+                    </a>
+                    <a href="/people/perf/pms/reviews"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        Monthly Reviews
+                    </a>
+                    <a href="/people/perf/pms/institutional"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        Institutional
+                    </a>
+                    <a href="/people/perf/pms/objectives"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        Objectives
+                    </a>
+                    <a href="/people/perf/pms/pips"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        PIPs
+                    </a>
+                    <a href="/people/perf/pms/appeals"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        Appeals
+                    </a>
+                    <a href="/people/perf/pms/reports"
+                       class="flex items-center rounded-md px-3 py-2 text-sm transition-all text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50">
+                        Reports
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
             <a href="/people/hr/discipline"
                :aria-current="activeModule === 'discipline' || activeModule === 'hr-discipline' ? 'page' : false"
                :class="activeModule === 'discipline' || activeModule === 'hr-discipline' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
