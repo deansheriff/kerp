@@ -231,7 +231,7 @@ class PIPService:
         """
         pip = self._get_or_404(org_id, pip_id)
         if pip.status != PIPStatus.DRAFT:
-            raise PIPStatusError(pip.status, PIPStatus.ACTIVE)
+            raise PIPStatusError(pip.status.value, PIPStatus.ACTIVE.value)
         pip.status = PIPStatus.ACTIVE
         self.db.flush()
         logger.info("PIP %s activated", pip_id)
@@ -330,6 +330,9 @@ class PIPService:
             PIPNotFoundError: if PIP not found.
         """
         pip = self._get_or_404(org_id, pip_id)
+
+        if pip.status not in (PIPStatus.ACTIVE, PIPStatus.EXTENDED):
+            raise PIPStatusError(pip.status.value, "ACTIVE or EXTENDED")
 
         pip.outcome = outcome
         pip.outcome_notes = notes

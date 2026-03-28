@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ContractAuthorizationError",
     "ContractServiceError",
     "ContractNotFoundError",
     "ContractValidationError",
@@ -64,6 +65,14 @@ class ContractStatusError(ContractServiceError):
         self.current = current
         self.target = target
         super().__init__(f"Cannot transition from {current} to {target}")
+
+
+class ContractAuthorizationError(ContractServiceError):
+    """Raised when the current actor cannot sign the contract."""
+
+    def __init__(self, action: str) -> None:
+        self.action = action
+        super().__init__(f"Not authorized to {action} this contract")
 
 
 # =============================================================================
@@ -203,7 +212,9 @@ class PerformanceContractService:
         """
         # Sequencing gate: institutional goals must exist for this cycle/department
         from app.models.people.hr.employee import Employee
-        from app.models.people.perf.institutional_performance import InstitutionalPerformance
+        from app.models.people.perf.institutional_performance import (
+            InstitutionalPerformance,
+        )
         from app.models.people.perf.pms_enums import InstitutionalPerfStatus
 
         employee = self.db.scalar(
@@ -254,8 +265,23 @@ class PerformanceContractService:
         )
         return contract
 
+    def _get_employee_for_person(
+        self, org_id: UUID, person_id: UUID
+    ) -> UUID | None:
+        """Resolve the actor's employee ID for the organisation."""
+        from app.models.people.hr.employee import Employee
+
+        employee = self.db.scalar(
+            select(Employee).where(
+                Employee.organization_id == org_id,
+                Employee.person_id == person_id,
+                Employee.is_deleted.is_(False),
+            )
+        )
+        return employee.employee_id if employee is not None else None
+
     def sign_employee(
-        self, org_id: UUID, contract_id: UUID
+        self, org_id: UUID, contract_id: UUID, *, actor_person_id: UUID
     ) -> PerformanceContract:
         """Record the employee's signature.
 
@@ -263,6 +289,9 @@ class PerformanceContractService:
         Otherwise sets status to PENDING_SIGNATURE.
         """
         contract = self.get_contract(org_id, contract_id)
+        actor_employee_id = self._get_employee_for_person(org_id, actor_person_id)
+        if actor_employee_id != contract.employee_id:
+            raise ContractAuthorizationError("employee-sign")
         if contract.status not in (ContractStatus.DRAFT, ContractStatus.PENDING_SIGNATURE):
             raise ContractStatusError(
                 contract.status.value, "PENDING_SIGNATURE"
@@ -284,7 +313,7 @@ class PerformanceContractService:
         return contract
 
     def sign_supervisor(
-        self, org_id: UUID, contract_id: UUID
+        self, org_id: UUID, contract_id: UUID, *, actor_person_id: UUID
     ) -> PerformanceContract:
         """Record the supervisor's signature.
 
@@ -292,6 +321,9 @@ class PerformanceContractService:
         Otherwise sets status to PENDING_SIGNATURE.
         """
         contract = self.get_contract(org_id, contract_id)
+        actor_employee_id = self._get_employee_for_person(org_id, actor_person_id)
+        if actor_employee_id != contract.supervisor_id:
+            raise ContractAuthorizationError("supervisor-sign")
         if contract.status not in (ContractStatus.DRAFT, ContractStatus.PENDING_SIGNATURE):
             raise ContractStatusError(
                 contract.status.value, "PENDING_SIGNATURE"
@@ -324,6 +356,10 @@ class PerformanceContractService:
         signature status.
         """
         contract = self.get_contract(org_id, contract_id)
+
+        if contract.status not in (ContractStatus.DRAFT, ContractStatus.PENDING_SIGNATURE):
+            raise ContractStatusError(contract.status.value, "PENDING_SIGNATURE")
+
         contract.countersigner_id = countersigner_id
         contract.countersigner_date = date.today()
         contract.status = ContractStatus.ACTIVE

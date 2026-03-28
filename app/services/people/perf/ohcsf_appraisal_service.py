@@ -178,6 +178,7 @@ class OHCSFAppraisalService:
             stmt = select(AppraisalKRAScore).where(
                 AppraisalKRAScore.appraisal_id == appraisal_id,
                 AppraisalKRAScore.kra_id == kra_id,
+                AppraisalKRAScore.organization_id == org_id,
             )
             score_row = self.db.scalar(stmt)
             if score_row is None:
@@ -204,6 +205,14 @@ class OHCSFAppraisalService:
                         if val is not None:
                             thresholds[band] = Decimal(str(val))
                             setattr(score_row, f"{band}_threshold", thresholds[band])
+                    if len(thresholds) < 5 and actual is not None:
+                        logger.warning(
+                            "Incomplete thresholds (%d/5) for KRA %s in appraisal %s"
+                            " — skipping score calculation",
+                            len(thresholds),
+                            kra_id,
+                            appraisal_id,
+                        )
                     if len(thresholds) == 5:
                         raw_pct = self._scoring.calculate_raw_score(
                             score_row.actual_achievement, thresholds
@@ -215,10 +224,11 @@ class OHCSFAppraisalService:
                         score_row.weighted_score = weighted
                         score_row.final_rating = entry.get("rating")
 
-    def _compute_objective_score(self, appraisal_id: UUID) -> Decimal:
+    def _compute_objective_score(self, appraisal_id: UUID, org_id: UUID) -> Decimal:
         """Sum weighted scores of all KRA score rows for this appraisal."""
         stmt = select(AppraisalKRAScore).where(
             AppraisalKRAScore.appraisal_id == appraisal_id,
+            AppraisalKRAScore.organization_id == org_id,
         )
         rows = list(self.db.scalars(stmt).all())
         weighted_scores = [
@@ -237,8 +247,8 @@ class OHCSFAppraisalService:
         if not rated:
             return Decimal("0.00")
         # Scale: ratings are 1-5; map to 0-100 as (rating / 5) * 100
-        avg = sum(rated) / len(rated)
-        return (Decimal(str(avg)) / Decimal("5") * Decimal("100")).quantize(
+        avg = Decimal(sum(rated)) / Decimal(len(rated))
+        return (avg / Decimal("5") * Decimal("100")).quantize(
             TWO_DP, rounding=ROUND_HALF_UP
         )
 
@@ -366,7 +376,7 @@ class OHCSFAppraisalService:
         self.db.flush()
 
         # Calculate composite scores
-        objective_score = self._compute_objective_score(appraisal_id)
+        objective_score = self._compute_objective_score(appraisal_id, org_id)
         competency_score = self._compute_competency_score(appraisal_id, org_id)
         process_score = (
             (Decimal(str(appraisal.process_final_rating)) / Decimal("5") * Decimal("100"))
@@ -581,6 +591,7 @@ class OHCSFAppraisalService:
                 "annual_score": Decimal("0.00"),
                 "rating": 1,
                 "label": "Poor",
+                "has_data": False,
             }
 
         appraisals = list(
@@ -614,6 +625,7 @@ class OHCSFAppraisalService:
                 "annual_score": Decimal("0.00"),
                 "rating": 1,
                 "label": "Poor",
+                "has_data": False,
             }
 
         total = sum(entry["score"] for entry in quarterly_scores)
@@ -628,4 +640,5 @@ class OHCSFAppraisalService:
             "annual_score": annual_score,
             "rating": rating_int,
             "label": label,
+            "has_data": True,
         }

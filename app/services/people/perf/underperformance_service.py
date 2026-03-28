@@ -256,10 +256,13 @@ class UnderperformanceService:
         from sqlalchemy import func as sa_func
 
         employee = self.db.scalar(
-            select(Employee).where(Employee.employee_id == employee_id)
+            select(Employee).where(
+                Employee.employee_id == employee_id,
+                Employee.organization_id == org_id,
+            )
         )
         if not employee:
-            return {"status": "error", "message": f"Employee {employee_id} not found"}
+            raise UnderperformanceServiceError(f"Employee {employee_id} not found")
 
         # Generate PIP code
         count = self.db.scalar(

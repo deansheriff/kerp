@@ -211,6 +211,11 @@ class MonthlyReviewService:
         """
         review = self.get_review(org_id, review_id)
 
+        if review.status != MonthlyReviewStatus.DRAFT:
+            raise MonthlyReviewValidationError(
+                f"Cannot submit review in {review.status.value} status, must be DRAFT"
+            )
+
         review.objective_progress = objective_progress
         review.challenges = challenges
         review.support_required = support_required
@@ -243,6 +248,11 @@ class MonthlyReviewService:
         """
         review = self.get_review(org_id, review_id)
 
+        if review.status != MonthlyReviewStatus.SUBMITTED:
+            raise MonthlyReviewValidationError(
+                f"Cannot acknowledge review in {review.status.value} status, must be SUBMITTED"
+            )
+
         review.employee_signed_date = date.today()
         review.status = MonthlyReviewStatus.ACKNOWLEDGED
 
@@ -259,7 +269,7 @@ class MonthlyReviewService:
         org_id: UUID,
         cycle_id: UUID,
         month: date,
-    ) -> list[MonthlyReview]:
+    ) -> list:
         """Return employees with active contracts who have no review for the given month.
 
         Finds employees that have an active PerformanceContract in the given

@@ -395,7 +395,10 @@ class AppraisalAppealService:
             from app.services.people.perf.scoring_engine import OHCSFScoringEngine
 
             appraisal = self.db.scalar(
-                select(Appraisal).where(Appraisal.appraisal_id == appeal.appraisal_id)
+                select(Appraisal).where(
+                    Appraisal.appraisal_id == appeal.appraisal_id,
+                    Appraisal.organization_id == org_id,
+                )
             )
             if appraisal:
                 engine = OHCSFScoringEngine()
