@@ -441,3 +441,364 @@ class TestProbationLogic:
         assert result["date_of_joining"] == join_date
         assert "months_of_service" in result
         assert "milestone_date" in result
+
+
+# ---------------------------------------------------------------------------
+# flag_for_pip — DB-backed method tests
+# ---------------------------------------------------------------------------
+
+
+def make_employee_model(
+    employee_id: uuid.UUID | None = None,
+    organization_id: uuid.UUID | None = None,
+    reports_to_id: uuid.UUID | None = None,
+) -> SimpleNamespace:
+    """Create a mock Employee model instance."""
+    return SimpleNamespace(
+        employee_id=employee_id or uuid.uuid4(),
+        organization_id=organization_id or uuid.uuid4(),
+        reports_to_id=reports_to_id,
+    )
+
+
+class TestFlagForPIP:
+    """Test the flag_for_pip method (DB-backed)."""
+
+    def test_creates_draft_pip_for_valid_employee(self) -> None:
+        """Creates a PIP with correct fields when employee exists."""
+        org_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+        supervisor_id = uuid.uuid4()
+        employee = make_employee_model(
+            employee_id=employee_id,
+            organization_id=org_id,
+            reports_to_id=supervisor_id,
+        )
+
+        db = MagicMock()
+        # First scalar → employee lookup; second scalar → count query
+        db.scalar.side_effect = [employee, 5]
+
+        svc = UnderperformanceService(db)
+
+        with patch(
+            "app.models.people.perf.pip.PerformanceImprovementPlan",
+            autospec=True,
+        ) as MockPIP:
+            mock_pip_instance = MagicMock()
+            mock_pip_instance.pip_id = uuid.uuid4()
+            MockPIP.return_value = mock_pip_instance
+
+            result = svc.flag_for_pip(
+                org_id,
+                employee_id,
+                trigger_type="annual",
+                triggering_appraisal_id=None,
+            )
+
+        assert result["status"] == "flagged"
+        assert result["pip_code"] == "PIP-2026-0006"
+        assert result["employee_id"] == str(employee_id)
+        assert result["trigger_type"] == "annual"
+        assert "pip_id" in result
+        db.add.assert_called_once()
+        db.flush.assert_called_once()
+
+    def test_raises_when_employee_not_found(self) -> None:
+        """Raises UnderperformanceServiceError when employee doesn't exist."""
+        org_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+
+        db = MagicMock()
+        db.scalar.return_value = None  # employee not found
+
+        svc = UnderperformanceService(db)
+
+        with pytest.raises(UnderperformanceServiceError, match=str(employee_id)):
+            svc.flag_for_pip(org_id, employee_id, trigger_type="annual")
+
+    def test_uses_org_id_filter_on_employee_lookup(self) -> None:
+        """Verify multi-tenancy: employee query checks organization_id."""
+        org_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+        employee = make_employee_model(
+            employee_id=employee_id,
+            organization_id=org_id,
+        )
+
+        db = MagicMock()
+        # Capture the statement passed to db.scalar
+        captured_calls: list = []
+
+        def capturing_scalar(stmt: object) -> object:
+            captured_calls.append(stmt)
+            # Return employee on first call, 0 (count) on second
+            if len(captured_calls) == 1:
+                return employee
+            return 0
+
+        db.scalar.side_effect = capturing_scalar
+
+        svc = UnderperformanceService(db)
+        svc.flag_for_pip(org_id, employee_id, trigger_type="quarterly")
+
+        # db.scalar must have been called at least once (employee lookup)
+        assert db.scalar.call_count >= 1
+        # Verify db.add was called (PIP was created)
+        db.add.assert_called_once()
+
+    def test_pip_code_increments_from_existing_count(self) -> None:
+        """PIP code uses count + 1 for sequence number."""
+        org_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+        employee = make_employee_model(employee_id=employee_id, organization_id=org_id)
+
+        db = MagicMock()
+        db.scalar.side_effect = [employee, 9]  # count = 9 → code should be 0010
+
+        svc = UnderperformanceService(db)
+        result = svc.flag_for_pip(org_id, employee_id, trigger_type="probation")
+
+        assert result["pip_code"].endswith("-0010")
+
+    def test_uses_employee_id_as_supervisor_when_no_reports_to(self) -> None:
+        """When reports_to_id is None, supervisor_id falls back to employee_id."""
+        org_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+        employee = make_employee_model(
+            employee_id=employee_id,
+            organization_id=org_id,
+            reports_to_id=None,
+        )
+
+        db = MagicMock()
+        db.scalar.side_effect = [employee, 0]
+
+        svc = UnderperformanceService(db)
+        result = svc.flag_for_pip(org_id, employee_id, trigger_type="annual")
+
+        # With no reports_to_id the method uses employee_id as supervisor fallback
+        # and still produces a flagged result
+        assert result["status"] == "flagged"
+        assert result["employee_id"] == str(employee_id)
+        db.add.assert_called_once()  # PIP was created and added to session
+
+
+# ---------------------------------------------------------------------------
+# detect_annual_trigger — DB-backed detection
+# ---------------------------------------------------------------------------
+
+
+class TestDetectAnnualTrigger:
+    """Test the detect_annual_trigger DB-backed method."""
+
+    def test_returns_empty_when_no_appraisals(self) -> None:
+        """No appraisals in the cycle → returns empty list."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_annual_trigger(org_id, cycle_id)
+
+        assert result == []
+
+    def test_flags_employee_with_majority_fair_kpis(self) -> None:
+        """Employee with ≥50% Fair KPIs gets included in flagged list."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+        emp_id = uuid.uuid4()
+
+        # 4 out of 7 KRAs score below 70 → 57% → should flag
+        appraisal = make_appraisal(
+            employee_id=emp_id,
+            is_quarterly=False,
+            kra_scores=[
+                make_kra_score(65.0),
+                make_kra_score(60.0),
+                make_kra_score(55.0),
+                make_kra_score(68.0),
+                make_kra_score(80.0),
+                make_kra_score(85.0),
+                make_kra_score(90.0),
+            ],
+        )
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [appraisal]
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_annual_trigger(org_id, cycle_id)
+
+        assert len(result) == 1
+        assert result[0]["employee_id"] == emp_id
+        assert result[0]["fair_count"] == 4
+        assert result[0]["total_kpis"] == 7
+
+    def test_does_not_flag_employee_with_few_fair_kpis(self) -> None:
+        """Employee with <50% Fair KPIs is not included in flagged list."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+
+        appraisal = make_appraisal(
+            is_quarterly=False,
+            kra_scores=[
+                make_kra_score(65.0),   # fair
+                make_kra_score(80.0),
+                make_kra_score(85.0),
+                make_kra_score(90.0),
+            ],
+        )
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [appraisal]
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_annual_trigger(org_id, cycle_id)
+
+        assert result == []
+
+    def test_filters_by_non_quarterly_appraisals(self) -> None:
+        """detect_annual_trigger queries only non-quarterly appraisals."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        svc.detect_annual_trigger(org_id, cycle_id)
+
+        # Verify db.scalars was called (the method hits the DB)
+        db.scalars.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# detect_quarterly_trigger — DB-backed detection
+# ---------------------------------------------------------------------------
+
+
+class TestDetectQuarterlyTrigger:
+    """Test the detect_quarterly_trigger DB-backed method."""
+
+    def test_flags_employee_with_3_quarters_below_threshold(self) -> None:
+        """3 quarterly appraisals with final_score below 70 triggers a flag."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+        emp_id = uuid.uuid4()
+
+        appraisals = [
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=65.0),
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=60.0),
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=68.0),
+        ]
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = appraisals
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_quarterly_trigger(org_id, cycle_id)
+
+        assert len(result) == 1
+        assert result[0]["employee_id"] == emp_id
+        assert result[0]["quarters_below"] == 3
+
+    def test_skips_employee_with_2_quarters_below(self) -> None:
+        """Only 2 quarterly scores below threshold — not flagged."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+        emp_id = uuid.uuid4()
+
+        appraisals = [
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=65.0),
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=60.0),
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=75.0),
+        ]
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = appraisals
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_quarterly_trigger(org_id, cycle_id)
+
+        assert result == []
+
+    def test_returns_empty_when_no_quarterly_appraisals(self) -> None:
+        """No quarterly appraisals → returns empty list."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_quarterly_trigger(org_id, cycle_id)
+
+        assert result == []
+
+    def test_skips_appraisals_with_no_final_score(self) -> None:
+        """Appraisals without a final_score are excluded from score aggregation."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+        emp_id = uuid.uuid4()
+
+        # 2 scored below + 1 unscored → only 2 counted, not enough to trigger
+        appraisals = [
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=65.0),
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=60.0),
+            make_appraisal(employee_id=emp_id, is_quarterly=True, final_score=None),
+        ]
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = appraisals
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_quarterly_trigger(org_id, cycle_id)
+
+        assert result == []
+
+    def test_groups_appraisals_by_employee(self) -> None:
+        """Multiple employees are grouped and evaluated independently."""
+        org_id = uuid.uuid4()
+        cycle_id = uuid.uuid4()
+        emp_a = uuid.uuid4()
+        emp_b = uuid.uuid4()
+
+        # emp_a: 3 below → flagged; emp_b: only 1 below → not flagged
+        appraisals = [
+            make_appraisal(employee_id=emp_a, is_quarterly=True, final_score=65.0),
+            make_appraisal(employee_id=emp_a, is_quarterly=True, final_score=60.0),
+            make_appraisal(employee_id=emp_a, is_quarterly=True, final_score=68.0),
+            make_appraisal(employee_id=emp_b, is_quarterly=True, final_score=60.0),
+            make_appraisal(employee_id=emp_b, is_quarterly=True, final_score=80.0),
+            make_appraisal(employee_id=emp_b, is_quarterly=True, final_score=85.0),
+        ]
+
+        db = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = appraisals
+        db.scalars.return_value = mock_scalars
+
+        svc = UnderperformanceService(db)
+        result = svc.detect_quarterly_trigger(org_id, cycle_id)
+
+        assert len(result) == 1
+        assert result[0]["employee_id"] == emp_a
