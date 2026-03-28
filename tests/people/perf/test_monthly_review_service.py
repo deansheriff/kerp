@@ -349,6 +349,197 @@ class TestAcknowledgeReview:
 
 
 # ---------------------------------------------------------------------------
+# create_review — duplicate detection
+# ---------------------------------------------------------------------------
+
+
+class TestCreateReviewDuplicateDetection:
+    """Test one-per-employee-per-month enforcement."""
+
+    def setup_method(self) -> None:
+        self.db = MagicMock()
+        self.service = MonthlyReviewService(self.db)
+
+    def test_rejects_duplicate_review_for_same_month(self) -> None:
+        """Creating a second review for same employee+month raises error."""
+        existing = make_review(review_month=date(2026, 3, 1))
+        # scalar() is called first for the duplicate check
+        self.db.scalar.return_value = existing
+
+        with pytest.raises(MonthlyReviewValidationError, match="already exists"):
+            self.service.create_review(
+                uuid.uuid4(),
+                employee_id=uuid.uuid4(),
+                reviewer_id=uuid.uuid4(),
+                contract_id=uuid.uuid4(),
+                review_month=date(2026, 3, 1),
+            )
+
+    def test_duplicate_error_mentions_month(self) -> None:
+        """The validation error message includes the month name."""
+        existing = make_review(review_month=date(2026, 3, 1))
+        self.db.scalar.return_value = existing
+
+        with pytest.raises(MonthlyReviewValidationError) as exc_info:
+            self.service.create_review(
+                uuid.uuid4(),
+                employee_id=uuid.uuid4(),
+                reviewer_id=uuid.uuid4(),
+                contract_id=uuid.uuid4(),
+                review_month=date(2026, 3, 1),
+            )
+
+        assert "March 2026" in str(exc_info.value)
+
+    def test_allows_review_for_different_month(self) -> None:
+        """Different month for same employee is OK — no error raised."""
+        # No existing review for this month
+        self.db.scalar.return_value = None
+        added: list = []
+        self.db.add.side_effect = lambda obj: added.append(obj)
+
+        self.service.create_review(
+            uuid.uuid4(),
+            employee_id=uuid.uuid4(),
+            reviewer_id=uuid.uuid4(),
+            contract_id=uuid.uuid4(),
+            review_month=date(2026, 4, 1),
+        )
+
+        assert len(added) == 1
+
+    def test_does_not_add_to_db_when_duplicate(self) -> None:
+        """db.add() must not be called when a duplicate is rejected."""
+        existing = make_review(review_month=date(2026, 3, 1))
+        self.db.scalar.return_value = existing
+
+        with pytest.raises(MonthlyReviewValidationError):
+            self.service.create_review(
+                uuid.uuid4(),
+                employee_id=uuid.uuid4(),
+                reviewer_id=uuid.uuid4(),
+                contract_id=uuid.uuid4(),
+                review_month=date(2026, 3, 1),
+            )
+
+        self.db.add.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# submit_review — status guard
+# ---------------------------------------------------------------------------
+
+
+class TestSubmitReviewStatusGuard:
+    """Test that submit_review enforces DRAFT-only precondition."""
+
+    def setup_method(self) -> None:
+        self.db = MagicMock()
+        self.service = MonthlyReviewService(self.db)
+
+    def _setup_review(self, status: MonthlyReviewStatus) -> MagicMock:
+        review = make_review(status=status)
+        self.db.scalar.return_value = review
+        return review
+
+    def test_rejects_submit_from_submitted_status(self) -> None:
+        """Cannot re-submit an already SUBMITTED review."""
+        review = self._setup_review(MonthlyReviewStatus.SUBMITTED)
+
+        with pytest.raises(MonthlyReviewValidationError):
+            self.service.submit_review(
+                review.organization_id,
+                review.review_id,
+                objective_progress={},
+            )
+
+    def test_rejects_submit_from_acknowledged_status(self) -> None:
+        """Cannot submit an ACKNOWLEDGED review."""
+        review = self._setup_review(MonthlyReviewStatus.ACKNOWLEDGED)
+
+        with pytest.raises(MonthlyReviewValidationError):
+            self.service.submit_review(
+                review.organization_id,
+                review.review_id,
+                objective_progress={},
+            )
+
+    def test_submit_error_mentions_current_status(self) -> None:
+        """Error message should include the current status value."""
+        review = self._setup_review(MonthlyReviewStatus.SUBMITTED)
+
+        with pytest.raises(MonthlyReviewValidationError) as exc_info:
+            self.service.submit_review(
+                review.organization_id,
+                review.review_id,
+                objective_progress={},
+            )
+
+        assert "SUBMITTED" in str(exc_info.value)
+
+    def test_allows_submit_from_draft_status(self) -> None:
+        """DRAFT → SUBMITTED transition is valid."""
+        review = self._setup_review(MonthlyReviewStatus.DRAFT)
+
+        result = self.service.submit_review(
+            review.organization_id,
+            review.review_id,
+            objective_progress={"kra": "on track"},
+        )
+
+        assert result.status == MonthlyReviewStatus.SUBMITTED
+
+
+# ---------------------------------------------------------------------------
+# acknowledge_review — status guard
+# ---------------------------------------------------------------------------
+
+
+class TestAcknowledgeReviewStatusGuard:
+    """Test that acknowledge_review enforces SUBMITTED-only precondition."""
+
+    def setup_method(self) -> None:
+        self.db = MagicMock()
+        self.service = MonthlyReviewService(self.db)
+
+    def _setup_review(self, status: MonthlyReviewStatus) -> MagicMock:
+        review = make_review(status=status)
+        self.db.scalar.return_value = review
+        return review
+
+    def test_rejects_acknowledge_from_draft_status(self) -> None:
+        """Cannot acknowledge a DRAFT review."""
+        review = self._setup_review(MonthlyReviewStatus.DRAFT)
+
+        with pytest.raises(MonthlyReviewValidationError):
+            self.service.acknowledge_review(review.organization_id, review.review_id)
+
+    def test_rejects_acknowledge_from_acknowledged_status(self) -> None:
+        """Cannot re-acknowledge an already ACKNOWLEDGED review."""
+        review = self._setup_review(MonthlyReviewStatus.ACKNOWLEDGED)
+
+        with pytest.raises(MonthlyReviewValidationError):
+            self.service.acknowledge_review(review.organization_id, review.review_id)
+
+    def test_acknowledge_error_mentions_current_status(self) -> None:
+        """Error message includes the current status value."""
+        review = self._setup_review(MonthlyReviewStatus.DRAFT)
+
+        with pytest.raises(MonthlyReviewValidationError) as exc_info:
+            self.service.acknowledge_review(review.organization_id, review.review_id)
+
+        assert "DRAFT" in str(exc_info.value)
+
+    def test_allows_acknowledge_from_submitted_status(self) -> None:
+        """SUBMITTED → ACKNOWLEDGED is the valid transition."""
+        review = self._setup_review(MonthlyReviewStatus.SUBMITTED)
+
+        result = self.service.acknowledge_review(review.organization_id, review.review_id)
+
+        assert result.status == MonthlyReviewStatus.ACKNOWLEDGED
+
+
+# ---------------------------------------------------------------------------
 # Status transition constants / enum sanity
 # ---------------------------------------------------------------------------
 
