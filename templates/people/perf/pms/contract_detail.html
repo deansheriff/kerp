@@ -1,0 +1,429 @@
+{% extends "people/base_people.html" %}
+
+{% from "components/macros.html" import status_badge, empty_state, icon_svg, pagination %}
+
+{% block page_title %}Contract {{ contract.contract_code }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">PMS</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms/contracts" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Contracts</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white font-mono tabular-nums" aria-current="page">{{ contract.contract_code }}</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    {% if contract.status.value == 'DRAFT' %}
+    <a href="/people/perf/pms/contracts/{{ contract.contract_id }}/edit" class="btn btn-secondary">
+        {{ icon_svg("edit", "h-4 w-4 mr-1.5") }}
+        Edit
+    </a>
+    {% endif %}
+
+    {% if contract.status.value in ['DRAFT', 'PENDING_SIGNATURE'] %}
+    <div class="relative" x-data="{ open: false }">
+        <button @click="open = !open" type="button" class="btn btn-secondary">
+            {{ icon_svg("edit", "h-4 w-4 mr-1") }}
+            Sign
+            {{ icon_svg("chevron-down", "h-4 w-4 ml-1") }}
+        </button>
+        <div x-show="open" @click.away="open = false" x-cloak
+             class="absolute right-0 z-10 mt-2 w-52 rounded-lg bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
+            <div class="py-1">
+                {% if not contract.employee_signed_date %}
+                <form method="post" action="/people/perf/pms/contracts/{{ contract.contract_id }}/sign-employee">
+                    {{ request.state.csrf_form | safe }}
+                    <button type="submit"
+                            class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                        Sign as Employee
+                    </button>
+                </form>
+                {% else %}
+                <span class="block px-4 py-2 text-sm text-slate-400 dark:text-slate-500">Employee signed</span>
+                {% endif %}
+
+                {% if not contract.supervisor_signed_date %}
+                <form method="post" action="/people/perf/pms/contracts/{{ contract.contract_id }}/sign-supervisor">
+                    {{ request.state.csrf_form | safe }}
+                    <button type="submit"
+                            class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                        Sign as Supervisor
+                    </button>
+                </form>
+                {% else %}
+                <span class="block px-4 py-2 text-sm text-slate-400 dark:text-slate-500">Supervisor signed</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <a href="/people/perf/pms/reviews/new?contract_id={{ contract.contract_id }}" class="btn btn-primary">
+        {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
+        Add Review
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    {# Alerts #}
+    {% if error %}
+    <div class="p-4 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-900/20 dark:border-rose-800">
+        <div class="flex items-center gap-2 text-rose-700 dark:text-rose-400">
+            {{ icon_svg("warning", "w-5 h-5 flex-shrink-0") }}
+            <span>{{ error }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if success or request.query_params.get('saved') %}
+    <div class="p-4 rounded-lg bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800">
+        <div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+            {{ icon_svg("check-circle", "w-5 h-5 flex-shrink-0") }}
+            <span>{{ success if success else "Changes saved successfully." }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Status banner for inactive contracts #}
+    {% if contract.status.value == 'CANCELLED' %}
+    <div class="p-4 rounded-lg bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+        <div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            {{ icon_svg("warning", "w-5 h-5 flex-shrink-0") }}
+            <span class="font-medium">This contract has been CANCELLED.</span>
+        </div>
+    </div>
+    {% elif contract.status.value == 'AMENDED' %}
+    <div class="p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+        <div class="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+            {{ icon_svg("warning", "w-5 h-5 flex-shrink-0") }}
+            <span class="font-medium">This contract has been AMENDED.</span>
+            {% if contract.amendment_reason %}
+            <span class="text-sm">Reason: {{ contract.amendment_reason }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Contract header card #}
+    <div class="card p-6">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                    {{ icon_svg("document", "h-6 w-6 text-violet-600 dark:text-violet-400") }}
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold font-display text-slate-900 dark:text-white">
+                        {{ contract.employee.full_name if contract.employee else 'Unknown Employee' }}
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                        {{ contract.contract_code }}
+                    </p>
+                    {% if contract.cycle %}
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                        Cycle: {{ contract.cycle.cycle_name }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                {{ status_badge(contract.status.value, 'md') }}
+                <span class="text-xs text-slate-400 dark:text-slate-500">
+                    {{ contract.contract_type.value | replace('_', ' ') | title if contract.contract_type else '' }}
+                </span>
+            </div>
+        </div>
+
+        {# Workflow stepper #}
+        <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+            {% set steps = [
+                ('DRAFT', 'Draft'),
+                ('PENDING_SIGNATURE', 'Pending Signature'),
+                ('ACTIVE', 'Active'),
+                ('COMPLETED', 'Completed')
+            ] %}
+            {% set current_status = contract.status.value %}
+            {% set step_order = ['DRAFT', 'PENDING_SIGNATURE', 'ACTIVE', 'AMENDED', 'COMPLETED', 'CANCELLED'] %}
+            {% set current_idx = step_order.index(current_status) if current_status in step_order else 0 %}
+
+            <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                {% for step_val, step_label in steps %}
+                {% set sidx = loop.index0 %}
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    {% if sidx < current_idx %}
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 dark:bg-violet-500">
+                        {{ icon_svg("check-circle", "h-4 w-4 text-white") }}
+                    </div>
+                    {% elif sidx == current_idx %}
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 dark:bg-violet-500 ring-4 ring-violet-100 dark:ring-violet-900/40">
+                        <span class="text-xs font-bold text-white">{{ sidx + 1 }}</span>
+                    </div>
+                    {% else %}
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-slate-300 dark:border-slate-600">
+                        <span class="text-xs font-medium text-slate-400 dark:text-slate-500">{{ sidx + 1 }}</span>
+                    </div>
+                    {% endif %}
+                    <span class="text-xs font-medium
+                        {% if sidx < current_idx %}text-violet-600 dark:text-violet-400
+                        {% elif sidx == current_idx %}text-violet-700 dark:text-violet-300 font-semibold
+                        {% else %}text-slate-400 dark:text-slate-500{% endif %}">
+                        {{ step_label }}
+                    </span>
+                    {% if not loop.last %}
+                    <div class="h-px w-8 {% if sidx < current_idx %}bg-violet-400 dark:bg-violet-600{% else %}bg-slate-200 dark:bg-slate-700{% endif %}"></div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# Contract details grid #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {# Main details #}
+        <div class="lg:col-span-2 space-y-6">
+
+            {# Parties & signatures #}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Parties &amp; Signatures</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <dt class="label-caps text-slate-500 dark:text-slate-400">Employee</dt>
+                            <dd class="mt-1 font-medium text-slate-900 dark:text-white">
+                                {{ contract.employee.full_name if contract.employee else '—' }}
+                            </dd>
+                            <dd class="mt-0.5 text-slate-500 dark:text-slate-400">
+                                {% if contract.employee_signed_date %}
+                                <span class="text-emerald-600 dark:text-emerald-400">
+                                    {{ icon_svg("check-circle", "h-3.5 w-3.5 inline") }}
+                                    Signed {{ contract.employee_signed_date.strftime('%d %b %Y') }}
+                                </span>
+                                {% else %}
+                                <span class="text-amber-600 dark:text-amber-400">Awaiting signature</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="label-caps text-slate-500 dark:text-slate-400">Supervisor</dt>
+                            <dd class="mt-1 font-medium text-slate-900 dark:text-white">
+                                {{ contract.supervisor.full_name if contract.supervisor else '—' }}
+                            </dd>
+                            <dd class="mt-0.5 text-slate-500 dark:text-slate-400">
+                                {% if contract.supervisor_signed_date %}
+                                <span class="text-emerald-600 dark:text-emerald-400">
+                                    {{ icon_svg("check-circle", "h-3.5 w-3.5 inline") }}
+                                    Signed {{ contract.supervisor_signed_date.strftime('%d %b %Y') }}
+                                </span>
+                                {% else %}
+                                <span class="text-amber-600 dark:text-amber-400">Awaiting signature</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        {% if contract.countersigner %}
+                        <div>
+                            <dt class="label-caps text-slate-500 dark:text-slate-400">Countersigner (HoD)</dt>
+                            <dd class="mt-1 font-medium text-slate-900 dark:text-white">
+                                {{ contract.countersigner.full_name }}
+                            </dd>
+                            <dd class="mt-0.5 text-emerald-600 dark:text-emerald-400">
+                                {% if contract.countersigner_date %}
+                                {{ icon_svg("check-circle", "h-3.5 w-3.5 inline") }}
+                                Signed {{ contract.countersigner_date.strftime('%d %b %Y') }}
+                                {% endif %}
+                            </dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            {# Objectives #}
+            {% if contract.objectives %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Performance Objectives</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Weights must sum to 70</p>
+                </div>
+                <div class="table-container">
+                    <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                        <thead>
+                            <tr class="bg-slate-50 dark:bg-slate-800/50">
+                                <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">#</th>
+                                <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Objective</th>
+                                <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">KPI</th>
+                                <th scope="col" class="px-4 py-2.5 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Weight</th>
+                                <th scope="col" class="px-4 py-2.5 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Target</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                            {% for obj in contract.objectives %}
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td class="px-4 py-3 text-sm font-mono tabular-nums text-slate-500 dark:text-slate-400">{{ loop.index }}</td>
+                                <td class="px-4 py-3 text-sm text-slate-900 dark:text-white">{{ obj.kra if obj.kra else obj.objective if obj.objective else '—' }}</td>
+                                <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ obj.kpi if obj.kpi else '—' }}</td>
+                                <td class="px-4 py-3 text-sm text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">{{ obj.weight if obj.weight else '—' }}%</td>
+                                <td class="px-4 py-3 text-sm text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">{{ obj.target if obj.target else '—' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-400">No objectives defined.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        {% if contract.objectives %}
+                        <tfoot>
+                            <tr class="bg-slate-50 dark:bg-slate-800/50">
+                                <td colspan="3" class="px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Total</td>
+                                <td class="px-4 py-2.5 text-right text-sm font-semibold font-mono tabular-nums text-slate-900 dark:text-white">
+                                    {% set total_weight = namespace(val=0) %}
+                                    {% for obj in contract.objectives %}
+                                    {% set total_weight.val = total_weight.val + (obj.weight | int if obj.weight else 0) %}
+                                    {% endfor %}
+                                    <span class="{{ 'text-emerald-600 dark:text-emerald-400' if total_weight.val == 70 else 'text-rose-600 dark:text-rose-400' }}">
+                                        {{ total_weight.val }}%
+                                    </span>
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Development plan #}
+            {% if contract.development_plan %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Development Plan</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{{ contract.development_plan }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Monthly Reviews #}
+            <div class="card">
+                <div class="card-header flex items-center justify-between">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Monthly Reviews</h3>
+                    <a href="/people/perf/pms/reviews/new?contract_id={{ contract.contract_id }}"
+                       class="btn btn-sm btn-secondary">
+                        {{ icon_svg("plus", "h-3.5 w-3.5 mr-1") }}
+                        Add
+                    </a>
+                </div>
+                {% if reviews %}
+                <div class="table-container">
+                    <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                        <thead>
+                            <tr class="bg-slate-50 dark:bg-slate-800/50">
+                                <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Month</th>
+                                <th scope="col" class="px-4 py-2.5 text-center text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider hidden sm:table-cell">Reviewer</th>
+                                <th scope="col" class="px-4 py-2.5 w-10 text-xs font-semibold uppercase tracking-wider"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                            {% for review in reviews %}
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <td class="px-4 py-3 text-sm">
+                                    <a href="/people/perf/pms/reviews/{{ review.review_id }}"
+                                       class="font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300">
+                                        {{ review.review_month.strftime('%B %Y') if review.review_month else '—' }}
+                                    </a>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    {{ status_badge(review.status.value if review.status else '', 'sm') }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hidden sm:table-cell">
+                                    {{ review.reviewer.full_name if review.reviewer else '—' }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <a href="/people/perf/pms/reviews/{{ review.review_id }}"
+                                       class="text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                       aria-label="View review">
+                                        {{ icon_svg("eye", "h-4 w-4") }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="px-4 py-6 text-center text-sm text-slate-400">No monthly reviews yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="card-body">
+                    <p class="text-sm text-slate-500 dark:text-slate-400 text-center py-4">No monthly reviews recorded yet.</p>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+
+        {# Sidebar info #}
+        <div class="space-y-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Contract Info</h3>
+                </div>
+                <div class="card-body space-y-3 text-sm">
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Contract Code</p>
+                        <p class="mt-1 font-mono tabular-nums font-medium text-slate-900 dark:text-white">{{ contract.contract_code }}</p>
+                    </div>
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Type</p>
+                        <p class="mt-1 text-slate-900 dark:text-white">{{ contract.contract_type.value | replace('_', ' ') | title if contract.contract_type else '—' }}</p>
+                    </div>
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Cycle</p>
+                        <p class="mt-1 text-slate-900 dark:text-white">{{ contract.cycle.cycle_name if contract.cycle else '—' }}</p>
+                    </div>
+                    {% if contract.amended_from %}
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Amended From</p>
+                        <p class="mt-1">
+                            <a href="/people/perf/pms/contracts/{{ contract.amended_from_id }}"
+                               class="text-violet-600 hover:text-violet-700 dark:text-violet-400 font-mono tabular-nums">
+                                {{ contract.amended_from.contract_code }}
+                            </a>
+                        </p>
+                    </div>
+                    {% endif %}
+                    <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Created</p>
+                        <p class="mt-1 text-slate-600 dark:text-slate-300">
+                            {{ contract.created_at.strftime('%d %b %Y') if contract.created_at else '—' }}
+                        </p>
+                    </div>
+                    {% if contract.updated_at %}
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Last Updated</p>
+                        <p class="mt-1 text-slate-600 dark:text-slate-300">
+                            {{ contract.updated_at.strftime('%d %b %Y') }}
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

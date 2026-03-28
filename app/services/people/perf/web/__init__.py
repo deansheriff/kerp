@@ -17,19 +17,32 @@ from .base import (
     parse_kpi_status,
     parse_uuid,
 )
+from .appeal_web import AppealWebService
+from .contract_web import ContractWebService
 from .cycle_web import CycleWebService
+from .institutional_web import InstitutionalWebService
+from .monthly_review_web import MonthlyReviewWebService
 from .perf_web import PerfWebService
+from .pip_web import PIPWebService
+from .strategic_objective_web import StrategicObjectiveWebService
 
 
 class PerformanceWebService(
     PerfWebService,
     CycleWebService,
+    PIPWebService,
+    AppealWebService,
+    InstitutionalWebService,
+    StrategicObjectiveWebService,
+    ContractWebService,
+    MonthlyReviewWebService,
 ):
     """
     Unified Performance Web Service facade.
 
     Combines performance appraisal, feedback, goals, cycles, KRAs,
-    templates, scorecards, and report web services into a single interface.
+    templates, scorecards, PIP, appeal, institutional, and strategic
+    objective web services into a single interface.
     """
 
     pass
@@ -55,6 +68,12 @@ __all__ = [
     # Services
     "PerfWebService",
     "CycleWebService",
+    "PIPWebService",
+    "AppealWebService",
+    "InstitutionalWebService",
+    "StrategicObjectiveWebService",
+    "ContractWebService",
+    "MonthlyReviewWebService",
     "PerformanceWebService",
     "perf_web_service",
 ]

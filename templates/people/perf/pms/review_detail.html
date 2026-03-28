@@ -1,0 +1,287 @@
+{% extends "people/base_people.html" %}
+
+{% from "components/macros.html" import status_badge, icon_svg %}
+
+{% block page_title %}Monthly Review — {{ review.review_month.strftime('%B %Y') if review.review_month else 'Detail' }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">PMS</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms/reviews" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Reviews</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }}
+            <span class="font-medium text-slate-900 dark:text-white" aria-current="page">
+                {{ review.review_month.strftime('%b %Y') if review.review_month else 'Detail' }}
+            </span>
+        </li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    {% if review.status.value == 'DRAFT' %}
+    {# Submit form — opens submit modal #}
+    <button type="button" @click="showSubmitModal = true" class="btn btn-primary">
+        {{ icon_svg("check-circle", "h-4 w-4 mr-1.5") }}
+        Submit Review
+    </button>
+    {% endif %}
+
+    {% if review.status.value == 'SUBMITTED' %}
+    <form method="post" action="/people/perf/pms/reviews/{{ review.review_id }}/acknowledge">
+        {{ request.state.csrf_form | safe }}
+        <button type="submit" class="btn btn-success">
+            {{ icon_svg("check-circle", "h-4 w-4 mr-1.5") }}
+            Acknowledge
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6"
+     x-data="{ showSubmitModal: false }">
+
+    {# Alerts #}
+    {% if error %}
+    <div class="p-4 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-900/20 dark:border-rose-800">
+        <div class="flex items-center gap-2 text-rose-700 dark:text-rose-400">
+            {{ icon_svg("warning", "w-5 h-5 flex-shrink-0") }}
+            <span>{{ error }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if success or request.query_params.get('saved') %}
+    <div class="p-4 rounded-lg bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800">
+        <div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+            {{ icon_svg("check-circle", "w-5 h-5 flex-shrink-0") }}
+            <span>{{ success if success else "Changes saved successfully." }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Review header card #}
+    <div class="card p-6">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                    {{ icon_svg("calendar", "h-6 w-6 text-violet-600 dark:text-violet-400") }}
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold font-display text-slate-900 dark:text-white">
+                        {{ review.review_month.strftime('%B %Y') if review.review_month else '—' }}
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                        Employee: <span class="font-medium text-slate-700 dark:text-slate-300">{{ review.employee.full_name if review.employee else '—' }}</span>
+                    </p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        Reviewer: <span class="text-slate-700 dark:text-slate-300">{{ review.reviewer.full_name if review.reviewer else '—' }}</span>
+                    </p>
+                    {% if review.contract %}
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        Contract:
+                        <a href="/people/perf/pms/contracts/{{ review.contract_id }}"
+                           class="font-mono tabular-nums text-violet-600 hover:text-violet-700 dark:text-violet-400">
+                            {{ review.contract.contract_code }}
+                        </a>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                {{ status_badge(review.status.value if review.status else '', 'md') }}
+            </div>
+        </div>
+
+        {# Workflow stepper #}
+        <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+            {% set steps = [('DRAFT', 'Draft'), ('SUBMITTED', 'Submitted'), ('ACKNOWLEDGED', 'Acknowledged')] %}
+            {% set current_status = review.status.value %}
+            {% set step_order = ['DRAFT', 'SUBMITTED', 'ACKNOWLEDGED'] %}
+            {% set current_idx = step_order.index(current_status) if current_status in step_order else 0 %}
+
+            <div class="flex items-center gap-2">
+                {% for step_val, step_label in steps %}
+                {% set sidx = loop.index0 %}
+                <div class="flex items-center gap-2">
+                    {% if sidx < current_idx %}
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 dark:bg-violet-500">
+                        {{ icon_svg("check-circle", "h-4 w-4 text-white") }}
+                    </div>
+                    {% elif sidx == current_idx %}
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 dark:bg-violet-500 ring-4 ring-violet-100 dark:ring-violet-900/40">
+                        <span class="text-xs font-bold text-white">{{ sidx + 1 }}</span>
+                    </div>
+                    {% else %}
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-slate-300 dark:border-slate-600">
+                        <span class="text-xs font-medium text-slate-400 dark:text-slate-500">{{ sidx + 1 }}</span>
+                    </div>
+                    {% endif %}
+                    <span class="text-xs font-medium
+                        {% if sidx < current_idx %}text-violet-600 dark:text-violet-400
+                        {% elif sidx == current_idx %}text-violet-700 dark:text-violet-300 font-semibold
+                        {% else %}text-slate-400 dark:text-slate-500{% endif %}">
+                        {{ step_label }}
+                    </span>
+                    {% if not loop.last %}
+                    <div class="h-px w-10 {% if sidx < current_idx %}bg-violet-400 dark:bg-violet-600{% else %}bg-slate-200 dark:bg-slate-700{% endif %}"></div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# Two-column layout #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {# Main content #}
+        <div class="lg:col-span-2 space-y-6">
+
+            {# Review content #}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Review Content</h3>
+                </div>
+                <div class="card-body space-y-4 text-sm">
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Challenges Faced</p>
+                        <p class="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                            {{ review.challenges if review.challenges else '—' }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Support Required</p>
+                        <p class="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                            {{ review.support_required if review.support_required else '—' }}
+                        </p>
+                    </div>
+                    {% if review.reviewer_feedback %}
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Reviewer Feedback</p>
+                        <p class="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{{ review.reviewer_feedback }}</p>
+                    </div>
+                    {% endif %}
+                    {% if review.agreed_actions %}
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Agreed Actions</p>
+                        <p class="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{{ review.agreed_actions }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Objective progress #}
+            {% if review.objective_progress %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Objective Progress</h3>
+                </div>
+                <div class="card-body">
+                    <pre class="text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded p-3 overflow-x-auto">{{ review.objective_progress | tojson(indent=2) }}</pre>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        {# Sidebar #}
+        <div class="space-y-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Sign-off</h3>
+                </div>
+                <div class="card-body space-y-3 text-sm">
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Reviewer Signed</p>
+                        <p class="mt-1">
+                            {% if review.reviewer_signed_date %}
+                            <span class="text-emerald-600 dark:text-emerald-400">
+                                {{ icon_svg("check-circle", "h-3.5 w-3.5 inline") }}
+                                {{ review.reviewer_signed_date.strftime('%d %b %Y') }}
+                            </span>
+                            {% else %}
+                            <span class="text-amber-600 dark:text-amber-400">Pending</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Employee Signed</p>
+                        <p class="mt-1">
+                            {% if review.employee_signed_date %}
+                            <span class="text-emerald-600 dark:text-emerald-400">
+                                {{ icon_svg("check-circle", "h-3.5 w-3.5 inline") }}
+                                {{ review.employee_signed_date.strftime('%d %b %Y') }}
+                            </span>
+                            {% else %}
+                            <span class="text-amber-600 dark:text-amber-400">Pending</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Review Month</p>
+                        <p class="mt-1 font-medium text-slate-900 dark:text-white">
+                            {{ review.review_month.strftime('%B %Y') if review.review_month else '—' }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="label-caps text-slate-500 dark:text-slate-400">Created</p>
+                        <p class="mt-1 text-slate-600 dark:text-slate-300">
+                            {{ review.created_at.strftime('%d %b %Y') if review.created_at else '—' }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    {# Submit modal #}
+    <div x-show="showSubmitModal" x-cloak
+         role="dialog" aria-modal="true" aria-labelledby="submit-modal-title"
+         @keydown.escape.window="showSubmitModal = false"
+         class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="fixed inset-0 bg-black/50" @click="showSubmitModal = false"
+             x-transition:enter="duration-200 ease-out" x-transition:enter-start="opacity-0"
+             x-transition:leave="duration-150 ease-in" x-transition:leave-end="opacity-0"></div>
+        <div class="relative card max-w-lg w-full mx-4 p-6 space-y-4"
+             x-transition:enter="duration-200 ease-out" x-transition:enter-start="opacity-0 scale-95"
+             x-transition:leave="duration-150 ease-in" x-transition:leave-end="opacity-0 scale-95">
+            <h3 id="submit-modal-title" class="text-lg font-semibold text-slate-900 dark:text-white">Submit Monthly Review</h3>
+            <form method="post" action="/people/perf/pms/reviews/{{ review.review_id }}/submit" class="space-y-4">
+                {{ request.state.csrf_form | safe }}
+                <div>
+                    <label class="form-label">Reviewer Feedback</label>
+                    <textarea name="reviewer_feedback" rows="3" class="form-input w-full"
+                              placeholder="Overall assessment and feedback..."></textarea>
+                </div>
+                <div>
+                    <label class="form-label">Agreed Actions</label>
+                    <textarea name="agreed_actions" rows="3" class="form-input w-full"
+                              placeholder="Actions agreed between reviewer and employee..."></textarea>
+                </div>
+                <div>
+                    <label class="form-label">Challenges</label>
+                    <textarea name="challenges" rows="2" class="form-input w-full"
+                              placeholder="Challenges noted this month..."></textarea>
+                </div>
+                <div>
+                    <label class="form-label">Support Required</label>
+                    <textarea name="support_required" rows="2" class="form-input w-full"
+                              placeholder="Support or resources needed..."></textarea>
+                </div>
+                <div class="flex gap-3 justify-end pt-2">
+                    <button type="button" @click="showSubmitModal = false" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Review</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

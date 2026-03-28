@@ -1,0 +1,230 @@
+{% extends "people/base_people.html" %}
+
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}New Performance Contract{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">PMS</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms/contracts" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Contracts</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">New</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+
+    {# Error summary #}
+    {% if error %}
+    <div class="mb-6 p-4 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-900/20 dark:border-rose-800">
+        <div class="flex items-start gap-2 text-rose-700 dark:text-rose-400">
+            {{ icon_svg("warning", "w-5 h-5 flex-shrink-0 mt-0.5") }}
+            <span>{{ error }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/people/perf/pms/contracts/new"
+          x-data='{
+              objectives: {{ (form_data.objectives_json if form_data and form_data.objectives_json else "[]") | safe }},
+              totalWeight: 0,
+              addObjective() {
+                  this.objectives.push({ kra: "", kpi: "", weight: 0, target: "" });
+                  this.recalc();
+              },
+              removeObjective(idx) {
+                  this.objectives.splice(idx, 1);
+                  this.recalc();
+              },
+              recalc() {
+                  this.totalWeight = this.objectives.reduce((s, o) => s + (parseInt(o.weight) || 0), 0);
+              },
+              get objectivesJson() {
+                  return JSON.stringify(this.objectives);
+              }
+          }'
+          @submit="$refs.objectivesInput.value = objectivesJson; recalc();"
+          class="space-y-6">
+        {{ request.state.csrf_form | safe }}
+
+        {# Contract details #}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="font-semibold text-slate-900 dark:text-white">Contract Details</h3>
+            </div>
+            <div class="card-body space-y-4">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="contract_code" class="form-label">Contract Code <span class="text-rose-500" aria-hidden="true">*</span></label>
+                        <input type="text" name="contract_code" id="contract_code"
+                               class="form-input w-full font-mono"
+                               placeholder="e.g. PC-2026-001"
+                               value="{{ form_data.contract_code if form_data and form_data.contract_code else '' }}"
+                               required>
+                        <span class="form-hint">Unique identifier for this contract</span>
+                    </div>
+                    <div>
+                        <label for="contract_type" class="form-label">Contract Type <span class="text-rose-500" aria-hidden="true">*</span></label>
+                        <select name="contract_type" id="contract_type" class="form-select w-full" required>
+                            <option value="">Select type</option>
+                            {% for ct in contract_types %}
+                            <option value="{{ ct }}"
+                                {% if form_data and form_data.contract_type == ct %}selected{% endif %}>
+                                {{ ct | replace('_', ' ') | title }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="cycle_id" class="form-label">Appraisal Cycle <span class="text-rose-500" aria-hidden="true">*</span></label>
+                    <select name="cycle_id" id="cycle_id" class="form-select w-full" required>
+                        <option value="">Select cycle</option>
+                        {% for cycle in cycles %}
+                        <option value="{{ cycle.cycle_id }}"
+                            {% if (form_data and form_data.cycle_id == cycle.cycle_id | string)
+                               or (prefill_cycle_id and prefill_cycle_id == cycle.cycle_id | string) %}selected{% endif %}>
+                            {{ cycle.cycle_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+            </div>
+        </div>
+
+        {# Parties #}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="font-semibold text-slate-900 dark:text-white">Parties</h3>
+            </div>
+            <div class="card-body space-y-4">
+                <div>
+                    <label for="employee_id" class="form-label">Employee <span class="text-rose-500" aria-hidden="true">*</span></label>
+                    <select name="employee_id" id="employee_id" class="form-select w-full" required>
+                        <option value="">Select employee</option>
+                        {% for emp in employees %}
+                        <option value="{{ emp.employee_id }}"
+                            {% if (form_data and form_data.employee_id == emp.employee_id | string)
+                               or (prefill_employee_id and prefill_employee_id == emp.employee_id | string) %}selected{% endif %}>
+                            {{ emp.employee_code }} — {{ emp.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="supervisor_id" class="form-label">Supervisor <span class="text-rose-500" aria-hidden="true">*</span></label>
+                    <select name="supervisor_id" id="supervisor_id" class="form-select w-full" required>
+                        <option value="">Select supervisor</option>
+                        {% for emp in employees %}
+                        <option value="{{ emp.employee_id }}"
+                            {% if form_data and form_data.supervisor_id == emp.employee_id | string %}selected{% endif %}>
+                            {{ emp.employee_code }} — {{ emp.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <span class="form-hint">The direct supervisor who will evaluate this contract</span>
+                </div>
+            </div>
+        </div>
+
+        {# Objectives #}
+        <div class="card">
+            <div class="card-header flex items-center justify-between">
+                <div>
+                    <h3 class="font-semibold text-slate-900 dark:text-white">Performance Objectives</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        3–7 objectives. Weights must sum to exactly 70.
+                        Current total:
+                        <span :class="totalWeight === 70 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'"
+                              x-text="totalWeight + '%'"></span>
+                    </p>
+                </div>
+                <button type="button" @click="addObjective()" class="btn btn-sm btn-secondary">
+                    {{ icon_svg("plus", "h-3.5 w-3.5 mr-1") }}
+                    Add Objective
+                </button>
+            </div>
+
+            <div class="card-body space-y-3">
+                <template x-for="(obj, idx) in objectives" :key="idx">
+                    <div class="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 label-caps pt-0.5"
+                                  x-text="'Objective ' + (idx + 1)"></span>
+                            <button type="button" @click="removeObjective(idx)"
+                                    class="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                                    aria-label="Remove objective">
+                                {{ icon_svg("trash", "h-4 w-4") }}
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="form-label text-xs">KRA / Objective <span class="text-rose-500">*</span></label>
+                                <input type="text" x-model="obj.kra" class="form-input w-full"
+                                       placeholder="Key result area" @change="recalc()">
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">KPI</label>
+                                <input type="text" x-model="obj.kpi" class="form-input w-full"
+                                       placeholder="Key performance indicator">
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">Weight (%) <span class="text-rose-500">*</span></label>
+                                <input type="number" x-model.number="obj.weight" min="0" max="70"
+                                       class="form-input w-full font-mono tabular-nums"
+                                       placeholder="e.g. 20" @input="recalc()">
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">Target</label>
+                                <input type="text" x-model="obj.target" class="form-input w-full"
+                                       placeholder="Measurable target">
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="objectives.length === 0">
+                    <div class="text-center py-6 text-sm text-slate-400 dark:text-slate-500">
+                        No objectives added yet. Click "Add Objective" to begin.
+                    </div>
+                </template>
+
+                {# Hidden input for form submission #}
+                <input type="hidden" name="objectives_json" x-ref="objectivesInput" :value="objectivesJson">
+            </div>
+        </div>
+
+        {# Development plan #}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="font-semibold text-slate-900 dark:text-white">Development Plan</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Optional — outline training and development goals</p>
+            </div>
+            <div class="card-body">
+                <textarea name="development_plan" id="development_plan" rows="4"
+                          class="form-input w-full"
+                          placeholder="Describe development activities, training needs, and goals...">{{ form_data.development_plan if form_data and form_data.development_plan else '' }}</textarea>
+            </div>
+        </div>
+
+        {# Form actions #}
+        <div class="flex items-center justify-end gap-3 pb-4">
+            <a href="/people/perf/pms/contracts" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary"
+                    :disabled="objectives.length < 3 || totalWeight !== 70">
+                {{ icon_svg("document", "h-4 w-4 mr-1.5") }}
+                Save Contract
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}

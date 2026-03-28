@@ -1,0 +1,173 @@
+{% extends "people/base_people.html" %}
+
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}New Monthly Review{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">PMS</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms/reviews" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Reviews</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">New</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+
+    {# Context banner — prefilled from contract #}
+    {% if prefill_contract %}
+    <div class="mb-6 p-4 rounded-lg bg-violet-50 border border-violet-200 dark:bg-violet-900/20 dark:border-violet-800">
+        <div class="flex items-start gap-2 text-violet-700 dark:text-violet-300">
+            {{ icon_svg("document", "w-5 h-5 flex-shrink-0 mt-0.5") }}
+            <div>
+                <p class="font-medium text-sm">Creating review for contract</p>
+                <p class="text-sm mt-0.5">
+                    <span class="font-mono tabular-nums">{{ prefill_contract.contract_code }}</span>
+                    —
+                    {{ prefill_contract.employee.full_name if prefill_contract.employee else '' }}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Error summary #}
+    {% if error %}
+    <div class="mb-6 p-4 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-900/20 dark:border-rose-800">
+        <div class="flex items-start gap-2 text-rose-700 dark:text-rose-400">
+            {{ icon_svg("warning", "w-5 h-5 flex-shrink-0 mt-0.5") }}
+            <span>{{ error }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/people/perf/pms/reviews/new" class="space-y-6">
+        {{ request.state.csrf_form | safe }}
+
+        {# Review details #}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="font-semibold text-slate-900 dark:text-white">Review Details</h3>
+            </div>
+            <div class="card-body space-y-4">
+
+                <div>
+                    <label for="contract_id" class="form-label">Performance Contract <span class="text-rose-500" aria-hidden="true">*</span></label>
+                    {% if prefill_contract %}
+                    <input type="hidden" name="contract_id" value="{{ prefill_contract.contract_id }}">
+                    <div class="form-input w-full bg-slate-50 dark:bg-slate-700 cursor-not-allowed text-slate-700 dark:text-slate-300">
+                        <span class="font-mono tabular-nums">{{ prefill_contract.contract_code }}</span>
+                        <span class="text-xs text-slate-400 ml-2">(from contract)</span>
+                    </div>
+                    {% else %}
+                    <select name="contract_id" id="contract_id" class="form-select w-full" required>
+                        <option value="">Select active contract</option>
+                        {% for c in contracts %}
+                        <option value="{{ c.contract_id }}"
+                            {% if (form_data and form_data.contract_id == c.contract_id | string)
+                               or (prefill_contract_id and prefill_contract_id == c.contract_id | string) %}selected{% endif %}>
+                            {{ c.contract_code }} — {{ c.employee.full_name if c.employee else '' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="employee_id" class="form-label">Employee <span class="text-rose-500" aria-hidden="true">*</span></label>
+                    {% if prefill_contract and prefill_contract.employee %}
+                    <input type="hidden" name="employee_id" value="{{ prefill_contract.employee_id }}">
+                    <div class="form-input w-full bg-slate-50 dark:bg-slate-700 cursor-not-allowed text-slate-700 dark:text-slate-300">
+                        {{ prefill_contract.employee.full_name }}
+                        <span class="text-xs text-slate-400 ml-2">(from contract)</span>
+                    </div>
+                    {% else %}
+                    <select name="employee_id" id="employee_id" class="form-select w-full" required>
+                        <option value="">Select employee</option>
+                        {% for emp in employees %}
+                        <option value="{{ emp.employee_id }}"
+                            {% if (form_data and form_data.employee_id == emp.employee_id | string)
+                               or (prefill_employee_id and prefill_employee_id == emp.employee_id | string) %}selected{% endif %}>
+                            {{ emp.employee_code }} — {{ emp.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="reviewer_id" class="form-label">Reviewer <span class="text-rose-500" aria-hidden="true">*</span></label>
+                    {% if prefill_contract and prefill_contract.supervisor %}
+                    <input type="hidden" name="reviewer_id" value="{{ prefill_contract.supervisor_id }}">
+                    <div class="form-input w-full bg-slate-50 dark:bg-slate-700 cursor-not-allowed text-slate-700 dark:text-slate-300">
+                        {{ prefill_contract.supervisor.full_name }}
+                        <span class="text-xs text-slate-400 ml-2">(supervisor from contract)</span>
+                    </div>
+                    {% else %}
+                    <select name="reviewer_id" id="reviewer_id" class="form-select w-full" required>
+                        <option value="">Select reviewer</option>
+                        {% for emp in employees %}
+                        <option value="{{ emp.employee_id }}"
+                            {% if form_data and form_data.reviewer_id == emp.employee_id | string %}selected{% endif %}>
+                            {{ emp.employee_code }} — {{ emp.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="review_month" class="form-label">Review Month <span class="text-rose-500" aria-hidden="true">*</span></label>
+                    <input type="date" name="review_month" id="review_month"
+                           class="form-input w-full"
+                           value="{{ form_data.review_month if form_data and form_data.review_month else today }}"
+                           required>
+                    <span class="form-hint">Select any date within the review month (will be set to the 1st automatically)</span>
+                </div>
+
+            </div>
+        </div>
+
+        {# Optional content #}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="font-semibold text-slate-900 dark:text-white">Review Notes (Optional)</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Can be added now or updated when submitting</p>
+            </div>
+            <div class="card-body space-y-4">
+                <div>
+                    <label for="challenges" class="form-label">Challenges</label>
+                    <textarea name="challenges" id="challenges" rows="3"
+                              class="form-input w-full"
+                              placeholder="Any challenges or blockers this month...">{{ form_data.challenges if form_data and form_data.challenges else '' }}</textarea>
+                </div>
+                <div>
+                    <label for="support_required" class="form-label">Support Required</label>
+                    <textarea name="support_required" id="support_required" rows="3"
+                              class="form-input w-full"
+                              placeholder="Resources or support needed...">{{ form_data.support_required if form_data and form_data.support_required else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        {# Form actions #}
+        <div class="flex items-center justify-end gap-3 pb-4">
+            {% if prefill_contract %}
+            <a href="/people/perf/pms/contracts/{{ prefill_contract.contract_id }}" class="btn btn-secondary">Cancel</a>
+            {% else %}
+            <a href="/people/perf/pms/reviews" class="btn btn-secondary">Cancel</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">
+                {{ icon_svg("check-circle", "h-4 w-4 mr-1.5") }}
+                Create Review
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
