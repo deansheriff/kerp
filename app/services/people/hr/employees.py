@@ -727,6 +727,8 @@ class EmployeeService:
             date_of_joining=data.date_of_joining or date.today(),
             probation_end_date=data.probation_end_date,
             confirmation_date=data.confirmation_date,
+            nysc_start_date=data.nysc_start_date,
+            nysc_end_date=data.nysc_end_date,
             status=data.status or EmployeeStatus.DRAFT,
             cost_center_id=data.cost_center_id,
             # Personal contact
@@ -1013,6 +1015,16 @@ class EmployeeService:
             employee.confirmation_date = data.confirmation_date
         elif use_provided_fields and "confirmation_date" in provided_fields:
             employee.confirmation_date = None
+
+        if data.nysc_start_date is not None:
+            employee.nysc_start_date = data.nysc_start_date
+        elif use_provided_fields and "nysc_start_date" in provided_fields:
+            employee.nysc_start_date = None
+
+        if data.nysc_end_date is not None:
+            employee.nysc_end_date = data.nysc_end_date
+        elif use_provided_fields and "nysc_end_date" in provided_fields:
+            employee.nysc_end_date = None
 
         # Bank details
         if data.bank_name is not None:

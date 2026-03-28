@@ -123,6 +123,73 @@ class HRWebService:
             return None
         return cleaned
 
+    @staticmethod
+    def _designation_is_nysc(designation_name: str | None) -> bool:
+        """Return True when the designation is an NYSC tenure role."""
+        return (designation_name or "").strip().upper().endswith("(NYSC)")
+
+    def _designation_requires_nysc_dates(
+        self,
+        db: Session,
+        organization_id: UUID,
+        designation_id: str,
+    ) -> bool:
+        """Check if the selected designation requires NYSC date tracking."""
+        if not designation_id:
+            return False
+
+        designation = db.scalar(
+            select(Designation).where(
+                Designation.designation_id == coerce_uuid(designation_id),
+                Designation.organization_id == organization_id,
+            )
+        )
+        if not designation:
+            return False
+
+        return self._designation_is_nysc(designation.designation_name)
+
+    def _validate_nysc_dates(
+        self,
+        *,
+        db: Session,
+        organization_id: UUID,
+        designation_id: str,
+        nysc_start_date: str,
+        nysc_end_date: str,
+    ) -> tuple[dict[str, str], date | None, date | None]:
+        """Validate NYSC date requirements for temporary designations."""
+        requires_nysc_dates = self._designation_requires_nysc_dates(
+            db,
+            organization_id,
+            designation_id,
+        )
+        start_date_value = self._parse_date(nysc_start_date)
+        end_date_value = self._parse_date(nysc_end_date)
+        errors: dict[str, str] = {}
+
+        if not requires_nysc_dates:
+            return errors, None, None
+
+        if not nysc_start_date:
+            errors["nysc_start_date"] = "Required for NYSC designation"
+        elif start_date_value is None:
+            errors["nysc_start_date"] = "Enter a valid date"
+
+        if not nysc_end_date:
+            errors["nysc_end_date"] = "Required for NYSC designation"
+        elif end_date_value is None:
+            errors["nysc_end_date"] = "Enter a valid date"
+
+        if (
+            start_date_value is not None
+            and end_date_value is not None
+            and end_date_value < start_date_value
+        ):
+            errors["nysc_end_date"] = "End date must be on or after start date"
+
+        return errors, start_date_value, end_date_value
+
     def _update_linked_person(
         self,
         *,
@@ -475,6 +542,8 @@ class HRWebService:
         date_of_joining = self._form_str(form, "date_of_joining")
         probation_end_date = self._form_str(form, "probation_end_date")
         confirmation_date = self._form_str(form, "confirmation_date")
+        nysc_start_date = self._form_str(form, "nysc_start_date")
+        nysc_end_date = self._form_str(form, "nysc_end_date")
         notes = self._form_str(form, "notes")
         status = self._form_str(form, "status") or "DRAFT"
         # Personal contact & emergency
@@ -553,6 +622,9 @@ class HRWebService:
                     "cost_center_id": cost_center_id,
                     "date_of_joining": date_of_joining,
                     "probation_end_date": probation_end_date,
+                    "confirmation_date": confirmation_date,
+                    "nysc_start_date": nysc_start_date,
+                    "nysc_end_date": nysc_end_date,
                     "status": status,
                     "bank_name": bank_name,
                     "bank_account_name": bank_account_name,
@@ -572,6 +644,69 @@ class HRWebService:
             )
 
         org_id = coerce_uuid(auth.organization_id)
+        nysc_errors, nysc_start_value, nysc_end_value = self._validate_nysc_dates(
+            db=db,
+            organization_id=org_id,
+            designation_id=designation_id,
+            nysc_start_date=nysc_start_date,
+            nysc_end_date=nysc_end_date,
+        )
+        if nysc_errors:
+            return self.employee_new_form_response(
+                request,
+                auth,
+                db,
+                error="NYSC start and end dates are required for NYSC designations.",
+                form_data={
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "email": email,
+                    "phone": phone,
+                    "date_of_birth": date_of_birth,
+                    "gender": gender,
+                    "address_line1": address_line1,
+                    "address_line2": address_line2,
+                    "city": city,
+                    "region": region,
+                    "postal_code": postal_code,
+                    "country_code": country_code,
+                    "employee_code": employee_code,
+                    "department_id": department_id,
+                    "designation_id": designation_id,
+                    "employment_type_id": employment_type_id,
+                    "grade_id": grade_id,
+                    "reports_to_id": reports_to_id,
+                    "expense_approver_id": expense_approver_id,
+                    "assigned_location_id": assigned_location_id,
+                    "default_shift_type_id": default_shift_type_id,
+                    "linked_person_id": linked_person_id,
+                    "cost_center_id": cost_center_id,
+                    "date_of_joining": date_of_joining,
+                    "probation_end_date": probation_end_date,
+                    "confirmation_date": confirmation_date,
+                    "nysc_start_date": nysc_start_date,
+                    "nysc_end_date": nysc_end_date,
+                    "status": status,
+                    "personal_email": personal_email,
+                    "personal_phone": personal_phone,
+                    "emergency_contact_name": emergency_contact_name,
+                    "emergency_contact_phone": emergency_contact_phone,
+                    "bank_name": bank_name,
+                    "bank_account_name": bank_account_name,
+                    "bank_account_number": bank_account_number,
+                    "bank_branch_code": bank_branch_code,
+                    "ctc": ctc_raw,
+                    "salary_mode": salary_mode_raw,
+                    "notes": notes,
+                    "tin": tin,
+                    "tax_state": tax_state,
+                    "rsa_pin": rsa_pin,
+                    "pfa_code": pfa_code,
+                    "pension_rate": pension_rate_raw,
+                    "nhf_number": nhf_number,
+                },
+                errors=nysc_errors,
+            )
 
         joining_date = self._parse_date(date_of_joining)
         dob = self._parse_date(date_of_birth)
@@ -618,6 +753,8 @@ class HRWebService:
                         "expense_approver_id": expense_approver_id,
                         "linked_person_id": linked_person_id,
                         "date_of_joining": date_of_joining,
+                        "nysc_start_date": nysc_start_date,
+                        "nysc_end_date": nysc_end_date,
                         "status": status,
                         "bank_name": bank_name,
                         "bank_account_name": bank_account_name,
@@ -669,6 +806,9 @@ class HRWebService:
                             "cost_center_id": cost_center_id,
                             "date_of_joining": date_of_joining,
                             "probation_end_date": probation_end_date,
+                            "confirmation_date": confirmation_date,
+                            "nysc_start_date": nysc_start_date,
+                            "nysc_end_date": nysc_end_date,
                             "status": status,
                             "bank_name": bank_name,
                             "bank_account_name": bank_account_name,
@@ -729,6 +869,8 @@ class HRWebService:
             date_of_joining=joining_date,
             probation_end_date=probation_date,
             confirmation_date=confirm_date,
+            nysc_start_date=nysc_start_value,
+            nysc_end_date=nysc_end_value,
             status=status_enum,
             personal_email=personal_email or None,
             personal_phone=personal_phone or None,
@@ -764,7 +906,7 @@ class HRWebService:
         employee_id: UUID,
         auth: WebAuthContext,
         db: Session,
-    ) -> RedirectResponse:
+    ) -> RedirectResponse | HTMLResponse:
         """Handle employee update form submission."""
         org_id = coerce_uuid(auth.organization_id)
         svc = EmployeeService(db, org_id)
@@ -788,6 +930,8 @@ class HRWebService:
         date_of_joining = self._form_str(form, "date_of_joining")
         probation_end_date = self._form_str(form, "probation_end_date")
         confirmation_date = self._form_str(form, "confirmation_date")
+        nysc_start_date = self._form_str(form, "nysc_start_date")
+        nysc_end_date = self._form_str(form, "nysc_end_date")
         notes = self._form_str(form, "notes")
         status = self._form_str(form, "status")
         # Personal contact & emergency
@@ -815,6 +959,52 @@ class HRWebService:
         joining_date = self._parse_date(date_of_joining)
         probation_date = self._parse_date(probation_end_date)
         confirm_date = self._parse_date(confirmation_date)
+        nysc_errors, nysc_start_value, nysc_end_value = self._validate_nysc_dates(
+            db=db,
+            organization_id=org_id,
+            designation_id=designation_id,
+            nysc_start_date=nysc_start_date,
+            nysc_end_date=nysc_end_date,
+        )
+        if nysc_errors:
+            return self.employee_edit_form_response(
+                request,
+                auth,
+                db,
+                str(employee_id),
+                error="NYSC start and end dates are required for NYSC designations.",
+                form_data={
+                    "employee_code": employee_code,
+                    "department_id": department_id,
+                    "designation_id": designation_id,
+                    "employment_type_id": employment_type_id,
+                    "grade_id": grade_id,
+                    "reports_to_id": reports_to_id,
+                    "expense_approver_id": expense_approver_id,
+                    "assigned_location_id": assigned_location_id,
+                    "default_shift_type_id": default_shift_type_id,
+                    "linked_person_id": linked_person_id,
+                    "cost_center_id": cost_center_id,
+                    "date_of_joining": date_of_joining,
+                    "probation_end_date": probation_end_date,
+                    "confirmation_date": confirmation_date,
+                    "nysc_start_date": nysc_start_date,
+                    "nysc_end_date": nysc_end_date,
+                    "notes": notes,
+                    "status": status,
+                    "personal_email": personal_email,
+                    "personal_phone": personal_phone,
+                    "emergency_contact_name": emergency_contact_name,
+                    "emergency_contact_phone": emergency_contact_phone,
+                    "bank_name": bank_name,
+                    "bank_account_name": bank_account_name,
+                    "bank_account_number": bank_account_number,
+                    "bank_branch_code": bank_branch_code,
+                    "ctc": ctc_raw,
+                    "salary_mode": salary_mode_raw,
+                },
+                errors=nysc_errors,
+            )
 
         provided_fields = {
             "employee_number",
@@ -830,6 +1020,8 @@ class HRWebService:
             "date_of_joining",
             "probation_end_date",
             "confirmation_date",
+            "nysc_start_date",
+            "nysc_end_date",
             "status",
             "personal_email",
             "personal_phone",
@@ -866,6 +1058,8 @@ class HRWebService:
             date_of_joining=joining_date,
             probation_end_date=probation_date,
             confirmation_date=confirm_date,
+            nysc_start_date=nysc_start_value,
+            nysc_end_date=nysc_end_value,
             status=status_enum,
             personal_email=personal_email or None,
             personal_phone=personal_phone or None,
@@ -1496,6 +1690,9 @@ class HRWebService:
         auth: WebAuthContext,
         db: Session,
         employee_id: str,
+        error: str | None = None,
+        form_data: dict | None = None,
+        errors: dict | None = None,
     ) -> HTMLResponse:
         """Render edit employee form."""
         org_id = coerce_uuid(auth.organization_id)
@@ -1610,8 +1807,9 @@ class HRWebService:
             "statuses": [s.value for s in EmployeeStatus],
             "salary_modes": [m.value for m in SalaryMode],
             "genders": [g.value for g in Gender],
-            "errors": {},
-            "form_data": {},
+            "error": error,
+            "errors": errors or {},
+            "form_data": form_data or {},
             "nigeria_states": NIGERIA_STATES,
         }
 

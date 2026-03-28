@@ -184,6 +184,8 @@ class EmployeeCreateData:
     date_of_joining: date | None = None
     probation_end_date: date | None = None
     confirmation_date: date | None = None
+    nysc_start_date: date | None = None
+    nysc_end_date: date | None = None
     # Status
     status: EmploymentStatus | None = None
     # Compensation
@@ -225,6 +227,8 @@ class EmployeeUpdateData:
     date_of_leaving: date | None = None
     probation_end_date: date | None = None
     confirmation_date: date | None = None
+    nysc_start_date: date | None = None
+    nysc_end_date: date | None = None
     status: EmploymentStatus | None = None
     # Compensation
     ctc: Decimal | None = None

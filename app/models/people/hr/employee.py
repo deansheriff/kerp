@@ -298,6 +298,16 @@ class Employee(Base, AuditMixin, SoftDeleteMixin, ERPNextSyncMixin, VersionMixin
         Date,
         nullable=True,
     )
+    nysc_start_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+        comment="Start date for temporary NYSC designations",
+    )
+    nysc_end_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+        comment="End date for temporary NYSC designations",
+    )
 
     # Status
     status: Mapped[EmployeeStatus] = mapped_column(

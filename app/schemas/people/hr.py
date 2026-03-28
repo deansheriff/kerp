@@ -218,6 +218,8 @@ class EmployeeBase(BaseModel):
     date_of_joining: date
     probation_end_date: date | None = None
     confirmation_date: date | None = None
+    nysc_start_date: date | None = None
+    nysc_end_date: date | None = None
     status: EmployeeStatus = EmployeeStatus.DRAFT
     cost_center_id: UUID | None = None
     ctc: Decimal | None = None
@@ -254,6 +256,8 @@ class EmployeeUpdate(BaseModel):
     date_of_leaving: date | None = None
     probation_end_date: date | None = None
     confirmation_date: date | None = None
+    nysc_start_date: date | None = None
+    nysc_end_date: date | None = None
     status: EmployeeStatus | None = None
     cost_center_id: UUID | None = None
     ctc: Decimal | None = None
@@ -317,6 +321,8 @@ class EmployeeRead(BaseModel):
     date_of_leaving: date | None = None
     probation_end_date: date | None = None
     confirmation_date: date | None = None
+    nysc_start_date: date | None = None
+    nysc_end_date: date | None = None
     status: EmployeeStatus
     cost_center_id: UUID | None = None
     ctc: Decimal | None = None

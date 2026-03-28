@@ -130,3 +130,111 @@ async def test_update_employee_response_keeps_linked_person_read_only_without_pe
     assert stored.first_name == person.first_name
     assert stored.email == original_email
     assert stored.city is None
+
+
+@pytest.mark.asyncio
+async def test_update_employee_response_persists_nysc_dates(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    employee_id = uuid4()
+    designation_id = str(uuid4())
+    employee = SimpleNamespace(employee_id=employee_id, person_id=person.id)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.get_employee",
+        lambda self, _employee_id: employee,
+    )
+
+    def _capture_update(self, _employee_id, data):
+        captured["nysc_start_date"] = data.nysc_start_date
+        captured["nysc_end_date"] = data.nysc_end_date
+        return employee
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
+        _capture_update,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_designation_requires_nysc_dates",
+        lambda self, db, organization_id, designation_id: True,
+    )
+
+    request = _make_request(
+        {
+            "designation_id": designation_id,
+            "nysc_start_date": "2026-01-10",
+            "nysc_end_date": "2026-11-10",
+        }
+    )
+    auth = _make_auth(person.id, person.organization_id, [])
+
+    response = await service.update_employee_response(
+        request=request,
+        employee_id=employee_id,
+        auth=auth,
+        db=db_session,
+    )
+
+    assert response.status_code == 303
+    assert str(captured["nysc_start_date"]) == "2026-01-10"
+    assert str(captured["nysc_end_date"]) == "2026-11-10"
+
+
+@pytest.mark.asyncio
+async def test_update_employee_response_requires_nysc_dates_for_nysc_designation(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    employee_id = uuid4()
+    designation_id = str(uuid4())
+    employee = SimpleNamespace(employee_id=employee_id, person_id=person.id)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.get_employee",
+        lambda self, _employee_id: employee,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
+        lambda self, _employee_id, data: captured.setdefault("called", True),
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_designation_requires_nysc_dates",
+        lambda self, db, organization_id, designation_id: True,
+    )
+
+    def _capture_edit_form(self, request, auth, db, employee_id, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(status_code=200, context=kwargs)
+
+    monkeypatch.setattr(HRWebService, "employee_edit_form_response", _capture_edit_form)
+
+    request = _make_request(
+        {
+            "designation_id": designation_id,
+            "nysc_start_date": "",
+            "nysc_end_date": "",
+        }
+    )
+    auth = _make_auth(person.id, person.organization_id, [])
+
+    response = await service.update_employee_response(
+        request=request,
+        employee_id=employee_id,
+        auth=auth,
+        db=db_session,
+    )
+
+    assert response.status_code == 200
+    assert captured["errors"]["nysc_start_date"] == "Required for NYSC designation"
+    assert captured["errors"]["nysc_end_date"] == "Required for NYSC designation"
+    assert "called" not in captured
