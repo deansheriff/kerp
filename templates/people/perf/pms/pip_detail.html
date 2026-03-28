@@ -1,0 +1,232 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import empty_state, icon_svg, status_badge %}
+
+{% block page_title %}{{ pip.pip_code if pip else 'PIP Not Found' }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf/pms/pips" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">PIPs</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">{{ pip.pip_code if pip else 'Not Found' }}</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+{% if pip %}
+<div class="flex items-center gap-2">
+    {% if pip.status and pip.status.value == 'DRAFT' %}
+    <form method="POST" action="/people/perf/pms/pips/{{ pip.pip_id }}/activate">
+        {{ request.state.csrf_form | safe }}
+        <button type="submit" class="btn btn-success">Activate PIP</button>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% if error %}
+    <div class="card p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+        <p class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    {% if success %}
+    <div class="card p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+        <div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+            {{ icon_svg("check-circle", "w-5 h-5") }}
+            <span class="text-sm font-medium">PIP created successfully.</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if pip %}
+    {# Status Banner for special states #}
+    {% if pip.status and pip.status.value in ['ESCALATED', 'IMPROVED'] %}
+    <div class="card p-4 {% if pip.status.value == 'ESCALATED' %}bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800{% else %}bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800{% endif %} border">
+        <p class="text-sm font-medium {% if pip.status.value == 'ESCALATED' %}text-rose-700 dark:text-rose-300{% else %}text-emerald-700 dark:text-emerald-300{% endif %}">
+            {% if pip.status.value == 'ESCALATED' %}
+            This PIP has been ESCALATED to the disciplinary committee
+            {% if pip.committee_referral_date %}(referred {{ pip.committee_referral_date.strftime('%d %b %Y') }}){% endif %}.
+            {% else %}
+            This PIP has been completed with a SATISFACTORY outcome
+            {% if pip.outcome_date %}on {{ pip.outcome_date.strftime('%d %b %Y') }}{% endif %}.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+
+    {# Info Grid #}
+    <div class="card p-6">
+        <div class="flex items-start justify-between mb-6">
+            <div>
+                <h1 class="text-xl font-semibold font-display text-slate-900 dark:text-white">{{ pip.pip_code }}</h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Performance Improvement Plan</p>
+            </div>
+            <div>{{ status_badge(pip.status.value if pip.status else '', 'md') }}</div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Employee</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {% if pip.employee and pip.employee.person %}
+                        {{ pip.employee.person.first_name }} {{ pip.employee.person.last_name }}
+                    {% else %}
+                        <span class="text-slate-400">—</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Supervisor</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {% if pip.supervisor and pip.supervisor.person %}
+                        {{ pip.supervisor.person.first_name }} {{ pip.supervisor.person.last_name }}
+                    {% else %}
+                        <span class="text-slate-400">—</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">HR Officer</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {% if pip.hr_officer and pip.hr_officer.person %}
+                        {{ pip.hr_officer.person.first_name }} {{ pip.hr_officer.person.last_name }}
+                    {% else %}
+                        <span class="text-slate-400">—</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Start Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ pip.start_date.strftime('%d %b %Y') if pip.start_date else '—' }}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">End Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {% if pip.extension_granted and pip.extension_end_date %}
+                        {{ pip.extension_end_date.strftime('%d %b %Y') }}
+                        <span class="ml-1 text-xs text-amber-600 dark:text-amber-400">(Extended)</span>
+                    {% else %}
+                        {{ pip.end_date.strftime('%d %b %Y') if pip.end_date else '—' }}
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cause Category</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ pip.cause_category.value | replace('_', ' ') | title if pip.cause_category else '—' }}
+                </p>
+            </div>
+        </div>
+
+        {% if pip.reason %}
+        <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Reason</p>
+            <p class="text-sm text-slate-700 dark:text-slate-300">{{ pip.reason }}</p>
+        </div>
+        {% endif %}
+
+        {% if pip.support_measures %}
+        <div class="mt-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Support Measures</p>
+            <p class="text-sm text-slate-700 dark:text-slate-300">{{ pip.support_measures }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Improvement Areas #}
+    {% if improvement_areas %}
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Improvement Areas</h2>
+        <div class="space-y-3">
+            {% for area in improvement_areas %}
+            <div class="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                <div class="mt-0.5 h-5 w-5 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
+                    <span class="text-xs font-bold text-violet-700 dark:text-violet-300">{{ loop.index }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-slate-900 dark:text-white">
+                        {{ area.area if area.area is defined else area }}
+                    </p>
+                    {% if area.target is defined and area.target %}
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Target: {{ area.target }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Review Timeline #}
+    {% if review_intervals %}
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Review Timeline</h2>
+        <div class="space-y-3">
+            {% for review in review_intervals %}
+            <div class="flex items-start gap-4 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div class="text-sm text-slate-500 dark:text-slate-400 font-mono tabular-nums flex-shrink-0 min-w-[90px]">
+                    {{ review.review_date if review.review_date else '—' }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm text-slate-700 dark:text-slate-300">{{ review.notes if review.notes else '—' }}</p>
+                    {% if review.progress_status %}
+                    <span class="mt-1 inline-block text-xs font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        {{ review.progress_status | replace('_', ' ') | title }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Outcome Section #}
+    {% if pip.outcome %}
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Outcome</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Decision</p>
+                <p class="mt-1 text-sm font-medium {% if pip.outcome.value == 'SATISFACTORY' %}text-emerald-700 dark:text-emerald-400{% else %}text-rose-700 dark:text-rose-400{% endif %}">
+                    {{ pip.outcome.value | replace('_', ' ') | title }}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Outcome Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ pip.outcome_date.strftime('%d %b %Y') if pip.outcome_date else '—' }}
+                </p>
+            </div>
+            {% if pip.outcome_notes %}
+            <div class="sm:col-span-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Notes</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ pip.outcome_notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="card p-8">
+        {{ empty_state(
+            title="PIP Not Found",
+            description="The performance improvement plan could not be found.",
+            icon="document",
+            cta_text="Back to PIPs",
+            cta_href="/people/perf/pms/pips"
+        ) }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

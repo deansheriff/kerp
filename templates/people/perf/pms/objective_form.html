@@ -1,0 +1,123 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}New Strategic Objective{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf/pms/objectives" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Objectives</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">New</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    {% if error %}
+    <div class="card p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+        <p class="text-sm font-medium text-rose-700 dark:text-rose-300">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-6">New Strategic Objective</h2>
+
+        <form method="POST" action="/people/perf/pms/objectives/new" class="space-y-6">
+            {{ request.state.csrf_form | safe }}
+
+            {# Appraisal Cycle #}
+            <div>
+                <label class="form-label" for="cycle_id">Appraisal Cycle <span class="text-rose-500">*</span></label>
+                <select id="cycle_id" name="cycle_id" class="form-select" required>
+                    <option value="">Select cycle...</option>
+                    {% for cycle in cycles %}
+                    <option value="{{ cycle.cycle_id }}"
+                        {% if form_data.cycle_id == cycle.cycle_id | string %}selected{% endif %}>
+                        {{ cycle.cycle_name if cycle.cycle_name else cycle.cycle_code }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Parent Objective (optional) #}
+            <div>
+                <label class="form-label" for="parent_objective_id">Parent Objective (optional)</label>
+                <select id="parent_objective_id" name="parent_objective_id" class="form-select">
+                    <option value="">No parent — top-level objective</option>
+                    {% for parent in parent_objectives %}
+                    <option value="{{ parent.objective_id }}"
+                        {% if form_data.parent_objective_id == parent.objective_id | string %}selected{% endif %}>
+                        {{ parent.objective_code }} — {{ parent.description | truncate(60) }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <span class="form-hint">Leave empty to create a top-level MDA objective.</span>
+            </div>
+
+            {# Objective Code #}
+            <div>
+                <label class="form-label" for="objective_code">Objective Code <span class="text-rose-500">*</span></label>
+                <input type="text" id="objective_code" name="objective_code" class="form-input" required
+                       placeholder="e.g. SO-001"
+                       value="{{ form_data.objective_code if form_data.objective_code else '' }}">
+                <span class="form-hint">Unique code within the organisation.</span>
+            </div>
+
+            {# Description #}
+            <div>
+                <label class="form-label" for="description">Description <span class="text-rose-500">*</span></label>
+                <textarea id="description" name="description" class="form-input" rows="4" required
+                          placeholder="Full text description of the strategic objective...">{{ form_data.description if form_data.description else '' }}</textarea>
+            </div>
+
+            {# Department #}
+            <div>
+                <label class="form-label" for="department_id">Department (optional)</label>
+                <select id="department_id" name="department_id" class="form-select">
+                    <option value="">Organisation-wide</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.department_id }}"
+                        {% if form_data.department_id == dept.department_id | string %}selected{% endif %}>
+                        {{ dept.department_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Weight #}
+            <div>
+                <label class="form-label" for="weight">Weight (%)</label>
+                <input type="number" id="weight" name="weight" class="form-input" min="0" max="100" step="0.01"
+                       placeholder="e.g. 25.00"
+                       value="{{ form_data.weight if form_data.weight else '' }}">
+                <span class="form-hint">Percentage weight of this objective (all objectives per cycle should sum to 100).</span>
+            </div>
+
+            {# Source Document #}
+            <div>
+                <label class="form-label" for="source_document">Source Document</label>
+                <input type="text" id="source_document" name="source_document" class="form-input"
+                       placeholder="e.g. State Development Plan 2025-2030"
+                       value="{{ form_data.source_document if form_data.source_document else '' }}">
+            </div>
+
+            {# Target Description #}
+            <div>
+                <label class="form-label" for="target_description">Target Description</label>
+                <textarea id="target_description" name="target_description" class="form-input" rows="3"
+                          placeholder="Quantitative or qualitative target statement...">{{ form_data.target_description if form_data.target_description else '' }}</textarea>
+            </div>
+
+            {# Actions #}
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <a href="/people/perf/pms/objectives" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Create Objective</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

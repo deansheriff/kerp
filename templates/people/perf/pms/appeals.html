@@ -1,0 +1,111 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import empty_state, compact_filters, icon_svg, pagination, status_badge %}
+
+{% block page_title %}Appraisal Appeals{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">Appeals</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<a href="/people/perf/pms/appeals/new" class="btn btn-primary">
+    {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
+    File Appeal
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {# Info banner #}
+    <div class="card p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+        <div class="flex items-start gap-3">
+            {{ icon_svg("warning", "w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0") }}
+            <p class="text-sm text-blue-700 dark:text-blue-300">
+                Appeals must be filed within 5 working days of appraisal completion and resolved by 28 February of the appraisal cycle year.
+            </p>
+        </div>
+    </div>
+
+    {% call(filter_attrs) compact_filters(
+        base_url="/people/perf/pms/appeals",
+        active_filters=active_filters if active_filters is defined else []
+    ) %}
+    <div class="w-52">
+        <label class="form-label text-xs">Status</label>
+        <select name="status" class="form-select w-full" {{ filter_attrs }}>
+            <option value="">All Statuses</option>
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s | replace('_', ' ') | title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endcall %}
+
+    <div id="results-container">
+        <div class="card">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Appeal ID</th>
+                            <th scope="col">Employee</th>
+                            <th scope="col" class="hidden md:table-cell">Filed Date</th>
+                            <th scope="col" class="hidden lg:table-cell">Reason (excerpt)</th>
+                            <th scope="col" class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for appeal in appeals %}
+                        <tr class="group">
+                            <td>
+                                <a href="/people/perf/pms/appeals/{{ appeal.appeal_id }}"
+                                   class="font-mono tabular-nums font-medium text-slate-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-400 transition-colors text-xs">
+                                    {{ appeal.appeal_id | string | truncate(8, True, '') }}...
+                                </a>
+                            </td>
+                            <td class="text-sm text-slate-700 dark:text-slate-300">
+                                {% if appeal.employee and appeal.employee.person %}
+                                    {{ appeal.employee.person.first_name }} {{ appeal.employee.person.last_name }}
+                                {% else %}
+                                    <span class="text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="hidden md:table-cell text-sm text-slate-500 dark:text-slate-400">
+                                {{ appeal.filed_date.strftime('%d %b %Y') if appeal.filed_date else '—' }}
+                            </td>
+                            <td class="hidden lg:table-cell text-sm text-slate-500 dark:text-slate-400 max-w-xs truncate">
+                                {{ appeal.reason | truncate(80) if appeal.reason else '—' }}
+                            </td>
+                            <td class="text-center">
+                                {{ status_badge(appeal.status.value if appeal.status else '', 'sm') }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5">
+                                {{ empty_state(
+                                    title="No appeals found",
+                                    description="No appraisal appeals have been filed.",
+                                    icon="document",
+                                    cta_text="File Appeal",
+                                    cta_href="/people/perf/pms/appeals/new"
+                                ) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{ pagination(page=page, total_pages=total_pages, total_count=total, base_url="/people/perf/pms/appeals") }}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}New Performance Improvement Plan{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf/pms/pips" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">PIPs</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">New PIP</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    {% if error %}
+    <div class="card p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+        <p class="text-sm font-medium text-rose-700 dark:text-rose-300">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-6">New Performance Improvement Plan</h2>
+
+        <form method="POST" action="/people/perf/pms/pips/new" class="space-y-6">
+            {{ request.state.csrf_form | safe }}
+
+            {# PIP Code #}
+            <div>
+                <label class="form-label" for="pip_code">PIP Code <span class="text-rose-500">*</span></label>
+                <input type="text" id="pip_code" name="pip_code" class="form-input" required
+                       placeholder="e.g. PIP-2026-001"
+                       value="{{ form_data.pip_code if form_data.pip_code else '' }}">
+                <span class="form-hint">Unique identifier for this PIP within the organisation.</span>
+            </div>
+
+            {# Employee #}
+            <div>
+                <label class="form-label" for="employee_id">Employee <span class="text-rose-500">*</span></label>
+                <select id="employee_id" name="employee_id" class="form-select" required>
+                    <option value="">Select employee...</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.employee_id }}"
+                        {% if form_data.employee_id == emp.employee_id | string %}selected{% endif %}>
+                        {% if emp.person %}{{ emp.person.first_name }} {{ emp.person.last_name }}{% else %}{{ emp.employee_id }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Supervisor #}
+            <div>
+                <label class="form-label" for="supervisor_id">Supervisor <span class="text-rose-500">*</span></label>
+                <select id="supervisor_id" name="supervisor_id" class="form-select" required>
+                    <option value="">Select supervisor...</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.employee_id }}"
+                        {% if form_data.supervisor_id == emp.employee_id | string %}selected{% endif %}>
+                        {% if emp.person %}{{ emp.person.first_name }} {{ emp.person.last_name }}{% else %}{{ emp.employee_id }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# HR Officer #}
+            <div>
+                <label class="form-label" for="hr_officer_id">HR Officer <span class="text-rose-500">*</span></label>
+                <select id="hr_officer_id" name="hr_officer_id" class="form-select" required>
+                    <option value="">Select HR officer...</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.employee_id }}"
+                        {% if form_data.hr_officer_id == emp.employee_id | string %}selected{% endif %}>
+                        {% if emp.person %}{{ emp.person.first_name }} {{ emp.person.last_name }}{% else %}{{ emp.employee_id }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Dates #}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label" for="start_date">Start Date <span class="text-rose-500">*</span></label>
+                    <input type="date" id="start_date" name="start_date" class="form-input" required
+                           value="{{ form_data.start_date if form_data.start_date else '' }}">
+                </div>
+                <div>
+                    <label class="form-label" for="end_date">End Date <span class="text-rose-500">*</span></label>
+                    <input type="date" id="end_date" name="end_date" class="form-input" required
+                           value="{{ form_data.end_date if form_data.end_date else '' }}">
+                    <span class="form-hint">Maximum 183 days from start date.</span>
+                </div>
+            </div>
+
+            {# Cause Category #}
+            <div>
+                <label class="form-label" for="cause_category">Cause Category <span class="text-rose-500">*</span></label>
+                <select id="cause_category" name="cause_category" class="form-select" required>
+                    <option value="">Select cause...</option>
+                    {% for cat in cause_categories %}
+                    <option value="{{ cat }}"
+                        {% if form_data.cause_category == cat %}selected{% endif %}>
+                        {{ cat | replace('_', ' ') | title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Reason #}
+            <div>
+                <label class="form-label" for="reason">Reason <span class="text-rose-500">*</span></label>
+                <textarea id="reason" name="reason" class="form-input" rows="4" required
+                          placeholder="Describe the performance gap and reason for initiating this PIP...">{{ form_data.reason if form_data.reason else '' }}</textarea>
+            </div>
+
+            {# Improvement Areas #}
+            <div>
+                <label class="form-label" for="improvement_areas">Improvement Areas</label>
+                <textarea id="improvement_areas" name="improvement_areas" class="form-input" rows="4"
+                          placeholder="Enter one improvement area per line...">{{ form_data.improvement_areas if form_data.improvement_areas else '' }}</textarea>
+                <span class="form-hint">Enter each improvement area on a new line.</span>
+            </div>
+
+            {# Support Measures #}
+            <div>
+                <label class="form-label" for="support_measures">Support Measures</label>
+                <textarea id="support_measures" name="support_measures" class="form-input" rows="3"
+                          placeholder="Training, coaching, or other support provided...">{{ form_data.support_measures if form_data.support_measures else '' }}</textarea>
+            </div>
+
+            {# Actions #}
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <a href="/people/perf/pms/pips" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Create PIP</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,234 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import empty_state, icon_svg, status_badge %}
+
+{% block page_title %}Appeal Detail{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf/pms/appeals" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Appeals</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">Detail</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% if error %}
+    <div class="card p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+        <p class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    {% if success %}
+    <div class="card p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+        <div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+            {{ icon_svg("check-circle", "w-5 h-5") }}
+            <span class="text-sm font-medium">Appeal filed successfully.</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if appeal %}
+
+    {# Workflow Stepper #}
+    <div class="card p-6">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4">Appeal Progress</h2>
+        <div class="flex items-center gap-0">
+            {% set steps = [
+                ('FILED', 'Filed'),
+                ('UNDER_MEDIATION', 'Mediation'),
+                ('REFERRED_TO_COMMITTEE', 'Committee'),
+                ('RESOLVED', 'Resolved')
+            ] %}
+            {% set current_val = appeal.status.value if appeal.status else '' %}
+            {% set step_order = ['FILED', 'UNDER_MEDIATION', 'REFERRED_TO_COMMITTEE', 'RESOLVED'] %}
+            {% set current_idx = step_order.index(current_val) if current_val in step_order else 0 %}
+
+            {% for step_key, step_label in steps %}
+            {% set step_idx = loop.index0 %}
+            {% set is_done = step_idx < current_idx %}
+            {% set is_current = step_idx == current_idx %}
+            <div class="flex flex-col items-center {% if not loop.last %}flex-1{% endif %}">
+                <div class="flex items-center w-full">
+                    <div class="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 border-2
+                        {% if is_done %}bg-violet-600 border-violet-600{% elif is_current %}bg-white dark:bg-slate-900 border-violet-600{% else %}bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600{% endif %}">
+                        {% if is_done %}
+                        {{ icon_svg("check", "w-4 h-4 text-white") }}
+                        {% else %}
+                        <span class="text-xs font-bold {% if is_current %}text-violet-600{% else %}text-slate-400{% endif %}">{{ loop.index }}</span>
+                        {% endif %}
+                    </div>
+                    {% if not loop.last %}
+                    <div class="flex-1 h-0.5 {% if step_idx < current_idx %}bg-violet-600{% else %}bg-slate-200 dark:bg-slate-700{% endif %}"></div>
+                    {% endif %}
+                </div>
+                <p class="mt-1.5 text-xs {% if is_current %}font-semibold text-violet-700 dark:text-violet-400{% elif is_done %}text-slate-500 dark:text-slate-400{% else %}text-slate-400 dark:text-slate-600{% endif %}">
+                    {{ step_label }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Info Grid #}
+    <div class="card p-6">
+        <div class="flex items-start justify-between mb-6">
+            <div>
+                <h1 class="text-xl font-semibold font-display text-slate-900 dark:text-white">Appraisal Appeal</h1>
+                <p class="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400 mt-1">{{ appeal.appeal_id }}</p>
+            </div>
+            <div>{{ status_badge(appeal.status.value if appeal.status else '', 'md') }}</div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Employee</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {% if appeal.employee and appeal.employee.person %}
+                        {{ appeal.employee.person.first_name }} {{ appeal.employee.person.last_name }}
+                    {% else %}
+                        <span class="text-slate-400">—</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filed Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ appeal.filed_date.strftime('%d %b %Y') if appeal.filed_date else '—' }}
+                </p>
+            </div>
+            <div class="sm:col-span-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Reason for Appeal</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appeal.reason if appeal.reason else '—' }}</p>
+            </div>
+            {% if appeal.requested_outcome %}
+            <div class="sm:col-span-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Requested Outcome</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appeal.requested_outcome }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Mediation Section #}
+    {% if appeal.mediation_date or appeal.mediator %}
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Mediation</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Mediator</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {% if appeal.mediator and appeal.mediator.person %}
+                        {{ appeal.mediator.person.first_name }} {{ appeal.mediator.person.last_name }}
+                    {% else %}
+                        <span class="text-slate-400">—</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Mediation Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ appeal.mediation_date.strftime('%d %b %Y') if appeal.mediation_date else '—' }}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Outcome</p>
+                <p class="mt-1 text-sm {% if appeal.mediation_resolved %}text-emerald-700 dark:text-emerald-400{% else %}text-amber-700 dark:text-amber-400{% endif %}">
+                    {% if appeal.mediation_resolved %}Resolved{% else %}Unresolved{% endif %}
+                </p>
+            </div>
+            {% if appeal.mediation_outcome %}
+            <div class="sm:col-span-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Mediation Notes</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appeal.mediation_outcome }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Committee Section #}
+    {% if appeal.committee_referral_date or appeal.committee_decision %}
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Committee Review</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Referred Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ appeal.committee_referral_date.strftime('%d %b %Y') if appeal.committee_referral_date else '—' }}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Hearing Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ appeal.committee_hearing_date.strftime('%d %b %Y') if appeal.committee_hearing_date else '—' }}
+                </p>
+            </div>
+            {% if appeal.committee_decision %}
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Decision</p>
+                <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">
+                    {{ appeal.committee_decision.value | replace('_', ' ') | title if appeal.committee_decision else '—' }}
+                </p>
+            </div>
+            {% endif %}
+            {% if appeal.adjusted_rating %}
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Adjusted Rating</p>
+                <p class="mt-1 text-sm font-mono tabular-nums text-slate-900 dark:text-white">{{ appeal.adjusted_rating }}</p>
+            </div>
+            {% endif %}
+            {% if appeal.committee_notes %}
+            <div class="sm:col-span-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Committee Notes</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appeal.committee_notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Resolution Section #}
+    {% if appeal.resolution_date or appeal.resolution_notes %}
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Resolution</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Resolution Date</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ appeal.resolution_date.strftime('%d %b %Y') if appeal.resolution_date else '—' }}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Communicated</p>
+                <p class="mt-1 text-sm text-slate-900 dark:text-white">
+                    {{ appeal.communicated_date.strftime('%d %b %Y') if appeal.communicated_date else 'Not yet communicated' }}
+                </p>
+            </div>
+            {% if appeal.resolution_notes %}
+            <div class="sm:col-span-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Resolution Notes</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appeal.resolution_notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="card p-8">
+        {{ empty_state(
+            title="Appeal Not Found",
+            description="The appraisal appeal could not be found.",
+            icon="document",
+            cta_text="Back to Appeals",
+            cta_href="/people/perf/pms/appeals"
+        ) }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

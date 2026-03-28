@@ -1,0 +1,117 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import empty_state, compact_filters, icon_svg, pagination, status_badge %}
+
+{% block page_title %}Institutional Performance{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">Institutional</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<a href="/people/perf/pms/institutional/new" class="btn btn-primary">
+    {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
+    New Record
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% call(filter_attrs) compact_filters(
+        base_url="/people/perf/pms/institutional",
+        active_filters=active_filters if active_filters is defined else []
+    ) %}
+    <div class="w-44">
+        <label class="form-label text-xs">Status</label>
+        <select name="status" class="form-select w-full" {{ filter_attrs }}>
+            <option value="">All Statuses</option>
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s | replace('_', ' ') | title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="w-56">
+        <label class="form-label text-xs">Cycle</label>
+        <select name="cycle_id" class="form-select w-full" {{ filter_attrs }}>
+            <option value="">All Cycles</option>
+            {% for cycle in cycles %}
+            <option value="{{ cycle.cycle_id }}" {% if cycle_id == cycle.cycle_id | string %}selected{% endif %}>
+                {{ cycle.cycle_name if cycle.cycle_name else cycle.cycle_code }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endcall %}
+
+    <div id="results-container">
+        <div class="card">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Institution Type</th>
+                            <th scope="col" class="hidden md:table-cell">Cycle</th>
+                            <th scope="col" class="hidden lg:table-cell">Department</th>
+                            <th scope="col" class="text-right hidden sm:table-cell">Composite Score</th>
+                            <th scope="col" class="hidden sm:table-cell">Rating</th>
+                            <th scope="col" class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr class="group">
+                            <td>
+                                <a href="/people/perf/pms/institutional/{{ record.inst_perf_id }}"
+                                   class="font-medium text-slate-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-400 transition-colors text-sm">
+                                    {{ record.institution_type.value | replace('_', ' ') | title if record.institution_type else '—' }}
+                                </a>
+                            </td>
+                            <td class="hidden md:table-cell text-sm text-slate-500 dark:text-slate-400">
+                                {% if record.cycle %}
+                                    {{ record.cycle.cycle_name if record.cycle.cycle_name else record.cycle.cycle_code }}
+                                {% else %}
+                                    <span class="text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="hidden lg:table-cell text-sm text-slate-500 dark:text-slate-400">
+                                {# Department not loaded via relationship in list view #}
+                                {{ record.department_id | string | truncate(8, True, '') if record.department_id else '—' }}
+                            </td>
+                            <td class="hidden sm:table-cell text-right font-mono tabular-nums text-sm text-slate-900 dark:text-white">
+                                {{ "%.2f" | format(record.composite_score | float) if record.composite_score else '—' }}
+                            </td>
+                            <td class="hidden sm:table-cell text-sm text-slate-500 dark:text-slate-400">
+                                {{ record.rating_label if record.rating_label else '—' }}
+                            </td>
+                            <td class="text-center">
+                                {{ status_badge(record.status.value if record.status else '', 'sm') }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6">
+                                {{ empty_state(
+                                    title="No institutional records",
+                                    description="No institutional performance records have been created.",
+                                    icon="chart",
+                                    cta_text="New Record",
+                                    cta_href="/people/perf/pms/institutional/new"
+                                ) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{ pagination(page=page, total_pages=total_pages, total_count=total, base_url="/people/perf/pms/institutional") }}
+    </div>
+</div>
+{% endblock %}

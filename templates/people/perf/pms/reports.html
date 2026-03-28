@@ -1,0 +1,134 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}PMS Reports{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">PMS Reports</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="card p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800">
+        <div class="flex items-start gap-3">
+            {{ icon_svg("chart", "w-5 h-5 text-violet-500 mt-0.5 flex-shrink-0") }}
+            <p class="text-sm text-violet-700 dark:text-violet-300">
+                Performance Management System analytics and reporting. Select a report to view detailed data and export options.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        {# Rating Summary #}
+        <a href="/people/perf/pms/reports/ratings"
+           class="card card-hover p-6 group transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="h-10 w-10 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-200 dark:group-hover:bg-violet-900/50 transition-colors">
+                    {{ icon_svg("chart", "w-5 h-5 text-violet-600 dark:text-violet-400") }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors">Rating Summary</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Overall performance rating distribution across all employees for a given cycle.</p>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-end text-xs text-violet-600 dark:text-violet-400 font-medium">
+                View report {{ icon_svg("chevron-right", "w-3.5 h-3.5 ml-1") }}
+            </div>
+        </a>
+
+        {# By Department #}
+        <a href="/people/perf/pms/reports/by-department"
+           class="card card-hover p-6 group transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors">
+                    {{ icon_svg("building", "w-5 h-5 text-blue-600 dark:text-blue-400") }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">By Department</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Average performance scores broken down by department or directorate.</p>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-end text-xs text-blue-600 dark:text-blue-400 font-medium">
+                View report {{ icon_svg("chevron-right", "w-3.5 h-3.5 ml-1") }}
+            </div>
+        </a>
+
+        {# By Grade #}
+        <a href="/people/perf/pms/reports/by-grade"
+           class="card card-hover p-6 group transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="h-10 w-10 rounded-xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-200 dark:group-hover:bg-teal-900/50 transition-colors">
+                    {{ icon_svg("tag", "w-5 h-5 text-teal-600 dark:text-teal-400") }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">By Grade</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Performance distribution across salary grades and employment levels.</p>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-end text-xs text-teal-600 dark:text-teal-400 font-medium">
+                View report {{ icon_svg("chevron-right", "w-3.5 h-3.5 ml-1") }}
+            </div>
+        </a>
+
+        {# Distribution #}
+        <a href="/people/perf/pms/reports/distribution"
+           class="card card-hover p-6 group transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 dark:group-hover:bg-amber-900/50 transition-colors">
+                    {{ icon_svg("chart", "w-5 h-5 text-amber-600 dark:text-amber-400") }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">Distribution</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Bell-curve analysis of performance scores to identify calibration outliers.</p>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-end text-xs text-amber-600 dark:text-amber-400 font-medium">
+                View report {{ icon_svg("chevron-right", "w-3.5 h-3.5 ml-1") }}
+            </div>
+        </a>
+
+        {# Top/Bottom Performers #}
+        <a href="/people/perf/pms/reports/top-bottom"
+           class="card card-hover p-6 group transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/50 transition-colors">
+                    {{ icon_svg("trending-up", "w-5 h-5 text-emerald-600 dark:text-emerald-400") }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">Top &amp; Bottom Performers</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Identify the highest and lowest performers for reward and intervention planning.</p>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-end text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                View report {{ icon_svg("chevron-right", "w-3.5 h-3.5 ml-1") }}
+            </div>
+        </a>
+
+        {# L&D Needs #}
+        <a href="/people/perf/pms/reports/ld-needs"
+           class="card card-hover p-6 group transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="h-10 w-10 rounded-xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-rose-200 dark:group-hover:bg-rose-900/50 transition-colors">
+                    {{ icon_svg("users", "w-5 h-5 text-rose-600 dark:text-rose-400") }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-rose-700 dark:group-hover:text-rose-400 transition-colors">L&amp;D Needs</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Learning and development gaps identified through performance reviews and PIP data.</p>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-end text-xs text-rose-600 dark:text-rose-400 font-medium">
+                View report {{ icon_svg("chevron-right", "w-3.5 h-3.5 ml-1") }}
+            </div>
+        </a>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}File an Appeal{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/hr/employees" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Performance</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf/pms/appeals" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Appeals</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">File Appeal</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    {# Info Banner #}
+    <div class="card p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+        <div class="flex items-start gap-3">
+            {{ icon_svg("warning", "w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0") }}
+            <p class="text-sm text-amber-700 dark:text-amber-300">
+                Appeals must be filed within <strong>5 working days</strong> of appraisal completion.
+                Only one open appeal is permitted per appraisal.
+            </p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="card p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+        <p class="text-sm font-medium text-rose-700 dark:text-rose-300">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-6">File an Appraisal Appeal</h2>
+
+        <form method="POST" action="/people/perf/pms/appeals/new" class="space-y-6">
+            {{ request.state.csrf_form | safe }}
+
+            {# Employee #}
+            <div>
+                <label class="form-label" for="employee_id">Employee <span class="text-rose-500">*</span></label>
+                <select id="employee_id" name="employee_id" class="form-select" required>
+                    <option value="">Select employee...</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.employee_id }}"
+                        {% if form_data.employee_id == emp.employee_id | string %}selected{% endif %}>
+                        {% if emp.person %}{{ emp.person.first_name }} {{ emp.person.last_name }}{% else %}{{ emp.employee_id }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Appraisal #}
+            <div>
+                <label class="form-label" for="appraisal_id">Appraisal <span class="text-rose-500">*</span></label>
+                <select id="appraisal_id" name="appraisal_id" class="form-select" required>
+                    <option value="">Select completed appraisal...</option>
+                    {% for appraisal in appraisals %}
+                    <option value="{{ appraisal.appraisal_id }}"
+                        {% if form_data.appraisal_id == appraisal.appraisal_id | string %}selected{% endif %}>
+                        {{ appraisal.appraisal_id | string | truncate(8, True, '') }}...
+                        {% if appraisal.completed_on %} — {{ appraisal.completed_on.strftime('%d %b %Y') }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <span class="form-hint">Only completed appraisals are eligible for appeal.</span>
+            </div>
+
+            {# Filed Date #}
+            <div>
+                <label class="form-label" for="filed_date">Filed Date <span class="text-rose-500">*</span></label>
+                <input type="date" id="filed_date" name="filed_date" class="form-input" required
+                       value="{{ form_data.filed_date if form_data.filed_date else '' }}">
+            </div>
+
+            {# Reason #}
+            <div>
+                <label class="form-label" for="reason">Reason for Appeal <span class="text-rose-500">*</span></label>
+                <textarea id="reason" name="reason" class="form-input" rows="5" required
+                          placeholder="Describe the grounds for your appeal in detail...">{{ form_data.reason if form_data.reason else '' }}</textarea>
+            </div>
+
+            {# Requested Outcome #}
+            <div>
+                <label class="form-label" for="requested_outcome">Requested Outcome</label>
+                <textarea id="requested_outcome" name="requested_outcome" class="form-input" rows="3"
+                          placeholder="What outcome are you requesting from this appeal?">{{ form_data.requested_outcome if form_data.requested_outcome else '' }}</textarea>
+            </div>
+
+            {# Actions #}
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <a href="/people/perf/pms/appeals" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">File Appeal</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
