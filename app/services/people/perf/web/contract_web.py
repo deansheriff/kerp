@@ -316,7 +316,11 @@ class ContractWebService:
 
         svc = PerformanceContractService(db)
         try:
-            svc.sign_employee(org_id, coerce_uuid(contract_id))
+            svc.sign_employee(
+                org_id,
+                coerce_uuid(contract_id),
+                actor_person_id=coerce_uuid(auth.person_id),
+            )
             db.commit()
             success_msg = "Employee signature recorded."
         except Exception as e:
@@ -345,7 +349,11 @@ class ContractWebService:
 
         svc = PerformanceContractService(db)
         try:
-            svc.sign_supervisor(org_id, coerce_uuid(contract_id))
+            svc.sign_supervisor(
+                org_id,
+                coerce_uuid(contract_id),
+                actor_person_id=coerce_uuid(auth.person_id),
+            )
             db.commit()
         except Exception as e:
             db.rollback()
