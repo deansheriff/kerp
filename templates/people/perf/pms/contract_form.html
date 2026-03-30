@@ -53,11 +53,11 @@
         {{ request.state.csrf_form | safe }}
 
         {# Contract details #}
-        <div class="card">
-            <div class="card-header">
+        <div class="card overflow-hidden">
+            <div class="card-header px-6 py-5">
                 <h3 class="font-semibold text-slate-900 dark:text-white">Contract Details</h3>
             </div>
-            <div class="card-body space-y-4">
+            <div class="card-body px-6 py-5 space-y-4">
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -101,11 +101,11 @@
         </div>
 
         {# Parties #}
-        <div class="card">
-            <div class="card-header">
+        <div class="card overflow-hidden">
+            <div class="card-header px-6 py-5">
                 <h3 class="font-semibold text-slate-900 dark:text-white">Parties</h3>
             </div>
-            <div class="card-body space-y-4">
+            <div class="card-body px-6 py-5 space-y-4">
                 <div>
                     <label for="employee_id" class="form-label">Employee <span class="text-rose-500" aria-hidden="true">*</span></label>
                     <select name="employee_id" id="employee_id" class="form-select w-full" required>
@@ -136,8 +136,8 @@
         </div>
 
         {# Objectives #}
-        <div class="card">
-            <div class="card-header flex items-center justify-between">
+        <div class="card overflow-hidden">
+            <div class="card-header px-6 py-5 flex items-center justify-between">
                 <div>
                     <h3 class="font-semibold text-slate-900 dark:text-white">Performance Objectives</h3>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -153,7 +153,7 @@
                 </button>
             </div>
 
-            <div class="card-body space-y-3">
+            <div class="card-body px-6 py-5 space-y-3">
                 <template x-for="(obj, idx) in objectives" :key="idx">
                     <div class="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 space-y-3">
                         <div class="flex items-start justify-between gap-2">
@@ -203,12 +203,12 @@
         </div>
 
         {# Development plan #}
-        <div class="card">
-            <div class="card-header">
+        <div class="card overflow-hidden">
+            <div class="card-header px-6 py-5">
                 <h3 class="font-semibold text-slate-900 dark:text-white">Development Plan</h3>
                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Optional — outline training and development goals</p>
             </div>
-            <div class="card-body">
+            <div class="card-body px-6 py-5">
                 <textarea name="development_plan" id="development_plan" rows="4"
                           class="form-input w-full"
                           placeholder="Describe development activities, training needs, and goals...">{{ form_data.development_plan if form_data and form_data.development_plan else '' }}</textarea>

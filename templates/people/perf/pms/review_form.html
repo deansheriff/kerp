@@ -50,11 +50,11 @@
         {{ request.state.csrf_form | safe }}
 
         {# Review details #}
-        <div class="card">
-            <div class="card-header">
+        <div class="card overflow-hidden">
+            <div class="card-header px-6 py-5">
                 <h3 class="font-semibold text-slate-900 dark:text-white">Review Details</h3>
             </div>
-            <div class="card-body space-y-4">
+            <div class="card-body px-6 py-5 space-y-4">
 
                 <div>
                     <label for="contract_id" class="form-label">Performance Contract <span class="text-rose-500" aria-hidden="true">*</span></label>
@@ -134,12 +134,12 @@
         </div>
 
         {# Optional content #}
-        <div class="card">
-            <div class="card-header">
+        <div class="card overflow-hidden">
+            <div class="card-header px-6 py-5">
                 <h3 class="font-semibold text-slate-900 dark:text-white">Review Notes (Optional)</h3>
                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Can be added now or updated when submitting</p>
             </div>
-            <div class="card-body space-y-4">
+            <div class="card-body px-6 py-5 space-y-4">
                 <div>
                     <label for="challenges" class="form-label">Challenges</label>
                     <textarea name="challenges" id="challenges" rows="3"

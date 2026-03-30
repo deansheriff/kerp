@@ -9,7 +9,6 @@ from app.services.people.perf.pms_config_service import (
     OHCSF_INSTITUTIONAL_WEIGHTS,
 )
 
-
 # ---------------------------------------------------------------------------
 # OHCSF Competency seed data
 # ---------------------------------------------------------------------------
@@ -62,10 +61,19 @@ def test_competency_codes_are_unique() -> None:
 
 def test_competency_codes_start_with_ohcsf_prefix() -> None:
     for cluster, comps in OHCSF_COMPETENCIES.items():
-        for code, name in comps:
+        for code, _name in comps:
             assert code.startswith("OHCSF-"), (
                 f"Competency code {code!r} in cluster {cluster!r} "
                 "does not start with 'OHCSF-'"
+            )
+
+
+def test_competency_codes_fit_model_length_limit() -> None:
+    for cluster, comps in OHCSF_COMPETENCIES.items():
+        for code, _name in comps:
+            assert len(code) <= 20, (
+                f"Competency code {code!r} in cluster {cluster!r} "
+                "exceeds hr.competency.competency_code length limit"
             )
 
 
@@ -130,7 +138,7 @@ def test_institutional_weights_criteria_are_positive() -> None:
 
 def test_institutional_weights_criteria_names_non_empty() -> None:
     for inst_type, criteria in OHCSF_INSTITUTIONAL_WEIGHTS.items():
-        for name, weight in criteria:
+        for name, _weight in criteria:
             assert name.strip(), (
                 f"Empty criteria name in {inst_type}"
             )

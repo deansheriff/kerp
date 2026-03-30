@@ -154,6 +154,8 @@ class AdminSettingsWebService:
         if not org:
             return False, "Organization not found"
 
+        pms_enabled_before = bool(org.pms_ohcsf_enabled)
+
         # Update allowed fields
         allowed_fields = [
             "legal_name",
@@ -190,6 +192,14 @@ class AdminSettingsWebService:
                 ]:
                     value = None
                 setattr(org, field, value)
+
+        if "pms_ohcsf_enabled" in data:
+            org.pms_ohcsf_enabled = str(data["pms_ohcsf_enabled"]).lower() == "true"
+
+        if org.pms_ohcsf_enabled and not pms_enabled_before:
+            from app.services.people.perf.pms_config_service import PMSConfigService
+
+            PMSConfigService(db).activate_ohcsf_pms(organization_id)
 
         db.commit()
         return True, None
@@ -423,6 +433,7 @@ class AdminSettingsWebService:
 
         service = FeatureFlagService(db)
         flags = service.get_all_flags(organization_id)
+        org = db.get(Organization, organization_id)
 
         # Group by category for the template
         categories: dict[str, list[dict[str, Any]]] = {}
@@ -441,6 +452,26 @@ class AdminSettingsWebService:
                     "owner": flag.owner,
                     "expires_at": flag.expires_at,
                     "category": flag.category.value,
+                }
+            )
+
+        if org is not None:
+            module_flags = categories.setdefault("Module", [])
+            module_flags.append(
+                {
+                    "key": "pms_ohcsf_enabled",
+                    "label": "PMS (OHCSF)",
+                    "description": (
+                        "Enable the OHCSF Performance Management System for "
+                        "this organization and show PMS in the People sidebar."
+                    ),
+                    "enabled": bool(org.pms_ohcsf_enabled),
+                    "default_enabled": False,
+                    "is_org_override": True,
+                    "status": "ACTIVE",
+                    "owner": "People",
+                    "expires_at": None,
+                    "category": "MODULE",
                 }
             )
 
@@ -463,6 +494,22 @@ class AdminSettingsWebService:
     ) -> tuple[bool, str | None]:
         """Toggle a feature flag for an organization."""
         from app.services.feature_flag_service import FeatureFlagService
+
+        if key == "pms_ohcsf_enabled":
+            org = db.get(Organization, organization_id)
+            if org is None:
+                return False, "Organization not found"
+
+            pms_enabled_before = bool(org.pms_ohcsf_enabled)
+            org.pms_ohcsf_enabled = enabled
+
+            if enabled and not pms_enabled_before:
+                from app.services.people.perf.pms_config_service import PMSConfigService
+
+                PMSConfigService(db).activate_ohcsf_pms(organization_id)
+
+            db.commit()
+            return True, None
 
         service = FeatureFlagService(db)
         try:

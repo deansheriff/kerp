@@ -31,7 +31,7 @@ OHCSF_COMPETENCIES: dict[str, list[tuple[str, str]]] = {
     "PEOPLE": [
         ("OHCSF-COLLABORATING", "Collaborating & Partnering"),
         ("OHCSF-COMMUNICATION", "Effective Communication"),
-        ("OHCSF-MANAGING-PEOPLE", "Managing & Developing People"),
+        ("OHCSF-MNG-PEOPLE", "Managing & Developing People"),
     ],
     "EXECUTION": [
         ("OHCSF-DRIVE-RESULTS", "Drive for Results"),
@@ -39,8 +39,8 @@ OHCSF_COMPETENCIES: dict[str, list[tuple[str, str]]] = {
         ("OHCSF-VALUE-MONEY", "Value for Money"),
     ],
     "VISION": [
-        ("OHCSF-DECISION-MAKING", "Effective Decision Making"),
-        ("OHCSF-STRATEGIC-THINKING", "Strategic Thinking"),
+        ("OHCSF-DECISION", "Effective Decision Making"),
+        ("OHCSF-STRAT-THINK", "Strategic Thinking"),
         ("OHCSF-CHANGE-MGMT", "Embracing and Managing Change"),
     ],
     "EXPERTISE": [
@@ -180,7 +180,7 @@ class PMSConfigService:
         existing_codes: set[str] = set(self.db.scalars(existing_stmt).all())
 
         created = 0
-        for cluster_name, competencies in OHCSF_COMPETENCIES.items():
+        for _cluster_name, competencies in OHCSF_COMPETENCIES.items():
             for code, name in competencies:
                 if code in existing_codes:
                     continue

@@ -816,6 +816,9 @@ def base_context(
             "auth": auth,
             "user": auth.user,
             "organization": organization,
+            "pms_ohcsf_enabled": bool(
+                getattr(organization, "pms_ohcsf_enabled", False)
+            ),
             "accessible_modules": auth.accessible_modules,
             "can_team_leave": can_team_leave,
             "can_team_expenses": can_team_expenses,
