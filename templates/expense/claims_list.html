@@ -85,6 +85,7 @@
                     <tr>
                         <th scope="col">Claim</th>
                         <th scope="col">Employee</th>
+                        <th class="hidden md:table-cell" scope="col">Approver</th>
                         <th class="hidden sm:table-cell" scope="col">Date</th>
                         <th scope="col" class="text-right">Amount</th>
                         <th scope="col">Status</th>
@@ -102,6 +103,9 @@
                         </td>
                         <td class="text-slate-600 dark:text-slate-300">
                             {{ claim.employee.full_name if claim.employee else '-' }}
+                        </td>
+                        <td class="hidden md:table-cell text-slate-500 dark:text-slate-400">
+                            {{ claim_approver_names.get(claim.claim_id | string, '—') }}
                         </td>
                         <td class="hidden sm:table-cell text-slate-500">{{ claim.claim_date.strftime('%d %b %Y') if claim.claim_date else '—' }}</td>
                         <td class="text-right font-mono text-slate-900 dark:text-white">{{ claim.total_claimed_amount }}</td>

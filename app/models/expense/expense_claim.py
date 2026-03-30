@@ -392,6 +392,10 @@ class ExpenseClaim(Base, AuditMixin, StatusTrackingMixin, ERPNextSyncMixin):
         "Employee",
         foreign_keys=[approver_id],
     )
+    requested_approver: Mapped[Optional["Employee"]] = relationship(
+        "Employee",
+        foreign_keys=[requested_approver_id],
+    )
     approval_steps: Mapped[list["ExpenseClaimApprovalStep"]] = relationship(
         "ExpenseClaimApprovalStep",
         back_populates="claim",

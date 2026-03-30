@@ -101,6 +101,33 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         return {"items": items}
 
     @staticmethod
+    def _current_approver_name(claim: ExpenseClaim) -> str:
+        """Extract the current pending approver name for display in the list.
+
+        Checks persisted approval steps first (latest round, first pending),
+        then falls back to the requested_approver relationship.
+        """
+        if claim.approval_steps:
+            max_round = max(s.submission_round for s in claim.approval_steps)
+            current_round_steps = sorted(
+                (s for s in claim.approval_steps if s.submission_round == max_round),
+                key=lambda s: s.step_number,
+            )
+            # Find first pending step
+            for step in current_round_steps:
+                if not step.decision:
+                    return step.approver_name
+            # All decided — show last decider
+            if current_round_steps:
+                return current_round_steps[-1].approver_name
+        # Legacy fallback
+        if claim.requested_approver:
+            return claim.requested_approver.full_name or ""
+        if claim.approver:
+            return claim.approver.full_name or ""
+        return ""
+
+    @staticmethod
     def claims_list_response(
         request: Request,
         auth,
@@ -138,9 +165,16 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         start = _parse_date(start_date)
         end = _parse_date(end_date)
 
+        from sqlalchemy.orm import selectinload
+
         stmt = (
             select(ExpenseClaim)
-            .options(joinedload(ExpenseClaim.employee).joinedload(Employee.person))
+            .options(
+                joinedload(ExpenseClaim.employee).joinedload(Employee.person),
+                selectinload(ExpenseClaim.approval_steps),
+                joinedload(ExpenseClaim.requested_approver).joinedload(Employee.person),
+                joinedload(ExpenseClaim.approver).joinedload(Employee.person),
+            )
             .where(ExpenseClaim.organization_id == org_id)
         )
         if filter_view == "submitted_to_me":
@@ -258,10 +292,18 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 db, auth.person_id, "expense:claims:delete", org_id
             )
 
+        # Build approver name lookup for each claim
+        claim_approver_names: dict[str, str] = {}
+        for c in claims:
+            name = ExpenseClaimsWebMixin._current_approver_name(c)
+            if name:
+                claim_approver_names[str(c.claim_id)] = name
+
         context = _web_facade().base_context(request, auth, "Expense Claims", "claims")
         context.update(
             {
                 "claims": claims,
+                "claim_approver_names": claim_approver_names,
                 "search": search or "",
                 "statuses": [status.value for status in ExpenseClaimStatus],
                 "status_counts": counts,
@@ -861,6 +903,20 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             db.rollback()
             return RedirectResponse(
                 f"/expense/claims/{claim_id}?error=invalid_status", status_code=303
+            )
+        except ValueError as exc:
+            db.rollback()
+            message = str(exc).strip() or "Rejection could not be completed."
+            if message == "Approver is not assigned to the current approval step":
+                message = (
+                    "You cannot reject this claim yet because it is assigned "
+                    "to a different approval step."
+                )
+            elif message == "Claim has no pending approval steps":
+                message = "This claim has no pending approval step."
+            return RedirectResponse(
+                f"/expense/claims/{claim_id}?error_message={quote(message)}",
+                status_code=303,
             )
         except Exception:
             db.rollback()

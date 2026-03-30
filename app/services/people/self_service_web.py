@@ -414,11 +414,62 @@ class SelfServiceWebService:
         )
 
     @staticmethod
-    def _get_expense_approver_options(db: Session, org_id: UUID) -> list[dict]:
-        """Return active employee options with admin or expense_approver roles."""
+    def _get_expense_approver_options(
+        db: Session,
+        org_id: UUID,
+        employee_id: UUID | None = None,
+    ) -> list[dict]:
+        """Return valid expense approver options for the given employee.
+
+        Priority:
+        1. Employee's designated expense_approver_id
+        2. Employee's reports_to_id (manager)
+        3. Fallback: all active employees with admin/expense_approver roles
+        """
+
+        def _build_option(emp: Employee, person: Person | None) -> dict[str, str]:
+            label = ""
+            if person:
+                label = (
+                    person.name
+                    or f"{person.first_name or ''} {person.last_name or ''}".strip()
+                )
+            if emp.employee_code:
+                label = f"{label} ({emp.employee_code})" if label else emp.employee_code
+            return {"id": str(emp.employee_id), "label": label or "Unnamed"}
+
+        # Try employee-specific approvers first
+        if employee_id:
+            employee = db.get(Employee, employee_id)
+            if employee:
+                candidate_ids: list[UUID] = []
+                if employee.expense_approver_id:
+                    candidate_ids.append(employee.expense_approver_id)
+                if (
+                    employee.reports_to_id
+                    and employee.reports_to_id not in candidate_ids
+                ):
+                    candidate_ids.append(employee.reports_to_id)
+
+                if candidate_ids:
+                    rows = db.execute(
+                        select(Employee, Person)
+                        .join(Person, Person.id == Employee.person_id)
+                        .where(
+                            Employee.organization_id == org_id,
+                            Employee.status == EmployeeStatus.ACTIVE,
+                            Employee.employee_id.in_(candidate_ids),
+                        )
+                        .order_by(Person.first_name, Person.last_name)
+                    ).all()
+                    if rows:
+                        return [_build_option(emp, p) for emp, p in rows]
+
+        # Fallback: all employees with admin or expense_approver roles
         roles = db.scalars(
             select(Role).where(
-                Role.is_active == True, Role.name.in_(["admin", "expense_approver"])
+                Role.is_active == True,
+                Role.name.in_(["admin", "expense_approver"]),
             )
         ).all()
         role_ids = [role.id for role in roles]
@@ -426,7 +477,7 @@ class SelfServiceWebService:
             return []
 
         rows = db.execute(
-            select(Employee, PersonRole, Person)
+            select(Employee, Person)
             .join(PersonRole, PersonRole.person_id == Employee.person_id)
             .join(Person, Person.id == Employee.person_id)
             .where(
@@ -437,26 +488,9 @@ class SelfServiceWebService:
             .order_by(Person.first_name, Person.last_name)
         ).all()
 
-        options = {}
-        for employee, _, person in rows:
-            label = ""
-            if person:
-                if person.name:
-                    label = person.name
-                else:
-                    label = (
-                        f"{person.first_name or ''} {person.last_name or ''}".strip()
-                    )
-            if employee.employee_code:
-                label = (
-                    f"{label} ({employee.employee_code})"
-                    if label
-                    else employee.employee_code
-                )
-            options[str(employee.employee_id)] = {
-                "id": str(employee.employee_id),
-                "label": label or "Unnamed",
-            }
+        options: dict[str, dict[str, str]] = {}
+        for emp, person in rows:
+            options[str(emp.employee_id)] = _build_option(emp, person)
 
         return list(options.values())
 
@@ -1694,7 +1728,7 @@ class SelfServiceWebService:
                 or "",
                 "allowed_banks": allowed_banks,
                 "expense_approver_options": self._get_expense_approver_options(
-                    db, org_id
+                    db, org_id, employee_id=employee_id
                 ),
             }
         )
@@ -1921,7 +1955,7 @@ class SelfServiceWebService:
                     selected_claim_bank.bank_sort_code if selected_claim_bank else ""
                 ),
                 "expense_approver_options": self._get_expense_approver_options(
-                    db, org_id
+                    db, org_id, employee_id=employee_id
                 ),
             }
         )
