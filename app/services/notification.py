@@ -7,8 +7,10 @@ Handles in-app and email notifications for all app modules.
 import logging
 import uuid
 from datetime import datetime, timedelta
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.models.notification import (
@@ -636,9 +638,9 @@ class NotificationService:
         if organization_id:
             query = query.where(Notification.organization_id == organization_id)
 
-        result = db.execute(query)
+        result = cast(CursorResult[Any], db.execute(query))
         db.flush()
-        return result.rowcount
+        return result.rowcount or 0
 
     def delete_old_notifications(
         self,
@@ -666,7 +668,7 @@ class NotificationService:
         )
 
         db.flush()
-        count = result.rowcount
+        count = cast(CursorResult[Any], result).rowcount or 0
         logger.info("Deleted %d old notifications", count)
 
         return count

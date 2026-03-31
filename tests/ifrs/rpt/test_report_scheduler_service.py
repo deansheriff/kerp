@@ -3,7 +3,13 @@ Tests for ReportSchedulerService.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 import pytest
 from fastapi import HTTPException

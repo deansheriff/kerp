@@ -8,10 +8,18 @@ due to process crashes or network failures.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Any, cast
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from uuid import UUID
 
 from sqlalchemy import and_, delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.models.finance.platform.saga_execution import (
@@ -332,12 +340,11 @@ class SagaRecoveryService:
         ids_to_delete = list(saga_ids)
 
         # Delete in batches (steps cascade)
-        deleted = (
-            db.execute(
-                delete(SagaExecution).where(SagaExecution.saga_id.in_(ids_to_delete))
-            ).rowcount
-            or 0
+        result = cast(
+            CursorResult[Any],
+            db.execute(delete(SagaExecution).where(SagaExecution.saga_id.in_(ids_to_delete))),
         )
+        deleted = result.rowcount or 0
 
         db.commit()
 

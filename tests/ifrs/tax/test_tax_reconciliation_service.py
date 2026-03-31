@@ -4,7 +4,13 @@ Tests for TaxReconciliationService.
 Tests IAS 12 tax rate reconciliation creation, review, and validation.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import uuid4

@@ -462,7 +462,7 @@ def calculate_customer_balance_trends(
     if not customer_ids:
         return {}
 
-    from dateutil.relativedelta import relativedelta
+    from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
     trends: dict[UUID, list[float]] = {cid: [] for cid in customer_ids}
     today = date.today()

@@ -5,8 +5,13 @@ Handles reservation requests, approvals, and vehicle checkouts.
 """
 
 import logging
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload

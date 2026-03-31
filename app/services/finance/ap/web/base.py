@@ -419,7 +419,7 @@ def calculate_supplier_balance_trends(
     if not supplier_ids:
         return {}
 
-    from dateutil.relativedelta import relativedelta
+    from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
     trends: dict[UUID, list[float]] = {sid: [] for sid in supplier_ids}
     today = date.today()

@@ -1,0 +1,123 @@
+{% extends "modules/base_modules.html" %}
+{% from "components/macros.html" import icon_svg, currency, data_table %}
+
+{% block page_title %}Fleet Invoice Reports{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/fleet" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Fleet</a></li>
+        <li class="flex items-center gap-2">
+            {{ icon_svg("chevron-right", "h-4 w-4") }}
+            <a href="/fleet/reports" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Reports</a>
+        </li>
+        <li class="flex items-center gap-2">
+            {{ icon_svg("chevron-right", "h-4 w-4") }}
+            <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Invoices</span>
+        </li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 page-enter">
+    <div class="card p-6">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Invoices by Vehicle</h2>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    Shows AP invoices where a Fleet vehicle was selected.
+                </p>
+            </div>
+            <a href="/fleet/reports" class="btn btn-secondary">Back</a>
+        </div>
+        {% if not tables_ready %}
+        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+            Fleet tables are not initialized in this database yet.
+        </div>
+        {% endif %}
+    </div>
+
+    {% call data_table(
+        headers=[
+            {"label": "Vehicle", "class": "text-left"},
+            {"label": "Invoices", "class": "text-right"},
+            {"label": "Total", "class": "text-right"}
+        ],
+        empty_title="No linked invoices",
+        empty_description="Create an AP invoice and assign a Fleet vehicle to start tracking costs."
+    ) %}
+        {% for row in vehicle_rows %}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+            <td class="px-4 py-3">
+                <a href="/fleet/reports/invoices?vehicle_id={{ row.vehicle_id }}" class="font-medium text-slate-900 dark:text-white hover:text-amber-700 dark:hover:text-amber-300">
+                    {{ row.registration_number }}
+                </a>
+                {% if row.vehicle_label %}
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ row.vehicle_label }}</div>
+                {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right text-sm text-slate-700 dark:text-slate-200 tabular-nums">{{ row.invoice_count }}</td>
+            <td class="px-4 py-3 text-right text-sm text-slate-900 dark:text-white font-medium tabular-nums">{{ currency(row.total_amount) }}</td>
+        </tr>
+        {% endfor %}
+    {% endcall %}
+
+    {% if selected_vehicle %}
+    <div class="grid gap-4 lg:grid-cols-2">
+        <div class="card p-6">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Expense Account Breakdown</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {{ selected_vehicle.registration_number }} {% if selected_vehicle.make or selected_vehicle.model %}({{ (selected_vehicle.make ~ " " ~ selected_vehicle.model)|trim }}){% endif %}
+            </p>
+            <div class="mt-4">
+                {% call data_table(
+                    headers=[
+                        {"label": "Account", "class": "text-left"},
+                        {"label": "Total", "class": "text-right"}
+                    ],
+                    empty_title="No accounts yet",
+                    empty_description="This vehicle has no linked invoice lines."
+                ) %}
+                    {% for row in category_rows %}
+                    <tr>
+                        <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{{ row.category_name }}</td>
+                        <td class="px-4 py-3 text-right text-sm text-slate-900 dark:text-white font-medium tabular-nums">{{ currency(row.total_amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endcall %}
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Recent Invoices</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Up to the latest 200 invoices linked to this vehicle.</p>
+            <div class="mt-4">
+                {% call data_table(
+                    headers=[
+                        {"label": "Invoice", "class": "text-left"},
+                        {"label": "Date", "class": "text-left"},
+                        {"label": "Status", "class": "text-left"},
+                        {"label": "Total", "class": "text-right"}
+                    ],
+                    empty_title="No linked invoices",
+                    empty_description="No AP invoices are linked to this vehicle yet."
+                ) %}
+                    {% for row in invoice_rows %}
+                    <tr>
+                        <td class="px-4 py-3">
+                            <a class="text-slate-900 dark:text-white hover:text-amber-700 dark:hover:text-amber-300 font-medium" href="/finance/ap/invoices/{{ row.invoice_id }}">{{ row.invoice_number }}</a>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{{ row.invoice_date }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{{ row.status }}</td>
+                        <td class="px-4 py-3 text-right text-sm text-slate-900 dark:text-white font-medium tabular-nums">{{ currency(row.total_amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endcall %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

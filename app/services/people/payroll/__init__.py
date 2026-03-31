@@ -14,7 +14,6 @@ from app.services.people.payroll.paye_calculator import (
 from app.services.people.payroll.payroll_gl_adapter import (
     PayrollGLAdapter,
     PayrollPostingResult,
-    payroll_gl_adapter,
 )
 from app.services.people.payroll.payroll_service import (
     PayrollService,
@@ -30,7 +29,6 @@ __all__ = [
     # GL Adapter
     "PayrollGLAdapter",
     "PayrollPostingResult",
-    "payroll_gl_adapter",
     # Salary Slip Service
     "SalarySlipInput",
     "SalarySlipService",

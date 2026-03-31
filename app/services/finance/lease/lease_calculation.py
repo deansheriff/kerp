@@ -260,7 +260,7 @@ class LeaseCalculationService(ListResponseMixin):
         Returns:
             List of PaymentScheduleEntry for each payment period
         """
-        from dateutil.relativedelta import relativedelta
+        from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         ls_id = coerce_uuid(lease_id)
 

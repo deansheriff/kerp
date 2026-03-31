@@ -48,6 +48,66 @@ def fleet_dashboard(
 
 
 # =============================================================================
+# Reports
+# =============================================================================
+
+
+@router.get("/reports", response_class=HTMLResponse)
+def fleet_reports_index(
+    request: Request,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db),
+):
+    """Fleet reports landing page."""
+    context = base_context(request, auth, "Fleet Reports", "fleet", db=db)
+    web_service = FleetWebService(db)
+    context.update(web_service.reports_index_context(auth.organization_id))
+    return templates.TemplateResponse(request, "fleet/reports/index.html", context)
+
+
+@router.get("/reports/expenses", response_class=HTMLResponse)
+def fleet_reports_expenses(
+    request: Request,
+    vehicle_id: UUID | None = None,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db),
+):
+    """Fleet expense reports (expense claims linked to vehicles)."""
+    context = base_context(request, auth, "Fleet Expense Reports", "fleet", db=db)
+    web_service = FleetWebService(db)
+    context.update(
+        web_service.reports_expenses_context(
+            auth.organization_id,
+            vehicle_id=vehicle_id,
+        )
+    )
+    return templates.TemplateResponse(
+        request, "fleet/reports/expenses.html", context
+    )
+
+
+@router.get("/reports/invoices", response_class=HTMLResponse)
+def fleet_reports_invoices(
+    request: Request,
+    vehicle_id: UUID | None = None,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db),
+):
+    """Fleet invoice reports (AP invoices linked to vehicles)."""
+    context = base_context(request, auth, "Fleet Invoice Reports", "fleet", db=db)
+    web_service = FleetWebService(db)
+    context.update(
+        web_service.reports_invoices_context(
+            auth.organization_id,
+            vehicle_id=vehicle_id,
+        )
+    )
+    return templates.TemplateResponse(
+        request, "fleet/reports/invoices.html", context
+    )
+
+
+# =============================================================================
 # Vehicles
 # =============================================================================
 

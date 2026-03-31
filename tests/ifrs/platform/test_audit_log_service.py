@@ -4,7 +4,13 @@ Tests for AuditLogService.
 
 import uuid
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from unittest.mock import MagicMock, patch
 
 import pytest

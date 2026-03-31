@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import JSON, Date, DateTime, Float, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID

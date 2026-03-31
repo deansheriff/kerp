@@ -325,3 +325,87 @@ def test_list_overdue_requires_filters():
     db.scalars.return_value.all.return_value = []
 
     SupplierInvoiceService.list(db, organization_id=str(org_id), overdue_only=True)
+
+
+def test_build_input_from_payload_parses_vehicle_id():
+    db = MagicMock()
+    org_id = uuid4()
+    vehicle_id = uuid4()
+    supplier_id = uuid4()
+
+    payload = {
+        "supplier_id": str(supplier_id),
+        "invoice_date": "2026-03-01",
+        "received_date": "2026-03-01",
+        "due_date": "2026-03-15",
+        "currency_code": "NGN",
+        "vehicle_id": str(vehicle_id),
+        "lines": [
+            {
+                "description": "Fuel",
+                "quantity": "1",
+                "unit_price": "100",
+                "expense_account_id": str(uuid4()),
+            }
+        ],
+    }
+
+    with patch(
+        "app.services.finance.ap.supplier_invoice.resolve_currency_code",
+        return_value="NGN",
+    ):
+        invoice_input = SupplierInvoiceService.build_input_from_payload(db, org_id, payload)
+
+    assert invoice_input.vehicle_id == vehicle_id
+
+
+def test_create_invoice_sets_vehicle_id_when_provided():
+    db = MagicMock()
+    org_id = uuid4()
+    supplier = _make_supplier(org_id, active=True)
+    db.get.return_value = supplier
+
+    vehicle_id = uuid4()
+
+    with (
+        patch(
+            "app.services.finance.ap.supplier_invoice.SequenceService.get_next_number",
+            return_value="SI-1",
+        ),
+        patch(
+            "app.services.finance.ap.supplier_invoice.SupplierInvoiceService._require_org_match",
+            return_value=None,
+        ),
+        patch(
+            "app.services.finance.ap.supplier_invoice.SupplierInvoiceService._require_po_line_org",
+            return_value=None,
+        ),
+        patch(
+            "app.services.finance.ap.supplier_invoice.SupplierInvoiceService._require_gr_line_org",
+            return_value=None,
+        ),
+    ):
+        invoice = SupplierInvoiceService.create_invoice(
+            db,
+            org_id,
+            SupplierInvoiceInput(
+                supplier_id=supplier.supplier_id,
+                invoice_type=SupplierInvoiceType.STANDARD,
+                invoice_date=date.today(),
+                received_date=date.today(),
+                due_date=date.today() + timedelta(days=14),
+                currency_code="NGN",
+                vehicle_id=vehicle_id,
+                lines=[
+                    InvoiceLineInput(
+                        description="Fuel",
+                        quantity=Decimal("1"),
+                        unit_price=Decimal("100"),
+                        expense_account_id=uuid4(),
+                    )
+                ],
+            ),
+            created_by_user_id=uuid4(),
+        )
+
+    assert invoice.vehicle_id == vehicle_id

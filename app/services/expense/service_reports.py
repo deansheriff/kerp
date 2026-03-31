@@ -412,7 +412,7 @@ class ExpenseReportingMixin(ExpenseServiceBase):
         }
 
     def get_expense_trends_report(self, org_id: UUID, *, months: int = 12) -> dict:
-        from dateutil.relativedelta import relativedelta
+        from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         today = date.today()
         end_date = today.replace(day=1)

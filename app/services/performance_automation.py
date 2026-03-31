@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from dateutil.relativedelta import relativedelta
+from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 

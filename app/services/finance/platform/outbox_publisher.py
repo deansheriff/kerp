@@ -6,9 +6,14 @@ then published asynchronously by a background processor.
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session

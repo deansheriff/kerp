@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.models.expense.expense_claim import ExpenseClaim, ExpenseClaimStatus
 from app.models.finance.core_org.location import Location
+from app.models.finance.gl.account import Account
 from app.models.fleet.enums import (
     AssignmentType,
     DocumentType,
@@ -45,6 +46,8 @@ from app.services.fleet.maintenance_service import MaintenanceService
 from app.services.fleet.reservation_service import ReservationService
 from app.services.fleet.vehicle_service import VehicleService
 from app.services.recent_activity import get_recent_activity_for_record
+from app.models.finance.ap.supplier_invoice import SupplierInvoice, SupplierInvoiceStatus
+from app.models.finance.ap.supplier_invoice_line import SupplierInvoiceLine
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +202,348 @@ class FleetWebService:
             "active_reservations": active_reservations,
             "open_incidents": open_incidents,
             "open_incidents_count": len(open_incidents),
+        }
+
+    # ─────────────────────────────────────────────────────────────
+    # Reports
+    # ─────────────────────────────────────────────────────────────
+
+    def reports_index_context(self, organization_id: UUID) -> dict[str, Any]:
+        """Context for Fleet → Reports landing page."""
+        if not self._fleet_tables_ready():
+            return {
+                "tables_ready": False,
+                "linked_expense_claims": 0,
+                "linked_invoices": 0,
+            }
+
+        org_id = coerce_uuid(organization_id)
+        inspector = inspect(self.db.get_bind())
+
+        linked_claims = 0
+        if inspector.has_table("expense_claim", schema="expense"):
+            from app.models.expense.expense_claim import ExpenseClaim, ExpenseClaimStatus
+            from sqlalchemy import func
+
+            linked_claims = (
+                self.db.execute(
+                    sa_select(func.count())
+                    .select_from(ExpenseClaim)
+                    .where(
+                        ExpenseClaim.organization_id == org_id,
+                        ExpenseClaim.vehicle_id.is_not(None),
+                        ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+                    )
+                ).scalar_one()
+                or 0
+            )
+
+        linked_invoices = 0
+        if inspector.has_table("supplier_invoice", schema="ap"):
+            from sqlalchemy import func
+
+            linked_invoices = (
+                self.db.execute(
+                    sa_select(func.count())
+                    .select_from(SupplierInvoice)
+                    .where(
+                        SupplierInvoice.organization_id == org_id,
+                        SupplierInvoice.vehicle_id.is_not(None),
+                        SupplierInvoice.status != SupplierInvoiceStatus.VOID,
+                    )
+                ).scalar_one()
+                or 0
+            )
+
+        return {
+            "tables_ready": True,
+            "linked_expense_claims": int(linked_claims),
+            "linked_invoices": int(linked_invoices),
+        }
+
+    def reports_expenses_context(
+        self,
+        organization_id: UUID,
+        *,
+        vehicle_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Context for Fleet → Reports → Expenses."""
+        if not self._fleet_tables_ready():
+            return {
+                "tables_ready": False,
+                "vehicle_rows": [],
+                "selected_vehicle": None,
+                "category_rows": [],
+                "claim_rows": [],
+            }
+
+        org_id = coerce_uuid(organization_id)
+        inspector = inspect(self.db.get_bind())
+
+        vehicles = VehicleService(self.db, org_id).list_vehicles(
+            params=PaginationParams(offset=0, limit=500)
+        ).items
+        vehicles_by_id = {getattr(v, "vehicle_id", None): v for v in vehicles}
+
+        vehicle_totals: dict[UUID, dict[str, Any]] = {}
+        if inspector.has_table("expense_claim", schema="expense"):
+            from app.models.expense.expense_claim import ExpenseClaim, ExpenseClaimStatus
+            from sqlalchemy import func
+
+            rows = (
+                self.db.execute(
+                    sa_select(
+                        ExpenseClaim.vehicle_id,
+                        func.count(ExpenseClaim.claim_id).label("claim_count"),
+                        func.coalesce(
+                            func.sum(ExpenseClaim.total_claimed_amount), 0
+                        ).label("total_amount"),
+                    )
+                    .where(
+                        ExpenseClaim.organization_id == org_id,
+                        ExpenseClaim.vehicle_id.is_not(None),
+                        ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+                    )
+                    .group_by(ExpenseClaim.vehicle_id)
+                )
+                .all()
+            )
+            for vid, claim_count, total_amount in rows:
+                if vid:
+                    vehicle_totals[vid] = {
+                        "claim_count": int(claim_count or 0),
+                        "total_amount": total_amount or Decimal("0"),
+                    }
+
+        vehicle_rows: list[dict[str, Any]] = []
+        for v in vehicles:
+            vid = getattr(v, "vehicle_id", None)
+            if not vid:
+                continue
+            totals = vehicle_totals.get(vid, {})
+            vehicle_rows.append(
+                {
+                    "vehicle_id": vid,
+                    "registration_number": getattr(v, "registration_number", "") or "",
+                    "vehicle_label": f"{getattr(v, 'make', '')} {getattr(v, 'model', '')}".strip(),
+                    "claim_count": totals.get("claim_count", 0),
+                    "total_amount": totals.get("total_amount", Decimal("0")),
+                }
+            )
+        vehicle_rows.sort(key=lambda r: (r["total_amount"] or Decimal("0")), reverse=True)
+
+        selected_vehicle = vehicles_by_id.get(vehicle_id) if vehicle_id else None
+        category_rows: list[dict[str, Any]] = []
+        claim_rows: list[dict[str, Any]] = []
+
+        if vehicle_id and inspector.has_table("expense_claim_item", schema="expense"):
+            from app.models.expense.expense_claim import ExpenseClaim, ExpenseClaimStatus
+            from app.models.expense.expense_claim import ExpenseCategory
+            from app.models.expense.expense_claim import ExpenseClaimItem
+            from sqlalchemy import func
+
+            total_amount_expr = func.coalesce(func.sum(ExpenseClaimItem.claimed_amount), 0).label(
+                "total_amount"
+            )
+            category_rows = [
+                {
+                    "category_name": category_name,
+                    "total_amount": total_amount or Decimal("0"),
+                }
+                for category_name, total_amount in self.db.execute(
+                    sa_select(
+                        ExpenseCategory.category_name,
+                        total_amount_expr,
+                    )
+                    .select_from(ExpenseClaimItem)
+                    .join(
+                        ExpenseClaim,
+                        ExpenseClaim.claim_id == ExpenseClaimItem.claim_id,
+                    )
+                    .join(
+                        ExpenseCategory,
+                        ExpenseCategory.category_id == ExpenseClaimItem.category_id,
+                    )
+                    .where(
+                        ExpenseClaim.organization_id == org_id,
+                        ExpenseClaim.vehicle_id == vehicle_id,
+                        ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+                    )
+                    .group_by(ExpenseCategory.category_name)
+                    .order_by(total_amount_expr.desc())
+                ).all()
+            ]
+
+            claim_rows = [
+                {
+                    "claim_id": claim.claim_id,
+                    "claim_number": claim.claim_number,
+                    "claim_date": claim.claim_date,
+                    "status": claim.status.value if claim.status else "",
+                    "total_amount": claim.total_claimed_amount or Decimal("0"),
+                }
+                for claim in self.db.scalars(
+                    sa_select(ExpenseClaim)
+                    .where(
+                        ExpenseClaim.organization_id == org_id,
+                        ExpenseClaim.vehicle_id == vehicle_id,
+                        ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+                    )
+                    .order_by(ExpenseClaim.claim_date.desc(), ExpenseClaim.claim_number.desc())
+                    .limit(200)
+                ).all()
+            ]
+
+        return {
+            "tables_ready": True,
+            "vehicle_rows": vehicle_rows,
+            "selected_vehicle": selected_vehicle,
+            "category_rows": category_rows,
+            "claim_rows": claim_rows,
+        }
+
+    def reports_invoices_context(
+        self,
+        organization_id: UUID,
+        *,
+        vehicle_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Context for Fleet → Reports → Invoices."""
+        if not self._fleet_tables_ready():
+            return {
+                "tables_ready": False,
+                "vehicle_rows": [],
+                "selected_vehicle": None,
+                "category_rows": [],
+                "invoice_rows": [],
+            }
+
+        org_id = coerce_uuid(organization_id)
+        inspector = inspect(self.db.get_bind())
+
+        vehicles = VehicleService(self.db, org_id).list_vehicles(
+            params=PaginationParams(offset=0, limit=500)
+        ).items
+        vehicles_by_id = {getattr(v, "vehicle_id", None): v for v in vehicles}
+
+        vehicle_totals: dict[UUID, dict[str, Any]] = {}
+        if inspector.has_table("supplier_invoice", schema="ap"):
+            from sqlalchemy import func
+
+            rows = self.db.execute(
+                sa_select(
+                    SupplierInvoice.vehicle_id,
+                    func.count(SupplierInvoice.invoice_id).label("invoice_count"),
+                    func.coalesce(func.sum(SupplierInvoice.total_amount), 0).label(
+                        "total_amount"
+                    ),
+                )
+                .where(
+                    SupplierInvoice.organization_id == org_id,
+                    SupplierInvoice.vehicle_id.is_not(None),
+                    SupplierInvoice.status != SupplierInvoiceStatus.VOID,
+                )
+                .group_by(SupplierInvoice.vehicle_id)
+            ).all()
+
+            for vid, invoice_count, total_amount in rows:
+                if vid:
+                    vehicle_totals[vid] = {
+                        "invoice_count": int(invoice_count or 0),
+                        "total_amount": total_amount or Decimal("0"),
+                    }
+
+        vehicle_rows: list[dict[str, Any]] = []
+        for v in vehicles:
+            vid = getattr(v, "vehicle_id", None)
+            if not vid:
+                continue
+            totals = vehicle_totals.get(vid, {})
+            vehicle_rows.append(
+                {
+                    "vehicle_id": vid,
+                    "registration_number": getattr(v, "registration_number", "") or "",
+                    "vehicle_label": f"{getattr(v, 'make', '')} {getattr(v, 'model', '')}".strip(),
+                    "invoice_count": totals.get("invoice_count", 0),
+                    "total_amount": totals.get("total_amount", Decimal("0")),
+                }
+            )
+        vehicle_rows.sort(key=lambda r: (r["total_amount"] or Decimal("0")), reverse=True)
+
+        selected_vehicle = vehicles_by_id.get(vehicle_id) if vehicle_id else None
+        category_rows: list[dict[str, Any]] = []
+        invoice_rows: list[dict[str, Any]] = []
+
+        if (
+            vehicle_id
+            and inspector.has_table("supplier_invoice_line", schema="ap")
+            and inspector.has_table("account", schema="gl")
+        ):
+            from sqlalchemy import func
+
+            amount_expr = SupplierInvoiceLine.line_amount + SupplierInvoiceLine.tax_amount
+            category_name_expr = func.coalesce(
+                (Account.account_code + " - " + Account.account_name),
+                "Unassigned",
+            ).label("category_name")
+            total_amount_expr = func.coalesce(func.sum(amount_expr), 0).label("total_amount")
+
+            category_rows = [
+                {
+                    "category_name": category_name,
+                    "total_amount": total_amount or Decimal("0"),
+                }
+                for category_name, total_amount in self.db.execute(
+                    sa_select(
+                        category_name_expr,
+                        total_amount_expr,
+                    )
+                    .select_from(SupplierInvoiceLine)
+                    .join(
+                        SupplierInvoice,
+                        SupplierInvoice.invoice_id == SupplierInvoiceLine.invoice_id,
+                    )
+                    .join(
+                        Account,
+                        Account.account_id == SupplierInvoiceLine.expense_account_id,
+                        isouter=True,
+                    )
+                    .where(
+                        SupplierInvoice.organization_id == org_id,
+                        SupplierInvoice.vehicle_id == vehicle_id,
+                        SupplierInvoice.status != SupplierInvoiceStatus.VOID,
+                    )
+                    .group_by(category_name_expr)
+                    .order_by(total_amount_expr.desc())
+                ).all()
+            ]
+
+            invoice_rows = [
+                {
+                    "invoice_id": inv.invoice_id,
+                    "invoice_number": inv.invoice_number,
+                    "invoice_date": inv.invoice_date,
+                    "status": inv.status.value if inv.status else "",
+                    "total_amount": inv.total_amount or Decimal("0"),
+                }
+                for inv in self.db.scalars(
+                    sa_select(SupplierInvoice)
+                    .where(
+                        SupplierInvoice.organization_id == org_id,
+                        SupplierInvoice.vehicle_id == vehicle_id,
+                        SupplierInvoice.status != SupplierInvoiceStatus.VOID,
+                    )
+                    .order_by(SupplierInvoice.invoice_date.desc(), SupplierInvoice.invoice_number.desc())
+                    .limit(200)
+                ).all()
+            ]
+
+        return {
+            "tables_ready": True,
+            "vehicle_rows": vehicle_rows,
+            "selected_vehicle": selected_vehicle,
+            "category_rows": category_rows,
+            "invoice_rows": invoice_rows,
         }
 
     # ─────────────────────────────────────────────────────────────

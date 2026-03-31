@@ -8,6 +8,7 @@ logic without hitting the database.
 from __future__ import annotations
 
 import uuid
+import calendar
 from datetime import date, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -332,7 +333,8 @@ class TestProbationLogic:
         while month <= 0:
             month += 12
             year -= 1
-        join_date = date(year, month, today.day)
+        join_day = min(today.day, calendar.monthrange(year, month)[1])
+        join_date = date(year, month, join_day)
 
         result = svc._evaluate_probation_milestone(
             employee=make_employee(
@@ -376,7 +378,8 @@ class TestProbationLogic:
         while month <= 0:
             month += 12
             year -= 1
-        join_date = date(year, month, today.day)
+        join_day = min(today.day, calendar.monthrange(year, month)[1])
+        join_date = date(year, month, join_day)
 
         result = svc._evaluate_probation_milestone(
             employee=make_employee(
@@ -428,7 +431,8 @@ class TestProbationLogic:
         while month <= 0:
             month += 12
             year -= 1
-        join_date = date(year, month, today.day)
+        join_day = min(today.day, calendar.monthrange(year, month)[1])
+        join_date = date(year, month, join_day)
 
         emp = make_employee(
             employee_id=emp_id,

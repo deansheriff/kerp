@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
 
-from dateutil.relativedelta import relativedelta
+from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session

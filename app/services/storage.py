@@ -11,7 +11,7 @@ from __future__ import annotations
 import io
 import logging
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 from app.config import settings
@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _client: Minio | None = None
 _bucket_ensured: bool = False
+
+
+class _FallbackS3Error(Exception):
+    """Fallback used when the optional `minio` dependency is not installed."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args)
 
 
 def _get_client() -> Minio:
@@ -186,9 +193,14 @@ class S3StorageService:
     @property
     def _s3_error(self) -> type[Exception]:
         """Lazy import of minio.error.S3Error for exception handling."""
-        from minio.error import S3Error
+        try:
+            from minio.error import S3Error
+        except ModuleNotFoundError:  # pragma: no cover
+            # Allow unit tests to run without the optional `minio` dependency.
+            S3Error = _FallbackS3Error
 
-        return S3Error
+        # minio is untyped, so mypy treats S3Error as Any unless we cast.
+        return cast(type[Exception], S3Error)
 
 
 def get_storage() -> S3StorageService:

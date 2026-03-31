@@ -5,7 +5,13 @@ Provides response builders for profile-related web routes.
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse

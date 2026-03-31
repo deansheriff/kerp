@@ -7,10 +7,15 @@ from __future__ import annotations
 import calendar
 import json
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import quote, urlencode
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -47,7 +52,7 @@ from app.services.finance.banking.bank_directory import BankDirectoryService
 from app.services.people.attendance import AttendanceService
 from app.services.people.attendance.attendance_service import AttendanceServiceError
 from app.services.people.expense import ExpenseService
-from app.services.people.hr import EmployeeService
+from app.services.people.hr.employees import EmployeeService
 from app.services.people.hr.employee_types import EmployeeFilters
 from app.services.people.hr.info_change_service import InfoChangeService
 from app.services.people.leave import LeaveService
@@ -1653,6 +1658,11 @@ class SelfServiceWebService:
         selected_project_id = request.query_params.get("project_id")
         selected_task_id = request.query_params.get("task_id")
         tasks = self._get_tasks_for_dropdown(db, org_id, selected_project_id)
+        from app.services.fleet.vehicle_service import VehicleService
+
+        vehicles = VehicleService(db, org_id).list_vehicles(
+            params=PaginationParams(offset=0, limit=500)
+        ).items
         context = base_context(request, auth, "My Expenses", "self-expenses", db=db)
         context.update(
             {
@@ -1662,6 +1672,7 @@ class SelfServiceWebService:
                 "projects": projects,
                 "cost_centers": cost_centers,
                 "tasks": tasks,
+                "vehicles": vehicles,
                 "selected_ticket_id": selected_ticket_id,
                 "selected_project_id": selected_project_id,
                 "selected_task_id": selected_task_id,
@@ -1715,6 +1726,7 @@ class SelfServiceWebService:
         project_id: str | None = None,
         ticket_id: str | None = None,
         task_id: str | None = None,
+        vehicle_id: str | None = None,
         cost_center_id: str | None = None,
     ) -> RedirectResponse:
         org_id = coerce_uuid(auth.organization_id)
@@ -1815,6 +1827,7 @@ class SelfServiceWebService:
             project_id=coerce_uuid(project_id) if project_id else None,
             ticket_id=coerce_uuid(ticket_id) if ticket_id else None,
             task_id=coerce_uuid(task_id) if task_id else None,
+            vehicle_id=coerce_uuid(vehicle_id) if vehicle_id else None,
             cost_center_id=coerce_uuid(cost_center_id) if cost_center_id else None,
             recipient_bank_code=recipient_bank_code,
             recipient_bank_name=recipient_bank_name,
@@ -1856,6 +1869,11 @@ class SelfServiceWebService:
         tasks = self._get_tasks_for_dropdown(
             db, org_id, str(claim.project_id) if claim.project_id else None
         )
+        from app.services.fleet.vehicle_service import VehicleService
+
+        vehicles = VehicleService(db, org_id).list_vehicles(
+            params=PaginationParams(offset=0, limit=500)
+        ).items
 
         # Get cost centers for dropdown
         from app.models.finance.core_org.cost_center import CostCenter
@@ -1889,6 +1907,7 @@ class SelfServiceWebService:
                 "projects": projects,
                 "tickets": tickets,
                 "tasks": tasks,
+                "vehicles": vehicles,
                 "cost_centers": cost_centers,
                 "allowed_banks": allowed_banks,
                 "selected_claim_bank_name": (
@@ -1976,6 +1995,7 @@ class SelfServiceWebService:
         project_id: UUID | None = None,
         ticket_id: UUID | None = None,
         task_id: UUID | None = None,
+        vehicle_id: UUID | None = None,
         cost_center_id: UUID | None = None,
     ) -> RedirectResponse:
         org_id = coerce_uuid(auth.organization_id)
@@ -2013,6 +2033,7 @@ class SelfServiceWebService:
             project_id=project_id,
             ticket_id=ticket_id,
             task_id=task_id,
+            vehicle_id=vehicle_id,
             cost_center_id=cost_center_id,
         )
 

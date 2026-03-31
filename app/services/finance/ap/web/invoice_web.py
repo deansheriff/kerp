@@ -7,9 +7,14 @@ Provides view-focused data and operations for AP invoice web routes.
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -288,6 +293,12 @@ class InvoiceWebService:
             po_id,
         )
         org_id = coerce_uuid(organization_id)
+        from app.services.common import PaginationParams
+        from app.services.fleet.vehicle_service import VehicleService
+
+        fleet_vehicles = VehicleService(db, org_id).list_vehicles(
+            params=PaginationParams(offset=0, limit=500)
+        ).items
         suppliers_list = [
             supplier_option_view(supplier)
             for supplier in supplier_service.list(
@@ -425,6 +436,7 @@ class InvoiceWebService:
             "items_list": items_list,
             "tax_codes": tax_codes,
             "asset_categories": asset_categories,
+            "fleet_vehicles": fleet_vehicles,
             "organization_id": organization_id,
             "selected_supplier": selected_supplier,
             "selected_po": selected_po,
@@ -836,6 +848,7 @@ class InvoiceWebService:
             "invoice_date": invoice.invoice_date,
             "received_date": invoice.received_date,
             "due_date": invoice.due_date,
+            "vehicle_id": getattr(invoice, "vehicle_id", None),
             "currency_code": invoice.currency_code,
             "purpose": invoice.purpose or "",
             "exchange_rate": str(invoice.exchange_rate)

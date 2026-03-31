@@ -9,10 +9,15 @@ from __future__ import annotations
 import builtins
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, date
+from datetime import date, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import HTTPException
 from sqlalchemy import select

@@ -6,7 +6,12 @@ like common.py, bulk_actions.py, scheduler.py, audit.py, and scheduler_config.py
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 from unittest.mock import MagicMock
 
 import pytest

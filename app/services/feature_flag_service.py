@@ -19,8 +19,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import Depends, HTTPException
 from sqlalchemy import select, update
@@ -467,8 +473,6 @@ class FeatureFlagService:
 
     def get_expired_flags(self) -> list[FeatureFlagRegistry]:
         """Get active flags past their expiry date."""
-        from datetime import UTC, datetime
-
         now = datetime.now(UTC)
         stmt = select(FeatureFlagRegistry).where(
             FeatureFlagRegistry.status == FeatureFlagStatus.ACTIVE,

@@ -11,9 +11,14 @@ import builtins
 import logging
 import uuid as uuid_lib
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import HTTPException
 from sqlalchemy import select

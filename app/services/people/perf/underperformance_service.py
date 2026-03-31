@@ -201,7 +201,9 @@ class UnderperformanceService:
         # milestone_date = date_of_joining + ~21 months
         # We query broadly (joining date range) and filter precisely in Python
         # to avoid calendar arithmetic edge cases in SQL.
-        window_start = today
+        # Flag employees whose 21-month milestone is near "now" (not only upcoming).
+        # This avoids missing end-of-month edge cases where join_date day clamps.
+        window_start = today - timedelta(days=_PROBATION_WINDOW_DAYS)
         window_end = today + timedelta(days=_PROBATION_WINDOW_DAYS)
 
         # Approximate the join date range corresponding to the 21-month window
@@ -395,7 +397,9 @@ class UnderperformanceService:
         milestone_day = min(join_date.day, max_day)
         milestone_date = date(milestone_year, milestone_month, milestone_day)
 
-        window_start = today
+        # Flag milestones near "now" (not only upcoming) to avoid end-of-month
+        # join-date clamping missing employees by 1 day.
+        window_start = today - timedelta(days=_PROBATION_WINDOW_DAYS)
         window_end = today + timedelta(days=_PROBATION_WINDOW_DAYS)
 
         if not (window_start <= milestone_date <= window_end):

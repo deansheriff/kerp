@@ -8,7 +8,13 @@ movements from posted ledger lines.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
 from uuid import UUID
 

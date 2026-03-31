@@ -26,7 +26,6 @@ from app.services.fixed_assets.disposal import (
 from app.services.fixed_assets.fa_posting_adapter import (
     FAPostingAdapter,
     FAPostingResult,
-    fa_posting_adapter,
 )
 from app.services.fixed_assets.revaluation import (
     AssetRevaluationService,
@@ -58,5 +57,4 @@ __all__ = [
     # Posting
     "FAPostingAdapter",
     "FAPostingResult",
-    "fa_posting_adapter",
 ]

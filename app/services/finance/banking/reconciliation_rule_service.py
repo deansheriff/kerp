@@ -9,11 +9,15 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import UTC as _UTC
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
+
+try:
+    from datetime import UTC as _UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    _UTC = timezone.utc
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session

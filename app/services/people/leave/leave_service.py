@@ -8,11 +8,16 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
 from zoneinfo import ZoneInfo
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import and_, case, delete, func, or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -1890,7 +1895,7 @@ class LeaveService:
 
         Returns monthly breakdown of leave applications.
         """
-        from dateutil.relativedelta import relativedelta
+        from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         today = date.today()
         end_date = today.replace(day=1)

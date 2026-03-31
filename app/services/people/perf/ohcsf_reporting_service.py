@@ -434,8 +434,10 @@ class OHCSFReportingService:
             .limit(n)
         )
 
-        rows = self.db.execute(stmt).tuples().all()
-        return self._format_performer_rows(rows)
+        # Use `.all()` (not `.tuples()`) so unit tests can stub `execute().all()`
+        # with plain tuples, while SQLAlchemy will still yield unpackable Row objects.
+        rows = self.db.execute(stmt).all()
+        return self._format_performer_rows(rows)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------------
     # Report 8 — Bottom Performers
@@ -474,8 +476,8 @@ class OHCSFReportingService:
             .limit(n)
         )
 
-        rows = self.db.execute(stmt).tuples().all()
-        return self._format_performer_rows(rows)
+        rows = self.db.execute(stmt).all()
+        return self._format_performer_rows(rows)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------------
     # Report 9 — Development Needs Overview

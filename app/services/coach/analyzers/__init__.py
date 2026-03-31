@@ -5,7 +5,13 @@ Provides ``metric_is_fresh()`` helper for MetricStore-based fast paths.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
 from uuid import UUID
 

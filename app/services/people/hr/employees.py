@@ -13,10 +13,16 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING
+from datetime import date, datetime, timezone
+from typing import TYPE_CHECKING, Any, cast
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import func, or_, select, text, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.auth import AuthProvider, UserCredential
@@ -1470,8 +1476,8 @@ class EmployeeService:
             )
             .values(**updates)
         )
-        result_proxy = self.db.execute(stmt)
-        result.updated_count = result_proxy.rowcount
+        result_proxy = cast(CursorResult[Any], self.db.execute(stmt))
+        result.updated_count = result_proxy.rowcount or 0
 
         return result
 
@@ -1505,7 +1511,7 @@ class EmployeeService:
                 updated_at=now,
             )
         )
-        result_proxy = self.db.execute(stmt)
-        result.deleted_count = result_proxy.rowcount
+        result_proxy = cast(CursorResult[Any], self.db.execute(stmt))
+        result.deleted_count = result_proxy.rowcount or 0
 
         return result

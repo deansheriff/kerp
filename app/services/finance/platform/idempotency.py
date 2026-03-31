@@ -6,12 +6,18 @@ return cached responses rather than re-executing operations.
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import HTTPException
 from sqlalchemy import and_, delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -289,7 +295,7 @@ class IdempotencyService(ListResponseMixin):
         )
         db.commit()
 
-        return result.rowcount or 0
+        return cast(CursorResult[Any], result).rowcount or 0
 
     @staticmethod
     def get(

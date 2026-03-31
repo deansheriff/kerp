@@ -8,12 +8,19 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from datetime import tzinfo as dt_tzinfo
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
+
+try:
+    from datetime import UTC as _UTC  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover
+    _UTC = timezone.utc
 from zoneinfo import ZoneInfo
+
+UTC: dt_tzinfo = _UTC
 
 from sqlalchemy import case, func, literal_column, or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -1709,7 +1716,7 @@ class AttendanceService:
 
         Returns monthly breakdown of attendance metrics.
         """
-        from dateutil.relativedelta import relativedelta
+        from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         today = self.get_org_today(org_id)
         end_date = today.replace(day=1)

@@ -16,12 +16,19 @@ Handles:
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Any, cast
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
 from celery import shared_task
+from sqlalchemy.engine import CursorResult
 
 from app.db import SessionLocal
 from app.services.common import coerce_uuid
@@ -88,8 +95,8 @@ def cleanup_old_notifications(
                     Notification.organization_id == org_id
                 )
 
-            read_deleted = db.execute(read_del_stmt).rowcount
-            unread_deleted = db.execute(unread_del_stmt).rowcount
+            read_deleted = cast(CursorResult[Any], db.execute(read_del_stmt)).rowcount or 0
+            unread_deleted = cast(CursorResult[Any], db.execute(unread_del_stmt)).rowcount or 0
 
             db.commit()
         except Exception as e:

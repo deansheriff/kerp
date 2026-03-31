@@ -4,8 +4,13 @@ import hashlib
 import logging
 import os
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, cast
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 import pyotp
 from cryptography.fernet import Fernet, InvalidToken

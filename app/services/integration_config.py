@@ -8,7 +8,13 @@ Supports both encrypted storage and OpenBao/Vault references.
 import logging
 import os
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select

@@ -5,7 +5,13 @@ Business logic for vendor prequalification management.
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from uuid import UUID
 
 from sqlalchemy import func, or_, select

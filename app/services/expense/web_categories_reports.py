@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from datetime import date as date_type
 from decimal import Decimal
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse

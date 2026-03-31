@@ -8,9 +8,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import func, literal_column, or_, select
 from sqlalchemy.orm import Session
@@ -1451,7 +1456,7 @@ class PayrollService:
 
         Returns monthly breakdown of payroll costs.
         """
-        from dateutil.relativedelta import relativedelta
+        from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         today = date.today()
         end_date = today.replace(day=1)

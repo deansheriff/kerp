@@ -17,16 +17,16 @@ Integration services:
 - integrations.expense_ap_adapter: Creates AP invoices from expense claims
 """
 
-from .attendance import AttendanceService
-from .expense import ExpenseService
-from .hr import (
-    EmployeeService,
-    OrganizationService,
-)
-from .leave import LeaveService
-from .perf import PerformanceService
-from .recruit import RecruitmentService
-from .training import TrainingService
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .attendance import AttendanceService
+    from .expense import ExpenseService
+    from .hr import EmployeeService, OrganizationService
+    from .leave import LeaveService
+    from .perf import PerformanceService
+    from .recruit import RecruitmentService
+    from .training import TrainingService
 
 __all__ = [
     # HR Core
@@ -45,3 +45,40 @@ __all__ = [
     # Expenses
     "ExpenseService",
 ]
+
+
+def __getattr__(name: str) -> Any:  # pragma: no cover
+    """Lazy attribute loading to avoid importing large submodules at package import."""
+    if name == "AttendanceService":
+        from .attendance import AttendanceService as _AttendanceService
+
+        return _AttendanceService
+    if name == "ExpenseService":
+        from .expense import ExpenseService as _ExpenseService
+
+        return _ExpenseService
+    if name == "EmployeeService":
+        from .hr import EmployeeService as _EmployeeService
+
+        return _EmployeeService
+    if name == "OrganizationService":
+        from .hr import OrganizationService as _OrganizationService
+
+        return _OrganizationService
+    if name == "LeaveService":
+        from .leave import LeaveService as _LeaveService
+
+        return _LeaveService
+    if name == "PerformanceService":
+        from .perf import PerformanceService as _PerformanceService
+
+        return _PerformanceService
+    if name == "RecruitmentService":
+        from .recruit import RecruitmentService as _RecruitmentService
+
+        return _RecruitmentService
+    if name == "TrainingService":
+        from .training import TrainingService as _TrainingService
+
+        return _TrainingService
+    raise AttributeError(name)

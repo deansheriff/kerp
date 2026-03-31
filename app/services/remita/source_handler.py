@@ -6,7 +6,13 @@ This is a dispatcher that routes updates to the appropriate module service.
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy.orm import Session
 

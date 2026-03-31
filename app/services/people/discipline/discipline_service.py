@@ -13,7 +13,13 @@ Routes and tasks should delegate to this service - no logic in routes!
 """
 
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from uuid import UUID
 
 from sqlalchemy import func, select

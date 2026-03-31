@@ -4,7 +4,13 @@ Validates JWT tokens against the shared auth database for SSO clients.
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from typing import Any
 
 from sqlalchemy.orm import Session

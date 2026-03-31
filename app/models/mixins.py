@@ -9,7 +9,12 @@ change tracking.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 from typing import Any, ClassVar
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, select

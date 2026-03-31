@@ -10,7 +10,13 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from pathlib import Path
 
 from app.licensing.fingerprint import get_machine_fingerprint

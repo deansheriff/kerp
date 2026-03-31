@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC
+from datetime import timezone
 from datetime import date as date_type
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from math import ceil
 
 from fastapi import HTTPException, Request

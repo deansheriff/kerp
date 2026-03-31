@@ -6,8 +6,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import cast
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -69,8 +75,6 @@ class BasePostingAdapter:
                     # For automated/system postings (sync, backfill), the
                     # same user creates and approves.  Bypass the SoD check
                     # by setting journal status directly.
-                    from datetime import UTC, datetime
-
                     from app.models.finance.gl.journal_entry import JournalStatus
 
                     journal.status = JournalStatus.APPROVED

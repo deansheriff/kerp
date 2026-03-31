@@ -7,10 +7,12 @@ Business logic for sales quotes with conversion to invoices/sales orders.
 import logging
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -635,7 +637,7 @@ class QuoteService:
         )
         if organization_id is not None:
             stmt = stmt.where(Quote.organization_id == coerce_uuid(organization_id))
-        result = db.execute(stmt)
+        result = cast(CursorResult[Any], db.execute(stmt))
         db.flush()
         return result.rowcount or 0
 

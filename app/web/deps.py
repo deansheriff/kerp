@@ -8,9 +8,14 @@ proper tenant context handling.
 import json
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 from uuid import UUID
+
+try:
+    from datetime import UTC
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request
 from sqlalchemy import select

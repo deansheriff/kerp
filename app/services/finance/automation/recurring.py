@@ -8,12 +8,17 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
-from dateutil.relativedelta import relativedelta
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
+from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
@@ -98,20 +103,20 @@ class RecurringService:
             import calendar
 
             day_of_month = config.get("day_of_month", current_date.day)
-            next_date = current_date + relativedelta(months=1)
+            next_date = cast(date, current_date + relativedelta(months=1))
             # Handle day overflow (e.g., 31st in February → cap to month max)
             max_day = calendar.monthrange(next_date.year, next_date.month)[1]
             next_date = next_date.replace(day=min(day_of_month, max_day))
             return next_date
 
         elif frequency == RecurringFrequency.QUARTERLY:
-            return current_date + relativedelta(months=3)
+            return cast(date, current_date + relativedelta(months=3))
 
         elif frequency == RecurringFrequency.SEMI_ANNUALLY:
-            return current_date + relativedelta(months=6)
+            return cast(date, current_date + relativedelta(months=6))
 
         elif frequency == RecurringFrequency.ANNUALLY:
-            return current_date + relativedelta(years=1)
+            return cast(date, current_date + relativedelta(years=1))
 
         return current_date + timedelta(days=30)  # Default fallback
 

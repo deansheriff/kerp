@@ -11,8 +11,13 @@ import calendar
 import logging
 import uuid as uuid_lib
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import HTTPException
 from sqlalchemy import and_, select

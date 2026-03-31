@@ -9,9 +9,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.models.people.exp import (
@@ -109,7 +111,7 @@ class ExpenseAPAdapter:
                     index_elements=["organization_id", "claim_id", "action_type"],
                 )
             )
-            action_result = db.execute(action_stmt)
+            action_result = cast(CursorResult[Any], db.execute(action_stmt))
             db.flush()
             if (action_result.rowcount or 0) == 0:
                 # Conflict: another process already started invoice creation.

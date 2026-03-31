@@ -651,18 +651,33 @@
                            class="form-input">
                 </div>
 
-                <!-- Due Date -->
-                <div>
-                    <label for="due_date" class="form-label">
-                        Due Date <span class="required">*</span>
-                    </label>
-                    <input type="date"
-                           id="due_date"
-                           name="due_date"
-                           x-model="form.due_date"
-                           required
-                           class="form-input">
-                </div>
+	                <!-- Due Date -->
+	                <div>
+	                    <label for="due_date" class="form-label">
+	                        Due Date <span class="required">*</span>
+	                    </label>
+	                    <input type="date"
+	                           id="due_date"
+	                           name="due_date"
+	                           x-model="form.due_date"
+	                           required
+	                           class="form-input">
+	                </div>
+
+	                <!-- Fleet (Optional) -->
+	                <div>
+	                    <label for="vehicle_id" class="form-label">Fleet (Optional)</label>
+	                    <select id="vehicle_id"
+	                            name="vehicle_id"
+	                            x-model="form.vehicle_id"
+	                            class="form-input dark:text-white">
+	                        <option value="">No fleet vehicle</option>
+	                        {% for v in fleet_vehicles %}
+	                        <option value="{{ v.vehicle_id }}">{{ v.registration_number }} - {{ v.make }} {{ v.model }}</option>
+	                        {% endfor %}
+	                    </select>
+	                    <p class="form-help">Assign this invoice to a fleet vehicle for reporting</p>
+	                </div>
 
                 <div class="sm:col-span-2 lg:col-span-3">
                     <label for="purpose" class="form-label">Purpose</label>
@@ -951,10 +966,11 @@ function invoiceForm() {
             supplier_id: '{{ invoice.supplier_id if invoice else "" }}' || (selectedSupplier?.supplier_id || ''),
             supplier_name: (selectedSupplier ? `${selectedSupplier.supplier_code || ''} - ${selectedSupplier.supplier_name || ''}`.trim().replace(/^-\s*/, '') : ''),
             invoice_number: '{{ invoice.invoice_number if invoice else "" }}',
-            invoice_date: '{{ invoice.invoice_date if invoice else "" }}',
-            received_date: '{{ invoice.received_date if invoice else "" }}',
-            due_date: '{{ invoice.due_date if invoice else "" }}',
-            purpose: '{{ invoice.purpose if invoice else "" }}',
+	            invoice_date: '{{ invoice.invoice_date if invoice else "" }}',
+	            received_date: '{{ invoice.received_date if invoice else "" }}',
+	            due_date: '{{ invoice.due_date if invoice else "" }}',
+	            vehicle_id: '{{ invoice.vehicle_id if invoice and invoice.vehicle_id else "" }}',
+	            purpose: '{{ invoice.purpose if invoice else "" }}',
             currency_code: '{{ invoice.currency_code if invoice else "" }}' || (selectedSupplier?.currency_code || selectedPO?.currency_code || '{{ default_currency_code }}'),
             exchange_rate: '{{ invoice.exchange_rate if invoice and invoice.exchange_rate else "1" }}',
             po_id: selectedPO?.po_id || '',

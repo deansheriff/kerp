@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import UTC, datetime, timedelta
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, cast
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from uuid import UUID
 
 from celery import shared_task
 from sqlalchemy import select
+from sqlalchemy.engine import CursorResult
 
 from app.db import SessionLocal
 from app.models.finance.platform.service_hook import HookHandlerType, ServiceHook
@@ -114,7 +121,7 @@ def cleanup_old_hook_executions(
                     ServiceHookExecution.execution_id.in_(execution_ids)
                 )
             )
-            deleted = result.rowcount
+            deleted = cast(CursorResult[Any], result).rowcount or 0
             db.commit()
         except Exception as exc:
             db.rollback()

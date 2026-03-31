@@ -2,7 +2,13 @@ import os
 import sys
 import uuid
 from contextlib import asynccontextmanager, contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    # Python 3.11+
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 from types import ModuleType
 
 import anyio.to_thread as anyio_to_thread
@@ -534,25 +540,32 @@ def client(db_session):
     app.dependency_overrides[discipline_get_db] = override_get_db
     app.dependency_overrides[auth_deps_get_db] = override_get_db
 
-    # Convert sync endpoints to async wrappers to avoid threadpool usage.
-    import inspect
+    # Optional: Convert sync endpoints to async wrappers to avoid threadpool usage.
+    # This is fragile across FastAPI versions; keep it opt-in for stability.
+    import os
 
-    from fastapi.routing import APIRoute, request_response
+    if os.getenv("DOTMAC_TEST_WRAP_SYNC_ENDPOINTS") == "1":  # pragma: no cover
+        import inspect
 
-    for route in app.router.routes:
-        if isinstance(route, APIRoute) and not inspect.iscoroutinefunction(
-            route.endpoint
-        ):
-            endpoint = route.endpoint
+        from fastapi.routing import APIRoute, request_response
 
-            async def _async_endpoint(*args, __endpoint=endpoint, **kwargs):
-                return __endpoint(*args, **kwargs)
+        for route in app.router.routes:
+            if isinstance(route, APIRoute) and not inspect.iscoroutinefunction(
+                route.endpoint
+            ):
+                endpoint = route.endpoint
 
-            _async_endpoint.__signature__ = inspect.signature(endpoint)
-            route.endpoint = _async_endpoint
-            route.dependant.call = _async_endpoint
-            route.dependant.is_coroutine = True
-            route.app = request_response(route.get_route_handler())
+                async def _async_endpoint(*args, __endpoint=endpoint, **kwargs):
+                    result = __endpoint(*args, **kwargs)
+                    if inspect.isawaitable(result):
+                        return await result
+                    return result
+
+                _async_endpoint.__signature__ = inspect.signature(endpoint)
+                route.endpoint = _async_endpoint
+                route.dependant.call = _async_endpoint
+                route.dependant.is_coroutine = True
+                route.app = request_response(route.get_route_handler())
 
     # Seed the settings in the test database
     seed_auth_settings(db_session)

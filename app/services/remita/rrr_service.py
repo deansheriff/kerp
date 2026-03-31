@@ -6,7 +6,13 @@ Used by all modules needing to make government payments: Payroll, Finance, Procu
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
 from uuid import UUID, uuid4
 

@@ -26,7 +26,6 @@ from app.services.finance.lease.lease_modification import (
 from app.services.finance.lease.lease_posting_adapter import (
     LeasePostingAdapter,
     LeasePostingResult,
-    lease_posting_adapter,
 )
 from app.services.finance.lease.lease_variable_payment import (
     IndexAdjustmentInput,
@@ -50,7 +49,6 @@ __all__ = [
     # Posting
     "LeasePostingAdapter",
     "LeasePostingResult",
-    "lease_posting_adapter",
     # Modification
     "LeaseModificationService",
     "lease_modification_service",

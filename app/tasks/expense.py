@@ -10,7 +10,13 @@ Handles:
 
 import logging
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from typing import Any
 
 from celery import shared_task

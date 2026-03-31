@@ -1,4 +1,10 @@
-from datetime import UTC
+from datetime import timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from typing import Any
 
 from fastapi import HTTPException

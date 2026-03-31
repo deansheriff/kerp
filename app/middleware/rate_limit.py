@@ -14,6 +14,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from threading import Lock
+from typing import Any
 
 from fastapi import HTTPException, Request, status
 from starlette.middleware.base import RequestResponseEndpoint
@@ -130,7 +131,7 @@ class RedisRateLimiter:
 
     def __init__(self, redis_url: str | None = None):
         self._redis_url = redis_url or os.getenv("REDIS_URL")
-        self._client = None
+        self._client: Any = None
         self._available = False
         self._init_client()
 

@@ -118,7 +118,9 @@ class TestExists:
             assert svc.exists("avatars/photo.jpg") is True
 
     def test_exists_returns_false_on_missing(self, svc, mock_minio_client):
-        from minio.error import S3Error
+        # `minio` is an optional dependency in this environment; use the service's
+        # resolved S3 error type instead of importing it directly.
+        S3Error = svc._s3_error
 
         mock_minio_client.stat_object.side_effect = S3Error(
             "NoSuchKey", "Object does not exist", "", "", "", ""

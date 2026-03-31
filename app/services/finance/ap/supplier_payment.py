@@ -10,7 +10,13 @@ import builtins
 import logging
 import uuid as uuid_lib
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
 from typing import Any
 from unittest.mock import Mock

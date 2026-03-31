@@ -14,7 +14,6 @@ from app.services.finance.ar.ar_aging import (
 from app.services.finance.ar.ar_posting_adapter import (
     ARPostingAdapter,
     ARPostingResult,
-    ar_posting_adapter,
 )
 from app.services.finance.ar.contract import (
     ContractInput,
@@ -59,7 +58,6 @@ __all__ = [
     # Posting
     "ARPostingAdapter",
     "ARPostingResult",
-    "ar_posting_adapter",
     # Aging
     "ARAgingService",
     "CustomerAgingSummary",

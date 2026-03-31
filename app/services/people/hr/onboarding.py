@@ -14,7 +14,13 @@ from __future__ import annotations
 import hashlib
 import logging
 import secrets
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select

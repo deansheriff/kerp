@@ -1,8 +1,14 @@
 import json
 import logging
 import logging.config
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
+
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 def _get_request_context() -> dict:
     """Get request context from context variables if available.

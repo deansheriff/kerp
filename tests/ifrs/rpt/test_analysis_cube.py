@@ -2,7 +2,13 @@
 Tests for AnalysisCubeService.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4

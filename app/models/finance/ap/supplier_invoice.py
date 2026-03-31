@@ -95,6 +95,7 @@ class SupplierInvoice(Base, VersionedMixin):
             "due_date",
             postgresql_where="status NOT IN ('PAID', 'VOID')",
         ),
+        Index("idx_supplier_invoice_vehicle", "organization_id", "vehicle_id"),
         {"schema": "ap"},
     )
 
@@ -128,6 +129,13 @@ class SupplierInvoice(Base, VersionedMixin):
     invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
     received_date: Mapped[date] = mapped_column(Date, nullable=False)
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+    # Optional fleet linkage (for vehicle cost reporting)
+    vehicle_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("fleet.vehicle.vehicle_id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     # Currency
     currency_code: Mapped[str] = mapped_column(String(3), nullable=False)

@@ -12,11 +12,18 @@ commits after marking the event as PUBLISHED.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from celery import shared_task
+from sqlalchemy.engine import CursorResult
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -233,8 +240,6 @@ def cleanup_published_outbox_events(
     deleted = 0
 
     with SessionLocal() as db:
-        from datetime import UTC, datetime, timedelta
-
         from sqlalchemy import delete
 
         from app.models.finance.platform.event_outbox import EventOutbox, EventStatus
@@ -247,7 +252,7 @@ def cleanup_published_outbox_events(
                 EventOutbox.published_at < cutoff,
             )
         )
-        deleted = result.rowcount
+        deleted = cast(CursorResult[Any], result).rowcount or 0
         db.commit()
 
     logger.info("Deleted %d old published outbox events", deleted)

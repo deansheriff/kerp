@@ -494,6 +494,7 @@ async def create_expense_claim(
     project_id = _safe_form_text(form.get("project_id"))
     ticket_id = _safe_form_text(form.get("ticket_id"))
     task_id = _safe_form_text(form.get("task_id"))
+    vehicle_id = _safe_form_text(form.get("vehicle_id"))
     cost_center_id = _safe_form_text(form.get("cost_center_id"))
 
     if (
@@ -613,6 +614,7 @@ async def create_expense_claim(
         project_id=project_id or None,
         ticket_id=ticket_id or None,
         task_id=task_id or None,
+        vehicle_id=vehicle_id or None,
         cost_center_id=cost_center_id or None,
     )
 
@@ -667,15 +669,17 @@ async def update_expense_claim(
             detail="Bank code, account number, and expense approver are required",
         )
 
-    # Extract optional project/ticket/task/cost center linkage
+    # Extract optional project/ticket/task/vehicle/cost center linkage
     project_id_str = _safe_form_text(form.get("project_id"))
     ticket_id_str = _safe_form_text(form.get("ticket_id"))
     task_id_str = _safe_form_text(form.get("task_id"))
+    vehicle_id_str = _safe_form_text(form.get("vehicle_id"))
     cost_center_id_str = _safe_form_text(form.get("cost_center_id"))
 
     project_id = UUID(project_id_str) if project_id_str else None
     ticket_id = UUID(ticket_id_str) if ticket_id_str else None
     task_id = UUID(task_id_str) if task_id_str else None
+    vehicle_id = UUID(vehicle_id_str) if vehicle_id_str else None
     cost_center_id = UUID(cost_center_id_str) if cost_center_id_str else None
 
     items = []
@@ -768,6 +772,7 @@ async def update_expense_claim(
         project_id=project_id,
         ticket_id=ticket_id,
         task_id=task_id,
+        vehicle_id=vehicle_id,
         cost_center_id=cost_center_id,
     )
 

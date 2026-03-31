@@ -9,7 +9,13 @@ login pages redirect to the SSO provider for authentication.
 """
 
 import logging
-from datetime import UTC
+from datetime import timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urlparse
 

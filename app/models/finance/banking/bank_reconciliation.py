@@ -5,7 +5,12 @@ Represents bank reconciliation records that match bank statements to GL entries.
 """
 
 import enum
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4

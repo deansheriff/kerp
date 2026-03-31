@@ -7,7 +7,13 @@ skips expensive live queries when MetricStore reports "nothing to report".
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 

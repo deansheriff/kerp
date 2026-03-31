@@ -10,7 +10,13 @@ Provides methods for:
 import logging
 import secrets
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload

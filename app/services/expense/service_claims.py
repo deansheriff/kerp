@@ -109,6 +109,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         project_id: UUID | None = None,
         ticket_id: UUID | None = None,
         task_id: UUID | None = None,
+        vehicle_id: UUID | None = None,
         currency_code: str | None = None,
         cost_center_id: UUID | None = None,
         recipient_bank_code: str | None = None,
@@ -120,6 +121,20 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         items: list[dict] | None = None,
     ) -> ExpenseClaim:
         resolved_currency_code = self._resolve_currency_code(org_id, currency_code)
+
+        if vehicle_id is not None:
+            from app.models.fleet.vehicle import Vehicle
+
+            valid_vehicle = self.db.scalar(
+                select(Vehicle.vehicle_id).where(
+                    Vehicle.organization_id == org_id,
+                    Vehicle.vehicle_id == vehicle_id,
+                    Vehicle.is_deleted.is_(False),
+                )
+            )
+            if valid_vehicle is None:
+                raise ExpenseServiceError("Invalid vehicle")
+
         claim = ExpenseClaim(
             organization_id=org_id,
             employee_id=employee_id,
@@ -131,6 +146,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             project_id=project_id,
             ticket_id=ticket_id,
             task_id=task_id,
+            vehicle_id=vehicle_id,
             currency_code=resolved_currency_code,
             cost_center_id=cost_center_id,
             recipient_bank_code=recipient_bank_code,

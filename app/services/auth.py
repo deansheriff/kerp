@@ -3,8 +3,13 @@ import logging
 import os
 import secrets
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, cast
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 import redis
 from fastapi import HTTPException, Request

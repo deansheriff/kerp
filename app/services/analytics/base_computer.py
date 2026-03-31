@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import abc
 import logging
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
 from typing import Any
 from uuid import UUID

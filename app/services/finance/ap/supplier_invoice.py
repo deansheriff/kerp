@@ -10,10 +10,15 @@ import builtins
 import logging
 import uuid as uuid_lib
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest.mock import Mock
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
@@ -91,6 +96,7 @@ class SupplierInvoiceInput:
     received_date: date
     due_date: date
     currency_code: str
+    vehicle_id: UUID | None = None
     lines: list[InvoiceLineInput] = field(default_factory=list)
     purpose: str | None = None
     supplier_invoice_number: str | None = None
@@ -179,6 +185,10 @@ class SupplierInvoiceService(ListResponseMixin):
         if payload.get("exchange_rate") not in (None, ""):
             exchange_rate = parse_decimal(payload.get("exchange_rate"), "Exchange rate")
 
+        vehicle_id = (
+            coerce_uuid(payload.get("vehicle_id")) if payload.get("vehicle_id") else None
+        )
+
         return SupplierInvoiceInput(
             supplier_id=require_uuid(payload.get("supplier_id"), "Supplier"),
             invoice_type=SupplierInvoiceType.STANDARD,
@@ -188,6 +198,7 @@ class SupplierInvoiceService(ListResponseMixin):
             currency_code=resolve_currency_code(
                 db, org_id, payload.get("currency_code")
             ),
+            vehicle_id=vehicle_id,
             purpose=(payload.get("purpose") or "").strip() or None,
             exchange_rate=exchange_rate,
             supplier_invoice_number=payload.get("invoice_number") or None,
@@ -273,6 +284,17 @@ class SupplierInvoiceService(ListResponseMixin):
 
         if not supplier.is_active:
             raise ValidationError("Supplier is not active")
+
+        if input.vehicle_id is not None:
+            from app.models.fleet.vehicle import Vehicle
+
+            vehicle = db.get(Vehicle, coerce_uuid(input.vehicle_id))
+            if (
+                not vehicle
+                or getattr(vehicle, "organization_id", None) != org_id
+                or getattr(vehicle, "is_deleted", False)
+            ):
+                raise NotFoundError("Fleet vehicle not found")
 
         # Auto-detect fiscal position and remap taxes/accounts
         from app.services.finance.tax.fiscal_position_service import (
@@ -396,6 +418,7 @@ class SupplierInvoiceService(ListResponseMixin):
             invoice_date=input.invoice_date,
             received_date=input.received_date,
             due_date=input.due_date,
+            vehicle_id=input.vehicle_id,
             currency_code=input.currency_code,
             purpose=input.purpose,
             exchange_rate=exchange_rate,
@@ -544,6 +567,19 @@ class SupplierInvoiceService(ListResponseMixin):
             raise ValidationError(
                 f"Cannot update invoice with status '{invoice.status.value}'"
             )
+
+        if input.vehicle_id is not None:
+            from app.models.fleet.vehicle import Vehicle
+
+            vehicle = db.get(Vehicle, coerce_uuid(input.vehicle_id))
+            if (
+                not vehicle
+                or getattr(vehicle, "organization_id", None) != org_id
+                or getattr(vehicle, "is_deleted", False)
+            ):
+                raise NotFoundError("Fleet vehicle not found")
+
+        invoice.vehicle_id = input.vehicle_id
 
         # Delete existing line tax and line records
         line_ids = list(

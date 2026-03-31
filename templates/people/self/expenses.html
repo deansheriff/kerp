@@ -306,18 +306,30 @@
                         </datalist>
                         <p class="mt-1 text-xs text-slate-400">Link expense to a support ticket from ERPNext</p>
                     </div>
-                    <div>
-                        <label for="task_id" class="form-label">Task (Optional)</label>
-                        <select name="task_id" id="task_id" class="form-select w-full">
-                            <option value="">No task</option>
-                            {% for task in tasks %}
-                            <option value="{{ task.task_id }}" {{ 'selected' if selected_task_id and selected_task_id == task.task_id|string else '' }}>
-                                {{ task.task_code }} - {{ task.task_name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <p class="mt-1 text-xs text-slate-400">Link expense to a specific project task</p>
-                    </div>
+	                    <div>
+	                        <label for="task_id" class="form-label">Task (Optional)</label>
+	                        <select name="task_id" id="task_id" class="form-select w-full">
+	                            <option value="">No task</option>
+	                            {% for task in tasks %}
+	                            <option value="{{ task.task_id }}" {{ 'selected' if selected_task_id and selected_task_id == task.task_id|string else '' }}>
+	                                {{ task.task_code }} - {{ task.task_name }}
+	                            </option>
+	                            {% endfor %}
+	                        </select>
+	                        <p class="mt-1 text-xs text-slate-400">Link expense to a specific project task</p>
+	                    </div>
+		                    <div>
+		                        <label for="vehicle_id" class="form-label">Fleet (Optional)</label>
+		                        <select name="vehicle_id" id="vehicle_id" class="form-select w-full dark:text-white">
+		                            <option value="">No fleet vehicle</option>
+		                            {% for v in vehicles %}
+		                            <option value="{{ v.vehicle_id }}">
+		                                {{ v.registration_number }} - {{ v.make }} {{ v.model }}
+	                            </option>
+	                            {% endfor %}
+	                        </select>
+	                        <p class="mt-1 text-xs text-slate-400">Assign this claim to a fleet vehicle for reporting</p>
+	                    </div>
                     <div class="sm:col-span-2 flex items-center justify-between">
                         <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                             <input type="checkbox" name="submit_now" class="rounded border-slate-300 dark:border-slate-600 text-teal-600 focus:ring-teal-500">

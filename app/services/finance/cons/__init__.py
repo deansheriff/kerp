@@ -9,7 +9,6 @@ per IFRS 10.
 from app.services.finance.cons.cons_posting_adapter import (
     CONSPostingAdapter,
     CONSPostingResult,
-    cons_posting_adapter,
 )
 from app.services.finance.cons.consolidation import (
     ConsolidationRunInput,
@@ -66,5 +65,4 @@ __all__ = [
     # Posting
     "CONSPostingAdapter",
     "CONSPostingResult",
-    "cons_posting_adapter",
 ]

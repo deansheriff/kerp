@@ -8,8 +8,13 @@ from __future__ import annotations
 
 import logging
 from calendar import monthrange
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload

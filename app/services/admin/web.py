@@ -9,7 +9,13 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from importlib import import_module
 from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urlencode

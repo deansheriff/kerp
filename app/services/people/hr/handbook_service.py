@@ -6,7 +6,13 @@ Provides operations for managing HR policy documents and employee acknowledgment
 
 import hashlib
 import logging
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from pathlib import Path
 from uuid import UUID
 

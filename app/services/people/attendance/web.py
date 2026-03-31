@@ -7,11 +7,16 @@ Provides view-focused data and operations for attendance web routes.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from typing import Any, cast
 from urllib.parse import quote
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse

@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -119,7 +125,7 @@ class FiscalYearService(ListResponseMixin):
         Raises:
             HTTPException(400): If year code already exists
         """
-        from dateutil.relativedelta import relativedelta
+        from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         org_id = coerce_uuid(organization_id)
 

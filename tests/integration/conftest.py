@@ -72,7 +72,13 @@ if hasattr(_pg_dialect.UUID, "impl"):
 import os  # noqa: E402
 import uuid  # noqa: E402
 from collections.abc import Generator  # noqa: E402
-from datetime import UTC, date, datetime  # noqa: E402
+from datetime import date, timezone, datetime  # noqa: E402
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal  # noqa: E402
 from typing import TYPE_CHECKING  # noqa: E402
 
@@ -116,6 +122,19 @@ def get_test_database_url() -> str:
 
 # Create engine for tests
 _test_db_url = get_test_database_url()
+
+# If the test environment doesn't have the psycopg driver installed, skip
+# integration tests cleanly at import time (before SQLAlchemy tries to import
+# the DBAPI module during create_engine()).
+if "postgresql+psycopg" in _test_db_url:
+    try:
+        import psycopg  # noqa: F401
+    except ModuleNotFoundError:
+        pytest.skip(
+            "Integration tests require the `psycopg` package (psycopg3).",
+            allow_module_level=True,
+        )
+
 _test_engine = create_engine(
     _test_db_url,
     pool_pre_ping=True,

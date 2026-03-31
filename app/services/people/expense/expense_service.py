@@ -13,13 +13,20 @@ Adapted from DotMac People for the unified ERP platform.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.people.exp import (
@@ -178,7 +185,7 @@ class ExpenseService:
                 index_elements=["organization_id", "claim_id", "action_type"],
             )
         )
-        result = self.db.execute(stmt)
+        result = cast(CursorResult[Any], self.db.execute(stmt))
         self.db.flush()
         if (result.rowcount or 0) > 0:
             return True
@@ -435,6 +442,7 @@ class ExpenseService:
         project_id: UUID | None = None,
         ticket_id: UUID | None = None,
         task_id: UUID | None = None,
+        vehicle_id: UUID | None = None,
         currency_code: str | None = None,
         cost_center_id: UUID | None = None,
         recipient_bank_code: str | None = None,
@@ -455,6 +463,17 @@ class ExpenseService:
         claim_number = self._next_claim_number(org_id)
         resolved_currency_code = self._resolve_currency_code(org_id, currency_code)
 
+        if vehicle_id is not None:
+            from app.models.fleet.vehicle import Vehicle
+
+            vehicle = self.db.get(Vehicle, vehicle_id)
+            if (
+                not vehicle
+                or getattr(vehicle, "organization_id", None) != org_id
+                or getattr(vehicle, "is_deleted", False)
+            ):
+                raise ExpenseServiceError("Fleet vehicle not found")
+
         claim = ExpenseClaim(
             organization_id=org_id,
             employee_id=employee_id,
@@ -466,6 +485,7 @@ class ExpenseService:
             project_id=project_id,
             ticket_id=ticket_id,
             task_id=task_id,
+            vehicle_id=vehicle_id,
             currency_code=resolved_currency_code,
             cost_center_id=cost_center_id,
             recipient_bank_code=recipient_bank_code,

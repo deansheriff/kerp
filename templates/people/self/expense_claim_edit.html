@@ -167,19 +167,30 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div>
-                    <label for="task_id" class="form-label">Task</label>
-                    <select name="task_id" id="task_id" class="form-select w-full" {% if not can_edit %}disabled{% endif %}>
-                        <option value="">No task</option>
-                        {% for task in tasks %}
-                        <option value="{{ task.task_id }}" {% if claim.task_id and claim.task_id == task.task_id %}selected{% endif %}>
-                            {{ task.task_code }} - {{ task.task_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-        </div>
+	                <div>
+	                    <label for="task_id" class="form-label">Task</label>
+	                    <select name="task_id" id="task_id" class="form-select w-full" {% if not can_edit %}disabled{% endif %}>
+	                        <option value="">No task</option>
+	                        {% for task in tasks %}
+	                        <option value="{{ task.task_id }}" {% if claim.task_id and claim.task_id == task.task_id %}selected{% endif %}>
+	                            {{ task.task_code }} - {{ task.task_name }}
+	                        </option>
+	                        {% endfor %}
+	                    </select>
+	                </div>
+	                <div>
+	                    <label for="vehicle_id" class="form-label">Fleet</label>
+	                    <select name="vehicle_id" id="vehicle_id" class="form-select w-full dark:text-white" {% if not can_edit %}disabled{% endif %}>
+	                        <option value="">No fleet vehicle</option>
+	                        {% for v in vehicles %}
+	                        <option value="{{ v.vehicle_id }}" {% if claim.vehicle_id and claim.vehicle_id == v.vehicle_id %}selected{% endif %}>
+	                            {{ v.registration_number }} - {{ v.make }} {{ v.model }}
+	                        </option>
+	                        {% endfor %}
+	                    </select>
+	                </div>
+	            </div>
+	        </div>
 
         {% if can_edit %}
         <div class="flex items-center justify-between gap-3">

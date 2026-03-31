@@ -7,9 +7,14 @@ Provides append-only audit logging with hash chain for integrity verification.
 import hashlib
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import SQLAlchemyError

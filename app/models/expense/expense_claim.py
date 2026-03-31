@@ -165,6 +165,7 @@ class ExpenseClaim(Base, AuditMixin, StatusTrackingMixin, ERPNextSyncMixin):
         Index("idx_expense_claim_reimbursement_journal", "reimbursement_journal_id"),
         Index("idx_expense_claim_supplier_invoice", "supplier_invoice_id"),
         Index("idx_expense_claim_task", "task_id"),
+        Index("idx_expense_claim_vehicle", "organization_id", "vehicle_id"),
         {"schema": "expense"},
     )
 
@@ -230,6 +231,12 @@ class ExpenseClaim(Base, AuditMixin, StatusTrackingMixin, ERPNextSyncMixin):
         ForeignKey("pm.task.task_id"),
         nullable=True,
         comment="Related project task",
+    )
+    vehicle_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("fleet.vehicle.vehicle_id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Optional fleet vehicle linked to this claim",
     )
 
     # Totals

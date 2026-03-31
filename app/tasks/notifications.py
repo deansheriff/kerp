@@ -8,7 +8,13 @@ Handles:
 
 import html
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from typing import TypedDict
 
 from celery import shared_task

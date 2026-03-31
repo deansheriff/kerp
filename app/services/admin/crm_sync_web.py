@@ -7,7 +7,13 @@ Provides data and operations for the CRM sync management UI.
 import logging
 import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC  # type: ignore
+except ImportError:  # pragma: no cover
+    UTC = timezone.utc
+
 from urllib.parse import quote_plus, urlencode
 
 from fastapi import HTTPException, Request
