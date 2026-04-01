@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover
     UTC = timezone.utc
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -224,8 +224,7 @@ class ApprovalWorkflowService(ListResponseMixin):
         if request.request_id is None:
             request.request_id = created_request_id
 
-        assert created_request_id is not None
-        return created_request_id
+        return cast(UUID, created_request_id)
 
     @staticmethod
     def approve(
