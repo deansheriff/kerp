@@ -1660,9 +1660,11 @@ class SelfServiceWebService:
         tasks = self._get_tasks_for_dropdown(db, org_id, selected_project_id)
         from app.services.fleet.vehicle_service import VehicleService
 
-        vehicles = VehicleService(db, org_id).list_vehicles(
-            params=PaginationParams(offset=0, limit=500)
-        ).items
+        vehicles = (
+            VehicleService(db, org_id)
+            .list_vehicles(params=PaginationParams(offset=0, limit=500))
+            .items
+        )
         context = base_context(request, auth, "My Expenses", "self-expenses", db=db)
         context.update(
             {
@@ -1871,9 +1873,11 @@ class SelfServiceWebService:
         )
         from app.services.fleet.vehicle_service import VehicleService
 
-        vehicles = VehicleService(db, org_id).list_vehicles(
-            params=PaginationParams(offset=0, limit=500)
-        ).items
+        vehicles = (
+            VehicleService(db, org_id)
+            .list_vehicles(params=PaginationParams(offset=0, limit=500))
+            .items
+        )
 
         # Get cost centers for dropdown
         from app.models.finance.core_org.cost_center import CostCenter

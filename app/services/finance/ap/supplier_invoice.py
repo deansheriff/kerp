@@ -186,7 +186,9 @@ class SupplierInvoiceService(ListResponseMixin):
             exchange_rate = parse_decimal(payload.get("exchange_rate"), "Exchange rate")
 
         vehicle_id = (
-            coerce_uuid(payload.get("vehicle_id")) if payload.get("vehicle_id") else None
+            coerce_uuid(payload.get("vehicle_id"))
+            if payload.get("vehicle_id")
+            else None
         )
 
         return SupplierInvoiceInput(

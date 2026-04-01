@@ -213,11 +213,6 @@ class ApprovalWorkflowService(ListResponseMixin):
         db.commit()
         db.refresh(request)
 
-        if request.request_id is None:
-            raise HTTPException(
-                status_code=500, detail="Approval request ID was not generated"
-            )
-
         return request.request_id
 
     @staticmethod

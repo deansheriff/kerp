@@ -342,7 +342,9 @@ class SagaRecoveryService:
         # Delete in batches (steps cascade)
         result = cast(
             CursorResult[Any],
-            db.execute(delete(SagaExecution).where(SagaExecution.saga_id.in_(ids_to_delete))),
+            db.execute(
+                delete(SagaExecution).where(SagaExecution.saga_id.in_(ids_to_delete))
+            ),
         )
         deleted = result.rowcount or 0
 

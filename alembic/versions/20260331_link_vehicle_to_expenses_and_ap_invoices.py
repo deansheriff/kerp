@@ -39,7 +39,8 @@ def upgrade() -> None:
     # expense.expense_claim: add vehicle_id + FK + composite index
     if inspector.has_table("expense_claim", schema="expense"):
         columns = {
-            col["name"] for col in inspector.get_columns("expense_claim", schema="expense")
+            col["name"]
+            for col in inspector.get_columns("expense_claim", schema="expense")
         }
         if "vehicle_id" not in columns:
             op.add_column(
@@ -49,7 +50,8 @@ def upgrade() -> None:
             )
 
         indexes = {
-            idx["name"] for idx in inspector.get_indexes("expense_claim", schema="expense")
+            idx["name"]
+            for idx in inspector.get_indexes("expense_claim", schema="expense")
         }
         if "idx_expense_claim_vehicle" not in indexes:
             op.create_index(
@@ -80,7 +82,8 @@ def upgrade() -> None:
     # ap.supplier_invoice: add vehicle_id + FK + composite index
     if inspector.has_table("supplier_invoice", schema="ap"):
         columns = {
-            col["name"] for col in inspector.get_columns("supplier_invoice", schema="ap")
+            col["name"]
+            for col in inspector.get_columns("supplier_invoice", schema="ap")
         }
         if "vehicle_id" not in columns:
             op.add_column(
@@ -139,7 +142,8 @@ def downgrade() -> None:
             )
 
         indexes = {
-            idx["name"] for idx in inspector.get_indexes("expense_claim", schema="expense")
+            idx["name"]
+            for idx in inspector.get_indexes("expense_claim", schema="expense")
         }
         if "idx_expense_claim_vehicle" in indexes:
             op.drop_index(
@@ -149,7 +153,8 @@ def downgrade() -> None:
             )
 
         columns = {
-            col["name"] for col in inspector.get_columns("expense_claim", schema="expense")
+            col["name"]
+            for col in inspector.get_columns("expense_claim", schema="expense")
         }
         if "vehicle_id" in columns:
             op.drop_column("expense_claim", "vehicle_id", schema="expense")
@@ -180,7 +185,8 @@ def downgrade() -> None:
             )
 
         columns = {
-            col["name"] for col in inspector.get_columns("supplier_invoice", schema="ap")
+            col["name"]
+            for col in inspector.get_columns("supplier_invoice", schema="ap")
         }
         if "vehicle_id" in columns:
             op.drop_column("supplier_invoice", "vehicle_id", schema="ap")

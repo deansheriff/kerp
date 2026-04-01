@@ -81,9 +81,7 @@ def fleet_reports_expenses(
             vehicle_id=vehicle_id,
         )
     )
-    return templates.TemplateResponse(
-        request, "fleet/reports/expenses.html", context
-    )
+    return templates.TemplateResponse(request, "fleet/reports/expenses.html", context)
 
 
 @router.get("/reports/invoices", response_class=HTMLResponse)
@@ -102,9 +100,7 @@ def fleet_reports_invoices(
             vehicle_id=vehicle_id,
         )
     )
-    return templates.TemplateResponse(
-        request, "fleet/reports/invoices.html", context
-    )
+    return templates.TemplateResponse(request, "fleet/reports/invoices.html", context)
 
 
 # =============================================================================

@@ -95,8 +95,12 @@ def cleanup_old_notifications(
                     Notification.organization_id == org_id
                 )
 
-            read_deleted = cast(CursorResult[Any], db.execute(read_del_stmt)).rowcount or 0
-            unread_deleted = cast(CursorResult[Any], db.execute(unread_del_stmt)).rowcount or 0
+            read_deleted = (
+                cast(CursorResult[Any], db.execute(read_del_stmt)).rowcount or 0
+            )
+            unread_deleted = (
+                cast(CursorResult[Any], db.execute(unread_del_stmt)).rowcount or 0
+            )
 
             db.commit()
         except Exception as e:

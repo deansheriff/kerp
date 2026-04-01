@@ -112,4 +112,3 @@ def __getattr__(name: str) -> Any:  # pragma: no cover
         raise AttributeError(name)
     module = __import__(f"{__name__}.{module_name}", fromlist=[name])
     return getattr(module, name)
-

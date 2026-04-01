@@ -354,7 +354,9 @@ def test_build_input_from_payload_parses_vehicle_id():
         "app.services.finance.ap.supplier_invoice.resolve_currency_code",
         return_value="NGN",
     ):
-        invoice_input = SupplierInvoiceService.build_input_from_payload(db, org_id, payload)
+        invoice_input = SupplierInvoiceService.build_input_from_payload(
+            db, org_id, payload
+        )
 
     assert invoice_input.vehicle_id == vehicle_id
 

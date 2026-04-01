@@ -296,9 +296,11 @@ class InvoiceWebService:
         from app.services.common import PaginationParams
         from app.services.fleet.vehicle_service import VehicleService
 
-        fleet_vehicles = VehicleService(db, org_id).list_vehicles(
-            params=PaginationParams(offset=0, limit=500)
-        ).items
+        fleet_vehicles = (
+            VehicleService(db, org_id)
+            .list_vehicles(params=PaginationParams(offset=0, limit=500))
+            .items
+        )
         suppliers_list = [
             supplier_option_view(supplier)
             for supplier in supplier_service.list(

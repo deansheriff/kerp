@@ -195,6 +195,7 @@ class S3StorageService:
         """Lazy import of minio.error.S3Error for exception handling."""
         try:
             from minio.error import S3Error
+
             return cast(type[Exception], S3Error)
         except ModuleNotFoundError:  # pragma: no cover
             # Allow unit tests to run without the optional `minio` dependency.
