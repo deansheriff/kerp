@@ -212,7 +212,7 @@ class ApprovalWorkflowService(ListResponseMixin):
             correlation_id=correlation_id,
         )
 
-        created_request_id = request.request_id
+        created_request_id: UUID | None = request.request_id
         if created_request_id is None:
             created_request_id = uuid4()
             request.request_id = created_request_id
@@ -224,6 +224,7 @@ class ApprovalWorkflowService(ListResponseMixin):
         if request.request_id is None:
             request.request_id = created_request_id
 
+        assert created_request_id is not None
         return created_request_id
 
     @staticmethod
