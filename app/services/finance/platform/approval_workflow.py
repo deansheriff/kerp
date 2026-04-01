@@ -210,10 +210,11 @@ class ApprovalWorkflowService(ListResponseMixin):
 
         db.add(request)
         db.flush()
+        request_id = request.request_id
         db.commit()
         db.refresh(request)
 
-        return request.request_id
+        return request.request_id or request_id
 
     @staticmethod
     def approve(
