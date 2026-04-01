@@ -208,13 +208,22 @@ class ApprovalWorkflowService(ListResponseMixin):
             correlation_id=correlation_id,
         )
 
+        created_request_id = request.request_id
         db.add(request)
         db.flush()
-        request_id = request.request_id
+        if created_request_id is None:
+            created_request_id = request.request_id
         db.commit()
         db.refresh(request)
+        if created_request_id is None:
+            created_request_id = request.request_id
 
-        return request.request_id or request_id
+        if created_request_id is None:
+            raise HTTPException(
+                status_code=500, detail="Approval request ID was not generated"
+            )
+
+        return created_request_id
 
     @staticmethod
     def approve(
