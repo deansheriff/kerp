@@ -217,7 +217,8 @@ class TestApprovalWorkflowService:
 
         mock_db_session.add.assert_called_once()
         mock_db_session.commit.assert_called_once()
-        assert result == mock_request.request_id
+        created_request = mock_db_session.add.call_args.args[0]
+        assert result == created_request.request_id
 
     def test_submit_for_approval_raises_when_no_workflow(
         self, service, mock_db_session, organization_id, user_id

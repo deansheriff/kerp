@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover
 
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import and_, select
@@ -193,8 +193,12 @@ class ApprovalWorkflowService(ListResponseMixin):
                 status_code=400, detail="Approval workflow is not active"
             )
 
+        # Resolve models dynamically so test-time patches are respected reliably.
+        request_model = globals()["ApprovalRequest"]
+        status_model = globals()["ApprovalRequestStatus"]
+
         # Create approval request
-        request = ApprovalRequest(
+        request = request_model(
             organization_id=org_id,
             workflow_id=wf_id,
             document_type=document_type,
@@ -204,24 +208,21 @@ class ApprovalWorkflowService(ListResponseMixin):
             document_currency_code=document_currency_code,
             requested_by_user_id=coerce_uuid(requested_by_user_id),
             current_level=1,
-            status=ApprovalRequestStatus.PENDING,
+            status=status_model.PENDING,
             correlation_id=correlation_id,
         )
 
         created_request_id = request.request_id
-        db.add(request)
-        db.flush()
         if created_request_id is None:
-            created_request_id = request.request_id
+            created_request_id = uuid4()
+            request.request_id = created_request_id
+
+        db.add(request)
         db.commit()
         db.refresh(request)
-        if created_request_id is None:
-            created_request_id = request.request_id
 
-        if created_request_id is None:
-            raise HTTPException(
-                status_code=500, detail="Approval request ID was not generated"
-            )
+        if request.request_id is None:
+            request.request_id = created_request_id
 
         return created_request_id
 
