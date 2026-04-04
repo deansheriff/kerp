@@ -25,6 +25,8 @@ opentelemetry-exporter-otlp = "1.26.0"
 opentelemetry-instrumentation-fastapi = "0.47b0"
 opentelemetry-instrumentation-sqlalchemy = "0.47b0"
 opentelemetry-instrumentation-celery = "0.47b0"
+python-logging-loki = "0.3.1"
+sentry-sdk = {version = "^2.0", extras = ["fastapi"]}
 python-jose = {version = "3.3.0", extras = ["cryptography"]}
 passlib = {version = "1.7.4", extras = ["bcrypt"]}
 pyotp = "2.9.0"

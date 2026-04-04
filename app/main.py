@@ -196,6 +196,10 @@ _AUDIT_SETTINGS_CACHE_AT: float | None = None
 _AUDIT_SETTINGS_CACHE_TTL_SECONDS = 30.0
 _AUDIT_SETTINGS_LOCK = Lock()
 configure_logging()
+
+from app.monitoring import setup_monitoring  # noqa: E402
+
+setup_monitoring()
 setup_otel(app)
 
 # Register automatic ORM audit listeners (captures all model changes)

@@ -83,12 +83,14 @@ services:
       - ./templates:/app/templates:ro
       - ./app:/app/app:ro
       - ./license:/app/license:ro
+      - ./scripts/entrypoint-monitoring.sh:/app/entrypoint-monitoring.sh:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    entrypoint: ["/app/entrypoint-monitoring.sh"]
     command: ["gunicorn", "-c", "gunicorn.conf.py", "app.main:app"]
 
   app-dev:
@@ -157,6 +159,8 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/app/app:ro
+      - ./scripts/entrypoint-monitoring.sh:/app/entrypoint-monitoring.sh:ro
+    entrypoint: ["/app/entrypoint-monitoring.sh"]
     command: ["celery", "-A", "app.celery_app", "worker", "-l", "info"]
 
   beat:
@@ -185,6 +189,9 @@ services:
         condition: service_started
       openbao:
         condition: service_healthy
+    volumes:
+      - ./scripts/entrypoint-monitoring.sh:/app/entrypoint-monitoring.sh:ro
+    entrypoint: ["/app/entrypoint-monitoring.sh"]
     command: ["celery", "-A", "app.celery_app", "beat", "-l", "info"]
 
   db:
