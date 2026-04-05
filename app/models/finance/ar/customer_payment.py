@@ -2,6 +2,8 @@
 Customer Payment Model - AR Schema.
 """
 
+from __future__ import annotations
+
 import enum
 import uuid
 from datetime import date, datetime
@@ -21,9 +23,14 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.finance.ar.payment_allocation import PaymentAllocation
 
 
 class PaymentMethod(str, enum.Enum):
@@ -44,17 +51,17 @@ class PaymentStatus(str, enum.Enum):
     VOID = "VOID"
 
     @classmethod
-    def gl_impacting(cls) -> frozenset["PaymentStatus"]:
+    def gl_impacting(cls) -> frozenset[PaymentStatus]:
         """Statuses where the payment has been posted to the General Ledger."""
         return frozenset({cls.CLEARED})
 
     @classmethod
-    def effective(cls) -> frozenset["PaymentStatus"]:
+    def effective(cls) -> frozenset[PaymentStatus]:
         """Statuses where the payment reduces the customer's balance."""
         return frozenset({cls.APPROVED, cls.CLEARED})
 
     @classmethod
-    def terminal(cls) -> frozenset["PaymentStatus"]:
+    def terminal(cls) -> frozenset[PaymentStatus]:
         """Statuses where the payment is fully settled or cancelled."""
         return frozenset({cls.CLEARED, cls.BOUNCED, cls.REVERSED, cls.VOID})
 
@@ -204,3 +211,16 @@ class CustomerPayment(Base):
         nullable=True,
         onupdate=func.now(),
     )
+
+    # --- Relationships ---
+    allocations: Mapped[list[PaymentAllocation]] = relationship(
+        "PaymentAllocation",
+        foreign_keys="PaymentAllocation.payment_id",
+        lazy="select",
+    )
+
+    @property
+    def unallocated_amount(self) -> Decimal:
+        """Net amount minus total allocated across all linked invoices."""
+        allocated = sum((a.allocated_amount for a in self.allocations), Decimal("0"))
+        return self.amount - allocated

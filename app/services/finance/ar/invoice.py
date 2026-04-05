@@ -1077,6 +1077,26 @@ class ARInvoiceService(ListResponseMixin):
             user_id=user_id,
         )
 
+        # Auto-allocate any unallocated advance payments from this customer
+        try:
+            from app.services.finance.ar.advance_allocation import (
+                AdvanceAllocationService,
+            )
+
+            alloc_result = AdvanceAllocationService(db).apply_to_invoice(invoice)
+            if alloc_result.allocations_created:
+                logger.info(
+                    "Auto-allocated %d advance payment(s) totalling %s to %s",
+                    alloc_result.allocations_created,
+                    alloc_result.total_applied,
+                    invoice.invoice_number,
+                )
+        except Exception:
+            logger.exception(
+                "Advance allocation failed for %s — invoice posted without allocation",
+                inv_id,
+            )
+
         db.commit()
         db.refresh(invoice)
 
