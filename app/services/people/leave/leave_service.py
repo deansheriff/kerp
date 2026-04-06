@@ -35,7 +35,12 @@ from app.models.people.leave import (
     LeaveTypePolicy,
 )
 from app.services.audit_dispatcher import fire_audit_event
-from app.services.common import PaginatedResult, PaginationParams, ValidationError
+from app.services.common import (
+    ConflictError,
+    PaginatedResult,
+    PaginationParams,
+    ValidationError,
+)
 from app.services.state_machine import StateMachine
 
 logger = logging.getLogger(__name__)
@@ -131,6 +136,18 @@ class LeaveApplicationStatusError(LeaveServiceError):
         self.current = current
         self.target = target
         super().__init__(f"Cannot transition from {current} to {target}")
+
+
+class OverlappingLeaveApplicationError(ConflictError, LeaveServiceError):
+    """Raised when a leave request overlaps an existing submitted/approved request."""
+
+    def __init__(self, from_date: date, to_date: date):
+        self.from_date = from_date
+        self.to_date = to_date
+        ConflictError.__init__(
+            self,
+            f"Overlapping leave application exists for period {from_date} to {to_date}",
+        )
 
 
 # Valid status transitions for leave applications
@@ -1216,8 +1233,9 @@ class LeaveService:
             )
         )
         if overlapping:
-            raise LeaveServiceError(
-                f"Overlapping leave application exists for period {overlapping.from_date} to {overlapping.to_date}"
+            raise OverlappingLeaveApplicationError(
+                overlapping.from_date,
+                overlapping.to_date,
             )
 
         # Check for active disciplinary investigation

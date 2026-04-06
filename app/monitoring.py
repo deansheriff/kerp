@@ -14,11 +14,15 @@ from __future__ import annotations
 import json
 import logging
 import os
+import queue
 import time
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from threading import Lock
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
+
+from app.metrics import LOKI_LOGS_DROPPED, LOKI_LOGS_SENT
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +43,47 @@ _sentry_enabled = False
 _sentry_dsn = ""
 
 
-def get_monitoring_status() -> dict[str, Any]:
-    """Return current monitoring health for the ``/health/monitoring`` endpoint."""
+def _redact_url(url: str) -> str:
+    """Return a URL safe for operator-facing health responses."""
+    if not url:
+        return ""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "<redacted>"
+
+    hostname = parts.hostname
+    if not hostname:
+        return "<redacted>"
+
+    netloc = hostname
+    if parts.port is not None:
+        netloc = f"{netloc}:{parts.port}"
+
+    return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
+
+
+def _sanitize_error_message(error_msg: str) -> str:
+    """Avoid leaking internal endpoints or credentials via health output."""
+    if not error_msg:
+        return ""
+    if error_msg.startswith("HTTP "):
+        return error_msg.split(":", 1)[0]
+    return "delivery failure; inspect application logs for details"
+
+
+def _safe_loki_status() -> dict[str, Any]:
     with _loki_stats_lock:
         loki = dict(_loki_stats)
+
+    loki["url"] = _redact_url(str(loki.get("url", "")))
+    loki["last_error"] = _sanitize_error_message(str(loki.get("last_error", "")))
+    return loki
+
+
+def get_monitoring_status() -> dict[str, Any]:
+    """Return current monitoring health for the ``/health/monitoring`` endpoint."""
+    loki = _safe_loki_status()
 
     sentry_status: dict[str, Any] = {"enabled": _sentry_enabled}
     if _sentry_enabled:
@@ -51,7 +92,18 @@ def get_monitoring_status() -> dict[str, Any]:
 
             client = sentry_sdk.get_client()
             sentry_status["dsn_configured"] = client.dsn is not None
-            sentry_status["transport_healthy"] = True
+
+            # Inspect actual transport state instead of hardcoding True.
+            transport = client.transport
+            transport_health = getattr(transport, "is_healthy", None)
+            if callable(transport_health):
+                transport_health = transport_health()
+            if transport is not None and transport_health is not None:
+                sentry_status["transport_healthy"] = bool(transport_health)
+            else:
+                # Fallback: transport exists but doesn't expose is_healthy
+                # (e.g. custom transport).  Treat as healthy if DSN is set.
+                sentry_status["transport_healthy"] = sentry_status["dsn_configured"]
         except Exception as exc:
             sentry_status["dsn_configured"] = False
             sentry_status["transport_healthy"] = False
@@ -93,6 +145,10 @@ class ResilientLokiHandler(logging.Handler):
         self.tags = tags
         self.connect_timeout = connect_timeout
         self.read_timeout = read_timeout
+
+        from app.logging import JsonLogFormatter
+
+        self.setFormatter(JsonLogFormatter())
 
         self._session = self._new_session()
         self._consecutive_failures = 0
@@ -145,6 +201,7 @@ class ResilientLokiHandler(logging.Handler):
         if now < self._next_retry_at:
             with _loki_stats_lock:
                 _loki_stats["dropped"] += 1
+            LOKI_LOGS_DROPPED.inc()
             return
 
         try:
@@ -160,6 +217,7 @@ class ResilientLokiHandler(logging.Handler):
                     _loki_stats["last_success_ts"] = time.time()
                     _loki_stats["consecutive_failures"] = 0
                     _loki_stats["last_error"] = ""
+                LOKI_LOGS_SENT.inc()
                 self._consecutive_failures = 0
             else:
                 self._handle_failure(f"HTTP {resp.status_code}: {resp.text[:200]}")
@@ -175,9 +233,34 @@ class ResilientLokiHandler(logging.Handler):
             _loki_stats["dropped"] += 1
             _loki_stats["last_error"] = error_msg
             _loki_stats["consecutive_failures"] = self._consecutive_failures
+        LOKI_LOGS_DROPPED.inc()
 
         # Recreate session so a broken connection doesn't poison future attempts
         self._reset_session()
+
+
+# ---------------------------------------------------------------------------
+# Non-blocking queue handler
+# ---------------------------------------------------------------------------
+
+
+class _NonBlockingQueueHandler(QueueHandler):
+    """QueueHandler that drops records instead of blocking when the queue is full.
+
+    The default ``QueueHandler.emit()`` calls ``queue.put(record)`` which blocks
+    indefinitely on a full queue.  In a logging context this would freeze the
+    application thread when Loki is unreachable and the background listener
+    cannot drain the queue fast enough.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.queue.put_nowait(record)
+        except queue.Full:
+            # Silently drop — better to lose a log line than block the app.
+            with _loki_stats_lock:
+                _loki_stats["dropped"] += 1
+            LOKI_LOGS_DROPPED.inc()
 
 
 # ---------------------------------------------------------------------------
@@ -201,11 +284,11 @@ def _setup_loki(app_name: str, server: str, environment: str, url: str) -> None:
     tags = {"app": app_name, "server": server, "environment": environment}
     handler = ResilientLokiHandler(url, tags)
 
-    # Wrap in QueueHandler so emit() runs in a background thread
-    # and never blocks the application.
-    queue: Queue[logging.LogRecord] = Queue(maxsize=10_000)
-    queue_handler = QueueHandler(queue)
-    listener = QueueListener(queue, handler, respect_handler_level=True)
+    # Wrap in a non-blocking QueueHandler so emit() runs in a background
+    # thread and drops records instead of blocking when the queue is full.
+    log_queue: Queue[logging.LogRecord] = Queue(maxsize=10_000)
+    queue_handler = _NonBlockingQueueHandler(log_queue)
+    listener = QueueListener(log_queue, handler, respect_handler_level=True)
     listener.start()
 
     logging.getLogger().addHandler(queue_handler)

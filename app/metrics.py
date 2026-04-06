@@ -1,3 +1,5 @@
+import re
+
 from prometheus_client import Counter, Histogram
 
 REQUEST_COUNT = Counter(
@@ -21,7 +23,78 @@ JOB_DURATION = Histogram(
     "Background job duration",
     ["task", "status"],
 )
+JOB_RUNS = Counter(
+    "job_runs_total",
+    "Background job executions",
+    ["task", "status"],
+)
+
+INTEGRATION_REQUESTS = Counter(
+    "integration_requests_total",
+    "Outbound integration requests",
+    ["integration", "operation", "status"],
+)
+INTEGRATION_REQUEST_DURATION = Histogram(
+    "integration_request_duration_seconds",
+    "Outbound integration request duration",
+    ["integration", "operation", "status"],
+)
+
+# Loki log delivery counters — enables rate() / increase() alerting in Grafana.
+LOKI_LOGS_SENT = Counter(
+    "loki_logs_sent_total",
+    "Log records successfully pushed to Loki",
+)
+LOKI_LOGS_DROPPED = Counter(
+    "loki_logs_dropped_total",
+    "Log records dropped (Loki unreachable, queue full, or HTTP error)",
+)
 
 
 def observe_job(task_name: str, status: str, duration: float) -> None:
-    JOB_DURATION.labels(task=task_name, status=status).observe(duration)
+    normalized_status = normalize_metric_label(status)
+    JOB_RUNS.labels(task=task_name, status=normalized_status).inc()
+    JOB_DURATION.labels(task=task_name, status=normalized_status).observe(duration)
+
+
+def observe_integration_request(
+    integration: str,
+    operation: str,
+    status: str,
+    duration: float,
+) -> None:
+    normalized_status = normalize_metric_label(status)
+    INTEGRATION_REQUESTS.labels(
+        integration=integration,
+        operation=operation,
+        status=normalized_status,
+    ).inc()
+    INTEGRATION_REQUEST_DURATION.labels(
+        integration=integration,
+        operation=operation,
+        status=normalized_status,
+    ).observe(duration)
+
+
+def categorize_http_status(status_code: int) -> str:
+    if status_code in {401, 403}:
+        return "auth_error"
+    if status_code == 404:
+        return "not_found"
+    if status_code == 429:
+        return "rate_limited"
+    if 400 <= status_code < 500:
+        return "client_error"
+    if status_code >= 500:
+        return "server_error"
+    return "success"
+
+
+def normalize_metric_label(value: str) -> str:
+    scrubbed = _ID_TOKEN_RE.sub("id", str(value).strip().lower())
+    normalized = re.sub(r"[^a-zA-Z0-9_]+", "_", scrubbed)
+    normalized = normalized.strip("_")
+    return normalized or "unknown"
+
+
+_ID_TOKEN_RE = re.compile(r"\b(?:[0-9a-f]{8,}|[0-9]{3,})\b", re.IGNORECASE)

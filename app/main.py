@@ -66,6 +66,7 @@ from app.errors import register_error_handlers
 from app.logging import configure_logging
 from app.middleware.csp import add_unsafe_eval_to_csp
 from app.middleware.rate_limit import rate_limit_middleware
+from app.monitoring import setup_monitoring
 from app.models.domain_settings import DomainSetting, SettingDomain
 from app.observability import ObservabilityMiddleware
 from app.services import audit as audit_service
@@ -172,6 +173,10 @@ async def lifespan(app: FastAPI):
         )
 
         register_payroll_handlers()
+        try:
+            _get_cached_openapi_schema()
+        except Exception:
+            logger.exception("Failed to precompute OpenAPI schema during startup")
     finally:
         db.close()
     yield
@@ -195,12 +200,44 @@ _AUDIT_SETTINGS_CACHE: dict | None = None
 _AUDIT_SETTINGS_CACHE_AT: float | None = None
 _AUDIT_SETTINGS_CACHE_TTL_SECONDS = 30.0
 _AUDIT_SETTINGS_LOCK = Lock()
-configure_logging()
+_runtime_observability_pid: int | None = None
+_OPENAPI_SCHEMA_LOCK = Lock()
 
-from app.monitoring import setup_monitoring  # noqa: E402
 
-setup_monitoring()
-setup_otel(app)
+def _get_cached_openapi_schema() -> dict:
+    with _OPENAPI_SCHEMA_LOCK:
+        if app.openapi_schema is None:
+            app.openapi_schema = app.openapi()
+        return app.openapi_schema
+
+
+def bootstrap_runtime_observability(app_instance: FastAPI | None = None) -> None:
+    """Configure logging/monitoring once per process.
+
+    Gunicorn runs with ``preload_app = True`` in production, so runtime
+    integrations that own process-local resources (threads, sockets, handlers)
+    must be initialized after fork in worker processes, not during master
+    import. Direct app execution still initializes immediately below.
+    """
+    global _runtime_observability_pid  # noqa: PLW0603
+
+    pid = os.getpid()
+    if _runtime_observability_pid == pid:
+        return
+
+    configure_logging()
+    setup_monitoring()
+    setup_otel(app_instance)
+    _runtime_observability_pid = pid
+
+
+if os.getenv("DOTMAC_DEFER_RUNTIME_OBSERVABILITY", "").strip().lower() not in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}:
+    bootstrap_runtime_observability(app)
 
 # Register automatic ORM audit listeners (captures all model changes)
 from app.services.audit_listener import register_audit_listeners  # noqa: E402
@@ -741,6 +778,12 @@ def favicon_svg():
     return RedirectResponse(url="/static/favicon.svg")
 
 
+@app.get("/v2/api-docs", include_in_schema=False)
+def legacy_api_docs():
+    """Legacy OpenAPI alias used by older tooling."""
+    return JSONResponse(content=_get_cached_openapi_schema())
+
+
 @app.get("/health")
 def health_check():
     """Basic health check endpoint (backwards compatibility)."""
@@ -748,30 +791,41 @@ def health_check():
 
 
 @app.get("/health/monitoring")
-def monitoring_health():
+def monitoring_health(request: Request):
     """Report status of external monitoring integrations (Loki, Sentry/GlitchTip).
 
     Returns per-integration health with delivery stats so operators can detect
     silent failures (e.g. Loki handler dying after a connection timeout).
     """
+    if not _monitoring_authorized(request):
+        return Response(status_code=403)
+
     from app.monitoring import get_monitoring_status
+    from app.telemetry import get_otel_status
 
     status = get_monitoring_status()
+    status["tracing"] = get_otel_status()
 
     # Determine overall health: Loki healthy if enabled and no sustained failures
     loki = status["loki"]
     loki_healthy = not loki["enabled"] or loki["consecutive_failures"] < 5
-    sentry_healthy = not status["sentry"]["enabled"] or status["sentry"].get(
-        "dsn_configured", False
+    sentry = status["sentry"]
+    sentry_healthy = not sentry["enabled"] or (
+        sentry.get("dsn_configured", False) and sentry.get("transport_healthy", False)
     )
+    tracing = status["tracing"]
+    tracing_healthy = not tracing["enabled"] or bool(tracing.get("initialized", False))
 
-    overall = "healthy" if (loki_healthy and sentry_healthy) else "degraded"
+    overall = (
+        "healthy"
+        if (loki_healthy and sentry_healthy and tracing_healthy)
+        else "degraded"
+    )
     code = 200 if overall == "healthy" else 503
 
-    return Response(
-        content=JSONResponse(content={"status": overall, "integrations": status}).body,
+    return JSONResponse(
+        content={"status": overall, "integrations": status},
         status_code=code,
-        media_type="application/json",
     )
 
 
@@ -796,20 +850,43 @@ def readiness_probe():
         200: Ready to serve traffic
         503: Not ready (dependency failure)
     """
+    from app.dependency_health import collect_dependency_health, readiness_failures
+
     checks = {
         "database": _check_database(),
         "redis": _check_redis(),
     }
+    dependencies = collect_dependency_health()
+    required_dependency_failures = readiness_failures(dependencies)
 
-    all_healthy = all(check["healthy"] for check in checks.values())
+    core_healthy = all(check["healthy"] for check in checks.values())
+    all_healthy = core_healthy and not required_dependency_failures
+    degraded_dependencies = {
+        name: check
+        for name, check in dependencies.items()
+        if bool(check["configured"])
+        and not bool(check["healthy"])
+        and not bool(check["required"])
+    }
+
+    if all_healthy and degraded_dependencies:
+        status = "ready_with_degraded_dependencies"
+    elif all_healthy:
+        status = "ready"
+    else:
+        status = "not_ready"
+
+    payload = {
+        "status": status,
+        "checks": checks,
+        "dependencies": dependencies,
+    }
 
     if all_healthy:
-        return {"status": "ready", "checks": checks}
+        return payload
     else:
         return Response(
-            content=JSONResponse(
-                content={"status": "not_ready", "checks": checks}
-            ).body,
+            content=JSONResponse(content=payload).body,
             status_code=503,
             media_type="application/json",
         )
@@ -849,20 +926,45 @@ def _check_redis() -> dict:
         return {"healthy": False, "message": str(e)[:100]}
 
 
-def _metrics_authorized(request: Request) -> bool:
-    if os.getenv("METRICS_AUTH_DISABLED", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+def _bool_env_enabled(*keys: str) -> bool:
+    return any(
+        os.getenv(key, "").strip().lower() in {"1", "true", "yes", "on"} for key in keys
+    )
+
+
+def _observability_endpoint_authorized(
+    request: Request,
+    *,
+    token_env_keys: tuple[str, ...],
+    disable_env_keys: tuple[str, ...] = (),
+) -> bool:
+    if _bool_env_enabled(*disable_env_keys):
         return True
-    token = os.getenv("METRICS_TOKEN", "").strip()
-    if token:
-        header_token = request.headers.get("x-metrics-token", "").strip()
-        return header_token == token
+
+    for key in token_env_keys:
+        token = os.getenv(key, "").strip()
+        if token:
+            header_token = request.headers.get("x-metrics-token", "").strip()
+            return header_token == token
+
     # If no token configured, only allow local access.
     return bool(request.client and request.client.host in {"127.0.0.1", "::1"})
+
+
+def _metrics_authorized(request: Request) -> bool:
+    return _observability_endpoint_authorized(
+        request,
+        token_env_keys=("METRICS_TOKEN",),
+        disable_env_keys=("METRICS_AUTH_DISABLED",),
+    )
+
+
+def _monitoring_authorized(request: Request) -> bool:
+    return _observability_endpoint_authorized(
+        request,
+        token_env_keys=("MONITORING_TOKEN", "METRICS_TOKEN"),
+        disable_env_keys=("MONITORING_AUTH_DISABLED", "METRICS_AUTH_DISABLED"),
+    )
 
 
 @app.get("/metrics")

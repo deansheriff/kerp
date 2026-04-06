@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import app.monitoring as _monitoring_mod
+from app.logging import JsonLogFormatter
 from app.monitoring import (
     ResilientLokiHandler,
     _loki_stats,
@@ -39,8 +42,11 @@ def _reset_loki_stats() -> None:
 @pytest.fixture(autouse=True)
 def _clean_stats():
     _reset_loki_stats()
+    prev_sentry = _monitoring_mod._sentry_enabled
+    _monitoring_mod._sentry_enabled = False
     yield
     _reset_loki_stats()
+    _monitoring_mod._sentry_enabled = prev_sentry
 
 
 def _make_handler(
@@ -192,7 +198,10 @@ class TestResilientLokiHandler:
         mock_new_session.return_value = mock_session
 
         handler = _make_handler()
-        handler.emit(_make_record("hello from test"))
+        record = _make_record("hello from test")
+        record.request_id = "req-123"
+        record.invoice_id = "inv-123"
+        handler.emit(record)
 
         call_args = mock_session.post.call_args
         import json
@@ -203,7 +212,12 @@ class TestResilientLokiHandler:
         assert stream["stream"]["app"] == "test"
         assert stream["stream"]["logger"] == "test.logger"
         assert stream["stream"]["severity"] == "info"
-        assert stream["values"][0][1] == "hello from test"
+        payload = json.loads(stream["values"][0][1])
+        assert payload["message"] == "hello from test"
+        assert payload["logger"] == "test.logger"
+        assert payload["request_id"] == "req-123"
+        assert payload["invoice_id"] == "inv-123"
+        assert isinstance(handler.formatter, JsonLogFormatter)
 
 
 # ---------------------------------------------------------------------------
@@ -230,3 +244,38 @@ class TestGetMonitoringStatus:
         assert status["loki"]["enabled"] is True
         assert status["loki"]["sent"] == 42
         assert status["loki"]["dropped"] == 3
+        assert status["loki"]["url"] == "http://loki:3100/loki/api/v1/push"
+
+    def test_monitoring_status_redacts_sensitive_details(self) -> None:
+        with _loki_stats_lock:
+            _loki_stats["enabled"] = True
+            _loki_stats["url"] = (
+                "https://user:secret@loki.internal:3100/loki/api/v1/push?token=abc"
+            )
+            _loki_stats["last_error"] = (
+                "HTTPSConnectionPool(host='loki.internal', port=3100): Max retries exceeded"
+            )
+
+        status = get_monitoring_status()
+
+        assert status["loki"]["url"] == "https://loki.internal:3100/loki/api/v1/push"
+        assert status["loki"]["last_error"] == (
+            "delivery failure; inspect application logs for details"
+        )
+
+    @patch("sentry_sdk.get_client")
+    def test_sentry_transport_health_calls_callable(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        _monitoring_mod._sentry_enabled = True
+        mock_transport = SimpleNamespace(is_healthy=lambda: False)
+        mock_get_client.return_value = SimpleNamespace(
+            dsn="https://public@example.com/1",
+            transport=mock_transport,
+        )
+
+        status = get_monitoring_status()
+
+        assert status["sentry"]["enabled"] is True
+        assert status["sentry"]["dsn_configured"] is True
+        assert status["sentry"]["transport_healthy"] is False

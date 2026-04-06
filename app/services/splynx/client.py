@@ -6,6 +6,7 @@ Handles all HTTP communication with Splynx API for ISP billing data.
 
 import base64
 import logging
+import time
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from datetime import date
@@ -15,6 +16,7 @@ from typing import Any
 import httpx
 
 from app.config import settings
+from app.metrics import categorize_http_status, observe_integration_request
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +226,8 @@ class SplynxClient:
     ) -> Any:
         """Make an HTTP request with error handling and retries."""
         last_error: Exception | None = None
+        started_at = time.perf_counter()
+        metric_status = "unknown"
 
         for attempt in range(self.config.max_retries):
             try:
@@ -235,21 +239,25 @@ class SplynxClient:
                 )
 
                 if response.status_code == 401:
+                    metric_status = "auth_error"
                     raise SplynxAuthenticationError(
                         "Authentication failed. Check API credentials.",
                         status_code=401,
                     )
                 elif response.status_code == 404:
+                    metric_status = "not_found"
                     raise SplynxNotFoundError(
                         f"Resource not found: {endpoint}",
                         status_code=404,
                     )
                 elif response.status_code == 429:
+                    metric_status = "rate_limited"
                     raise SplynxRateLimitError(
                         "Rate limit exceeded. Try again later.",
                         status_code=429,
                     )
                 elif response.status_code >= 500:
+                    metric_status = "server_error"
                     # Server error - retry
                     raise SplynxError(
                         f"Server error: {response.status_code}",
@@ -257,9 +265,11 @@ class SplynxClient:
                     )
 
                 response.raise_for_status()
+                metric_status = categorize_http_status(response.status_code)
                 return response.json()
 
             except httpx.TimeoutException as e:
+                metric_status = "timeout"
                 last_error = e
                 logger.warning(
                     "Splynx request timeout (attempt %d/%d): %s",
@@ -268,6 +278,7 @@ class SplynxClient:
                     endpoint,
                 )
             except httpx.RequestError as e:
+                metric_status = "request_error"
                 last_error = e
                 logger.warning(
                     "Splynx request error (attempt %d/%d): %s - %s",
@@ -279,6 +290,11 @@ class SplynxClient:
             except SplynxRateLimitError:
                 raise
             except SplynxError as e:
+                metric_status = (
+                    categorize_http_status(e.status_code)
+                    if e.status_code is not None
+                    else "request_error"
+                )
                 if e.status_code and e.status_code >= 500:
                     last_error = e
                     logger.warning(
@@ -289,6 +305,20 @@ class SplynxClient:
                     )
                 else:
                     raise
+            finally:
+                if attempt == self.config.max_retries - 1 or metric_status in {
+                    "success",
+                    "auth_error",
+                    "not_found",
+                    "rate_limited",
+                    "client_error",
+                }:
+                    observe_integration_request(
+                        "splynx",
+                        f"{method.upper()} {endpoint}",
+                        metric_status,
+                        max(time.perf_counter() - started_at, 0.0),
+                    )
 
         raise SplynxError(
             f"Request failed after {self.config.max_retries} attempts: {last_error}"

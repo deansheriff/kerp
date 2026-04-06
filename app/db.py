@@ -1,3 +1,4 @@
+import os
 from collections.abc import Generator
 from contextlib import contextmanager
 
@@ -34,8 +35,34 @@ def _get_connect_args() -> dict:
     return connect_args
 
 
+_engine = None
+_engine_pid: int | None = None
+_session_local = None
+_session_local_pid: int | None = None
+
+
+def _current_pid() -> int:
+    return os.getpid()
+
+
+def _dispose_sync_engine(engine) -> None:
+    try:
+        engine.dispose()
+    except Exception:
+        return
+
+
 def get_engine():
-    return create_engine(
+    global _engine, _engine_pid
+
+    pid = _current_pid()
+    if _engine is not None and _engine_pid == pid:
+        return _engine
+
+    if _engine is not None and _engine_pid != pid:
+        _dispose_sync_engine(_engine)
+
+    _engine = create_engine(
         settings.database_url,
         pool_pre_ping=True,
         pool_size=settings.db_pool_size,
@@ -44,6 +71,8 @@ def get_engine():
         pool_recycle=settings.db_pool_recycle,
         connect_args=_get_connect_args(),
     )
+    _engine_pid = pid
+    return _engine
 
 
 def _get_async_connect_args() -> dict:
@@ -59,13 +88,23 @@ def _get_async_connect_args() -> dict:
     return connect_args
 
 
+_async_engine = None
+_async_engine_pid: int | None = None
+
+
 def get_async_engine():
     """Get async database engine."""
+    global _async_engine, _async_engine_pid
+
+    pid = _current_pid()
+    if _async_engine is not None and _async_engine_pid == pid:
+        return _async_engine
+
     # Convert postgresql:// to postgresql+psycopg:// for async psycopg
     async_url = settings.database_url.replace(
         "postgresql://", "postgresql+psycopg://"
     ).replace("postgresql+asyncpg://", "postgresql+psycopg://")
-    return create_async_engine(
+    _async_engine = create_async_engine(
         async_url,
         pool_pre_ping=True,
         pool_size=settings.db_pool_size,
@@ -74,9 +113,30 @@ def get_async_engine():
         pool_recycle=settings.db_pool_recycle,
         connect_args=_get_async_connect_args(),
     )
+    _async_engine_pid = pid
+    return _async_engine
 
 
-SessionLocal = sessionmaker(bind=get_engine(), autoflush=False, autocommit=False)
+def _get_session_local():
+    global _session_local, _session_local_pid
+
+    pid = _current_pid()
+    if _session_local is not None and _session_local_pid == pid:
+        return _session_local
+
+    _session_local = sessionmaker(bind=get_engine(), autoflush=False, autocommit=False)
+    _session_local_pid = pid
+    return _session_local
+
+
+class _SessionLocalProxy:
+    """Proxy for process-local sessionmaker creation."""
+
+    def __call__(self):
+        return _get_session_local()()
+
+
+SessionLocal = _SessionLocalProxy()
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -96,7 +156,9 @@ def get_db() -> Generator[Session, None, None]:
 
 # Lazy initialization - only create engine when actually needed
 _auth_engine = None
+_auth_engine_pid: int | None = None
 _auth_session_local = None
+_auth_session_local_pid: int | None = None
 
 
 def get_auth_engine():
@@ -111,9 +173,14 @@ def get_auth_engine():
     Engine is created lazily on first use to avoid startup failures
     when the auth database is temporarily unavailable.
     """
-    global _auth_engine
-    if _auth_engine is not None:
+    global _auth_engine, _auth_engine_pid
+
+    pid = _current_pid()
+    if _auth_engine is not None and _auth_engine_pid == pid:
         return _auth_engine
+
+    if _auth_engine is not None and _auth_engine_pid != pid:
+        _dispose_sync_engine(_auth_engine)
 
     url = settings.auth_database_url or settings.database_url
 
@@ -137,13 +204,16 @@ def get_auth_engine():
         pool_recycle=settings.db_pool_recycle,
         connect_args=connect_args if connect_args else {},
     )
+    _auth_engine_pid = pid
     return _auth_engine
 
 
 def _get_auth_session_maker():
     """Get auth session maker (lazy initialization)."""
-    global _auth_session_local
-    if _auth_session_local is not None:
+    global _auth_session_local, _auth_session_local_pid
+
+    pid = _current_pid()
+    if _auth_session_local is not None and _auth_session_local_pid == pid:
         return _auth_session_local
 
     _auth_session_local = sessionmaker(
@@ -151,6 +221,7 @@ def _get_auth_session_maker():
         autoflush=False,
         autocommit=False,
     )
+    _auth_session_local_pid = pid
     return _auth_session_local
 
 
@@ -193,12 +264,15 @@ def get_auth_db_session() -> Session:
 
 # Lazy initialization of async session
 _async_session_local = None
+_async_session_local_pid: int | None = None
 
 
 def get_async_session_local():
     """Get async session maker (lazy initialization)."""
-    global _async_session_local
-    if _async_session_local is None:
+    global _async_session_local, _async_session_local_pid
+
+    pid = _current_pid()
+    if _async_session_local is None or _async_session_local_pid != pid:
         _async_session_local = async_sessionmaker(
             bind=get_async_engine(),
             class_=AsyncSession,
@@ -206,6 +280,7 @@ def get_async_session_local():
             autocommit=False,
             expire_on_commit=False,
         )
+        _async_session_local_pid = pid
     return _async_session_local
 
 

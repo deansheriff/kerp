@@ -37,3 +37,15 @@ graceful_timeout = 30
 
 # Preload app for faster worker spawning (shares memory)
 preload_app = True
+
+# Defer per-process observability bootstrap until Gunicorn forks workers.
+os.environ.setdefault(
+    "DOTMAC_DEFER_RUNTIME_OBSERVABILITY",
+    "1" if preload_app else "0",
+)
+
+
+def post_worker_init(worker):
+    from app.main import app, bootstrap_runtime_observability
+
+    bootstrap_runtime_observability(app)

@@ -19,6 +19,7 @@ from app.services.analytics.dashboard_metrics import (
     ALL_DASHBOARD_METRICS,
     DashboardMetricsService,
 )
+import app.services.analytics.dashboard_metrics as dashboard_metrics_module
 
 DEFAULT_ORG = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -250,6 +251,24 @@ class TestGetOrgSnapshot:
         result = svc.get_org_snapshot(DEFAULT_ORG)
 
         assert result is None
+
+    @patch("app.services.analytics.dashboard_metrics.MetricStore")
+    def test_skips_snapshot_query_while_missing_table_backoff_active(
+        self, MockStore: MagicMock, monkeypatch
+    ) -> None:
+        db = MagicMock()
+        monkeypatch.setattr(
+            dashboard_metrics_module,
+            "_snapshot_table_missing_until",
+            999.0,
+        )
+        monkeypatch.setattr(dashboard_metrics_module, "monotonic", lambda: 100.0)
+
+        svc = DashboardMetricsService(db)
+        result = svc.get_org_snapshot(DEFAULT_ORG)
+
+        assert result is None
+        MockStore.return_value.get_latest.assert_not_called()
 
 
 class TestAllDashboardMetrics:

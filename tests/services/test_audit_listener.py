@@ -81,6 +81,9 @@ class TestShouldSkip:
     def test_account_balance_skipped(self) -> None:
         assert _should_skip("gl", "account_balance") is True
 
+    def test_org_metric_snapshot_skipped(self) -> None:
+        assert _should_skip("public", "org_metric_snapshot") is True
+
 
 # ── Org ID extraction tests ───────────────────────────────────────────────
 

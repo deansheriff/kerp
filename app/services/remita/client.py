@@ -8,11 +8,14 @@ import hashlib
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, cast
 
 import httpx
+
+from app.metrics import categorize_http_status, observe_integration_request
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +78,7 @@ class RemitaClient:
         merchant_id: str,
         api_key: str,
         is_live: bool = False,
+        timeout: float = 30.0,
     ):
         """
         Initialize Remita client.
@@ -87,6 +91,7 @@ class RemitaClient:
         self.merchant_id = merchant_id
         self.api_key = api_key
         self.base_url = REMITA_LIVE_URL if is_live else REMITA_DEMO_URL
+        self.timeout = timeout
         self._client: httpx.Client | None = None
 
     def _get_client(self) -> httpx.Client:
@@ -94,7 +99,7 @@ class RemitaClient:
         if self._client is None:
             self._client = httpx.Client(
                 base_url=self.base_url,
-                timeout=30.0,
+                timeout=self.timeout,
             )
         return self._client
 
@@ -115,6 +120,52 @@ class RemitaClient:
             "Content-Type": "application/json",
             "Authorization": f"remitaConsumerKey={self.merchant_id},remitaConsumerToken={api_hash}",
         }
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        operation: str,
+        headers: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        started_at = time.perf_counter()
+        metric_status = "unknown"
+        try:
+            response = self._get_client().request(
+                method=method,
+                url=url,
+                headers=headers,
+                json=json,
+            )
+            metric_status = categorize_http_status(response.status_code)
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError:
+            observe_integration_request(
+                "remita",
+                operation,
+                metric_status,
+                max(time.perf_counter() - started_at, 0.0),
+            )
+            raise
+        except httpx.RequestError:
+            observe_integration_request(
+                "remita",
+                operation,
+                "request_error",
+                max(time.perf_counter() - started_at, 0.0),
+            )
+            raise
+        finally:
+            if metric_status == "success":
+                observe_integration_request(
+                    "remita",
+                    operation,
+                    metric_status,
+                    max(time.perf_counter() - started_at, 0.0),
+                )
 
     def _parse_jsonp_response(self, response_text: str) -> dict[str, Any]:
         """
@@ -190,18 +241,18 @@ class RemitaClient:
             "description": description,
         }
 
-        client = self._get_client()
         logger.info(
             f"Generating RRR for service {service_type_id}, amount {amount_str}, order {order_id}"
         )
 
         try:
-            response = client.post(
+            response = self._request(
+                "POST",
                 self.RRR_ENDPOINT,
+                operation="generate_rrr",
                 headers=self._auth_header(api_hash),
                 json=payload,
             )
-            response.raise_for_status()
         except httpx.HTTPStatusError as e:
             logger.error(f"Remita RRR generation HTTP error: {e.response.text}")
             raise RemitaError(
@@ -260,12 +311,15 @@ class RemitaClient:
             api_hash=api_hash,
         )
 
-        client = self._get_client()
         logger.info(f"Checking status for RRR: {rrr}")
 
         try:
-            response = client.get(url, headers=self._auth_header(api_hash))
-            response.raise_for_status()
+            response = self._request(
+                "GET",
+                url,
+                operation="check_status",
+                headers=self._auth_header(api_hash),
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Remita status check HTTP error: {e.response.text}")
             raise RemitaError(

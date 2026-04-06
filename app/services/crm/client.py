@@ -15,6 +15,7 @@ from typing import Any, cast
 import httpx
 
 from app.config import settings
+from app.metrics import categorize_http_status, observe_integration_request
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,8 @@ class CRMClient:
             CRMError: On API error
         """
         last_error: Exception | None = None
+        started_at = time.perf_counter()
+        metric_status = "unknown"
 
         for attempt in range(self.config.max_retries):
             try:
@@ -161,16 +164,19 @@ class CRMClient:
                 )
 
                 if response.status_code == 401:
+                    metric_status = "auth_error"
                     raise CRMAuthenticationError(
                         "Authentication failed - check CRM_API_TOKEN",
                         status_code=401,
                     )
                 if response.status_code == 404:
+                    metric_status = "not_found"
                     raise CRMNotFoundError(
                         f"Resource not found: {path}",
                         status_code=404,
                     )
                 if response.status_code == 429:
+                    metric_status = "rate_limited"
                     # Rate limited - wait and retry
                     retry_after = int(response.headers.get("Retry-After", 5))
                     logger.warning(
@@ -181,9 +187,11 @@ class CRMClient:
                     continue
 
                 response.raise_for_status()
+                metric_status = categorize_http_status(response.status_code)
                 return cast(dict[str, Any], response.json())
 
             except httpx.HTTPStatusError as e:
+                metric_status = categorize_http_status(e.response.status_code)
                 last_error = CRMError(
                     f"HTTP {e.response.status_code}: {e.response.text}",
                     status_code=e.response.status_code,
@@ -201,6 +209,7 @@ class CRMClient:
                 raise last_error
 
             except httpx.RequestError as e:
+                metric_status = "request_error"
                 last_error = CRMError(f"Request failed: {str(e)}")
                 logger.warning(
                     "CRM API request failed (attempt %d/%d): %s",
@@ -209,6 +218,20 @@ class CRMClient:
                     str(e),
                 )
                 time.sleep(self.config.retry_delay * (attempt + 1))
+            finally:
+                if attempt == self.config.max_retries - 1 or metric_status in {
+                    "success",
+                    "auth_error",
+                    "not_found",
+                    "rate_limited",
+                    "client_error",
+                }:
+                    observe_integration_request(
+                        "crm",
+                        f"{method.upper()} {path}",
+                        metric_status,
+                        max(time.perf_counter() - started_at, 0.0),
+                    )
 
         if last_error:
             raise last_error

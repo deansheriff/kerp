@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 import uuid
 from contextvars import ContextVar
@@ -11,6 +12,10 @@ from starlette.requests import Request
 from app.metrics import REQUEST_COUNT, REQUEST_ERRORS, REQUEST_LATENCY
 
 logger = logging.getLogger(__name__)
+
+# Paths excluded from INFO-level request logging (health probes, static assets,
+# metrics scrapes).  These generate high volume with near-zero diagnostic value.
+_QUIET_PATH_PREFIXES = ("/health", "/static", "/metrics", "/favicon")
 
 # Context variables for request tracking - accessible anywhere in the request lifecycle
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
@@ -76,11 +81,28 @@ def _extract_actor_id_from_jwt(token: str | None) -> str | None:
     return None
 
 
+# Matches UUID-like and numeric-only path segments that would create
+# high-cardinality Prometheus labels if used as-is.
+_ID_SEGMENT_RE = re.compile(
+    r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|/\d{4,}",
+    re.IGNORECASE,
+)
+
+
 def _request_path(request: Request) -> str:
+    """Return the route template path, or a normalized fallback.
+
+    Starlette's ``request.scope["route"].path`` gives us the template
+    (e.g. ``/finance/ar/invoices/{invoice_id}``).  When no route matched
+    (404, middleware-intercepted), we fall back to the raw URL path but
+    replace UUID/numeric segments with ``/{id}`` to prevent Prometheus
+    cardinality explosion.
+    """
     route = request.scope.get("route")
     if route and hasattr(route, "path"):
         return str(route.path)
-    return request.url.path
+    # Normalize UUIDs and long numeric IDs to a fixed placeholder
+    return _ID_SEGMENT_RE.sub("/{id}", request.url.path)
 
 
 class ObservabilityMiddleware(BaseHTTPMiddleware):
@@ -158,16 +180,19 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         )
         if status_code >= 500:
             REQUEST_ERRORS.labels(request.method, path, str(status_code)).inc()
-        logger.info(
-            "request_completed",
-            extra={
-                "request_id": request_id,
-                "actor_id": actor_id,
-                "path": path,
-                "method": request.method,
-                "status": status_code,
-                "duration_ms": round(duration_ms, 2),
-            },
-        )
+        # Skip INFO logging for high-frequency, low-value paths (health probes,
+        # static assets, metrics).  Errors on these paths are still logged.
+        if status_code >= 400 or not path.startswith(_QUIET_PATH_PREFIXES):
+            logger.info(
+                "request_completed",
+                extra={
+                    "request_id": request_id,
+                    "actor_id": actor_id,
+                    "path": path,
+                    "method": request.method,
+                    "status": status_code,
+                    "duration_ms": round(duration_ms, 2),
+                },
+            )
         response.headers["x-request-id"] = request_id
         return response

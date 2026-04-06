@@ -83,6 +83,7 @@ services:
       - ./templates:/app/templates:ro
       - ./app:/app/app:ro
       - ./license:/app/license:ro
+      - ./gunicorn.conf.py:/app/gunicorn.conf.py:ro
       - ./scripts/entrypoint-monitoring.sh:/app/entrypoint-monitoring.sh:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
@@ -190,6 +191,7 @@ services:
       openbao:
         condition: service_healthy
     volumes:
+      - ./app:/app/app:ro
       - ./scripts/entrypoint-monitoring.sh:/app/entrypoint-monitoring.sh:ro
     entrypoint: ["/app/entrypoint-monitoring.sh"]
     command: ["celery", "-A", "app.celery_app", "beat", "-l", "info"]

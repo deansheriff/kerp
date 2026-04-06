@@ -6,6 +6,7 @@ Uses the OCS (Open Collaboration Services) REST API.
 """
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,6 +14,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.models.domain_settings import SettingDomain
+from app.metrics import categorize_http_status, observe_integration_request
 
 logger = logging.getLogger(__name__)
 
@@ -111,16 +113,34 @@ class NextcloudTalkClient:
         json: dict | None = None,
     ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
+        started_at = time.perf_counter()
+        metric_status = "unknown"
         with httpx.Client(timeout=self._timeout) as client:
-            resp = client.request(
-                method,
-                url,
-                auth=self._auth,
-                headers=self._headers,
-                json=json,
-            )
+            try:
+                resp = client.request(
+                    method,
+                    url,
+                    auth=self._auth,
+                    headers=self._headers,
+                    json=json,
+                )
+                metric_status = categorize_http_status(resp.status_code)
+            except httpx.RequestError:
+                observe_integration_request(
+                    "nextcloud",
+                    f"{method.upper()} {path}",
+                    "request_error",
+                    max(time.perf_counter() - started_at, 0.0),
+                )
+                raise
 
         if resp.status_code >= 400:
+            observe_integration_request(
+                "nextcloud",
+                f"{method.upper()} {path}",
+                metric_status,
+                max(time.perf_counter() - started_at, 0.0),
+            )
             raise NextcloudError(
                 f"Nextcloud API error: {resp.status_code}",
                 status_code=resp.status_code,
@@ -128,6 +148,12 @@ class NextcloudTalkClient:
             )
 
         result: dict[str, Any] = resp.json()
+        observe_integration_request(
+            "nextcloud",
+            f"{method.upper()} {path}",
+            metric_status,
+            max(time.perf_counter() - started_at, 0.0),
+        )
         return result
 
     def get_or_create_conversation(self, nextcloud_user_id: str) -> str:

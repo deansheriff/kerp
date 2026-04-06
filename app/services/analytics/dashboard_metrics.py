@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
+from time import monotonic
 
 try:
     from datetime import UTC  # type: ignore
@@ -88,6 +89,8 @@ ALL_DASHBOARD_METRICS = (
 )
 
 _MAX_STALE_HOURS = 24
+_SNAPSHOT_TABLE_RETRY_AFTER_SECONDS = 300.0
+_snapshot_table_missing_until = 0.0
 
 
 def _is_missing_snapshot_table_error(exc: Exception) -> bool:
@@ -150,10 +153,18 @@ class DashboardMetricsService:
         Returns a structured dict grouped by domain, or ``None`` if
         no fresh metrics are available (caller should fall back to live queries).
         """
+        global _snapshot_table_missing_until  # noqa: PLW0603
+
+        if monotonic() < _snapshot_table_missing_until:
+            return None
+
         try:
             metrics = self._store.get_latest(organization_id, ALL_DASHBOARD_METRICS)
         except (ProgrammingError, OperationalError) as exc:
             if _is_missing_snapshot_table_error(exc):
+                _snapshot_table_missing_until = (
+                    monotonic() + _SNAPSHOT_TABLE_RETRY_AFTER_SECONDS
+                )
                 logger.warning(
                     "Dashboard metric snapshot table missing; using live fallback for org %s",
                     organization_id,

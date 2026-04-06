@@ -23,6 +23,10 @@ from app.templates import templates
 logger = logging.getLogger(__name__)
 
 
+def _is_no_response_runtime_error(exc: RuntimeError) -> bool:
+    return str(exc).strip() == "No response returned."
+
+
 def _error_payload(code: str, message: str, details: object) -> dict[str, object]:
     return {
         "code": code,
@@ -471,6 +475,33 @@ def register_error_handlers(app) -> None:
         return JSONResponse(
             status_code=500,
             content=_error_payload("service_error", exc.message, None),
+        )
+
+    @app.exception_handler(RuntimeError)
+    async def runtime_error_handler(request: Request, exc: RuntimeError):
+        if _is_no_response_runtime_error(exc):
+            logger.warning(
+                "Client disconnected before response completed on %s %s",
+                request.method,
+                request.url.path,
+            )
+            return Response(status_code=499)
+        logger.exception(
+            "Unhandled runtime error on %s %s: %s",
+            request.method,
+            request.url.path,
+            str(exc),
+        )
+        if _is_html_request(request):
+            return templates.TemplateResponse(
+                request,
+                "errors/500.html",
+                {},
+                status_code=500,
+            )
+        return JSONResponse(
+            status_code=500,
+            content=_error_payload("internal_error", "Internal server error", None),
         )
 
     @app.exception_handler(Exception)

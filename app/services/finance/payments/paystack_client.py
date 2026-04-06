@@ -7,12 +7,14 @@ Handles all HTTP communication with Paystack API.
 import hashlib
 import hmac
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx
 
 from app.config import settings
+from app.metrics import categorize_http_status, observe_integration_request
 
 logger = logging.getLogger(__name__)
 
@@ -208,8 +210,9 @@ class PaystackClient:
     verification.
     """
 
-    def __init__(self, config: PaystackConfig):
+    def __init__(self, config: PaystackConfig, timeout: float = 30.0):
         self.config = config
+        self.timeout = timeout
         self._client: httpx.Client | None = None
 
     def _get_client(self) -> httpx.Client:
@@ -221,9 +224,55 @@ class PaystackClient:
                     "Authorization": f"Bearer {self.config.secret_key}",
                     "Content-Type": "application/json",
                 },
-                timeout=30.0,
+                timeout=self.timeout,
             )
         return self._client
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        operation: str,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        started_at = time.perf_counter()
+        metric_status = "unknown"
+        try:
+            response = self._get_client().request(
+                method=method,
+                url=path,
+                params=params,
+                json=json,
+            )
+            metric_status = categorize_http_status(response.status_code)
+            response.raise_for_status()
+            return cast(dict[str, Any], response.json())
+        except httpx.HTTPStatusError:
+            observe_integration_request(
+                "paystack",
+                operation,
+                metric_status,
+                max(time.perf_counter() - started_at, 0.0),
+            )
+            raise
+        except httpx.RequestError:
+            observe_integration_request(
+                "paystack",
+                operation,
+                "request_error",
+                max(time.perf_counter() - started_at, 0.0),
+            )
+            raise
+        finally:
+            if metric_status == "success":
+                observe_integration_request(
+                    "paystack",
+                    operation,
+                    metric_status,
+                    max(time.perf_counter() - started_at, 0.0),
+                )
 
     def initialize_transaction(
         self,
@@ -261,10 +310,13 @@ class PaystackClient:
         if metadata:
             payload["metadata"] = metadata
 
-        client = self._get_client()
         try:
-            response = client.post("/transaction/initialize", json=payload)
-            response.raise_for_status()
+            data = self._request(
+                "POST",
+                "/transaction/initialize",
+                operation="initialize_transaction",
+                json=payload,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack initialize failed: {e.response.text}")
             raise PaystackError(
@@ -274,8 +326,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
 
         if not data.get("status"):
             raise PaystackError(data.get("message", "Initialize failed"))
@@ -299,10 +349,12 @@ class PaystackClient:
         Raises:
             PaystackError: If verification fails
         """
-        client = self._get_client()
         try:
-            response = client.get(f"/transaction/verify/{reference}")
-            response.raise_for_status()
+            data = self._request(
+                "GET",
+                f"/transaction/verify/{reference}",
+                operation="verify_transaction",
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack verify failed: {e.response.text}")
             raise PaystackError(
@@ -312,8 +364,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
 
         if not data.get("status"):
             raise PaystackError(data.get("message", "Verify failed"))
@@ -393,13 +443,13 @@ class PaystackClient:
         Returns:
             List of Bank objects
         """
-        client = self._get_client()
         try:
-            response = client.get(
+            data = self._request(
+                "GET",
                 "/bank",
+                operation="list_banks",
                 params={"country": country, "currency": currency},
             )
-            response.raise_for_status()
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack list banks failed: {e.response.text}")
             raise PaystackError(
@@ -409,8 +459,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "List banks failed"))
 
@@ -440,16 +488,16 @@ class PaystackClient:
         Returns:
             ResolveAccountResponse with verified account details
         """
-        client = self._get_client()
         try:
-            response = client.get(
+            data = self._request(
+                "GET",
                 "/bank/resolve",
+                operation="resolve_account",
                 params={
                     "account_number": account_number,
                     "bank_code": bank_code,
                 },
             )
-            response.raise_for_status()
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack resolve account failed: {e.response.text}")
             raise PaystackError(
@@ -459,8 +507,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "Resolve account failed"))
 
@@ -508,10 +554,13 @@ class PaystackClient:
         if metadata:
             payload["metadata"] = metadata
 
-        client = self._get_client()
         try:
-            response = client.post("/transferrecipient", json=payload)
-            response.raise_for_status()
+            data = self._request(
+                "POST",
+                "/transferrecipient",
+                operation="create_transfer_recipient",
+                json=payload,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack create recipient failed: {e.response.text}")
             raise PaystackError(
@@ -521,8 +570,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "Create recipient failed"))
 
@@ -566,10 +613,13 @@ class PaystackClient:
         if reason:
             payload["reason"] = reason
 
-        client = self._get_client()
         try:
-            response = client.post("/transfer", json=payload)
-            response.raise_for_status()
+            data = self._request(
+                "POST",
+                "/transfer",
+                operation="initiate_transfer",
+                json=payload,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack initiate transfer failed: {e.response.text}")
             raise PaystackError(
@@ -579,8 +629,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "Initiate transfer failed"))
 
@@ -603,10 +651,12 @@ class PaystackClient:
         Returns:
             VerifyTransferResponse with transfer details
         """
-        client = self._get_client()
         try:
-            response = client.get(f"/transfer/verify/{reference}")
-            response.raise_for_status()
+            data = self._request(
+                "GET",
+                f"/transfer/verify/{reference}",
+                operation="verify_transfer",
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack verify transfer failed: {e.response.text}")
             raise PaystackError(
@@ -616,8 +666,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "Verify transfer failed"))
 
@@ -663,10 +711,13 @@ class PaystackClient:
         if status:
             params["status"] = status
 
-        client = self._get_client()
         try:
-            response = client.get("/transaction", params=params)
-            response.raise_for_status()
+            data = self._request(
+                "GET",
+                "/transaction",
+                operation="list_transactions",
+                params=params,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack list transactions failed: {e.response.text}")
             raise PaystackError(
@@ -676,8 +727,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "List transactions failed"))
 
@@ -729,10 +778,13 @@ class PaystackClient:
         if status:
             params["status"] = status
 
-        client = self._get_client()
         try:
-            response = client.get("/transfer", params=params)
-            response.raise_for_status()
+            data = self._request(
+                "GET",
+                "/transfer",
+                operation="list_transfers",
+                params=params,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack list transfers failed: {e.response.text}")
             raise PaystackError(
@@ -742,8 +794,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "List transfers failed"))
 
@@ -777,10 +827,12 @@ class PaystackClient:
         Returns:
             Dict with balance info per currency
         """
-        client = self._get_client()
         try:
-            response = client.get("/balance")
-            response.raise_for_status()
+            data = self._request(
+                "GET",
+                "/balance",
+                operation="get_balance",
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack get balance failed: {e.response.text}")
             raise PaystackError(
@@ -790,8 +842,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "Get balance failed"))
 
@@ -829,10 +879,13 @@ class PaystackClient:
         if status:
             params["status"] = status
 
-        client = self._get_client()
         try:
-            response = client.get("/settlement", params=params)
-            response.raise_for_status()
+            data = self._request(
+                "GET",
+                "/settlement",
+                operation="list_settlements",
+                params=params,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack list settlements failed: {e.response.text}")
             raise PaystackError(
@@ -842,8 +895,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "List settlements failed"))
 
@@ -884,12 +935,13 @@ class PaystackClient:
         """
         params: dict = {"perPage": per_page, "page": page}
 
-        client = self._get_client()
         try:
-            response = client.get(
-                f"/settlement/{settlement_id}/transactions", params=params
+            data = self._request(
+                "GET",
+                f"/settlement/{settlement_id}/transactions",
+                operation="get_settlement_transactions",
+                params=params,
             )
-            response.raise_for_status()
         except httpx.HTTPStatusError as e:
             logger.error(
                 f"Paystack get settlement transactions failed: {e.response.text}"
@@ -901,8 +953,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(
                 data.get("message", "Get settlement transactions failed")
@@ -966,10 +1016,13 @@ class PaystackClient:
         if metadata:
             payload["metadata"] = metadata
 
-        client = self._get_client()
         try:
-            response = client.post("/customer", json=payload)
-            response.raise_for_status()
+            data = self._request(
+                "POST",
+                "/customer",
+                operation="create_customer",
+                json=payload,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack create customer failed: {e.response.text}")
             raise PaystackError(
@@ -979,8 +1032,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "Create customer failed"))
 
@@ -1027,10 +1078,13 @@ class PaystackClient:
         if metadata:
             payload["metadata"] = metadata
 
-        client = self._get_client()
         try:
-            response = client.put(f"/customer/{customer_code}", json=payload)
-            response.raise_for_status()
+            data = self._request(
+                "PUT",
+                f"/customer/{customer_code}",
+                operation="update_customer",
+                json=payload,
+            )
         except httpx.HTTPStatusError as e:
             logger.error(f"Paystack update customer failed: {e.response.text}")
             raise PaystackError(
@@ -1040,8 +1094,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             raise PaystackError(data.get("message", "Update customer failed"))
 
@@ -1067,10 +1119,12 @@ class PaystackClient:
         Returns:
             PaystackCustomer if found, None if not found
         """
-        client = self._get_client()
         try:
-            response = client.get(f"/customer/{email_or_code}")
-            response.raise_for_status()
+            data = self._request(
+                "GET",
+                f"/customer/{email_or_code}",
+                operation="get_customer",
+            )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 return None
@@ -1082,8 +1136,6 @@ class PaystackClient:
         except httpx.RequestError as e:
             logger.error(f"Paystack request error: {e}")
             raise PaystackError(f"Request failed: {str(e)}")
-
-        data = response.json()
         if not data.get("status"):
             return None
 
