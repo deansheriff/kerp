@@ -348,7 +348,7 @@ class PurchaseInvoiceSyncService(BaseSyncService[SupplierInvoice]):
         data.pop("_bill_date", None)
 
         wht_category = data.pop("_wht_category", None)
-        data.pop("_wht_net_total", None)
+        wht_net_total = data.pop("_wht_net_total", None) or Decimal("0")
 
         # Resolve supplier
         supplier_id = self._resolve_supplier_id(supplier_source)
@@ -374,36 +374,13 @@ class PurchaseInvoiceSyncService(BaseSyncService[SupplierInvoice]):
             total = data.get("total_amount", Decimal("0"))
             functional_amount = total * (exchange_rate or Decimal("1"))
 
-        # Calculate WHT if supplier has WHT config and ERPNext indicates WHT
-        wht_amount = Decimal("0")
-        wht_code_id = None
-        if wht_category:
-            supplier = self.db.get(Supplier, supplier_id)
-            if (
-                supplier
-                and getattr(supplier, "withholding_tax_applicable", False)
-                and getattr(supplier, "withholding_tax_code_id", None)
-            ):
-                wht_code_id = supplier.withholding_tax_code_id
-                from app.services.finance.tax.tax_calculation import (
-                    TaxCalculationService,
-                )
-
-                try:
-                    subtotal = data.get("subtotal", Decimal("0"))
-                    invoice_date = data["invoice_date"]
-                    wht_amount, _net = TaxCalculationService.calculate_wht(
-                        self.db,
-                        self.organization_id,
-                        subtotal,
-                        wht_code_id,
-                        invoice_date,
-                    )
-                except Exception:
-                    logger.exception(
-                        "Failed to calculate WHT for synced invoice %s",
-                        data.get("supplier_invoice_number"),
-                    )
+        # Resolve WHT from ERPNext data or supplier config
+        wht_amount, wht_code_id = self._resolve_wht(
+            data,
+            wht_category,
+            wht_net_total,
+            supplier_id,
+        )
 
         invoice = SupplierInvoice(
             organization_id=self.organization_id,
@@ -465,7 +442,7 @@ class PurchaseInvoiceSyncService(BaseSyncService[SupplierInvoice]):
         data.pop("_bill_date", None)
         data.pop("_is_return", None)
         wht_category = data.pop("_wht_category", None)
-        data.pop("_wht_net_total", None)
+        wht_net_total = data.pop("_wht_net_total", None) or Decimal("0")
 
         entity.status = self._map_status(data)
         data.pop("_docstatus", None)
@@ -477,35 +454,114 @@ class PurchaseInvoiceSyncService(BaseSyncService[SupplierInvoice]):
         outstanding = data.get("outstanding_amount", Decimal("0"))
         entity.amount_paid = entity.total_amount - outstanding
 
-        # Update WHT if not already set and ERPNext indicates WHT
-        if wht_category and not entity.withholding_tax_amount:
-            supplier = self.db.get(Supplier, entity.supplier_id)
+        # Update WHT if not already set
+        if not entity.withholding_tax_amount:
+            wht_amount, wht_code_id = self._resolve_wht(
+                data,
+                wht_category,
+                wht_net_total,
+                entity.supplier_id,
+            )
+            if wht_amount:
+                entity.withholding_tax_amount = wht_amount
+                entity.withholding_tax_code_id = wht_code_id
+
+        return entity
+
+    def _resolve_wht(
+        self,
+        data: dict[str, Any],
+        wht_category: str | None,
+        wht_net_total: Decimal,
+        supplier_id: uuid.UUID,
+    ) -> tuple[Decimal, uuid.UUID | None]:
+        """Resolve WHT amount and code from ERPNext data or supplier config.
+
+        Strategy:
+        1. If ERPNext provides a non-zero ``base_tax_withholding_net_total``
+           (mapped as ``_wht_net_total``), derive the WHT amount as
+           ``subtotal - wht_net_total``.
+        2. Otherwise, if the supplier has local WHT config, recalculate.
+        3. Resolve the WHT tax code from the supplier, or fall back to the
+           first active WITHHOLDING code in the org.
+
+        Returns:
+            (wht_amount, wht_code_id) — both may be zero/None if no WHT.
+        """
+        subtotal = data.get("subtotal", Decimal("0"))
+        wht_amount = Decimal("0")
+        wht_code_id: uuid.UUID | None = None
+
+        # Derive WHT from ERPNext's net-after-WHT field
+        if wht_net_total and wht_net_total > 0 and subtotal > wht_net_total:
+            wht_amount = (subtotal - wht_net_total).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        elif wht_category:
+            # ERPNext flagged WHT but net total not usable — try local calc
+            supplier = self.db.get(Supplier, supplier_id)
             if (
                 supplier
                 and getattr(supplier, "withholding_tax_applicable", False)
                 and getattr(supplier, "withholding_tax_code_id", None)
             ):
+                wht_code_id = supplier.withholding_tax_code_id
                 from app.services.finance.tax.tax_calculation import (
                     TaxCalculationService,
                 )
 
                 try:
-                    wht_amount, _net = TaxCalculationService.calculate_wht(
-                        self.db,
-                        self.organization_id,
-                        entity.subtotal,
-                        supplier.withholding_tax_code_id,
-                        entity.invoice_date,
-                    )
-                    entity.withholding_tax_amount = wht_amount
-                    entity.withholding_tax_code_id = supplier.withholding_tax_code_id
+                    invoice_date = data.get("invoice_date") or data.get("due_date")
+                    if wht_code_id and invoice_date:
+                        wht_amount, _net = TaxCalculationService.calculate_wht(
+                            self.db,
+                            self.organization_id,
+                            subtotal,
+                            wht_code_id,
+                            invoice_date,
+                        )
                 except Exception:
                     logger.exception(
                         "Failed to calculate WHT for synced invoice %s",
-                        entity.invoice_number,
+                        data.get("supplier_invoice_number"),
                     )
 
-        return entity
+        # Resolve WHT code if we have an amount but no code yet
+        if wht_amount and not wht_code_id:
+            supplier = self.db.get(Supplier, supplier_id)
+            if supplier and getattr(supplier, "withholding_tax_code_id", None):
+                wht_code_id = supplier.withholding_tax_code_id
+            else:
+                # Fall back to best-matching active WHT code by rate
+                wht_code_id = self._find_wht_code_by_rate(subtotal, wht_amount)
+
+        return wht_amount, wht_code_id
+
+    def _find_wht_code_by_rate(
+        self, subtotal: Decimal, wht_amount: Decimal
+    ) -> uuid.UUID | None:
+        """Find the WHT tax code whose rate best matches the effective rate."""
+        if not subtotal or subtotal <= 0:
+            return None
+
+        from app.models.finance.tax.tax_code import TaxCode, TaxType
+
+        effective_rate = wht_amount / subtotal
+        wht_codes = list(
+            self.db.scalars(
+                select(TaxCode).where(
+                    TaxCode.organization_id == self.organization_id,
+                    TaxCode.is_active == True,
+                    TaxCode.tax_type == TaxType.WITHHOLDING,
+                )
+            ).all()
+        )
+        if not wht_codes:
+            return None
+
+        # Pick the code whose rate is closest to the effective rate
+        best = min(wht_codes, key=lambda tc: abs(tc.tax_rate - effective_rate))
+        return best.tax_code_id
 
     def get_entity_id(self, entity: SupplierInvoice) -> uuid.UUID:
         return entity.invoice_id

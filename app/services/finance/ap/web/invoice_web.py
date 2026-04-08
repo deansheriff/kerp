@@ -440,9 +440,7 @@ class InvoiceWebService:
                 "tax_code": wht.tax_code,
                 "tax_name": wht.tax_name,
                 "tax_rate": float(wht.tax_rate),
-                "rate_display": float(
-                    (wht.tax_rate * 100).quantize(Decimal("0.01"))
-                )
+                "rate_display": float((wht.tax_rate * 100).quantize(Decimal("0.01")))
                 if wht.tax_rate < 1
                 else float(wht.tax_rate),
             }
