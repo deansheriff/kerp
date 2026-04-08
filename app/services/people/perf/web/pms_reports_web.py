@@ -76,9 +76,13 @@ class PMSReportsWebService:
             cycle_id = active_cycle.cycle_id
             report_runners: dict[str, Callable[[], PMSReportsWebService.ReportData]] = {
                 "rating-summary": lambda: reporting.rating_summary(org_id, cycle_id),
-                "by-department": lambda: reporting.rating_by_department(org_id, cycle_id),
+                "by-department": lambda: reporting.rating_by_department(
+                    org_id, cycle_id
+                ),
                 "by-grade": lambda: reporting.rating_by_grade_level(org_id, cycle_id),
-                "distribution": lambda: reporting.distribution_org_wide(org_id, cycle_id),
+                "distribution": lambda: reporting.distribution_org_wide(
+                    org_id, cycle_id
+                ),
                 "distribution-dept": lambda: reporting.distribution_by_department(
                     org_id, cycle_id
                 ),
@@ -86,14 +90,18 @@ class PMSReportsWebService:
                     org_id, cycle_id
                 ),
                 "top-performers": lambda: reporting.top_performers(org_id, cycle_id),
-                "bottom-performers": lambda: reporting.bottom_performers(org_id, cycle_id),
+                "bottom-performers": lambda: reporting.bottom_performers(
+                    org_id, cycle_id
+                ),
                 "development-needs": lambda: reporting.development_needs_overview(
                     org_id, cycle_id
                 ),
                 "development-dept": lambda: reporting.development_needs_by_department(
                     org_id, cycle_id
                 ),
-                "compliance": lambda: reporting.cycle_compliance_dashboard(org_id, cycle_id),
+                "compliance": lambda: reporting.cycle_compliance_dashboard(
+                    org_id, cycle_id
+                ),
             }
             report_map: dict[
                 str, tuple[str, Callable[[], PMSReportsWebService.ReportData]]

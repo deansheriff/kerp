@@ -17,7 +17,11 @@ from starlette.datastructures import FormData, UploadFile
 
 from app.models.people.perf.pms_enums import ContractStatus, ContractType
 from app.services.common import PaginationParams, coerce_uuid
-from app.services.people.hr import CompetencyService, EmployeeFilters, OrganizationService
+from app.services.people.hr import (
+    CompetencyService,
+    EmployeeFilters,
+    OrganizationService,
+)
 from app.services.people.perf import PerformanceService
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
@@ -97,9 +101,7 @@ def _normalize_competency_rows(raw_rows: list | None) -> list[dict]:
 def _build_competency_rows(selected_rows: list[dict] | None) -> list[dict]:
     """Return exactly 5 rows for competency selector rendering."""
     normalized = _normalize_competency_rows(selected_rows)
-    rows = [
-        {"competency_id": "", "is_development_focus": False} for _ in range(5)
-    ]
+    rows = [{"competency_id": "", "is_development_focus": False} for _ in range(5)]
     for index, row in enumerate(normalized):
         if index >= 5:
             break
@@ -219,10 +221,14 @@ class ContractWebService:
             EmployeeFilters(is_active=True),
             PaginationParams(limit=500),
         ).items
-        competencies = CompetencyService(db, org_id).list_competencies(
-            is_active=True,
-            pagination=PaginationParams(limit=250),
-        ).items
+        competencies = (
+            CompetencyService(db, org_id)
+            .list_competencies(
+                is_active=True,
+                pagination=PaginationParams(limit=250),
+            )
+            .items
+        )
         amendment_workflow = svc.get_active_amendment_workflow(
             org_id, contract.contract_id
         )
@@ -280,10 +286,14 @@ class ContractWebService:
             EmployeeFilters(is_active=True),
             PaginationParams(limit=500),
         ).items
-        competencies = CompetencyService(db, org_id).list_competencies(
-            is_active=True,
-            pagination=PaginationParams(limit=250),
-        ).items
+        competencies = (
+            CompetencyService(db, org_id)
+            .list_competencies(
+                is_active=True,
+                pagination=PaginationParams(limit=250),
+            )
+            .items
+        )
         competency_rows = _build_competency_rows(selected_competencies)
 
         context = base_context(
@@ -568,7 +578,9 @@ class ContractWebService:
         except Exception:
             db.rollback()
             logger.exception(
-                "Failed to approve amendment stage %s for contract %s", stage, contract_id
+                "Failed to approve amendment stage %s for contract %s",
+                stage,
+                contract_id,
             )
             return RedirectResponse(
                 url=f"/people/perf/pms/contracts/{contract_id}?error=amendment_signoff_failed",

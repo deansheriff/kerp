@@ -95,7 +95,9 @@ class ContractAmendmentWorkflow(Base, AuditMixin):
         nullable=False,
         server_default=func.now(),
     )
-    updated_at: Mapped[datetime | None] = mapped_column(nullable=True, onupdate=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
+        nullable=True, onupdate=func.now()
+    )
 
     contract: Mapped["PerformanceContract"] = relationship(
         "PerformanceContract",
@@ -105,7 +107,11 @@ class ContractAmendmentWorkflow(Base, AuditMixin):
         "PerformanceContract",
         foreign_keys=[original_contract_id],
     )
-    appraisee: Mapped["Employee"] = relationship("Employee", foreign_keys=[appraisee_id])
-    appraiser: Mapped["Employee"] = relationship("Employee", foreign_keys=[appraiser_id])
+    appraisee: Mapped["Employee"] = relationship(
+        "Employee", foreign_keys=[appraisee_id]
+    )
+    appraiser: Mapped["Employee"] = relationship(
+        "Employee", foreign_keys=[appraiser_id]
+    )
     hod: Mapped["Employee"] = relationship("Employee", foreign_keys=[hod_id])
     hr_head: Mapped["Employee"] = relationship("Employee", foreign_keys=[hr_head_id])

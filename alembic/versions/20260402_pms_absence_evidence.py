@@ -27,7 +27,11 @@ def upgrade() -> None:
     if "approved_absence_evidence" not in cols:
         op.add_column(
             "appraisal",
-            sa.Column("approved_absence_evidence", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+            sa.Column(
+                "approved_absence_evidence",
+                postgresql.JSONB(astext_type=sa.Text()),
+                nullable=True,
+            ),
             schema="perf",
         )
 

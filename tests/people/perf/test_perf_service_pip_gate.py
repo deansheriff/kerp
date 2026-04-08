@@ -13,7 +13,10 @@ import pytest
 
 from app.models.people.perf import AppraisalStatus
 from app.models.people.perf.pms_enums import PIPStatus
-from app.services.people.perf.perf_service import PerformanceService, PerformanceServiceError
+from app.services.people.perf.perf_service import (
+    PerformanceService,
+    PerformanceServiceError,
+)
 
 
 def _make_service_and_appraisal() -> tuple[PerformanceService, MagicMock]:

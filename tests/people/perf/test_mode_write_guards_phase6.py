@@ -15,7 +15,10 @@ from app.services.people.perf.ohcsf_appraisal_service import (
     OHCSFAppraisalError,
     OHCSFAppraisalService,
 )
-from app.services.people.perf.perf_service import PerformanceService, PerformanceServiceError
+from app.services.people.perf.perf_service import (
+    PerformanceService,
+    PerformanceServiceError,
+)
 from app.services.people.perf.performance_mode_policy import (
     enforce_pms_write_mode,
     enforce_private_write_mode,
@@ -31,7 +34,8 @@ def _make_org(mode: PerformanceMode) -> Organization:
         fiscal_year_end_month=12,
         fiscal_year_end_day=31,
         performance_mode=mode,
-        pms_ohcsf_enabled=mode in {PerformanceMode.GOVERNMENT_PMS, PerformanceMode.HYBRID},
+        pms_ohcsf_enabled=mode
+        in {PerformanceMode.GOVERNMENT_PMS, PerformanceMode.HYBRID},
     )
 
 
@@ -114,7 +118,9 @@ def test_private_appraisal_flow_blocked_in_government_mode() -> None:
     db.get.return_value = _make_org(PerformanceMode.GOVERNMENT_PMS)
     svc = PerformanceService(db)
 
-    with pytest.raises(PerformanceServiceError, match="MODE_POLICY_BLOCKED:private_write"):
+    with pytest.raises(
+        PerformanceServiceError, match="MODE_POLICY_BLOCKED:private_write"
+    ):
         svc.create_appraisal(
             uuid4(),
             employee_id=uuid4(),

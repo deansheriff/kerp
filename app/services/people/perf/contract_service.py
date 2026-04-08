@@ -138,9 +138,7 @@ class PerformanceContractService:
             if not kpi_text:
                 raise ContractValidationError(f"Objective {idx} must include a KPI")
             if not target_text:
-                raise ContractValidationError(
-                    f"Objective {idx} must include a target"
-                )
+                raise ContractValidationError(f"Objective {idx} must include a target")
 
             weight = int(obj.get("weight", 0))
             if weight <= 0:
@@ -172,9 +170,13 @@ class PerformanceContractService:
                 f"Exactly {required_count} competencies must be selected "
                 f"(got {len(competencies)})"
             )
-        competency_ids = [str(c.get("competency_id") or "").strip() for c in competencies]
+        competency_ids = [
+            str(c.get("competency_id") or "").strip() for c in competencies
+        ]
         if any(not cid for cid in competency_ids):
-            raise ContractValidationError("Each competency entry must include competency_id")
+            raise ContractValidationError(
+                "Each competency entry must include competency_id"
+            )
         if len(set(competency_ids)) != required_count:
             raise ContractValidationError("Selected competencies must be unique")
 
@@ -601,7 +603,9 @@ class PerformanceContractService:
         self._ensure_pms_write_mode(org_id)
         workflow = self.get_active_amendment_workflow(org_id, contract_id)
         if workflow is None:
-            raise ContractValidationError("No pending amendment workflow for this contract")
+            raise ContractValidationError(
+                "No pending amendment workflow for this contract"
+            )
 
         actor_employee_id = self._get_employee_for_person(org_id, actor_person_id)
         if actor_employee_id is None:
@@ -663,7 +667,9 @@ class PerformanceContractService:
         self._ensure_pms_write_mode(org_id)
         workflow = self.get_active_amendment_workflow(org_id, contract_id)
         if workflow is None:
-            raise ContractValidationError("No pending amendment workflow for this contract")
+            raise ContractValidationError(
+                "No pending amendment workflow for this contract"
+            )
 
         actor_employee_id = self._get_employee_for_person(org_id, actor_person_id)
         if actor_employee_id is None:

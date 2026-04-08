@@ -56,7 +56,9 @@ def test_shared_pagination_defaults_are_intentionally_common() -> None:
 
 
 def test_unknown_policy_profile_raises() -> None:
-    with pytest.raises(PerformancePolicyError, match="Unknown performance policy profile"):
+    with pytest.raises(
+        PerformancePolicyError, match="Unknown performance policy profile"
+    ):
         get_policy_profile("NOT_A_PROFILE")
 
 

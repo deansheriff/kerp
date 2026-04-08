@@ -96,4 +96,3 @@ def downgrade() -> None:
         "BOTH",
         name="appraisal_template_profile",
     ).drop(bind, checkfirst=True)
-

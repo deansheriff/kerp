@@ -47,7 +47,7 @@ def test_legacy_api_docs_alias_returns_openapi_schema(monkeypatch):
 
 
 def test_wrapped_http_exception_returns_original_status(client):
-    app = getattr(client, "app", getattr(client, "_app"))
+    app = getattr(client, "app", client._app)
 
     @app.get("/_test_wrapped_http_exception")
     def _test_wrapped_http_exception():

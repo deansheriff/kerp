@@ -30,7 +30,9 @@ def upgrade() -> None:
     if "pms_config" not in columns:
         op.add_column(
             "appraisal_template",
-            sa.Column("pms_config", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+            sa.Column(
+                "pms_config", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+            ),
             schema="perf",
         )
 

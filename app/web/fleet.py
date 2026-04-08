@@ -8,7 +8,16 @@ from pathlib import Path
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -105,9 +114,13 @@ def fleet_reports_expense_vehicle_detail(
         parsed_year = int(year) if year else None
         parsed_month = int(month) if month else None
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid date filter value") from exc
+        raise HTTPException(
+            status_code=400, detail="Invalid date filter value"
+        ) from exc
     if parsed_year is not None and not 1900 <= parsed_year <= 2100:
-        raise HTTPException(status_code=400, detail="Year must be between 1900 and 2100")
+        raise HTTPException(
+            status_code=400, detail="Year must be between 1900 and 2100"
+        )
     if parsed_month is not None and not 1 <= parsed_month <= 12:
         raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
     try:
@@ -172,9 +185,13 @@ def fleet_reports_invoice_vehicle_detail(
         parsed_year = int(year) if year else None
         parsed_month = int(month) if month else None
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid date filter value") from exc
+        raise HTTPException(
+            status_code=400, detail="Invalid date filter value"
+        ) from exc
     if parsed_year is not None and not 1900 <= parsed_year <= 2100:
-        raise HTTPException(status_code=400, detail="Year must be between 1900 and 2100")
+        raise HTTPException(
+            status_code=400, detail="Year must be between 1900 and 2100"
+        )
     if parsed_month is not None and not 1 <= parsed_month <= 12:
         raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
     try:

@@ -28,13 +28,13 @@ def test_process_pending_notification_emails_retries_on_operational_error() -> N
 
     with (
         patch("app.tasks.notifications.SessionLocal", side_effect=_operational_error()),
-        patch("app.tasks.notifications.process_pending_notification_emails.retry") as mock_retry,
+        patch(
+            "app.tasks.notifications.process_pending_notification_emails.retry"
+        ) as mock_retry,
     ):
         from app.tasks.notifications import process_pending_notification_emails
 
-        mock_retry.side_effect = RetryCalled(
-            "retry"
-        )
+        mock_retry.side_effect = RetryCalled("retry")
 
         try:
             process_pending_notification_emails()
@@ -59,7 +59,10 @@ def test_process_pending_notification_emails_sends_active_notification() -> None
         db = MagicMock()
         mock_session_local.return_value = db
         execute_result = MagicMock()
-        execute_result.scalars.return_value.all.side_effect = [[], [_build_notification()]]
+        execute_result.scalars.return_value.all.side_effect = [
+            [],
+            [_build_notification()],
+        ]
         db.execute.return_value = execute_result
 
         result = process_pending_notification_emails(batch_size=1)

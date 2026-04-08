@@ -192,7 +192,9 @@ class MonthlyReviewWebService:
             pagination=PaginationParams(limit=200),
         ).items
 
-        context = base_context(request, auth, "New Monthly Review", "pms-reviews", db=db)
+        context = base_context(
+            request, auth, "New Monthly Review", "pms-reviews", db=db
+        )
         context["request"] = request
         context.update(
             {

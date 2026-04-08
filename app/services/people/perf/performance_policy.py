@@ -83,9 +83,7 @@ class PerformancePolicyProfile:
 
 def _validate_policy(policy: PerformancePolicyProfile) -> None:
     if policy.objective.min_count <= 0:
-        raise PerformancePolicyError(
-            f"{policy.name}: objective.min_count must be > 0"
-        )
+        raise PerformancePolicyError(f"{policy.name}: objective.min_count must be > 0")
     if policy.objective.max_count < policy.objective.min_count:
         raise PerformancePolicyError(
             f"{policy.name}: objective.max_count must be >= objective.min_count"
@@ -173,17 +171,11 @@ def _validate_policy(policy: PerformancePolicyProfile) -> None:
         raise PerformancePolicyError(
             f"{policy.name}: committee_decisions_requiring_adjusted_rating cannot be empty"
         )
-    if (
-        policy.name == "GOVERNMENT_PMS"
-        and not policy.ohcsf_seed_competencies
-    ):
+    if policy.name == "GOVERNMENT_PMS" and not policy.ohcsf_seed_competencies:
         raise PerformancePolicyError(
             f"{policy.name}: ohcsf_seed_competencies cannot be empty"
         )
-    if (
-        policy.name == "GOVERNMENT_PMS"
-        and not policy.ohcsf_institutional_weights
-    ):
+    if policy.name == "GOVERNMENT_PMS" and not policy.ohcsf_institutional_weights:
         raise PerformancePolicyError(
             f"{policy.name}: ohcsf_institutional_weights cannot be empty"
         )

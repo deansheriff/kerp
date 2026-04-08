@@ -41,11 +41,5 @@ def test_resolve_mode_keeps_explicit_private_mode_when_legacy_pms_true() -> None
 
 
 def test_policy_profile_resolution_by_mode() -> None:
-    assert (
-        get_policy_profile_for_mode(PerformanceMode.PRIVATE).name
-        == "PRIVATE"
-    )
-    assert (
-        get_policy_profile_for_mode(PerformanceMode.HYBRID).name
-        == "GOVERNMENT_PMS"
-    )
+    assert get_policy_profile_for_mode(PerformanceMode.PRIVATE).name == "PRIVATE"
+    assert get_policy_profile_for_mode(PerformanceMode.HYBRID).name == "GOVERNMENT_PMS"

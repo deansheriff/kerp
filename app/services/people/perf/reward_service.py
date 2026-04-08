@@ -62,7 +62,9 @@ class PMSRewardService:
         except ValueError as exc:
             raise RewardValidationError(str(exc)) from exc
 
-    def _get_action_or_raise(self, org_id: UUID, action_id: UUID) -> AppraisalOutcomeAction:
+    def _get_action_or_raise(
+        self, org_id: UUID, action_id: UUID
+    ) -> AppraisalOutcomeAction:
         action = self.db.scalar(
             select(AppraisalOutcomeAction).where(
                 AppraisalOutcomeAction.organization_id == org_id,
@@ -126,14 +128,20 @@ class PMSRewardService:
             reasons.append(f"Final rating must be >= {min_rating}")
         if getattr(appraisal, "is_prior_year_carryover", False) is True:
             reasons.append("Prior-year carryover appraisals are not eligible")
-        if self._has_unresolved_appeal(appraisal.organization_id, appraisal.appraisal_id):
+        if self._has_unresolved_appeal(
+            appraisal.organization_id, appraisal.appraisal_id
+        ):
             reasons.append("Unresolved appeal exists")
         if self._has_unresolved_pip(appraisal.organization_id, appraisal.appraisal_id):
             reasons.append("Unresolved PIP exists")
-        if self._has_existing_reward_action(appraisal.organization_id, appraisal.appraisal_id):
+        if self._has_existing_reward_action(
+            appraisal.organization_id, appraisal.appraisal_id
+        ):
             reasons.append("Reward action already exists")
 
-        score = float(appraisal.final_score) if appraisal.final_score is not None else 0.0
+        score = (
+            float(appraisal.final_score) if appraisal.final_score is not None else 0.0
+        )
         return {
             "eligible": len(reasons) == 0,
             "reasons": reasons,
@@ -180,7 +188,9 @@ class PMSRewardService:
                 Appraisal.final_rating.isnot(None),
                 Appraisal.final_rating >= min_rating,
             )
-            .order_by(Appraisal.final_score.desc().nullslast(), Appraisal.completed_on.desc())
+            .order_by(
+                Appraisal.final_score.desc().nullslast(), Appraisal.completed_on.desc()
+            )
         )
         if cycle_id is not None:
             stmt = stmt.where(Appraisal.cycle_id == cycle_id)
@@ -193,9 +203,9 @@ class PMSRewardService:
         eligible_items = [
             appraisal
             for appraisal in raw.items
-            if self._evaluate_reward_eligibility(
-                appraisal, min_rating=min_rating
-            )["eligible"]
+            if self._evaluate_reward_eligibility(appraisal, min_rating=min_rating)[
+                "eligible"
+            ]
         ]
         return PaginatedResult(
             items=eligible_items,
@@ -219,7 +229,9 @@ class PMSRewardService:
                 Appraisal.organization_id == org_id,
                 Appraisal.status == AppraisalStatus.COMPLETED,
             )
-            .order_by(Appraisal.final_score.desc().nullslast(), Appraisal.completed_on.desc())
+            .order_by(
+                Appraisal.final_score.desc().nullslast(), Appraisal.completed_on.desc()
+            )
             .limit(limit)
         )
         if cycle_id is not None:
@@ -227,7 +239,9 @@ class PMSRewardService:
         appraisals = list(self.db.scalars(stmt).all())
         rows: list[dict] = []
         for appraisal in appraisals:
-            evaluation = self._evaluate_reward_eligibility(appraisal, min_rating=min_rating)
+            evaluation = self._evaluate_reward_eligibility(
+                appraisal, min_rating=min_rating
+            )
             rows.append(
                 {
                     "appraisal": appraisal,

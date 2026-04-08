@@ -6,7 +6,10 @@ import pytest
 
 from app.models.finance.core_org import PerformanceMode
 from app.models.people.perf import AppraisalTemplateProfile
-from app.services.people.perf.perf_service import PerformanceService, PerformanceServiceError
+from app.services.people.perf.perf_service import (
+    PerformanceService,
+    PerformanceServiceError,
+)
 
 
 def test_validate_template_pms_config_rejects_private_mode() -> None:
@@ -21,7 +24,11 @@ def test_validate_template_pms_config_rejects_private_mode() -> None:
         svc._validate_template_pms_config(
             org_id=org_id,
             template_profile=AppraisalTemplateProfile.PMS,
-            pms_config={"objective_weight_pct": 70, "process_weight_pct": 10, "competency_weight_pct": 20},
+            pms_config={
+                "objective_weight_pct": 70,
+                "process_weight_pct": 10,
+                "competency_weight_pct": 20,
+            },
         )
 
 
@@ -33,11 +40,17 @@ def test_validate_template_pms_config_rejects_private_profile() -> None:
         return_value=PerformanceMode.HYBRID
     )
 
-    with pytest.raises(PerformanceServiceError, match="requires template_profile PMS or BOTH"):
+    with pytest.raises(
+        PerformanceServiceError, match="requires template_profile PMS or BOTH"
+    ):
         svc._validate_template_pms_config(
             org_id=org_id,
             template_profile=AppraisalTemplateProfile.PRIVATE,
-            pms_config={"objective_weight_pct": 70, "process_weight_pct": 10, "competency_weight_pct": 20},
+            pms_config={
+                "objective_weight_pct": 70,
+                "process_weight_pct": 10,
+                "competency_weight_pct": 20,
+            },
         )
 
 
@@ -53,7 +66,11 @@ def test_validate_template_pms_config_rejects_invalid_totals_and_counts() -> Non
         svc._validate_template_pms_config(
             org_id=org_id,
             template_profile=AppraisalTemplateProfile.PMS,
-            pms_config={"objective_weight_pct": 60, "process_weight_pct": 20, "competency_weight_pct": 10},
+            pms_config={
+                "objective_weight_pct": 60,
+                "process_weight_pct": 20,
+                "competency_weight_pct": 10,
+            },
         )
 
     with pytest.raises(PerformanceServiceError, match="cannot exceed"):
@@ -109,7 +126,11 @@ def test_update_template_clears_pms_config_when_profile_becomes_private() -> Non
     existing = SimpleNamespace(
         template_id=template_id,
         template_profile=AppraisalTemplateProfile.BOTH,
-        pms_config={"objective_weight_pct": 70, "process_weight_pct": 10, "competency_weight_pct": 20},
+        pms_config={
+            "objective_weight_pct": 70,
+            "process_weight_pct": 10,
+            "competency_weight_pct": 20,
+        },
     )
     svc.get_template = MagicMock(return_value=existing)  # type: ignore[method-assign]
     svc._resolve_org_mode = MagicMock(  # type: ignore[method-assign]

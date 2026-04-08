@@ -106,7 +106,9 @@ class CascadeUpViolation(OHCSFAppraisalError):
 class OHCSFAppraisalService:
     """Service for managing OHCSF appraisal workflow operations."""
 
-    def __init__(self, db: Session, policy_profile_name: str = "GOVERNMENT_PMS") -> None:
+    def __init__(
+        self, db: Session, policy_profile_name: str = "GOVERNMENT_PMS"
+    ) -> None:
         self.db = db
         self._policy = get_policy_profile(policy_profile_name)
         self._scoring = OHCSFScoringEngine(policy_profile_name=policy_profile_name)
@@ -490,9 +492,7 @@ class OHCSFAppraisalService:
                 )
             if not str(objective.get("target") or "").strip():
                 raise OHCSFAppraisalError(
-                    self._progress_error_message(
-                        f"objective {idx} target is missing"
-                    )
+                    self._progress_error_message(f"objective {idx} target is missing")
                 )
             total_weight += int(objective.get("weight", 0))
 
@@ -520,7 +520,9 @@ class OHCSFAppraisalService:
                 )
             )
 
-        competency_ids = [str(c.get("competency_id") or "").strip() for c in competencies]
+        competency_ids = [
+            str(c.get("competency_id") or "").strip() for c in competencies
+        ]
         if any(not cid for cid in competency_ids):
             raise OHCSFAppraisalError(
                 self._progress_error_message(
@@ -529,9 +531,7 @@ class OHCSFAppraisalService:
             )
         if len(set(competency_ids)) != required_count:
             raise OHCSFAppraisalError(
-                self._progress_error_message(
-                    "selected competencies must be unique"
-                )
+                self._progress_error_message("selected competencies must be unique")
             )
 
         dev_focus = [c for c in competencies if c.get("is_development_focus")]
@@ -590,7 +590,11 @@ class OHCSFAppraisalService:
                 "A PIP has been created and must be resolved first."
             )
 
-        if pip.status not in {PIPStatus.IMPROVED, PIPStatus.ESCALATED, PIPStatus.CLOSED}:
+        if pip.status not in {
+            PIPStatus.IMPROVED,
+            PIPStatus.ESCALATED,
+            PIPStatus.CLOSED,
+        }:
             raise OHCSFAppraisalError(
                 "Cannot complete appraisal: linked PIP is not resolved "
                 f"(current status: {pip.status.value})."
@@ -709,8 +713,8 @@ class OHCSFAppraisalService:
             phase_label="manager review",
         )
         contract = self._ensure_contract_planning_compliance(org_id, appraisal)
-        development_focus_by_competency_id = self._validate_competency_ratings_for_contract(
-            contract, competency_ratings
+        development_focus_by_competency_id = (
+            self._validate_competency_ratings_for_contract(contract, competency_ratings)
         )
 
         appraisal.manager_review_date = date.today()

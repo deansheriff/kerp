@@ -5,7 +5,10 @@ from uuid import uuid4
 import pytest
 
 from app.models.people.perf import AppraisalTemplateProfile
-from app.services.people.perf.perf_service import PerformanceService, PerformanceServiceError
+from app.services.people.perf.perf_service import (
+    PerformanceService,
+    PerformanceServiceError,
+)
 
 
 def test_create_appraisal_rejects_disallowed_template_profile() -> None:

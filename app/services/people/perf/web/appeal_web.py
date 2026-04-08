@@ -97,7 +97,9 @@ class AppealWebService:
 
         appeal_uuid = parse_uuid(appeal_id)
         if appeal_uuid is None:
-            context = base_context(request, auth, "Appeal Not Found", "pms-appeals", db=db)
+            context = base_context(
+                request, auth, "Appeal Not Found", "pms-appeals", db=db
+            )
             context["request"] = request
             context.update({"appeal": None, "error": "Invalid appeal ID"})
             return templates.TemplateResponse(
@@ -107,7 +109,9 @@ class AppealWebService:
         try:
             appeal = svc.get_appeal(org_id, appeal_uuid)
         except Exception as e:
-            context = base_context(request, auth, "Appeal Not Found", "pms-appeals", db=db)
+            context = base_context(
+                request, auth, "Appeal Not Found", "pms-appeals", db=db
+            )
             context["request"] = request
             context.update({"appeal": None, "error": str(e)})
             return templates.TemplateResponse(
@@ -241,7 +245,9 @@ class AppealWebService:
                 EmployeeFilters(), PaginationParams(limit=500)
             ).items
 
-            context = base_context(request, auth, "File an Appeal", "pms-appeals", db=db)
+            context = base_context(
+                request, auth, "File an Appeal", "pms-appeals", db=db
+            )
             context["request"] = request
             context.update(
                 {

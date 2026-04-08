@@ -21,7 +21,8 @@ def _org(mode: PerformanceMode) -> Organization:
         fiscal_year_end_month=12,
         fiscal_year_end_day=31,
         performance_mode=mode,
-        pms_ohcsf_enabled=mode in {PerformanceMode.GOVERNMENT_PMS, PerformanceMode.HYBRID},
+        pms_ohcsf_enabled=mode
+        in {PerformanceMode.GOVERNMENT_PMS, PerformanceMode.HYBRID},
     )
 
 

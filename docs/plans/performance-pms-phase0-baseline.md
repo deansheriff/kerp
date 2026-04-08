@@ -49,4 +49,3 @@ Result:
 
 ## Known Gaps (Phase 0 remaining item)
 - Manual UI screenshot capture for before-state (private vs PMS-enabled org) is still pending and should be completed in a browser session.
-

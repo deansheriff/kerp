@@ -884,13 +884,13 @@ def admin_settings_organization(
 ):
     """Organization profile settings page."""
     if not auth.is_authenticated or not auth.organization_id:
-        return RedirectResponse(url="/login?next=/admin/settings/organization", status_code=303)
+        return RedirectResponse(
+            url="/login?next=/admin/settings/organization", status_code=303
+        )
 
     context = _admin_base_context(request, auth, "Organization Profile", db)
     context.update(
-        admin_settings_web_service.get_organization_context(
-            db, auth.organization_id
-        )
+        admin_settings_web_service.get_organization_context(db, auth.organization_id)
     )
     return templates.TemplateResponse(
         request, "admin/settings/organization.html", context
@@ -905,7 +905,9 @@ async def admin_settings_organization_update(
 ):
     """Update organization profile."""
     if not auth.is_authenticated or not auth.organization_id:
-        return RedirectResponse(url="/login?next=/admin/settings/organization", status_code=303)
+        return RedirectResponse(
+            url="/login?next=/admin/settings/organization", status_code=303
+        )
 
     form = getattr(request.state, "csrf_form", None)
     if form is None:

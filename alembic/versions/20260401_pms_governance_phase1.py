@@ -143,7 +143,9 @@ def upgrade() -> None:
             ),
             sa.Column("organization_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("inst_perf_id", postgresql.UUID(as_uuid=True), nullable=False),
-            sa.Column("actor_employee_id", postgresql.UUID(as_uuid=True), nullable=True),
+            sa.Column(
+                "actor_employee_id", postgresql.UUID(as_uuid=True), nullable=True
+            ),
             sa.Column("actor_role", sa.String(length=50), nullable=False),
             sa.Column("action_type", sa.String(length=50), nullable=False),
             sa.Column("from_stage", sa.String(length=40), nullable=True),
@@ -294,7 +296,9 @@ def upgrade() -> None:
             sa.Column("submitted_by_name", sa.String(length=120), nullable=True),
             sa.Column("submitted_by_contact", sa.String(length=120), nullable=True),
             sa.Column("sentiment", sa.String(length=20), nullable=True),
-            sa.Column("owner_employee_id", postgresql.UUID(as_uuid=True), nullable=True),
+            sa.Column(
+                "owner_employee_id", postgresql.UUID(as_uuid=True), nullable=True
+            ),
             sa.Column("action_taken", sa.Text(), nullable=True),
             sa.Column(
                 "received_date",

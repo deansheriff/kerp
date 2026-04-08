@@ -459,7 +459,9 @@ class TestAmendmentWorkflow:
                 actor_person_id=uuid.uuid4(),
             )
 
-    def test_final_hr_head_signoff_activates_amended_and_marks_original_amended(self) -> None:
+    def test_final_hr_head_signoff_activates_amended_and_marks_original_amended(
+        self,
+    ) -> None:
         from app.models.people.perf.contract_amendment import ContractAmendmentWorkflow
         from app.models.people.perf.performance_contract import PerformanceContract
         from app.models.people.perf.pms_enums import ContractStatus

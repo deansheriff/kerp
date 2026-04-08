@@ -130,7 +130,9 @@ class GovernanceWebService:
                 inst_perf_id=parse_uuid(self._text(form_data.get("inst_perf_id"))),
             )
             db.commit()
-            return RedirectResponse("/people/perf/pms/grievances?saved=1", status_code=303)
+            return RedirectResponse(
+                "/people/perf/pms/grievances?saved=1", status_code=303
+            )
         except Exception as exc:
             logger.exception("Failed to create governance grievance")
             db.rollback()
@@ -155,7 +157,9 @@ class GovernanceWebService:
         org_id = coerce_uuid(auth.organization_id)
         svc = PMSGovernanceService(db)
         try:
-            assigned_to_id = parse_uuid(self._text(form_data.get("assigned_to_employee_id")))
+            assigned_to_id = parse_uuid(
+                self._text(form_data.get("assigned_to_employee_id"))
+            )
             if assigned_to_id is None:
                 raise ValueError("Assigned employee is required")
             svc.assign_grievance(
@@ -165,7 +169,9 @@ class GovernanceWebService:
                 due_date=parse_date(self._text(form_data.get("due_date"))),
             )
             db.commit()
-            return RedirectResponse("/people/perf/pms/grievances?saved=1", status_code=303)
+            return RedirectResponse(
+                "/people/perf/pms/grievances?saved=1", status_code=303
+            )
         except Exception as exc:
             db.rollback()
             logger.exception("Failed to assign grievance %s", grievance_id)
@@ -192,7 +198,9 @@ class GovernanceWebService:
                 resolution_notes=resolution_notes,
             )
             db.commit()
-            return RedirectResponse("/people/perf/pms/grievances?saved=1", status_code=303)
+            return RedirectResponse(
+                "/people/perf/pms/grievances?saved=1", status_code=303
+            )
         except Exception as exc:
             db.rollback()
             logger.exception("Failed to resolve grievance %s", grievance_id)
@@ -219,7 +227,9 @@ class GovernanceWebService:
                 escalation_notes=escalation_notes or None,
             )
             db.commit()
-            return RedirectResponse("/people/perf/pms/grievances?saved=1", status_code=303)
+            return RedirectResponse(
+                "/people/perf/pms/grievances?saved=1", status_code=303
+            )
         except Exception as exc:
             db.rollback()
             logger.exception("Failed to escalate grievance %s", grievance_id)
@@ -302,7 +312,8 @@ class GovernanceWebService:
                 feedback_text=feedback_text,
                 source_type=self._text(form_data.get("source_type")) or "SERVICOM",
                 channel=self._text(form_data.get("channel")) or "PORTAL",
-                submitted_by_name=self._text(form_data.get("submitted_by_name")) or None,
+                submitted_by_name=self._text(form_data.get("submitted_by_name"))
+                or None,
                 submitted_by_contact=self._text(form_data.get("submitted_by_contact"))
                 or None,
                 inst_perf_id=parse_uuid(self._text(form_data.get("inst_perf_id"))),

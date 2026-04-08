@@ -414,9 +414,24 @@ class TestSubmitManagerReview:
         svc.db.scalars.return_value.all.return_value = []
         contract = SimpleNamespace(
             objectives=[
-                {"objective": "Obj A", "kpi": "KPI A", "target": "Target A", "weight": 20},
-                {"objective": "Obj B", "kpi": "KPI B", "target": "Target B", "weight": 20},
-                {"objective": "Obj C", "kpi": "KPI C", "target": "Target C", "weight": 30},
+                {
+                    "objective": "Obj A",
+                    "kpi": "KPI A",
+                    "target": "Target A",
+                    "weight": 20,
+                },
+                {
+                    "objective": "Obj B",
+                    "kpi": "KPI B",
+                    "target": "Target B",
+                    "weight": 20,
+                },
+                {
+                    "objective": "Obj C",
+                    "kpi": "KPI C",
+                    "target": "Target C",
+                    "weight": 30,
+                },
             ],
             competency_ids=[
                 {"competency_id": str(uuid.uuid4()), "is_development_focus": True},
@@ -743,7 +758,10 @@ class TestSubmitCommitteeReview:
         with patch(
             "app.services.people.perf.underperformance_service.UnderperformanceService.flag_for_pip"
         ) as flag_for_pip:
-            flag_for_pip.return_value = {"status": "flagged", "pip_code": "PIP-2026-0001"}
+            flag_for_pip.return_value = {
+                "status": "flagged",
+                "pip_code": "PIP-2026-0001",
+            }
             with pytest.raises(OHCSFAppraisalError, match="PIP has been created"):
                 svc.submit_committee_review(
                     ORG_ID,
@@ -755,7 +773,9 @@ class TestSubmitCommitteeReview:
     def test_underperformance_with_unresolved_pip_blocks_completion(self) -> None:
         svc, ap = self._setup()
         ap.final_score = Decimal("45.00")
-        svc.db.scalar.return_value = MagicMock(status=PIPStatus.ACTIVE, pip_code="PIP-2026-0002")
+        svc.db.scalar.return_value = MagicMock(
+            status=PIPStatus.ACTIVE, pip_code="PIP-2026-0002"
+        )
 
         with pytest.raises(OHCSFAppraisalError, match="not resolved"):
             svc.submit_committee_review(
@@ -768,7 +788,9 @@ class TestSubmitCommitteeReview:
     def test_underperformance_with_resolved_pip_allows_completion(self) -> None:
         svc, ap = self._setup()
         ap.final_score = Decimal("48.00")
-        svc.db.scalar.return_value = MagicMock(status=PIPStatus.IMPROVED, pip_code="PIP-2026-0003")
+        svc.db.scalar.return_value = MagicMock(
+            status=PIPStatus.IMPROVED, pip_code="PIP-2026-0003"
+        )
 
         svc.submit_committee_review(
             ORG_ID,

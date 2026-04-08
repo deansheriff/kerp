@@ -120,7 +120,9 @@ class FleetWebService:
             return str(assigned_department_name)
         return "Not currently assigned"
 
-    def _vehicle_report_header(self, organization_id: UUID, vehicle_id: UUID) -> dict[str, Any]:
+    def _vehicle_report_header(
+        self, organization_id: UUID, vehicle_id: UUID
+    ) -> dict[str, Any]:
         org_id = coerce_uuid(organization_id)
         vid = coerce_uuid(vehicle_id)
         vehicle = VehicleService(self.db, org_id).get_or_raise(vid)
@@ -656,10 +658,9 @@ class FleetWebService:
             invoice_count = int(row.invoice_count or 0)
             total_amount = row.total_amount or Decimal("0")
 
-        if (
-            inspector.has_table("supplier_invoice_line", schema="ap")
-            and inspector.has_table("account", schema="gl")
-        ):
+        if inspector.has_table(
+            "supplier_invoice_line", schema="ap"
+        ) and inspector.has_table("account", schema="gl"):
             from sqlalchemy import func
 
             amount_expr = (

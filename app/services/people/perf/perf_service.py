@@ -237,7 +237,9 @@ class PerformanceService:
             "evidence_required": bool(pms_config.get("evidence_required", True)),
         }
 
-    def _ensure_underperformance_pip_resolution(self, org_id: UUID, appraisal: Appraisal) -> None:
+    def _ensure_underperformance_pip_resolution(
+        self, org_id: UUID, appraisal: Appraisal
+    ) -> None:
         """Block appraisal completion until underperformance PIP is resolved."""
         if appraisal.final_score is None:
             return
@@ -269,7 +271,11 @@ class PerformanceService:
                 "A PIP has been created and must be resolved first."
             )
 
-        if pip.status not in {PIPStatus.IMPROVED, PIPStatus.ESCALATED, PIPStatus.CLOSED}:
+        if pip.status not in {
+            PIPStatus.IMPROVED,
+            PIPStatus.ESCALATED,
+            PIPStatus.CLOSED,
+        }:
             raise PerformanceServiceError(
                 "Cannot complete appraisal: linked PIP is not resolved "
                 f"(current status: {pip.status.value})."
@@ -699,7 +705,9 @@ class PerformanceService:
             query = query.where(AppraisalTemplate.designation_id == designation_id)
 
         if template_profiles:
-            query = query.where(AppraisalTemplate.template_profile.in_(template_profiles))
+            query = query.where(
+                AppraisalTemplate.template_profile.in_(template_profiles)
+            )
 
         if is_active is not None:
             query = query.where(AppraisalTemplate.is_active == is_active)
@@ -759,14 +767,17 @@ class PerformanceService:
         department_id: UUID | None = None,
         designation_id: UUID | None = None,
         rating_scale_max: int = 5,
-        template_profile: AppraisalTemplateProfile | str = AppraisalTemplateProfile.BOTH,
+        template_profile: AppraisalTemplateProfile
+        | str = AppraisalTemplateProfile.BOTH,
         is_active: bool = True,
         kras: list[dict] | None = None,
         pms_config: dict[str, Any] | None = None,
     ) -> AppraisalTemplate:
         """Create a new appraisal template."""
         if isinstance(template_profile, str):
-            template_profile = AppraisalTemplateProfile(template_profile.strip().upper())
+            template_profile = AppraisalTemplateProfile(
+                template_profile.strip().upper()
+            )
         normalized_pms_config = self._validate_template_pms_config(
             org_id=org_id,
             template_profile=template_profile,
@@ -1153,7 +1164,10 @@ class PerformanceService:
                     Appraisal.cycle_id != cycle_id,
                     Appraisal.is_prior_year_carryover.is_(False),
                 )
-                .order_by(Appraisal.completed_on.desc().nulls_last(), Appraisal.created_at.desc())
+                .order_by(
+                    Appraisal.completed_on.desc().nulls_last(),
+                    Appraisal.created_at.desc(),
+                )
             )
             if prior is None:
                 raise PerformanceServiceError(
@@ -1252,7 +1266,9 @@ class PerformanceService:
             )
 
         if "approved_absence_evidence" in kwargs:
-            appraisal.approved_absence_evidence = kwargs.pop("approved_absence_evidence")
+            appraisal.approved_absence_evidence = kwargs.pop(
+                "approved_absence_evidence"
+            )
 
         for key, value in kwargs.items():
             if value is not None and hasattr(appraisal, key):
@@ -1285,7 +1301,9 @@ class PerformanceService:
         """Submit employee self-assessment."""
         self._ensure_private_write_mode(org_id)
         appraisal = self.get_appraisal(org_id, appraisal_id)
-        self._ensure_not_prior_year_carryover(appraisal, action="submit self-assessment")
+        self._ensure_not_prior_year_carryover(
+            appraisal, action="submit self-assessment"
+        )
 
         if appraisal.status not in {
             AppraisalStatus.DRAFT,
@@ -1458,9 +1476,7 @@ class PerformanceService:
         for idx, entry in enumerate(entries, start=1):
             appraisal_id = entry.get("appraisal_id")
             if appraisal_id is None:
-                raise PerformanceServiceError(
-                    f"Entry {idx} is missing appraisal_id"
-                )
+                raise PerformanceServiceError(f"Entry {idx} is missing appraisal_id")
 
             appraisal = self.get_appraisal(org_id, UUID(str(appraisal_id)))
             if appraisal.cycle_id != cycle_id:
@@ -1474,9 +1490,7 @@ class PerformanceService:
 
             proposed_rating_raw = entry.get("final_rating")
             if proposed_rating_raw is None:
-                raise PerformanceServiceError(
-                    f"Entry {idx} is missing final_rating"
-                )
+                raise PerformanceServiceError(f"Entry {idx} is missing final_rating")
             proposed_rating = int(proposed_rating_raw)
             if proposed_rating < 1 or proposed_rating > 5:
                 raise PerformanceServiceError(

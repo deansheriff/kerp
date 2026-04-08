@@ -72,7 +72,9 @@ class RewardWebService:
             ).all()
         )
 
-        context = base_context(request, auth, "Rewards and Recognition", "pms-rewards", db=db)
+        context = base_context(
+            request, auth, "Rewards and Recognition", "pms-rewards", db=db
+        )
         context.update(
             {
                 "candidate_rows": candidate_rows,
@@ -90,7 +92,9 @@ class RewardWebService:
                 "error": request.query_params.get("error"),
             }
         )
-        return templates.TemplateResponse(request, "people/perf/pms/rewards.html", context)
+        return templates.TemplateResponse(
+            request, "people/perf/pms/rewards.html", context
+        )
 
     async def nominate_reward_response(
         self,

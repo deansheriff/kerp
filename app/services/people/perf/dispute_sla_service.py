@@ -108,10 +108,7 @@ class PMSDisputeSLAService:
         overdue_ids: set[UUID] = set()
         for org_id in org_ids:
             overdue_ids.update(
-                {
-                    g.grievance_id
-                    for g in gov.get_overdue_grievances(org_id)
-                }
+                {g.grievance_id for g in gov.get_overdue_grievances(org_id)}
             )
         overdue = [g for g in unresolved if g.grievance_id in overdue_ids]
 

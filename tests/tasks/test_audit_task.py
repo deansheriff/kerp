@@ -1,4 +1,5 @@
 """Tests for audit Celery task resilience."""
+
 from unittest.mock import MagicMock, patch
 
 from sqlalchemy.exc import OperationalError, ProgrammingError

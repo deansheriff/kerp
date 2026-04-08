@@ -163,10 +163,14 @@ async def amend_contract(
     """Create amendment and start staged signoff workflow."""
     from app.services.people.perf.web.contract_web import ContractWebService
 
-    return await ContractWebService().amend_contract_response(request, auth, db, contract_id)
+    return await ContractWebService().amend_contract_response(
+        request, auth, db, contract_id
+    )
 
 
-@router.post("/contracts/{contract_id}/amend/approve/{stage}", response_class=HTMLResponse)
+@router.post(
+    "/contracts/{contract_id}/amend/approve/{stage}", response_class=HTMLResponse
+)
 async def approve_contract_amendment_stage(
     request: Request,
     contract_id: str,
@@ -184,7 +188,9 @@ async def approve_contract_amendment_stage(
     )
 
 
-@router.post("/contracts/{contract_id}/amend/reject/{stage}", response_class=HTMLResponse)
+@router.post(
+    "/contracts/{contract_id}/amend/reject/{stage}", response_class=HTMLResponse
+)
 async def reject_contract_amendment_stage(
     request: Request,
     contract_id: str,
@@ -642,7 +648,9 @@ async def reconcile_institutional(
     )
 
 
-@router.post("/institutional/{inst_perf_id}/assign-governance", response_class=HTMLResponse)
+@router.post(
+    "/institutional/{inst_perf_id}/assign-governance", response_class=HTMLResponse
+)
 async def assign_institutional_governance(
     request: Request,
     inst_perf_id: str,
@@ -657,7 +665,9 @@ async def assign_institutional_governance(
     )
 
 
-@router.post("/institutional/{inst_perf_id}/transition-stage", response_class=HTMLResponse)
+@router.post(
+    "/institutional/{inst_perf_id}/transition-stage", response_class=HTMLResponse
+)
 async def transition_institutional_stage(
     request: Request,
     inst_perf_id: str,

@@ -144,7 +144,10 @@ class OutboxPublisher(ListResponseMixin):
                 .filter(
                     EventOutbox.status.in_([EventStatus.PENDING, EventStatus.FAILED]),
                     EventOutbox.retry_count < max_retries,
-                    or_(EventOutbox.next_retry_at.is_(None), EventOutbox.next_retry_at <= now),
+                    or_(
+                        EventOutbox.next_retry_at.is_(None),
+                        EventOutbox.next_retry_at <= now,
+                    ),
                 )
                 .order_by(EventOutbox.occurred_at.asc())
                 .limit(batch_size)

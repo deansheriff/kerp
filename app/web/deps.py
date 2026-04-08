@@ -1674,7 +1674,9 @@ def require_private_performance_mode(
         raise HTTPException(status_code=403, detail="Organization context required")
 
     from app.models.finance.core_org.organization import Organization, PerformanceMode
-    from app.services.people.perf.performance_mode_policy import resolve_performance_mode
+    from app.services.people.perf.performance_mode_policy import (
+        resolve_performance_mode,
+    )
 
     organization = db.get(Organization, auth.organization_id)
     if organization is None:
@@ -1697,7 +1699,9 @@ def require_government_pms_mode(
         raise HTTPException(status_code=403, detail="Organization context required")
 
     from app.models.finance.core_org.organization import Organization, PerformanceMode
-    from app.services.people.perf.performance_mode_policy import resolve_performance_mode
+    from app.services.people.perf.performance_mode_policy import (
+        resolve_performance_mode,
+    )
 
     organization = db.get(Organization, auth.organization_id)
     if organization is None:

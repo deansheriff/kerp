@@ -893,4 +893,3 @@ def report_trends(
 ):
     """Performance trends report."""
     return perf_web_service.trends_report_response(request, auth, db, employee_id)
-

@@ -68,7 +68,9 @@ def test_expense_detail_route_accepts_blank_filters_and_parses_month(monkeypatch
         def __init__(self, db):
             self.db = db
 
-        def reports_expense_vehicle_context(self, organization_id, vehicle_id, **kwargs):
+        def reports_expense_vehicle_context(
+            self, organization_id, vehicle_id, **kwargs
+        ):
             captured["organization_id"] = organization_id
             captured["vehicle_id"] = vehicle_id
             captured.update(kwargs)
@@ -105,7 +107,9 @@ def test_expense_detail_route_parses_start_date_only(monkeypatch):
         def __init__(self, db):
             self.db = db
 
-        def reports_expense_vehicle_context(self, organization_id, vehicle_id, **kwargs):
+        def reports_expense_vehicle_context(
+            self, organization_id, vehicle_id, **kwargs
+        ):
             captured.update(kwargs)
             return {"vehicle": SimpleNamespace(vehicle_id=vehicle_id)}
 
@@ -137,7 +141,9 @@ def test_invoice_detail_route_accepts_blank_filters_and_parses_year(monkeypatch)
         def __init__(self, db):
             self.db = db
 
-        def reports_invoice_vehicle_context(self, organization_id, vehicle_id, **kwargs):
+        def reports_invoice_vehicle_context(
+            self, organization_id, vehicle_id, **kwargs
+        ):
             captured["organization_id"] = organization_id
             captured["vehicle_id"] = vehicle_id
             captured.update(kwargs)
@@ -174,7 +180,9 @@ def test_invoice_detail_route_parses_end_date_only(monkeypatch):
         def __init__(self, db):
             self.db = db
 
-        def reports_invoice_vehicle_context(self, organization_id, vehicle_id, **kwargs):
+        def reports_invoice_vehicle_context(
+            self, organization_id, vehicle_id, **kwargs
+        ):
             captured.update(kwargs)
             return {"vehicle": SimpleNamespace(vehicle_id=vehicle_id)}
 

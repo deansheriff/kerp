@@ -278,9 +278,10 @@ class TestAuditMiddlewareDisconnectHandling:
 
         call_next = AsyncMock(side_effect=RuntimeError("No response returned."))
 
-        with patch("app.main._load_audit_settings") as mock_settings, patch(
-            "app.tasks.audit.log_audit_event"
-        ) as mock_task:
+        with (
+            patch("app.main._load_audit_settings") as mock_settings,
+            patch("app.tasks.audit.log_audit_event") as mock_task,
+        ):
             mock_settings.return_value = {
                 "enabled": True,
                 "methods": {"POST", "PUT", "PATCH", "DELETE"},
@@ -303,14 +304,13 @@ class TestAuditMiddlewareDisconnectHandling:
         request.query_params = {}
 
         call_next = AsyncMock(
-            side_effect=ExceptionGroup(
-                "group", [RuntimeError("No response returned.")]
-            )
+            side_effect=ExceptionGroup("group", [RuntimeError("No response returned.")])
         )
 
-        with patch("app.main._load_audit_settings") as mock_settings, patch(
-            "app.tasks.audit.log_audit_event"
-        ) as mock_task:
+        with (
+            patch("app.main._load_audit_settings") as mock_settings,
+            patch("app.tasks.audit.log_audit_event") as mock_task,
+        ):
             mock_settings.return_value = {
                 "enabled": True,
                 "methods": {"POST", "PUT", "PATCH", "DELETE"},
@@ -334,9 +334,10 @@ class TestAuditMiddlewareDisconnectHandling:
 
         call_next = AsyncMock(side_effect=anyio.EndOfStream())
 
-        with patch("app.main._load_audit_settings") as mock_settings, patch(
-            "app.tasks.audit.log_audit_event"
-        ) as mock_task:
+        with (
+            patch("app.main._load_audit_settings") as mock_settings,
+            patch("app.tasks.audit.log_audit_event") as mock_task,
+        ):
             mock_settings.return_value = {
                 "enabled": True,
                 "methods": {"POST", "PUT", "PATCH", "DELETE"},
@@ -350,7 +351,9 @@ class TestAuditMiddlewareDisconnectHandling:
         assert response.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_end_of_stream_exception_group_returns_204_without_audit_logging(self):
+    async def test_end_of_stream_exception_group_returns_204_without_audit_logging(
+        self,
+    ):
         request = MagicMock(spec=Request)
         request.url.path = "/operations/dashboard"
         request.method = "GET"
@@ -362,9 +365,10 @@ class TestAuditMiddlewareDisconnectHandling:
             side_effect=ExceptionGroup("group", [anyio.EndOfStream()])
         )
 
-        with patch("app.main._load_audit_settings") as mock_settings, patch(
-            "app.tasks.audit.log_audit_event"
-        ) as mock_task:
+        with (
+            patch("app.main._load_audit_settings") as mock_settings,
+            patch("app.tasks.audit.log_audit_event") as mock_task,
+        ):
             mock_settings.return_value = {
                 "enabled": True,
                 "methods": {"POST", "PUT", "PATCH", "DELETE"},

@@ -11,7 +11,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.models.people.perf import Appraisal, AppraisalStatus
-from app.services.people.perf.perf_service import PerformanceService, PerformanceServiceError
+from app.services.people.perf.perf_service import (
+    PerformanceService,
+    PerformanceServiceError,
+)
 
 
 def _make_appraisal(status: AppraisalStatus) -> Appraisal:
@@ -73,4 +76,3 @@ def test_submit_calibration_rejects_after_deadline() -> None:
             appraisal.appraisal_id,
             calibrated_rating=3,
         )
-

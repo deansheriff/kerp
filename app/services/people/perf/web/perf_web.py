@@ -205,7 +205,9 @@ class PerfWebService:
             cycle_id = _get_form_str(form_data, "cycle_id")
             manager_id = _get_form_str(form_data, "manager_id")
             template_id = _get_form_str(form_data, "template_id")
-            absence_months = parse_int(_get_form_str(form_data, "absence_months") or None)
+            absence_months = parse_int(
+                _get_form_str(form_data, "absence_months") or None
+            )
             approved_absence_evidence = _extract_absence_evidence(form_data)
 
             if not employee_id:
@@ -398,7 +400,9 @@ class PerfWebService:
 
         try:
             manager_id = _get_form_str(form_data, "manager_id")
-            absence_months = parse_int(_get_form_str(form_data, "absence_months") or None)
+            absence_months = parse_int(
+                _get_form_str(form_data, "absence_months") or None
+            )
             approved_absence_evidence = _extract_absence_evidence(form_data)
             svc.update_appraisal(
                 org_id,
@@ -822,7 +826,11 @@ class PerfWebService:
 
         feedback_base_url = self._feedback_base_url(request)
         context = base_context(
-            request, auth, "Request Feedback", self._feedback_active_module(request), db=db
+            request,
+            auth,
+            "Request Feedback",
+            self._feedback_active_module(request),
+            db=db,
         )
         context["request"] = request
         context.update(
@@ -885,7 +893,11 @@ class PerfWebService:
             appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
             feedback_base_url = self._feedback_base_url(request)
             context = base_context(
-                request, auth, "Request Feedback", self._feedback_active_module(request), db=db
+                request,
+                auth,
+                "Request Feedback",
+                self._feedback_active_module(request),
+                db=db,
             )
             context["request"] = request
             context.update(
@@ -961,7 +973,9 @@ class PerfWebService:
         try:
             feedback = svc.get_feedback(org_id, coerce_uuid(feedback_id))
         except Exception:
-            return RedirectResponse(url=self._feedback_base_url(request), status_code=303)
+            return RedirectResponse(
+                url=self._feedback_base_url(request), status_code=303
+            )
 
         if feedback.submitted_on:
             return RedirectResponse(
@@ -971,7 +985,11 @@ class PerfWebService:
 
         feedback_base_url = self._feedback_base_url(request)
         context = base_context(
-            request, auth, "Submit Feedback", self._feedback_active_module(request), db=db
+            request,
+            auth,
+            "Submit Feedback",
+            self._feedback_active_module(request),
+            db=db,
         )
         context["request"] = request
         context.update(
@@ -1020,7 +1038,11 @@ class PerfWebService:
             feedback = svc.get_feedback(org_id, coerce_uuid(feedback_id))
             feedback_base_url = self._feedback_base_url(request)
             context = base_context(
-                request, auth, "Submit Feedback", self._feedback_active_module(request), db=db
+                request,
+                auth,
+                "Submit Feedback",
+                self._feedback_active_module(request),
+                db=db,
             )
             context["request"] = request
             context.update(
@@ -1314,7 +1336,11 @@ class PerfWebService:
 
         goals_base_url = self._goals_base_url(request)
         context = base_context(
-            request, auth, f"Edit {kpi.kpi_name}", self._goals_active_module(request), db=db
+            request,
+            auth,
+            f"Edit {kpi.kpi_name}",
+            self._goals_active_module(request),
+            db=db,
         )
         context["request"] = request
         context.update(
@@ -1388,7 +1414,11 @@ class PerfWebService:
             kpi = svc.get_kpi(org_id, coerce_uuid(kpi_id))
             goals_base_url = self._goals_base_url(request)
             context = base_context(
-                request, auth, f"Edit {kpi.kpi_name}", self._goals_active_module(request), db=db
+                request,
+                auth,
+                f"Edit {kpi.kpi_name}",
+                self._goals_active_module(request),
+                db=db,
             )
             context["request"] = request
             context.update(

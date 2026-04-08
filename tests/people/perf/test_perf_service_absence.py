@@ -12,7 +12,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.models.people.perf import Appraisal, AppraisalStatus
-from app.services.people.perf.perf_service import PerformanceService, PerformanceServiceError
+from app.services.people.perf.perf_service import (
+    PerformanceService,
+    PerformanceServiceError,
+)
 
 
 def _make_cycle() -> MagicMock:

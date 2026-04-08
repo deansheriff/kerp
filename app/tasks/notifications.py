@@ -174,7 +174,9 @@ def process_pending_notification_emails(
                 try:
                     body_text = notification.message
                     safe_message = (
-                        html.escape(notification.message) if notification.message else None
+                        html.escape(notification.message)
+                        if notification.message
+                        else None
                     )
                     body_html = (
                         f"<p>{safe_message}</p>"

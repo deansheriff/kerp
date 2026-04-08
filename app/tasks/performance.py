@@ -341,7 +341,12 @@ def process_pms_dispute_sla_enforcement() -> dict:
     from app.services.people.perf.dispute_sla_service import PMSDisputeSLAService
 
     logger.info("Processing PMS dispute SLA enforcement")
-    results: dict[str, Any] = {"appeals": {}, "grievances": {}, "pips": {}, "errors": []}
+    results: dict[str, Any] = {
+        "appeals": {},
+        "grievances": {},
+        "pips": {},
+        "errors": [],
+    }
     with SessionLocal() as db:
         try:
             results = PMSDisputeSLAService(db).enforce_all_overdue()

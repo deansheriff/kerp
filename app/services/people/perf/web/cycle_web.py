@@ -985,7 +985,9 @@ class CycleWebService:
         try:
             template = svc.get_template(org_id, coerce_uuid(template_id))
         except Exception:
-            return RedirectResponse(url=self._templates_base_url(request), status_code=303)
+            return RedirectResponse(
+                url=self._templates_base_url(request), status_code=303
+            )
 
         templates_base_url = self._templates_base_url(request)
         context = base_context(
@@ -1023,7 +1025,9 @@ class CycleWebService:
         try:
             template = svc.get_template(org_id, coerce_uuid(template_id))
         except Exception:
-            return RedirectResponse(url=self._templates_base_url(request), status_code=303)
+            return RedirectResponse(
+                url=self._templates_base_url(request), status_code=303
+            )
 
         templates_base_url = self._templates_base_url(request)
         context = base_context(

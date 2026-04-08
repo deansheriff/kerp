@@ -28,7 +28,9 @@ from app.models.people.base import AuditMixin
 if TYPE_CHECKING:
     from app.models.people.hr.employee import Employee
     from app.models.people.perf.appraisal import Appraisal
-    from app.models.people.perf.institutional_performance import InstitutionalPerformance
+    from app.models.people.perf.institutional_performance import (
+        InstitutionalPerformance,
+    )
 
 
 class InstitutionalGovernanceAction(Base, AuditMixin):
@@ -71,7 +73,9 @@ class InstitutionalGovernanceAction(Base, AuditMixin):
         nullable=False,
         server_default=func.now(),
     )
-    updated_at: Mapped[datetime | None] = mapped_column(nullable=True, onupdate=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
+        nullable=True, onupdate=func.now()
+    )
 
     institutional_performance: Mapped["InstitutionalPerformance"] = relationship(
         "InstitutionalPerformance",
@@ -132,7 +136,9 @@ class PMSGovernanceGrievance(Base, AuditMixin):
     committee_level: Mapped[str | None] = mapped_column(String(30), nullable=True)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    escalated_to_fcsc: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    escalated_to_fcsc: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     escalated_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     raised_date: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
     resolved_date: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -140,7 +146,9 @@ class PMSGovernanceGrievance(Base, AuditMixin):
         nullable=False,
         server_default=func.now(),
     )
-    updated_at: Mapped[datetime | None] = mapped_column(nullable=True, onupdate=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
+        nullable=True, onupdate=func.now()
+    )
 
     appraisal: Mapped["Appraisal | None"] = relationship(
         "Appraisal",
@@ -186,7 +194,9 @@ class PMSStakeholderFeedback(Base, AuditMixin):
         ForeignKey("perf.institutional_performance.inst_perf_id"),
         nullable=True,
     )
-    source_type: Mapped[str] = mapped_column(String(40), nullable=False, default="SERVICOM")
+    source_type: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="SERVICOM"
+    )
     channel: Mapped[str] = mapped_column(String(40), nullable=False, default="PORTAL")
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="RECEIVED")
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -200,13 +210,17 @@ class PMSStakeholderFeedback(Base, AuditMixin):
         nullable=True,
     )
     action_taken: Mapped[str | None] = mapped_column(Text, nullable=True)
-    received_date: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+    received_date: Mapped[date] = mapped_column(
+        Date, nullable=False, default=date.today
+    )
     closed_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,
         server_default=func.now(),
     )
-    updated_at: Mapped[datetime | None] = mapped_column(nullable=True, onupdate=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(
+        nullable=True, onupdate=func.now()
+    )
 
     institutional_performance: Mapped["InstitutionalPerformance | None"] = relationship(
         "InstitutionalPerformance",

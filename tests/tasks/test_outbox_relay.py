@@ -266,11 +266,14 @@ def test_relay_retries_on_operational_error() -> None:
         pass
 
     with (
-        patch("app.tasks.outbox_relay.SessionLocal", side_effect=OperationalError(
-            "SELECT",
-            {},
-            Exception("db gone"),
-        )),
+        patch(
+            "app.tasks.outbox_relay.SessionLocal",
+            side_effect=OperationalError(
+                "SELECT",
+                {},
+                Exception("db gone"),
+            ),
+        ),
         patch("app.tasks.outbox_relay.relay_outbox_events.retry") as mock_retry,
     ):
         from app.tasks.outbox_relay import relay_outbox_events
@@ -283,9 +286,7 @@ def test_relay_retries_on_operational_error() -> None:
             pass
 
     mock_retry.assert_called_once()
-    assert isinstance(
-        mock_retry.call_args.kwargs["exc"], OperationalError
-    )
+    assert isinstance(mock_retry.call_args.kwargs["exc"], OperationalError)
 
 
 def test_relay_does_not_retry_on_not_implemented_error() -> None:

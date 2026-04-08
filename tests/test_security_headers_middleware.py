@@ -75,9 +75,7 @@ async def test_csp_middleware_returns_204_for_end_of_stream_exception_group():
     request = MagicMock(spec=Request)
     request.method = "GET"
     request.url.path = "/api/v1/anyio"
-    call_next = AsyncMock(
-        side_effect=ExceptionGroup("group", [anyio.EndOfStream()])
-    )
+    call_next = AsyncMock(side_effect=ExceptionGroup("group", [anyio.EndOfStream()]))
 
     response = await csp_middleware(request, call_next)
 

@@ -18,7 +18,9 @@ def test_leave_apply_response_redirects_on_overlap_error():
     svc = SelfServiceWebService()
     auth = _make_auth()
     db = MagicMock()
-    overlap_message = "Overlapping leave application exists for period 2026-04-07 to 2026-04-08"
+    overlap_message = (
+        "Overlapping leave application exists for period 2026-04-07 to 2026-04-08"
+    )
 
     with (
         patch.object(
@@ -41,7 +43,10 @@ def test_leave_apply_response_redirects_on_overlap_error():
         )
 
     assert response.status_code == 303
-    assert response.headers["location"] == f"/people/self/leave?error={quote(overlap_message)}"
+    assert (
+        response.headers["location"]
+        == f"/people/self/leave?error={quote(overlap_message)}"
+    )
     db.rollback.assert_called_once()
     db.commit.assert_not_called()
 

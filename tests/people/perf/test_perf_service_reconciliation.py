@@ -10,7 +10,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.models.people.perf import Appraisal, AppraisalStatus
-from app.services.people.perf.perf_service import PerformanceService, PerformanceServiceError
+from app.services.people.perf.perf_service import (
+    PerformanceService,
+    PerformanceServiceError,
+)
 
 
 def _make_appraisal(*, cycle_id: uuid.UUID, rating: int) -> Appraisal:
@@ -89,4 +92,3 @@ def test_reconcile_department_ratings_rejects_invalid_level() -> None:
             reconciled_by_id=uuid.uuid4(),
             entries=[{"appraisal_id": str(uuid.uuid4()), "final_rating": 3}],
         )
-

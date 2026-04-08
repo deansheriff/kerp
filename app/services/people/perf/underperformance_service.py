@@ -253,7 +253,9 @@ class UnderperformanceService:
         from sqlalchemy import func as sa_func
 
         from app.models.people.hr.employee import Employee
-        from app.models.people.perf.appraisal_outcome_action import AppraisalOutcomeAction
+        from app.models.people.perf.appraisal_outcome_action import (
+            AppraisalOutcomeAction,
+        )
         from app.models.people.perf.pip import PerformanceImprovementPlan
         from app.models.people.perf.pms_enums import (  # noqa: F401
             OutcomeActionStatus,
@@ -482,6 +484,7 @@ class UnderperformanceService:
             "months_of_service": months_of_service,
             "milestone_date": milestone_date,
         }
+
     @staticmethod
     def _score_to_percentage(final_score: Decimal | float | int) -> Decimal:
         """
