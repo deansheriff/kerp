@@ -43,6 +43,134 @@ def perf_index(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PMS Cycle Aliases
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/pms/cycles", response_class=HTMLResponse)
+def pms_list_cycles_alias(
+    request: Request,
+    status: str | None = None,
+    year: int | None = None,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle list on the mounted performance router."""
+    return perf_web_service.list_cycles_response(
+        request,
+        auth,
+        db,
+        status=status,
+        year=str(year) if year is not None else None,
+        search=search,
+        page=page,
+    )
+
+
+@router.get("/pms/cycles/new", response_class=HTMLResponse)
+def pms_new_cycle_form_alias(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle form on the mounted performance router."""
+    return perf_web_service.cycle_new_form_response(request, auth, db)
+
+
+@router.post("/pms/cycles/new", response_class=HTMLResponse)
+async def pms_create_cycle_alias(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle create on the mounted performance router."""
+    return await perf_web_service.create_cycle_response(request, auth, db)
+
+
+@router.get("/pms/cycles/{cycle_id}", response_class=HTMLResponse)
+def pms_cycle_detail_alias(
+    request: Request,
+    cycle_id: str,
+    success: str | None = None,
+    error: str | None = None,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle detail on the mounted performance router."""
+    return perf_web_service.cycle_detail_response(
+        request, auth, db, cycle_id, success=success, error=error
+    )
+
+
+@router.get("/pms/cycles/{cycle_id}/edit", response_class=HTMLResponse)
+def pms_edit_cycle_form_alias(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle edit form on the mounted performance router."""
+    return perf_web_service.cycle_edit_form_response(request, auth, db, cycle_id)
+
+
+@router.post("/pms/cycles/{cycle_id}/edit", response_class=HTMLResponse)
+async def pms_update_cycle_alias(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle update on the mounted performance router."""
+    return await perf_web_service.update_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/pms/cycles/{cycle_id}/activate")
+def pms_activate_cycle_alias(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle activate on the mounted performance router."""
+    return perf_web_service.activate_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/pms/cycles/{cycle_id}/advance")
+def pms_advance_cycle_alias(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle advance on the mounted performance router."""
+    return perf_web_service.advance_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/pms/cycles/{cycle_id}/cancel")
+def pms_cancel_cycle_alias(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle cancel on the mounted performance router."""
+    return perf_web_service.cancel_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/pms/cycles/{cycle_id}/delete")
+def pms_delete_cycle_alias(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Alias PMS cycle delete on the mounted performance router."""
+    return perf_web_service.delete_cycle_response(request, auth, db, cycle_id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Appraisals
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -313,12 +441,13 @@ async def submit_feedback(
 
 @router.post("/feedback/{feedback_id}/delete")
 def delete_feedback(
+    request: Request,
     feedback_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Delete a feedback request."""
-    return perf_web_service.delete_feedback_response(auth, db, feedback_id)
+    return perf_web_service.delete_feedback_response(request, auth, db, feedback_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -413,12 +542,13 @@ async def update_kpi_progress(
 
 @router.post("/goals/{kpi_id}/delete")
 def delete_kpi(
+    request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Delete a KPI."""
-    return perf_web_service.delete_goal_response(auth, db, kpi_id)
+    return perf_web_service.delete_goal_response(request, auth, db, kpi_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -501,42 +631,46 @@ async def update_cycle(
 
 @router.post("/cycles/{cycle_id}/activate")
 def activate_cycle(
+    request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Activate an appraisal cycle."""
-    return perf_web_service.activate_cycle_response(auth, db, cycle_id)
+    return perf_web_service.activate_cycle_response(request, auth, db, cycle_id)
 
 
 @router.post("/cycles/{cycle_id}/advance")
 def advance_cycle(
+    request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Advance cycle to next phase."""
-    return perf_web_service.advance_cycle_response(auth, db, cycle_id)
+    return perf_web_service.advance_cycle_response(request, auth, db, cycle_id)
 
 
 @router.post("/cycles/{cycle_id}/cancel")
 def cancel_cycle(
+    request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Cancel an appraisal cycle."""
-    return perf_web_service.cancel_cycle_response(auth, db, cycle_id)
+    return perf_web_service.cancel_cycle_response(request, auth, db, cycle_id)
 
 
 @router.post("/cycles/{cycle_id}/delete")
 def delete_cycle(
+    request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Delete an appraisal cycle."""
-    return perf_web_service.delete_cycle_response(auth, db, cycle_id)
+    return perf_web_service.delete_cycle_response(request, auth, db, cycle_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -616,22 +750,24 @@ async def update_kra(
 
 @router.post("/kras/{kra_id}/toggle-active")
 def toggle_kra_active(
+    request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Toggle KRA active status."""
-    return perf_web_service.toggle_kra_active_response(auth, db, kra_id)
+    return perf_web_service.toggle_kra_active_response(request, auth, db, kra_id)
 
 
 @router.post("/kras/{kra_id}/delete")
 def delete_kra(
+    request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
     """Delete a KRA."""
-    return perf_web_service.delete_kra_response(auth, db, kra_id)
+    return perf_web_service.delete_kra_response(request, auth, db, kra_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

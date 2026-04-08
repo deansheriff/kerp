@@ -1,6 +1,7 @@
 {% extends "people/base_people.html" %}
 
 {% from "components/macros.html" import status_badge, empty_state, icon_svg %}
+{% set cycles_base = cycles_base_url | default("/people/perf/cycles") %}
 {% block page_title %}{{ cycle.cycle_name }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -8,7 +9,7 @@
     <ol class="flex">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/hr/employees" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">People</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/perf/cycles" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Cycles</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="{{ cycles_base }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Cycles</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">{{ cycle.cycle_code }}</span></li>
     </ol>
 </nav>
@@ -17,7 +18,7 @@
 {% block header_actions %}
 <div class="flex items-center gap-2">
     {% if cycle.status.value == 'DRAFT' %}
-    <form method="post" action="/people/perf/cycles/{{ cycle.cycle_id }}/activate" class="inline">
+    <form method="post" action="{{ cycles_base }}/{{ cycle.cycle_id }}/activate" class="inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="btn btn-success">
             {{ icon_svg("play", "h-4 w-4 mr-1.5") }}
@@ -25,7 +26,7 @@
         </button>
     </form>
     {% elif cycle.status.value in ['ACTIVE', 'REVIEW', 'CALIBRATION'] %}
-    <form method="post" action="/people/perf/cycles/{{ cycle.cycle_id }}/advance" class="inline">
+    <form method="post" action="{{ cycles_base }}/{{ cycle.cycle_id }}/advance" class="inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="btn btn-primary">
             {{ icon_svg("arrow-right", "h-4 w-4 mr-1.5") }}
@@ -35,7 +36,7 @@
     {% endif %}
 
     {% if cycle.status.value not in ['COMPLETED', 'CANCELLED'] %}
-    <a href="/people/perf/cycles/{{ cycle.cycle_id }}/edit" class="btn btn-secondary">
+    <a href="{{ cycles_base }}/{{ cycle.cycle_id }}/edit" class="btn btn-secondary">
         {{ icon_svg("edit", "h-4 w-4 mr-1.5") }}
         Edit
     </a>
@@ -48,7 +49,7 @@
         </button>
         <div x-show="open" @click.away="open = false" x-cloak
              class="absolute right-0 z-10 mt-2 w-48 rounded-lg bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
-            <form method="post" action="/people/perf/cycles/{{ cycle.cycle_id }}/delete"
+            <form method="post" action="{{ cycles_base }}/{{ cycle.cycle_id }}/delete"
                   onsubmit="return confirm('Are you sure you want to delete this cycle?')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
@@ -58,7 +59,7 @@
         </div>
     </div>
     {% elif cycle.status.value not in ['COMPLETED', 'CANCELLED'] %}
-    <form method="post" action="/people/perf/cycles/{{ cycle.cycle_id }}/cancel"
+    <form method="post" action="{{ cycles_base }}/{{ cycle.cycle_id }}/cancel"
           onsubmit="return confirm('Are you sure you want to cancel this cycle?')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="btn btn-ghost text-red-600 hover:text-red-700">
@@ -175,7 +176,7 @@
             {% endif %}
 
             <!-- Recent Appraisals -->
-            {% if appraisals %}
+            {% if performance_private_enabled and appraisals %}
             <div class="card">
                 <div class="card-header flex items-center justify-between">
                     <h4 class="font-medium text-slate-900 dark:text-white">Recent Appraisals</h4>
@@ -227,6 +228,10 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+            {% elif not performance_private_enabled %}
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                Private appraisals are only available in Private/Hybrid mode.
             </div>
             {% endif %}
         </div>

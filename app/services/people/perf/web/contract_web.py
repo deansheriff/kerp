@@ -384,7 +384,7 @@ class ContractWebService:
             )
             db.commit()
             return RedirectResponse(
-                url=f"/people/perf/pms/contracts/{contract.contract_id}?saved=1",
+                url="/people/perf/pms/contracts?success=Contract+saved+successfully",
                 status_code=303,
             )
         except Exception as e:

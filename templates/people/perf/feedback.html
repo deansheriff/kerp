@@ -1,5 +1,7 @@
 {% extends "people/base_people.html" %}
 {% from "components/macros.html" import compact_filters, icon_svg, pagination %}
+{% set feedback_base = feedback_base_url | default("/people/perf/feedback") %}
+{% set perf_home = "/people/perf/pms/dashboard" if active_module and active_module.startswith("pms-") else "/people/perf/appraisals" %}
 
 
 {% block page_title %}360° Feedback{% endblock %}
@@ -9,7 +11,7 @@
     <ol class="flex">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/hr/employees" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">People</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/perf/appraisals" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">{{ performance_nav_label }}</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="{{ perf_home }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">{{ performance_nav_label }}</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">Feedback</span></li>
     </ol>
 </nav>
@@ -40,7 +42,7 @@
     <!-- Filters -->
     {# Filters #}
     {% call(filter_attrs) compact_filters(
-        base_url="/people/perf/feedback",
+        base_url=feedback_base,
         active_filters=active_filters | default([])
     ) %}
     <div>
@@ -85,7 +87,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                     {% for fb in feedback_list %}
-                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group" onclick="window.location='/people/perf/feedback/{{ fb.feedback_id }}'">
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group" onclick="window.location='{{ feedback_base }}/{{ fb.feedback_id }}'">
                         <td class="px-4 py-3">
                             <div class="text-sm font-medium text-slate-900 dark:text-white">
                                 {% if fb.is_anonymous and fb.submitted_on %}
@@ -132,7 +134,7 @@
                             {{ fb.created_at | format_date if fb.created_at else "-" }}
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <a href="/people/perf/feedback/{{ fb.feedback_id }}" class="text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity" title="View">
+                            <a href="{{ feedback_base }}/{{ fb.feedback_id }}" class="text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity" title="View">
                                 {{ icon_svg("chevron-right", "h-4 w-4") }}
                             </a>
                         </td>

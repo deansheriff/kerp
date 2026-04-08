@@ -1,0 +1,195 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import empty_state, status_badge %}
+
+{% block page_title %}Appraisal Review{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+        <li><a href="/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf/pms/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{{ pms_nav_label }}</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><a href="/people/perf/pms/appraisals/{{ queue_type if queue_type in ['countersign', 'committee'] else 'countersign' }}?area=reviews" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{{ queue_title }}</a></li>
+        <li class="flex items-center"><span class="mx-1 text-slate-400">/</span><span class="text-slate-900 dark:text-white" aria-current="page">Detail</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% set actor_hint = 'Countersigner' if queue_type == 'countersign' else 'Committee reviewer' %}
+    {% if success %}
+    <div class="card p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+        <p class="text-sm text-emerald-700 dark:text-emerald-300">Appraisal workflow updated successfully.</p>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="card p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+        <p class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    {% if appraisal %}
+    <div class="card p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ queue_title }}</p>
+                <h1 class="mt-2 text-xl font-semibold text-slate-900 dark:text-white">{{ appraisal.employee.full_name if appraisal.employee else appraisal.employee_id }}</h1>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ appraisal.cycle.cycle_name if appraisal.cycle else appraisal.cycle_id }}</p>
+            </div>
+            <div>{{ status_badge(appraisal.status.value if appraisal.status else "", "md") }}</div>
+        </div>
+    </div>
+
+    <div class="card p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Current Stage</p>
+                <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">{{ current_stage_label }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Next Stage</p>
+                <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">{{ next_stage_label }}</p>
+            </div>
+        </div>
+        <div class="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Expected Actor</p>
+            <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">{{ actor_hint }}</p>
+        </div>
+    </div>
+
+    {% if appraisal.status and appraisal.status.value in ['PENDING_COUNTERSIGN', 'COUNTERSIGNED', 'PENDING_COMMITTEE'] %}
+    <div class="card p-6">
+        <div class="flex items-start justify-between gap-4 mb-5">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Workflow Actions</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Complete the current government PMS review stage from this screen.</p>
+            </div>
+            <div>{{ status_badge(appraisal.status.value, "sm") }}</div>
+        </div>
+        <div class="mb-5 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4">
+            <p class="text-sm text-slate-600 dark:text-slate-300">
+                Acting role:
+                <span class="font-medium text-slate-900 dark:text-white">{{ actor_hint }}</span>.
+                After this step, the appraisal moves to
+                <span class="font-medium text-slate-900 dark:text-white">{{ next_stage_label }}</span>.
+            </p>
+        </div>
+
+        {% if appraisal.status.value == 'PENDING_COUNTERSIGN' %}
+        <form method="POST" action="/people/perf/pms/appraisals/{{ appraisal.appraisal_id }}/countersign" class="space-y-4">
+            {{ request.state.csrf_form | safe }}
+            <input type="hidden" name="queue" value="{{ queue_type }}">
+            <div>
+                <label for="comments" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Countersign Comments</label>
+                <textarea id="comments" name="comments" rows="4" class="form-input" placeholder="Record countersign comments or endorsement notes."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit Countersign</button>
+        </form>
+        {% elif appraisal.status.value in ['COUNTERSIGNED', 'PENDING_COMMITTEE'] %}
+        <form method="POST" action="/people/perf/pms/appraisals/{{ appraisal.appraisal_id }}/committee-review" class="space-y-4">
+            {{ request.state.csrf_form | safe }}
+            <input type="hidden" name="queue" value="{{ queue_type }}">
+            <div>
+                <label for="decision" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Committee Decision</label>
+                <select id="decision" name="decision" class="form-input" required>
+                    {% for decision in CommitteeDecision %}
+                    <option value="{{ decision.value }}">{{ decision.value | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="adjusted_rating" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Adjusted Rating</label>
+                <input id="adjusted_rating" name="adjusted_rating" type="number" min="1" max="5" class="form-input" placeholder="Required when decision is Adjusted">
+            </div>
+            <div>
+                <label for="notes" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Committee Notes</label>
+                <textarea id="notes" name="notes" rows="4" class="form-input" placeholder="Record the committee decision and notes."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit Committee Review</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Appraisal Summary</h2>
+            <dl class="space-y-3">
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Manager</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">{{ appraisal.manager.full_name if appraisal.manager else appraisal.manager_id }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Final Score</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">{{ appraisal.final_score if appraisal.final_score is not none else "—" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Final Rating</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">
+                        {% if appraisal.final_rating %}
+                        {{ appraisal.final_rating }}/5{% if appraisal.rating_label %} ({{ appraisal.rating_label }}){% endif %}
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Manager Review Date</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">{{ appraisal.manager_review_date | format_date if appraisal.manager_review_date else "—" }}</dd>
+                </div>
+            </dl>
+            {% if appraisal.manager_summary %}
+            <div class="mt-5 pt-5 border-t border-slate-200 dark:border-slate-700">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Manager Summary</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appraisal.manager_summary }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Later-Stage Review Data</h2>
+            <dl class="space-y-3">
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Countersigner</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">{{ appraisal.counter_signer_id if appraisal.counter_signer_id else "—" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Countersign Date</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">{{ appraisal.counter_signer_date | format_date if appraisal.counter_signer_date else "—" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Committee Review Date</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">{{ appraisal.committee_review_date | format_date if appraisal.committee_review_date else "—" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500 dark:text-slate-400">Committee Decision</dt>
+                    <dd class="text-right text-slate-900 dark:text-white">{{ appraisal.committee_decision if appraisal.committee_decision else "—" }}</dd>
+                </div>
+            </dl>
+            {% if appraisal.counter_signer_comments %}
+            <div class="mt-5 pt-5 border-t border-slate-200 dark:border-slate-700">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Countersign Comments</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appraisal.counter_signer_comments }}</p>
+            </div>
+            {% endif %}
+            {% if appraisal.committee_notes %}
+            <div class="mt-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Committee Notes</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300">{{ appraisal.committee_notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <div class="card p-8">
+        {{ empty_state(
+            title="Appraisal Not Found",
+            description="The appraisal record could not be found.",
+            icon="clipboard-check",
+            cta_text="Back to Review Queues",
+            cta_href="/people/perf/pms/appraisals/" ~ (queue_type if queue_type in ['countersign', 'committee'] else 'countersign') ~ "?area=reviews"
+        ) }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,113 +1,90 @@
-{% from "components/macros.html" import icon_svg %}
-
 {% set active = active_module | default("") %}
 {% set current_path = request.url.path %}
-{% set current_query = request.url.query | default("") %}
+{% set selected_area = request.query_params.get("area", "") %}
 
-{% macro workflow_link(href, label, icon_name, note="", active_values=[], path_prefix=None, query_contains=None) %}
+{% if not selected_area %}
+  {% if active in ["pms-institutional", "pms-objectives", "pms-cycles", "pms-contracts", "pms-templates", "pms-goals", "pms-kras"] or current_path.startswith("/people/perf/pms/institutional") or current_path.startswith("/people/perf/pms/objectives") or current_path.startswith("/people/perf/pms/cycles") or current_path.startswith("/people/perf/pms/contracts") or current_path.startswith("/people/perf/pms/templates") or current_path.startswith("/people/perf/pms/goals") or current_path.startswith("/people/perf/pms/kras") %}
+    {% set selected_area = "planning" %}
+  {% elif active in ["pms-reviews"] or current_path.startswith("/people/perf/pms/reviews") or current_path.startswith("/people/perf/pms/appraisals") %}
+    {% set selected_area = "reviews" %}
+  {% elif active in ["pms-pips", "pms-appeals", "pms-grievances", "pms-stakeholder-feedback", "pms-governance"] or current_path.startswith("/people/perf/pms/pips") or current_path.startswith("/people/perf/pms/appeals") or current_path.startswith("/people/perf/pms/grievances") or current_path.startswith("/people/perf/pms/stakeholder-feedback") or current_path.startswith("/people/perf/pms/governance") %}
+    {% set selected_area = "issues" %}
+  {% elif active in ["pms-reports", "pms-rewards", "pms-feedback"] or current_path.startswith("/people/perf/pms/reports") or current_path.startswith("/people/perf/pms/rewards") or current_path.startswith("/people/perf/pms/feedback") %}
+    {% set selected_area = "reports" %}
+  {% else %}
+    {% set selected_area = "planning" %}
+  {% endif %}
+{% endif %}
+
+{% macro nav_link(href, label, area, active_values=[], path_prefix=None, query_key=None, query_value=None) %}
+  {% set full_href = href ~ ('&' if '?' in href else '?') ~ 'area=' ~ area %}
   {% set is_active = active in active_values %}
-  {% if query_contains and path_prefix %}
-    {% if current_path.startswith(path_prefix) and current_query.find(query_contains) != -1 %}
-      {% set is_active = true %}
-    {% endif %}
-  {% elif path_prefix and current_path.startswith(path_prefix) %}
-    {% set is_active = true %}
-  {% elif query_contains and current_query.find(query_contains) != -1 %}
+  {% if query_key and query_value %}
+    {% set is_active = current_path.startswith(path_prefix if path_prefix else href) and request.query_params.get(query_key) == query_value and selected_area == area %}
+  {% elif not is_active and path_prefix and current_path.startswith(path_prefix) and selected_area == area %}
     {% set is_active = true %}
   {% endif %}
-  <a href="{{ href }}"
+  <a href="{{ full_href }}"
      {% if is_active %}aria-current="page"{% endif %}
-     class="group flex items-start gap-3 rounded-xl border px-3 py-3 transition-colors
+     class="inline-flex items-center rounded-full border px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap
             {% if is_active %}
-              border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-100
+              border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-700 dark:bg-violet-900/30 dark:text-violet-100
             {% else %}
-              border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/60
+              border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800/70
             {% endif %}">
-    <span class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg
-                 {% if is_active %}
-                   bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-200
-                 {% else %}
-                   bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400
-                 {% endif %}">
-      {{ icon_svg(icon_name, "h-4 w-4") }}
-    </span>
-    <span class="min-w-0">
-      <span class="block text-sm font-medium">{{ label }}</span>
-      {% if note %}
-      <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{{ note }}</span>
-      {% endif %}
-    </span>
+    {{ label }}
   </a>
 {% endmacro %}
 
 <div class="card p-4">
-  <div class="grid grid-cols-1 gap-4 xl:grid-cols-4">
-    <section class="space-y-3">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Planning</p>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Set goals, cycles, and agreements before reviews begin.</p>
-      </div>
-      <div class="space-y-2">
-        {{ workflow_link("/people/perf/pms/dashboard", "Overview", "view-boards", "See key metrics, charts, and next actions.", ["pms-dashboard"]) }}
-        {{ workflow_link("/people/perf/pms/institutional", "Department Goals", "building", "Track institutional targets.", ["pms-institutional"]) }}
-        {{ workflow_link("/people/perf/pms/objectives", "Strategic Objectives", "chart", "Maintain top-level objectives.", ["pms-objectives"]) }}
-        {{ workflow_link("/people/perf/pms/cycles", "Annual Cycles", "calendar", "Open and manage performance cycles.", [], "/people/perf/pms/cycles") }}
-        {{ workflow_link("/people/perf/pms/contracts", "Performance Agreements", "document", "Create and sign staff agreements.", ["pms-contracts"]) }}
-      </div>
-      <details class="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40"
-               {% if current_path.startswith("/people/perf/pms/templates") or current_path.startswith("/people/perf/pms/goals") or current_path.startswith("/people/perf/pms/kras") %}open{% endif %}>
-        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-          <span>Planning Setup</span>
-          <span class="text-xs text-slate-400 dark:text-slate-500">Templates, KPIs, KRAs</span>
-        </summary>
-        <div class="mt-3 space-y-2">
-          {{ workflow_link("/people/perf/pms/templates", "Templates", "document-text", "Appraisal structures and forms.", [], "/people/perf/pms/templates") }}
-          {{ workflow_link("/people/perf/pms/goals", "Goals & KPIs", "clipboard", "Manage KPI targets and progress.", [], "/people/perf/pms/goals") }}
-          {{ workflow_link("/people/perf/pms/kras", "KRAs", "briefcase", "Maintain key result areas.", [], "/people/perf/pms/kras") }}
-        </div>
-      </details>
-    </section>
-
-    <section class="space-y-3">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Reviews</p>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Run check-ins, assessments, and formal review queues.</p>
-      </div>
-      <div class="space-y-2">
-        {{ workflow_link("/people/perf/pms/reviews", "Monthly Check-ins", "calendar", "Progress reviews and acknowledgement.", ["pms-reviews"]) }}
-        {{ workflow_link("/people/perf/pms/dashboard", "Quarterly Reviews", "clipboard-check", "Quarterly review status and next steps.", ["pms-dashboard"]) }}
-        {{ workflow_link("/people/perf/pms/reviews", "My Self-Assessments", "user", "Open the performance review workspace.", ["pms-reviews"]) }}
-        {{ workflow_link("/people/perf/pms/reviews", "Manager Review Queue", "users", "Open review actions pending in Performance reviews.", ["pms-reviews"]) }}
-        {{ workflow_link("/people/perf/pms/governance", "Countersign Queue", "check-circle", "Use performance oversight views for endorsement follow-up.", ["pms-governance"]) }}
-        {{ workflow_link("/people/perf/pms/governance", "Committee Queue", "scale", "Use performance oversight views for committee-stage follow-up.", ["pms-governance"]) }}
-      </div>
-    </section>
-
-    <section class="space-y-3">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Issues</p>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Handle exceptions, disputes, and performance interventions.</p>
-      </div>
-      <div class="space-y-2">
-        {{ workflow_link("/people/perf/pms/pips", "Performance Improvement Plans", "trending-up", "Track underperformance interventions.", ["pms-pips"]) }}
-        {{ workflow_link("/people/perf/pms/appeals", "Appeals", "scale", "Manage appraisal disputes.", ["pms-appeals"]) }}
-        {{ workflow_link("/people/perf/pms/grievances", "Grievances", "warning", "Log and resolve governance complaints.", ["pms-grievances"]) }}
-        {{ workflow_link("/people/perf/pms/stakeholder-feedback", "Stakeholder Feedback", "users", "Collect external and internal input.", [], "/people/perf/pms/stakeholder-feedback") }}
-        {{ workflow_link("/people/perf/pms/governance", "Oversight", "shield-check", "Governance dashboards and controls.", ["pms-governance"]) }}
-      </div>
-    </section>
-
-    <section class="space-y-3">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Reports</p>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Monitor compliance, results, rewards, and supporting feedback.</p>
-      </div>
-      <div class="space-y-2">
-        {{ workflow_link("/people/perf/pms/dashboard", "Compliance Dashboard", "activity", "Track cycle health and completion.", ["pms-dashboard"]) }}
-        {{ workflow_link("/people/perf/pms/reports", "Reports", "clipboard", "Open mandatory performance report pack.", ["pms-reports"]) }}
-        {{ workflow_link("/people/perf/pms/rewards", "Rewards", "sparkles", "Recognition and nomination progress.", ["pms-rewards"]) }}
-        {{ workflow_link("/people/perf/pms/feedback", "Feedback", "chat-bubble", "Review supporting feedback requests.", ["perf"], "/people/perf/pms/feedback") }}
-      </div>
-    </section>
+  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <p class="text-sm font-semibold text-slate-900 dark:text-white">
+        {% if selected_area == "planning" %}Planning
+        {% elif selected_area == "reviews" %}Reviews
+        {% elif selected_area == "issues" %}Issues
+        {% else %}Reports
+        {% endif %}
+      </p>
+      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        {% if selected_area == "planning" %}Setup goals, cycles, agreements, and planning tools.
+        {% elif selected_area == "reviews" %}Open PMS-native review stages from quarterly reviews through committee.
+        {% elif selected_area == "issues" %}Handle interventions, complaints, and disputes.
+        {% else %}Open result, reward, and reporting views.
+        {% endif %}
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/people/perf/pms/dashboard"
+         class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition-colors whitespace-nowrap hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800">
+        Dashboard
+      </a>
+      {% if selected_area == "planning" %}
+        {{ nav_link("/people/perf/pms/institutional", "Department Goals", "planning", ["pms-institutional"], "/people/perf/pms/institutional") }}
+        {{ nav_link("/people/perf/pms/objectives", "Strategic Objectives", "planning", ["pms-objectives"], "/people/perf/pms/objectives") }}
+        {{ nav_link("/people/perf/pms/cycles", "Annual Cycles", "planning", ["pms-cycles"], "/people/perf/pms/cycles") }}
+        {{ nav_link("/people/perf/pms/contracts", "Performance Agreements", "planning", ["pms-contracts"], "/people/perf/pms/contracts") }}
+        {{ nav_link("/people/perf/pms/templates", "Templates", "planning", ["pms-templates"], "/people/perf/pms/templates") }}
+        {{ nav_link("/people/perf/pms/goals", "Goals & KPIs", "planning", ["pms-goals"], "/people/perf/pms/goals") }}
+        {{ nav_link("/people/perf/pms/kras", "KRAs", "planning", ["pms-kras"], "/people/perf/pms/kras") }}
+      {% elif selected_area == "reviews" %}
+        {{ nav_link("/people/perf/pms/reviews", "Monthly Check-ins", "reviews", ["pms-reviews"], "/people/perf/pms/reviews") }}
+        {{ nav_link("/people/perf/pms/appraisals/quarterly-reviews", "Quarterly Reviews", "reviews", [], "/people/perf/pms/appraisals/quarterly-reviews") }}
+        {{ nav_link("/people/perf/pms/appraisals/self-assessment", "My Self-Assessments", "reviews", [], "/people/perf/pms/appraisals/self-assessment") }}
+        {{ nav_link("/people/perf/pms/appraisals/manager-review", "Manager Review Queue", "reviews", [], "/people/perf/pms/appraisals/manager-review") }}
+        {{ nav_link("/people/perf/pms/appraisals/countersign", "Countersign Queue", "reviews", [], "/people/perf/pms/appraisals/countersign") }}
+        {{ nav_link("/people/perf/pms/appraisals/committee", "Committee Queue", "reviews", [], "/people/perf/pms/appraisals/committee") }}
+      {% elif selected_area == "issues" %}
+        {{ nav_link("/people/perf/pms/pips", "PIPs", "issues", ["pms-pips"], "/people/perf/pms/pips") }}
+        {{ nav_link("/people/perf/pms/appeals", "Appeals", "issues", ["pms-appeals"], "/people/perf/pms/appeals") }}
+        {{ nav_link("/people/perf/pms/grievances", "Grievances", "issues", ["pms-grievances"], "/people/perf/pms/grievances") }}
+        {{ nav_link("/people/perf/pms/stakeholder-feedback", "Stakeholder Feedback", "issues", ["pms-stakeholder-feedback"], "/people/perf/pms/stakeholder-feedback") }}
+        {{ nav_link("/people/perf/pms/governance", "Governance", "issues", ["pms-governance"], "/people/perf/pms/governance") }}
+      {% else %}
+        {{ nav_link("/people/perf/pms/reports", "Reports", "reports", ["pms-reports"], "/people/perf/pms/reports") }}
+        {{ nav_link("/people/perf/pms/rewards", "Rewards", "reports", ["pms-rewards"], "/people/perf/pms/rewards") }}
+        {{ nav_link("/people/perf/pms/feedback", "Feedback", "reports", ["pms-feedback"], "/people/perf/pms/feedback") }}
+      {% endif %}
+    </div>
   </div>
 </div>

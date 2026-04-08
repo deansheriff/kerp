@@ -23,6 +23,8 @@
 </div>
 {% endblock %}
 
+{% block pms_section_nav %}{% endblock %}
+
 {% block content %}
 {% set contracts = compliance.contracts if compliance and compliance.contracts else None %}
 {% set monthly_reviews = compliance.monthly_reviews if compliance and compliance.monthly_reviews else None %}
@@ -56,20 +58,26 @@
         <div>
             <p class="font-semibold text-amber-700 dark:text-amber-400">No Active Appraisal Cycle</p>
             <p class="text-sm text-amber-600 dark:text-amber-300 mt-0.5">Create and activate an annual cycle to see Performance dashboard metrics.</p>
-            <a href="/people/perf/cycles/new" class="mt-2 inline-block text-sm font-medium text-amber-700 dark:text-amber-300 underline hover:no-underline">Create a cycle</a>
+            <a href="/people/perf/pms/cycles/new" class="mt-2 inline-block text-sm font-medium text-amber-700 dark:text-amber-300 underline hover:no-underline">Create a cycle</a>
         </div>
     </div>
     {% endif %}
 
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section class="card p-5">
-            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Workflow Progress</h2>
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Cycle Completion Funnel</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Track where progress is slowing down across the current PMS cycle.</p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">Cycle Progress</span>
+            </div>
             <div class="mt-4 space-y-3 text-sm">
                 {% set wf_steps = [
                     ('Set Goals', planning_done, planning_total),
                     ('Agreements Signed', contracts_signed, contracts_total),
-                    ('Monthly Reviews', monthly_completed, monthly_expected),
-                    ('Appraisals', appraisals_completed, appraisals_total)
+                    ('Monthly Reviews Completed', monthly_completed, monthly_expected),
+                    ('Appraisals Completed', appraisals_completed, appraisals_total)
                 ] %}
                 {% for step_label, step_done, step_total in wf_steps %}
                     {% set step_pct = ((step_done * 100 / step_total) if step_total else 0) | round(0) | int %}
@@ -87,7 +95,13 @@
         </section>
 
         <section class="card p-5">
-            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Rate vs Target</h2>
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Stage Completion Summary</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Completion rates for the main stages currently measured in the dashboard.</p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">Percent Complete</span>
+            </div>
             <div class="mt-4 space-y-3">
                 <div>
                     <div class="mb-1 flex justify-between text-xs text-slate-600 dark:text-slate-300">
@@ -121,35 +135,110 @@
     </div>
 
     <section class="card p-5">
-        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">What to do next</h2>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Pick a workflow area to open that section.</p>
-        <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <a href="/people/perf/pms/institutional" class="block rounded-lg border border-slate-200 dark:border-slate-800 p-4 hover:border-violet-300 dark:hover:border-violet-600">
-                <p class="font-semibold text-sm text-slate-900 dark:text-white">Planning</p>
-                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Department Goals, Strategic Objectives, Annual Cycles, Agreements</p>
-            </a>
-            <a href="/people/perf/pms/reviews" class="block rounded-lg border border-slate-200 dark:border-slate-800 p-4 hover:border-violet-300 dark:hover:border-violet-600">
-                <p class="font-semibold text-sm text-slate-900 dark:text-white">Reviews</p>
-                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Monthly Check-ins, Self-Assessments, Manager Review, Countersign, Committee</p>
-            </a>
-            <a href="/people/perf/pms/pips" class="block rounded-lg border border-slate-200 dark:border-slate-800 p-4 hover:border-violet-300 dark:hover:border-violet-600">
-                <p class="font-semibold text-sm text-slate-900 dark:text-white">Issues</p>
-                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">PIPs, Appeals, Grievances, Stakeholder Feedback</p>
-            </a>
-            <a href="/people/perf/pms/reports" class="block rounded-lg border border-slate-200 dark:border-slate-800 p-4 hover:border-violet-300 dark:hover:border-violet-600">
-                <p class="font-semibold text-sm text-slate-900 dark:text-white">Reports</p>
-                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Compliance Dashboard, Reports, Rewards, Feedback</p>
-            </a>
+        <div class="flex flex-col gap-1">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Select Workflow Area</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Choose an area to open its page and see only that area's options.</p>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <a href="/people/perf/pms/institutional?area=planning" class="rounded-xl border border-slate-200 bg-white px-4 py-4 text-center text-sm font-medium text-slate-700 transition-colors hover:border-violet-300 hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">Planning</a>
+            <a href="/people/perf/pms/appraisals/quarterly-reviews?area=reviews" class="rounded-xl border border-slate-200 bg-white px-4 py-4 text-center text-sm font-medium text-slate-700 transition-colors hover:border-violet-300 hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">Reviews</a>
+            <a href="/people/perf/pms/pips?area=issues" class="rounded-xl border border-slate-200 bg-white px-4 py-4 text-center text-sm font-medium text-slate-700 transition-colors hover:border-violet-300 hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">Issues</a>
+            <a href="/people/perf/pms/reports?area=reports" class="rounded-xl border border-slate-200 bg-white px-4 py-4 text-center text-sm font-medium text-slate-700 transition-colors hover:border-violet-300 hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">Reports</a>
         </div>
     </section>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section class="card p-5">
-            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Planning Compliance</h2>
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Review Workflow</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Open the PMS-native review pages for each stage from quarterly review through committee.</p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">Reviews</span>
+            </div>
+            <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Monthly Check-ins</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ monthly_completed }}</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">completed of {{ monthly_expected }} expected</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Quarterly Reviews</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ appraisals_total }}</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">active appraisal records in cycle scope</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Completed Appraisals</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ appraisals_completed }}</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ appraisal_percent | round(0) | int }}% complete</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <a href="/people/perf/pms/reviews?area=reviews" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
+                    <span class="text-slate-600 dark:text-slate-300">Monthly Check-ins</span>
+                    <span>{{ monthly_completed }} / {{ monthly_expected }}</span>
+                </a>
+                <a href="/people/perf/pms/appraisals/quarterly-reviews?area=reviews" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
+                    <span class="text-slate-600 dark:text-slate-300">Quarterly Reviews</span>
+                    <span>Open</span>
+                </a>
+                <a href="/people/perf/pms/appraisals/self-assessment?area=reviews" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
+                    <span class="text-slate-600 dark:text-slate-300">My Self-Assessments</span>
+                    <span>Open</span>
+                </a>
+                <a href="/people/perf/pms/appraisals/manager-review?area=reviews" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
+                    <span class="text-slate-600 dark:text-slate-300">Manager Review Queue</span>
+                    <span>Open</span>
+                </a>
+                <a href="/people/perf/pms/appraisals/countersign?area=reviews" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
+                    <span class="text-slate-600 dark:text-slate-300">Countersign Queue</span>
+                    <span>Open</span>
+                </a>
+                <a href="/people/perf/pms/appraisals/committee?area=reviews" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
+                    <span class="text-slate-600 dark:text-slate-300">Committee Queue</span>
+                    <span>Open</span>
+                </a>
+            </div>
+        </section>
+        <section class="card p-5">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Planning Snapshot</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Early-cycle readiness using the contract metrics already available in this dashboard.</p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">Planning</span>
+            </div>
+            <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Contracts Signed</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ contracts_signed }}</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Contracts Total</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ contracts_total }}</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Agreement Completion</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ agreements_percent | round(0) | int }}%</p>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <div class="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                        <span>Performance Contracts Signed</span>
+                        <span>{{ contracts_signed }} / {{ contracts_total }}</span>
+                    </div>
+                    <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
+                        <div class="h-2 rounded-full bg-violet-500 dark:bg-violet-400" style="width: {{ agreements_percent }}%"></div>
+                    </div>
+                </div>
+            </div>
             <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <a href="/people/perf/pms/institutional" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
                     <span class="text-slate-600 dark:text-slate-300">Department goals</span>
-                    <span>{{ contracts_signed }} / {{ contracts_total }}</span>
+                    <span>Open</span>
                 </a>
                 <a href="/people/perf/pms/objectives" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
                     <span class="text-slate-600 dark:text-slate-300">Strategic objectives</span>
@@ -160,14 +249,20 @@
                     <span>Manage</span>
                 </a>
                 <a href="/people/perf/pms/contracts" class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 flex justify-between">
-                    <span class="text-slate-600 dark:text-slate-300">Agreements</span>
-                    <span>{{ contracts_signed }}</span>
+                    <span class="text-slate-600 dark:text-slate-300">Performance agreements</span>
+                    <span>{{ contracts_signed }} / {{ contracts_total }}</span>
                 </a>
             </div>
         </section>
         <section class="card p-5">
-            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Issues Snapshot</h2>
-            <div class="mt-4 grid grid-cols-3 gap-3 text-sm">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Issues Breakdown</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Current operational issues that may slow down or complicate the cycle.</p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">Open Issues</span>
+            </div>
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <a href="/people/perf/pms/pips" class="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-center">
                     <p class="text-xs uppercase tracking-wide text-emerald-700">Active PIPs</p>
                     <p class="mt-2 text-xl font-semibold text-emerald-900">{{ pips_active }}</p>
@@ -187,7 +282,10 @@
     {% if rating_distribution and rating_distribution.ratings and rating_distribution.total > 0 %}
     <section class="card p-5">
         <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Rating Distribution</h2>
+            <div>
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Rating Distribution</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Outcome distribution for completed appraisals currently available in the dashboard.</p>
+            </div>
             <span class="text-xs text-slate-500 dark:text-slate-400">{{ rating_distribution.total }} completed appraisal{{ "s" if rating_distribution.total != 1 else "" }}</span>
         </div>
         <div class="mt-4 space-y-3">

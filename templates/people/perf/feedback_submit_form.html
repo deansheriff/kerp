@@ -1,5 +1,6 @@
 {% extends "people/base_people.html" %}
 {% from "components/macros.html" import icon_svg %}
+{% set feedback_base = feedback_base_url | default("/people/perf/feedback") %}
 
 {% block page_title %}Submit Feedback{% endblock %}
 
@@ -7,8 +8,8 @@
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/perf/feedback" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Feedback</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/perf/feedback/{{ feedback.feedback_id }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Details</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="{{ feedback_base }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Feedback</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="{{ feedback_base }}/{{ feedback.feedback_id }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Details</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">Submit</span></li>
     </ol>
 </nav>
@@ -71,7 +72,7 @@
         </div>
     </div>
 
-    <form method="post" action="/people/perf/feedback/{{ feedback.feedback_id }}/submit" class="space-y-6" x-data="{ rating: {{ form_data.overall_rating or 0 }} }">
+    <form method="post" action="{{ feedback_base }}/{{ feedback.feedback_id }}/submit" class="space-y-6" x-data="{ rating: {{ form_data.overall_rating or 0 }} }">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <!-- Rating Card -->
@@ -176,7 +177,7 @@
         {% endif %}
 
         <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <a href="/people/perf/feedback/{{ feedback.feedback_id }}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ feedback_base }}/{{ feedback.feedback_id }}" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-primary">
                 {{ icon_svg("check", "h-4 w-4 mr-1.5") }}
                 Submit Feedback

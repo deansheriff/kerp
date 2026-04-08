@@ -1,5 +1,6 @@
 {% extends "people/base_people.html" %}
 {% from "components/macros.html" import icon_svg %}
+{% set kras_base = kras_base_url | default("/people/perf/kras") %}
 
 {% block page_title %}{% if kra %}Edit {{ kra.kra_name }}{% else %}New KRA{% endif %}{% endblock %}
 
@@ -8,7 +9,7 @@
     <ol class="flex">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/hr/employees" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">People</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/perf/kras" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">KRAs</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="{{ kras_base }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">KRAs</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">{% if kra %}Edit{% else %}New{% endif %}</span></li>
     </ol>
 </nav>
@@ -25,7 +26,7 @@
     </div>
     {% endif %}
 
-    <form method="post" action="{% if kra %}/people/perf/kras/{{ kra.kra_id }}/edit{% else %}/people/perf/kras/new{% endif %}" class="space-y-6">
+    <form method="post" action="{% if kra %}{{ kras_base }}/{{ kra.kra_id }}/edit{% else %}{{ kras_base }}/new{% endif %}" class="space-y-6">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <!-- Basic Information -->
@@ -142,7 +143,7 @@
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <a href="/people/perf/kras{% if kra %}/{{ kra.kra_id }}{% endif %}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ kras_base }}{% if kra %}/{{ kra.kra_id }}{% endif %}" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-primary">
                 {% if kra %}Save Changes{% else %}Create KRA{% endif %}
             </button>

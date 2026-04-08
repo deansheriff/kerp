@@ -1,5 +1,6 @@
 {% extends "people/base_people.html" %}
 {% from "components/macros.html" import icon_svg %}
+{% set goals_base = goals_base_url | default("/people/perf/goals") %}
 
 {% block page_title %}{% if kpi %}Edit KPI{% else %}New KPI{% endif %}{% endblock %}
 
@@ -8,7 +9,7 @@
     <ol class="flex">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/hr/employees" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">People</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/perf/goals" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Goals & KPIs</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="{{ goals_base }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Goals & KPIs</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">{% if kpi %}Edit{% else %}New{% endif %}</span></li>
     </ol>
 </nav>
@@ -25,7 +26,7 @@
     </div>
     {% endif %}
 
-    <form method="post" action="/people/perf/goals/{% if kpi %}{{ kpi.kpi_id }}/edit{% else %}new{% endif %}" class="space-y-6">
+    <form method="post" action="{% if kpi %}{{ goals_base }}/{{ kpi.kpi_id }}/edit{% else %}{{ goals_base }}/new{% endif %}" class="space-y-6">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         {# Basic Information #}
@@ -186,7 +187,7 @@
 
         {# Form Actions #}
         <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <a href="/people/perf/goals{% if kpi %}/{{ kpi.kpi_id }}{% endif %}" class="btn btn-secondary">
+            <a href="{{ goals_base }}{% if kpi %}/{{ kpi.kpi_id }}{% endif %}" class="btn btn-secondary">
                 Cancel
             </a>
             <button type="submit" class="btn btn-primary">

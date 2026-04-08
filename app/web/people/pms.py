@@ -237,6 +237,210 @@ def list_reviews(
     )
 
 
+@router.get("/appraisals/countersign", response_class=HTMLResponse)
+def pms_countersign_queue(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS countersign queue."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_appraisal_queue_response(
+        request, auth, db, queue="countersign", page=page
+    )
+
+
+@router.get("/appraisals/self-assessment", response_class=HTMLResponse)
+def pms_self_assessment_queue(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS self-assessment queue."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_self_assessment_queue_response(
+        request, auth, db, page=page
+    )
+
+
+@router.get("/appraisals/quarterly-reviews", response_class=HTMLResponse)
+def pms_quarterly_reviews(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS quarterly reviews overview."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_quarterly_reviews_response(
+        request, auth, db, page=page
+    )
+
+
+@router.get("/appraisals/manager-review", response_class=HTMLResponse)
+def pms_manager_review_queue(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS manager review queue."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_manager_review_queue_response(
+        request, auth, db, page=page
+    )
+
+
+@router.get("/appraisals/committee", response_class=HTMLResponse)
+def pms_committee_queue(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS committee queue."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_appraisal_queue_response(
+        request, auth, db, queue="committee", page=page
+    )
+
+
+@router.post("/appraisals/{appraisal_id}/start-self-assessment")
+def pms_start_self_assessment(
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Start PMS self-assessment."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_start_self_assessment_response(auth, db, appraisal_id)
+
+
+@router.post("/appraisals/{appraisal_id}/start-manager-review")
+def pms_start_manager_review(
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Start PMS manager review."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_start_manager_review_response(auth, db, appraisal_id)
+
+
+@router.get("/appraisals/{appraisal_id}/self-assessment", response_class=HTMLResponse)
+def pms_self_assessment_form(
+    request: Request,
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """PMS self-assessment form page."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_self_assessment_form_response(
+        request, auth, db, appraisal_id
+    )
+
+
+@router.post("/appraisals/{appraisal_id}/self-assessment", response_class=HTMLResponse)
+async def pms_submit_self_assessment(
+    request: Request,
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Submit PMS self-assessment."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.pms_submit_self_assessment_response(
+        request, auth, db, appraisal_id
+    )
+
+
+@router.get("/appraisals/{appraisal_id}/manager-review", response_class=HTMLResponse)
+def pms_manager_review_form(
+    request: Request,
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """PMS manager review form page."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_manager_review_form_response(
+        request, auth, db, appraisal_id
+    )
+
+
+@router.post("/appraisals/{appraisal_id}/manager-review", response_class=HTMLResponse)
+async def pms_submit_manager_review(
+    request: Request,
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Submit PMS manager review."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.pms_submit_manager_review_response(
+        request, auth, db, appraisal_id
+    )
+
+
+@router.get("/appraisals/{appraisal_id}", response_class=HTMLResponse)
+def pms_appraisal_detail(
+    request: Request,
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS appraisal queue detail."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.pms_appraisal_detail_response(
+        request, auth, db, appraisal_id
+    )
+
+
+@router.post("/appraisals/{appraisal_id}/countersign", response_class=HTMLResponse)
+async def pms_submit_countersign(
+    request: Request,
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS countersign action."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.pms_countersign_response(
+        request, auth, db, appraisal_id
+    )
+
+
+@router.post("/appraisals/{appraisal_id}/committee-review", response_class=HTMLResponse)
+async def pms_submit_committee_review(
+    request: Request,
+    appraisal_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Government PMS committee review action."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.pms_committee_review_response(
+        request, auth, db, appraisal_id
+    )
+
+
 @router.get("/reviews/new", response_class=HTMLResponse)
 def new_review_form(
     request: Request,
@@ -774,6 +978,623 @@ def pms_report(
         db,
         report_type=report_type,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KRAs (Shared Building Block)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/kras", response_class=HTMLResponse)
+def pms_list_kras(
+    request: Request,
+    search: str | None = None,
+    is_active: str | None = None,
+    department_id: str | None = None,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """KRAs list page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.list_kras_response(
+        request,
+        auth,
+        db,
+        search=search,
+        is_active=is_active,
+        department_id=department_id,
+        page=page,
+    )
+
+
+@router.get("/kras/new", response_class=HTMLResponse)
+def pms_new_kra_form(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """New KRA form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.kra_new_form_response(request, auth, db)
+
+
+@router.post("/kras/new", response_class=HTMLResponse)
+async def pms_create_kra(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Create a new KRA (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.create_kra_response(request, auth, db)
+
+
+@router.get("/kras/{kra_id}", response_class=HTMLResponse)
+def pms_kra_detail(
+    request: Request,
+    kra_id: str,
+    success: str | None = None,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """KRA detail page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.kra_detail_response(
+        request, auth, db, kra_id, success=success
+    )
+
+
+@router.get("/kras/{kra_id}/edit", response_class=HTMLResponse)
+def pms_edit_kra_form(
+    request: Request,
+    kra_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Edit KRA form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.kra_edit_form_response(request, auth, db, kra_id)
+
+
+@router.post("/kras/{kra_id}/edit", response_class=HTMLResponse)
+async def pms_update_kra(
+    request: Request,
+    kra_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Update a KRA (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.update_kra_response(request, auth, db, kra_id)
+
+
+@router.post("/kras/{kra_id}/toggle-active")
+def pms_toggle_kra_active(
+    request: Request,
+    kra_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Toggle KRA active status (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.toggle_kra_active_response(request, auth, db, kra_id)
+
+
+@router.post("/kras/{kra_id}/delete")
+def pms_delete_kra(
+    request: Request,
+    kra_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Delete a KRA (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.delete_kra_response(request, auth, db, kra_id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cycles (Shared Building Block)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/cycles", response_class=HTMLResponse)
+def pms_list_cycles(
+    request: Request,
+    status: str | None = None,
+    year: int | None = None,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Appraisal cycles list page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.list_cycles_response(
+        request, auth, db, status=status, year=str(year) if year is not None else None, search=search, page=page
+    )
+
+
+@router.get("/cycles/new", response_class=HTMLResponse)
+def pms_new_cycle_form(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """New appraisal cycle form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.cycle_new_form_response(request, auth, db)
+
+
+@router.post("/cycles/new", response_class=HTMLResponse)
+async def pms_create_cycle(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Create a new appraisal cycle (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.create_cycle_response(request, auth, db)
+
+
+@router.get("/cycles/{cycle_id}", response_class=HTMLResponse)
+def pms_cycle_detail(
+    request: Request,
+    cycle_id: str,
+    success: str | None = None,
+    error: str | None = None,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Appraisal cycle detail page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.cycle_detail_response(
+        request, auth, db, cycle_id, success=success, error=error
+    )
+
+
+@router.get("/cycles/{cycle_id}/edit", response_class=HTMLResponse)
+def pms_edit_cycle_form(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Edit appraisal cycle form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.cycle_edit_form_response(request, auth, db, cycle_id)
+
+
+@router.post("/cycles/{cycle_id}/edit", response_class=HTMLResponse)
+async def pms_update_cycle(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Update an appraisal cycle (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.update_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/cycles/{cycle_id}/activate")
+def pms_activate_cycle(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Activate an appraisal cycle (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.activate_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/cycles/{cycle_id}/advance")
+def pms_advance_cycle(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Advance cycle to next phase (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.advance_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/cycles/{cycle_id}/cancel")
+def pms_cancel_cycle(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Cancel an appraisal cycle (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.cancel_cycle_response(request, auth, db, cycle_id)
+
+
+@router.post("/cycles/{cycle_id}/delete")
+def pms_delete_cycle(
+    request: Request,
+    cycle_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Delete an appraisal cycle (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.delete_cycle_response(request, auth, db, cycle_id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Goals & KPIs (Shared Building Block)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/goals", response_class=HTMLResponse)
+def pms_list_goals(
+    request: Request,
+    status: str | None = None,
+    search: str | None = None,
+    employee_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """KPIs list page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.list_goals_response(
+        request, auth, db, status, search, employee_id, start_date, end_date, page
+    )
+
+
+@router.get("/goals/new", response_class=HTMLResponse)
+def pms_new_goal_form(
+    request: Request,
+    employee_id: str | None = None,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """New KPI form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.goal_new_form_response(request, auth, db, employee_id)
+
+
+@router.post("/goals/new", response_class=HTMLResponse)
+async def pms_create_goal(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Create a new KPI (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.create_goal_response(request, auth, db)
+
+
+@router.get("/goals/{kpi_id}", response_class=HTMLResponse)
+def pms_goal_detail(
+    request: Request,
+    kpi_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """KPI detail page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.goal_detail_response(request, auth, db, kpi_id)
+
+
+@router.get("/goals/{kpi_id}/edit", response_class=HTMLResponse)
+def pms_edit_goal_form(
+    request: Request,
+    kpi_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Edit KPI form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.goal_edit_form_response(request, auth, db, kpi_id)
+
+
+@router.post("/goals/{kpi_id}/edit", response_class=HTMLResponse)
+async def pms_update_goal(
+    request: Request,
+    kpi_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Update a KPI (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.update_goal_response(request, auth, db, kpi_id)
+
+
+@router.post("/goals/{kpi_id}/update-progress")
+async def pms_update_goal_progress(
+    request: Request,
+    kpi_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Update KPI progress (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.update_goal_progress_response(
+        request, auth, db, kpi_id
+    )
+
+
+@router.post("/goals/{kpi_id}/delete")
+def pms_delete_goal(
+    request: Request,
+    kpi_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Delete a KPI (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.delete_goal_response(request, auth, db, kpi_id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feedback (Shared Building Block)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/feedback", response_class=HTMLResponse)
+def pms_list_feedback_requests(
+    request: Request,
+    appraisal_id: str | None = None,
+    feedback_type: str | None = None,
+    submitted: str | None = None,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Feedback requests list page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.list_feedback_response(
+        request, auth, db, appraisal_id, feedback_type, submitted, page
+    )
+
+
+@router.get("/feedback/request", response_class=HTMLResponse)
+def pms_request_feedback_form(
+    request: Request,
+    appraisal_id: str = Query(...),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Request feedback form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.request_feedback_form_response(
+        request, auth, db, appraisal_id
+    )
+
+
+@router.post("/feedback/request", response_class=HTMLResponse)
+async def pms_create_feedback_request(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Create feedback request (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.create_feedback_request_response(request, auth, db)
+
+
+@router.get("/feedback/{feedback_id}", response_class=HTMLResponse)
+def pms_feedback_detail(
+    request: Request,
+    feedback_id: str,
+    success: str | None = None,
+    error: str | None = None,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Feedback detail page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.feedback_detail_response(
+        request, auth, db, feedback_id, success, error
+    )
+
+
+@router.get("/feedback/{feedback_id}/submit", response_class=HTMLResponse)
+def pms_submit_feedback_form(
+    request: Request,
+    feedback_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Submit feedback form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.submit_feedback_form_response(
+        request, auth, db, feedback_id
+    )
+
+
+@router.post("/feedback/{feedback_id}/submit", response_class=HTMLResponse)
+async def pms_submit_feedback(
+    request: Request,
+    feedback_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Submit feedback (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.submit_feedback_response(
+        request, auth, db, feedback_id
+    )
+
+
+@router.post("/feedback/{feedback_id}/delete")
+def pms_delete_feedback(
+    request: Request,
+    feedback_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Delete a feedback request (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.delete_feedback_response(request, auth, db, feedback_id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Templates (Government Mode Access)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/templates", response_class=HTMLResponse)
+def pms_list_templates(
+    request: Request,
+    search: str | None = None,
+    is_active: str | None = None,
+    department_id: str | None = None,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Appraisal templates list page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.list_templates_response(
+        request,
+        auth,
+        db,
+        search=search,
+        is_active=is_active,
+        department_id=department_id,
+        page=page,
+    )
+
+
+@router.get("/templates/new", response_class=HTMLResponse)
+def pms_new_template_form(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """New appraisal template form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.template_new_form_response(request, auth, db)
+
+
+@router.post("/templates/new", response_class=HTMLResponse)
+async def pms_create_template(
+    request: Request,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Create a new appraisal template (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.create_template_response(request, auth, db)
+
+
+@router.get("/templates/{template_id}", response_class=HTMLResponse)
+def pms_template_detail(
+    request: Request,
+    template_id: str,
+    success: str | None = None,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Appraisal template detail page (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.template_detail_response(
+        request,
+        auth,
+        db,
+        template_id,
+        success=success,
+    )
+
+
+@router.get("/templates/{template_id}/edit", response_class=HTMLResponse)
+def pms_edit_template_form(
+    request: Request,
+    template_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Edit appraisal template form (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.template_edit_form_response(
+        request, auth, db, template_id
+    )
+
+
+@router.post("/templates/{template_id}/edit", response_class=HTMLResponse)
+async def pms_update_template(
+    request: Request,
+    template_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Update an appraisal template (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return await perf_web_service.update_template_response(
+        request, auth, db, template_id
+    )
+
+
+@router.post("/templates/{template_id}/toggle-active")
+def pms_toggle_template_active(
+    template_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Toggle template active status (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.toggle_template_active_response(auth, db, template_id)
+
+
+@router.post("/templates/{template_id}/delete")
+def pms_delete_template(
+    template_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Delete a template (PMS mode)."""
+    from app.services.people.perf.web import perf_web_service
+
+    return perf_web_service.delete_template_response(auth, db, template_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

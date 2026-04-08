@@ -57,7 +57,7 @@
             or (not form_data and _pms_cfg)
         ) %}
         <div class="card"
-             x-show="performanceGovernmentEnabled && ['PMS','BOTH'].includes(templateProfile)"
+             x-show="performanceGovernmentEnabled"
              x-cloak>
             <div class="card-header">
                 <h3 class="font-medium text-slate-900 dark:text-white">PMS-Specific Settings</h3>
@@ -66,12 +66,14 @@
             <div class="card-body space-y-4">
                 <div class="flex items-center gap-3">
                     <input type="checkbox" id="pms_config_enabled" x-model="pmsConfigEnabled"
+                           @change="if (pmsConfigEnabled && templateProfile === 'PRIVATE') { templateProfile = 'BOTH'; }"
                            class="rounded border-slate-300 text-violet-600 focus:ring-violet-500">
                     <input type="hidden" name="pms_config_enabled" :value="pmsConfigEnabled ? 'true' : 'false'">
                     <label for="pms_config_enabled" class="text-sm text-slate-700 dark:text-slate-300">
                         Enable PMS-specific template details
                     </label>
                 </div>
+                <p class="text-xs text-slate-500">If enabled, Template Profile will switch to Both if it was Private.</p>
 
                 <div x-show="pmsConfigEnabled" x-cloak class="space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

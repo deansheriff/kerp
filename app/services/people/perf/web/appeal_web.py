@@ -8,6 +8,7 @@ AppraisalAppeal records.
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models.people.perf.pms_enums import AppealDecision, AppealStatus
 from app.services.common import PaginationParams, coerce_uuid
+from app.services.people.perf.performance_policy import get_policy_profile
 from app.services.people.perf.appeal_service import (
     AppealNotFoundError,
     AppealValidationError,
@@ -31,11 +33,51 @@ logger = logging.getLogger(__name__)
 class AppealWebService:
     """Web service for appraisal appeal list, detail, and create views."""
 
+    _deadline_warning_days = 7
+
     @staticmethod
     def _form_text(value: object | None, default: str = "") -> str:
         if isinstance(value, str):
             return value.strip()
         return default
+
+    def _appeal_resolution_deadline(self, appeal: object) -> date | None:
+        policy = get_policy_profile("GOVERNMENT_PMS")
+        cycle_year: int | None = None
+        appraisal = getattr(appeal, "appraisal", None)
+        cycle = getattr(appraisal, "cycle", None) if appraisal is not None else None
+        end_date = getattr(cycle, "end_date", None) if cycle is not None else None
+        if end_date is not None:
+            cycle_year = end_date.year
+        filed_date = getattr(appeal, "filed_date", None)
+        if cycle_year is None and filed_date is not None:
+            cycle_year = filed_date.year
+        if cycle_year is None:
+            return None
+        return date(
+            cycle_year,
+            policy.resolution_deadline_month,
+            policy.resolution_deadline_day,
+        )
+
+    def _deadline_meta(self, deadline: date | None, resolved: bool) -> dict[str, object] | None:
+        if deadline is None:
+            return None
+        today = date.today()
+        days_remaining = (deadline - today).days
+        if resolved:
+            state = "resolved"
+        elif days_remaining < 0:
+            state = "overdue"
+        elif days_remaining <= self._deadline_warning_days:
+            state = "approaching"
+        else:
+            state = "on_track"
+        return {
+            "date": deadline,
+            "days_remaining": days_remaining,
+            "state": state,
+        }
 
     def list_appeals_response(
         self,
@@ -67,6 +109,13 @@ class AppealWebService:
 
         context = base_context(request, auth, "Appraisal Appeals", "pms-appeals", db=db)
         context["request"] = request
+        deadline_map = {
+            str(appeal.appeal_id): self._deadline_meta(
+                self._appeal_resolution_deadline(appeal),
+                resolved=appeal.status in (AppealStatus.RESOLVED, AppealStatus.DISMISSED),
+            )
+            for appeal in result.items
+        }
         context.update(
             {
                 "appeals": result.items,
@@ -78,6 +127,7 @@ class AppealWebService:
                 "total": result.total,
                 "has_prev": result.has_prev,
                 "has_next": result.has_next,
+                "deadline_map": deadline_map,
             }
         )
         return templates.TemplateResponse(
@@ -123,11 +173,27 @@ class AppealWebService:
         )
         context["request"] = request
         success = request.query_params.get("saved")
+        error = request.query_params.get("error")
+
+        from app.services.people.hr import EmployeeFilters
+        from app.services.people.hr.employees import EmployeeService
+
+        emp_svc = EmployeeService(db, org_id)
+        mediators = emp_svc.list_employees(
+            EmployeeFilters(is_active=True), PaginationParams(limit=500)
+        ).items
         context.update(
             {
                 "appeal": appeal,
                 "success": success,
+                "error": error,
+                "mediators": mediators,
                 "AppealStatus": AppealStatus,
+                "AppealDecision": AppealDecision,
+                "deadline_meta": self._deadline_meta(
+                    self._appeal_resolution_deadline(appeal),
+                    resolved=appeal.status in (AppealStatus.RESOLVED, AppealStatus.DISMISSED),
+                ),
             }
         )
         return templates.TemplateResponse(

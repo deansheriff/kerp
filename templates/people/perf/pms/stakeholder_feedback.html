@@ -12,6 +12,32 @@
 
 {% block content %}
 <div id="results-container" class="space-y-4">
+    <div class="card p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Stakeholder Feedback Workflow</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Capture feedback from SERVICOM, citizens, and other stakeholders, then monitor whether each item still needs action or has been closed.</p>
+            </div>
+            <div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 px-4 py-3 text-right">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Feedback Items</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{{ total }}</p>
+            </div>
+        </div>
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Step 1</p>
+                <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">Capture feedback</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Step 2</p>
+                <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">Review status and source</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Step 3</p>
+                <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">Follow up to closure</p>
+            </div>
+        </div>
+    </div>
     <div class="card">
         <div class="table-container">
             <table class="table">
@@ -20,6 +46,7 @@
                         <th scope="col">Title</th>
                         <th scope="col" class="hidden md:table-cell">Source</th>
                         <th scope="col" class="hidden md:table-cell">Channel</th>
+                        <th scope="col" class="hidden lg:table-cell">What It Means</th>
                         <th scope="col" class="text-center">Status</th>
                     </tr>
                 </thead>
@@ -29,11 +56,20 @@
                         <td class="text-sm font-medium text-slate-900 dark:text-white">{{ record.title }}</td>
                         <td class="hidden md:table-cell text-sm text-slate-600 dark:text-slate-400">{{ record.source_type | replace('_', ' ') | title }}</td>
                         <td class="hidden md:table-cell text-sm text-slate-600 dark:text-slate-400">{{ record.channel | replace('_', ' ') | title }}</td>
+                        <td class="hidden lg:table-cell text-sm text-slate-600 dark:text-slate-400">
+                            {% if record.status == 'CLOSED' %}
+                            Feedback item closed
+                            {% elif record.status == 'IN_REVIEW' %}
+                            Under review by the assigned team
+                            {% else %}
+                            Awaiting follow-up or action
+                            {% endif %}
+                        </td>
                         <td class="text-center">{{ status_badge(record.status, "sm") }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4">
+                        <td colspan="5">
                             {{ empty_state(
                                 title="No feedback",
                                 description="No stakeholder feedback has been captured.",

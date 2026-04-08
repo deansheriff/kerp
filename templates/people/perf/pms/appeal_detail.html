@@ -27,12 +27,36 @@
     <div class="card p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
         <div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
             {{ icon_svg("check-circle", "w-5 h-5") }}
-            <span class="text-sm font-medium">Appeal filed successfully.</span>
+            <span class="text-sm font-medium">Appeal updated successfully.</span>
         </div>
     </div>
     {% endif %}
 
     {% if appeal %}
+    {% if deadline_meta %}
+    <div class="card p-4 border
+        {% if deadline_meta.state == 'overdue' %}bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800
+        {% elif deadline_meta.state == 'approaching' %}bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800
+        {% elif deadline_meta.state == 'resolved' %}bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800
+        {% else %}bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700{% endif %}">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Resolution Deadline</p>
+                <p class="mt-1 text-sm font-medium text-slate-900 dark:text-white">{{ deadline_meta.date.strftime('%d %b %Y') }}</p>
+            </div>
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium
+                {% if deadline_meta.state == 'overdue' %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300
+                {% elif deadline_meta.state == 'approaching' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300
+                {% elif deadline_meta.state == 'resolved' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300
+                {% else %}bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200{% endif %}">
+                {% if deadline_meta.state == 'overdue' %}Overdue by {{ deadline_meta.days_remaining | abs }} day{% if deadline_meta.days_remaining | abs != 1 %}s{% endif %}
+                {% elif deadline_meta.state == 'approaching' %}Due in {{ deadline_meta.days_remaining }} day{% if deadline_meta.days_remaining != 1 %}s{% endif %}
+                {% elif deadline_meta.state == 'resolved' %}Decision completed
+                {% else %}{{ deadline_meta.days_remaining }} day{% if deadline_meta.days_remaining != 1 %}s{% endif %} remaining{% endif %}
+            </span>
+        </div>
+    </div>
+    {% endif %}
 
     {# Workflow Stepper #}
     <div class="card p-6">
@@ -113,6 +137,100 @@
             {% endif %}
         </div>
     </div>
+
+    {% set appeal_status = appeal.status.value if appeal.status else '' %}
+
+    {% if appeal_status in ['FILED', 'UNDER_MEDIATION', 'REFERRED_TO_COMMITTEE', 'RESOLVED'] %}
+    <div class="card p-6">
+        <div class="flex items-start justify-between gap-4 mb-5">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Workflow Actions</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Only the action for the current appeal stage is shown below.</p>
+            </div>
+            <div>{{ status_badge(appeal_status, 'sm') }}</div>
+        </div>
+
+        {% if appeal_status == 'FILED' %}
+        <div class="mb-5 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4">
+            <p class="text-sm text-slate-600 dark:text-slate-300">Expected actor: <span class="font-medium text-slate-900 dark:text-white">HR / case coordinator</span>. Next handoff: <span class="font-medium text-slate-900 dark:text-white">Assigned mediator</span>.</p>
+        </div>
+        <form method="POST" action="/people/perf/pms/appeals/{{ appeal.appeal_id }}/assign-mediator" class="space-y-4">
+            {{ request.state.csrf_form | safe }}
+            <div>
+                <label for="mediator_id" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assign Mediator</label>
+                <select id="mediator_id" name="mediator_id" class="form-input" required>
+                    <option value="">Select mediator</option>
+                    {% for mediator in mediators %}
+                    <option value="{{ mediator.employee_id }}">
+                        {% if mediator.person %}
+                            {{ mediator.person.first_name }} {{ mediator.person.last_name }}
+                        {% else %}
+                            {{ mediator.employee_number or mediator.employee_id }}
+                        {% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">This moves the appeal into mediation.</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Assign Mediator</button>
+        </form>
+        {% elif appeal_status == 'UNDER_MEDIATION' %}
+        <div class="mb-5 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4">
+            <p class="text-sm text-slate-600 dark:text-slate-300">Expected actor: <span class="font-medium text-slate-900 dark:text-white">Mediator</span>. Next handoff: <span class="font-medium text-slate-900 dark:text-white">Resolved decision or committee referral</span>.</p>
+        </div>
+        <form method="POST" action="/people/perf/pms/appeals/{{ appeal.appeal_id }}/mediation-outcome" class="space-y-4">
+            {{ request.state.csrf_form | safe }}
+            <div>
+                <label for="outcome" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Mediation Outcome</label>
+                <textarea id="outcome" name="outcome" rows="4" class="form-input" required placeholder="Record the mediation summary and outcome."></textarea>
+            </div>
+            <div>
+                <label for="resolved" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Outcome Status</label>
+                <select id="resolved" name="resolved" class="form-input" required>
+                    <option value="true">Resolved at mediation</option>
+                    <option value="false">Refer to committee</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Record Mediation Outcome</button>
+        </form>
+        {% elif appeal_status == 'REFERRED_TO_COMMITTEE' %}
+        <div class="mb-5 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4">
+            <p class="text-sm text-slate-600 dark:text-slate-300">Expected actor: <span class="font-medium text-slate-900 dark:text-white">Committee</span>. Next handoff: <span class="font-medium text-slate-900 dark:text-white">Final communication to employee</span>.</p>
+        </div>
+        <form method="POST" action="/people/perf/pms/appeals/{{ appeal.appeal_id }}/committee-decision" class="space-y-4">
+            {{ request.state.csrf_form | safe }}
+            <div>
+                <label for="decision" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Committee Decision</label>
+                <select id="decision" name="decision" class="form-input" required>
+                    {% for decision in AppealDecision %}
+                    <option value="{{ decision.value }}">{{ decision.value | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="adjusted_rating" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Adjusted Rating</label>
+                <input id="adjusted_rating" name="adjusted_rating" type="number" min="1" max="5" class="form-input" placeholder="Required when appeal is upheld or partially upheld">
+            </div>
+            <div>
+                <label for="notes" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Committee Notes</label>
+                <textarea id="notes" name="notes" rows="4" class="form-input" required placeholder="Record the committee decision notes."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Record Committee Decision</button>
+        </form>
+        {% elif appeal_status == 'RESOLVED' and not appeal.communicated_date %}
+        <div class="mb-5 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4">
+            <p class="text-sm text-slate-600 dark:text-slate-300">Expected actor: <span class="font-medium text-slate-900 dark:text-white">HR / case coordinator</span>. Next handoff: <span class="font-medium text-slate-900 dark:text-white">Appeal closed</span>.</p>
+        </div>
+        <form method="POST" action="/people/perf/pms/appeals/{{ appeal.appeal_id }}/communicate" class="space-y-4">
+            {{ request.state.csrf_form | safe }}
+            <div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4">
+                <p class="text-sm text-slate-600 dark:text-slate-300">Mark the final appeal decision as communicated to the employee.</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Mark Decision Communicated</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
 
     {# Mediation Section #}
     {% if appeal.mediation_date or appeal.mediator %}

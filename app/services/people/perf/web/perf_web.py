@@ -13,10 +13,13 @@ from urllib.parse import quote_plus
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, joinedload
 from starlette.datastructures import UploadFile
 
 from app.models.people.perf import AppraisalStatus, KPIStatus
+from app.models.people.perf.appraisal import Appraisal
+from app.models.people.perf.pms_enums import CommitteeDecision
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.people.hr import (
@@ -25,6 +28,7 @@ from app.services.people.hr import (
     OrganizationService,
 )
 from app.services.people.perf import PerformanceService
+from app.services.people.perf.ohcsf_appraisal_service import OHCSFAppraisalService
 from app.services.people.perf.pip_service import PIPService
 from app.services.people.perf.performance_mode_policy import enforce_private_write_mode
 from app.templates import templates
@@ -96,6 +100,399 @@ class PerfWebService:
     # ─────────────────────────────────────────────────────────────────────────
     # Appraisals
     # ─────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _pms_queue_config(queue: str) -> dict[str, object] | None:
+        if queue == "self-assessment":
+            return {
+                "title": "My Self-Assessments",
+                "description": "Draft and in-progress appraisals awaiting employee self-assessment.",
+                "statuses": [AppraisalStatus.DRAFT, AppraisalStatus.SELF_ASSESSMENT],
+                "current_stage": "Self-Assessment",
+                "next_stage": "Manager Review",
+            }
+        if queue == "manager-review":
+            return {
+                "title": "Manager Review Queue",
+                "description": "Appraisals awaiting manager review after employee self-assessment.",
+                "statuses": [AppraisalStatus.PENDING_REVIEW, AppraisalStatus.UNDER_REVIEW],
+                "current_stage": "Manager Review",
+                "next_stage": "Countersign",
+            }
+        if queue == "countersign":
+            return {
+                "title": "Countersign Queue",
+                "description": "Appraisals awaiting countersign endorsement before committee review.",
+                "statuses": [AppraisalStatus.PENDING_COUNTERSIGN],
+                "current_stage": "Countersign",
+                "next_stage": "Committee Review",
+            }
+        if queue == "committee":
+            return {
+                "title": "Committee Queue",
+                "description": "Countersigned appraisals awaiting committee review and cycle completion.",
+                "statuses": [AppraisalStatus.COUNTERSIGNED, AppraisalStatus.PENDING_COMMITTEE],
+                "current_stage": "Committee Review",
+                "next_stage": "Cycle Completion",
+            }
+        return None
+
+    def pms_appraisal_queue_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        queue: str,
+        page: int = 1,
+    ) -> HTMLResponse:
+        org_id = coerce_uuid(auth.organization_id)
+        config = self._pms_queue_config(queue)
+        if config is None:
+            context = base_context(request, auth, "Queue Not Found", "pms-reviews", db=db)
+            context["request"] = request
+            context.update({"appraisals": [], "error": "Invalid appraisal queue"})
+            return templates.TemplateResponse(
+                request, "people/perf/pms/appraisal_queue.html", context, status_code=404
+            )
+
+        pagination = PaginationParams.from_page(page, per_page=20)
+        statuses = config["statuses"]
+        query = (
+            select(Appraisal)
+            .where(
+                Appraisal.organization_id == org_id,
+                Appraisal.status.in_(statuses),
+            )
+            .options(
+                joinedload(Appraisal.employee),
+                joinedload(Appraisal.manager),
+                joinedload(Appraisal.cycle),
+            )
+            .order_by(Appraisal.created_at.desc())
+        )
+        total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+        items = list(
+            db.scalars(query.offset(pagination.offset).limit(pagination.limit)).unique().all()
+        )
+        total_pages = max(1, (total + pagination.limit - 1) // pagination.limit) if pagination.limit else 1
+
+        context = base_context(request, auth, str(config["title"]), "pms-reviews", db=db)
+        context["request"] = request
+        context.update(
+            {
+                "queue_type": queue,
+                "queue_title": config["title"],
+                "queue_description": config["description"],
+                "current_stage": config["current_stage"],
+                "next_stage": config["next_stage"],
+                "appraisals": items,
+                "page": page,
+                "total_pages": total_pages,
+                "total": total,
+                "has_prev": page > 1,
+                "has_next": page < total_pages,
+            }
+        )
+        return templates.TemplateResponse(
+            request, "people/perf/pms/appraisal_queue.html", context
+        )
+
+    def pms_self_assessment_queue_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        page: int = 1,
+    ) -> HTMLResponse:
+        org_id = coerce_uuid(auth.organization_id)
+        config = self._pms_queue_config("self-assessment")
+        assert config is not None
+
+        pagination = PaginationParams.from_page(page, per_page=20)
+        query = (
+            select(Appraisal)
+            .where(
+                Appraisal.organization_id == org_id,
+                Appraisal.status.in_(config["statuses"]),
+            )
+            .options(
+                joinedload(Appraisal.employee),
+                joinedload(Appraisal.manager),
+                joinedload(Appraisal.cycle),
+            )
+            .order_by(Appraisal.created_at.desc())
+        )
+        total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+        items = list(
+            db.scalars(query.offset(pagination.offset).limit(pagination.limit))
+            .unique()
+            .all()
+        )
+        total_pages = (
+            max(1, (total + pagination.limit - 1) // pagination.limit)
+            if pagination.limit
+            else 1
+        )
+
+        context = base_context(request, auth, str(config["title"]), "pms-reviews", db=db)
+        context["request"] = request
+        context.update(
+            {
+                "queue_title": config["title"],
+                "queue_description": config["description"],
+                "current_stage": config["current_stage"],
+                "next_stage": config["next_stage"],
+                "appraisals": items,
+                "page": page,
+                "total_pages": total_pages,
+                "total": total,
+                "has_prev": page > 1,
+                "has_next": page < total_pages,
+                "success": request.query_params.get("success"),
+                "error": request.query_params.get("error"),
+            }
+        )
+        return templates.TemplateResponse(
+            request, "people/perf/pms/self_assessment_queue.html", context
+        )
+
+    def pms_manager_review_queue_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        page: int = 1,
+    ) -> HTMLResponse:
+        org_id = coerce_uuid(auth.organization_id)
+        config = self._pms_queue_config("manager-review")
+        assert config is not None
+
+        pagination = PaginationParams.from_page(page, per_page=20)
+        query = (
+            select(Appraisal)
+            .where(
+                Appraisal.organization_id == org_id,
+                Appraisal.status.in_(config["statuses"]),
+            )
+            .options(
+                joinedload(Appraisal.employee),
+                joinedload(Appraisal.manager),
+                joinedload(Appraisal.cycle),
+            )
+            .order_by(Appraisal.created_at.desc())
+        )
+        total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+        items = list(
+            db.scalars(query.offset(pagination.offset).limit(pagination.limit))
+            .unique()
+            .all()
+        )
+        total_pages = (
+            max(1, (total + pagination.limit - 1) // pagination.limit)
+            if pagination.limit
+            else 1
+        )
+
+        context = base_context(request, auth, str(config["title"]), "pms-reviews", db=db)
+        context["request"] = request
+        context.update(
+            {
+                "queue_title": config["title"],
+                "queue_description": config["description"],
+                "current_stage": config["current_stage"],
+                "next_stage": config["next_stage"],
+                "appraisals": items,
+                "page": page,
+                "total_pages": total_pages,
+                "total": total,
+                "has_prev": page > 1,
+                "has_next": page < total_pages,
+                "success": request.query_params.get("success"),
+                "error": request.query_params.get("error"),
+            }
+        )
+        return templates.TemplateResponse(
+            request, "people/perf/pms/manager_review_queue.html", context
+        )
+
+    def pms_quarterly_reviews_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        page: int = 1,
+    ) -> HTMLResponse:
+        org_id = coerce_uuid(auth.organization_id)
+        statuses = [
+            AppraisalStatus.DRAFT,
+            AppraisalStatus.SELF_ASSESSMENT,
+            AppraisalStatus.PENDING_REVIEW,
+            AppraisalStatus.UNDER_REVIEW,
+        ]
+        pagination = PaginationParams.from_page(page, per_page=20)
+        query = (
+            select(Appraisal)
+            .where(
+                Appraisal.organization_id == org_id,
+                Appraisal.status.in_(statuses),
+            )
+            .options(
+                joinedload(Appraisal.employee),
+                joinedload(Appraisal.manager),
+                joinedload(Appraisal.cycle),
+            )
+            .order_by(Appraisal.created_at.desc())
+        )
+        total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+        items = list(
+            db.scalars(query.offset(pagination.offset).limit(pagination.limit))
+            .unique()
+            .all()
+        )
+        total_pages = (
+            max(1, (total + pagination.limit - 1) // pagination.limit)
+            if pagination.limit
+            else 1
+        )
+        status_counts = {status.value: 0 for status in statuses}
+        for item in items:
+            if item.status:
+                status_counts[item.status.value] = status_counts.get(item.status.value, 0) + 1
+
+        context = base_context(request, auth, "Quarterly Reviews", "pms-reviews", db=db)
+        context["request"] = request
+        context.update(
+            {
+                "appraisals": items,
+                "page": page,
+                "total_pages": total_pages,
+                "total": total,
+                "has_prev": page > 1,
+                "has_next": page < total_pages,
+                "status_counts": status_counts,
+                "success": request.query_params.get("success"),
+            }
+        )
+        return templates.TemplateResponse(
+            request, "people/perf/pms/quarterly_reviews.html", context
+        )
+
+    def pms_appraisal_detail_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> HTMLResponse:
+        org_id = coerce_uuid(auth.organization_id)
+        svc = PerformanceService(db)
+        try:
+            appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
+        except Exception as exc:
+            context = base_context(request, auth, "Appraisal Not Found", "pms-reviews", db=db)
+            context["request"] = request
+            context.update({"appraisal": None, "error": str(exc)})
+            return templates.TemplateResponse(
+                request, "people/perf/pms/appraisal_detail.html", context, status_code=404
+            )
+
+        queue = request.query_params.get("queue", "").strip().lower()
+        config = self._pms_queue_config(queue)
+        context = base_context(request, auth, "Appraisal Review", "pms-reviews", db=db)
+        context["request"] = request
+        context.update(
+            {
+                "appraisal": appraisal,
+                "queue_type": queue,
+                "queue_title": config["title"] if config else "Review Queue",
+                "current_stage_label": config["current_stage"] if config else "Review",
+                "next_stage_label": config["next_stage"] if config else "Next Stage",
+                "success": request.query_params.get("saved"),
+                "error": request.query_params.get("error"),
+                "CommitteeDecision": CommitteeDecision,
+            }
+        )
+        return templates.TemplateResponse(
+            request, "people/perf/pms/appraisal_detail.html", context
+        )
+
+    async def pms_countersign_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> RedirectResponse:
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        employee_id = coerce_uuid(auth.employee_id)
+        queue = str(form_data.get("queue", "")).strip() or "countersign"
+        if employee_id is None:
+            return RedirectResponse(
+                url=f"/people/perf/pms/appraisals/{appraisal_id}?queue={queue}&error=Current+user+is+not+linked+to+an+employee+profile",
+                status_code=303,
+            )
+        comments = _get_form_str(form_data, "comments") or None
+        try:
+            svc = OHCSFAppraisalService(db)
+            svc.submit_countersign(
+                org_id,
+                coerce_uuid(appraisal_id),
+                counter_signer_id=employee_id,
+                comments=comments,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appraisals/{appraisal_id}?queue={queue}&saved=1",
+                status_code=303,
+            )
+        except Exception as exc:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appraisals/{appraisal_id}?queue={queue}&error={quote_plus(str(exc))}",
+                status_code=303,
+            )
+
+    async def pms_committee_review_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> RedirectResponse:
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        queue = str(form_data.get("queue", "")).strip() or "committee"
+        decision_str = _get_form_str(form_data, "decision")
+        notes = _get_form_str(form_data, "notes") or None
+        adjusted_rating = parse_int(_get_form_str(form_data, "adjusted_rating") or None)
+        try:
+            decision = CommitteeDecision(decision_str)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/people/perf/pms/appraisals/{appraisal_id}?queue={queue}&error=Invalid+committee+decision",
+                status_code=303,
+            )
+        try:
+            svc = OHCSFAppraisalService(db)
+            svc.submit_committee_review(
+                org_id,
+                coerce_uuid(appraisal_id),
+                decision=decision,
+                notes=notes,
+                adjusted_rating=adjusted_rating,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appraisals/{appraisal_id}?queue={queue}&saved=1",
+                status_code=303,
+            )
+        except Exception as exc:
+            db.rollback()
+            return RedirectResponse(
+                url=f"/people/perf/pms/appraisals/{appraisal_id}?queue={queue}&error={quote_plus(str(exc))}",
+                status_code=303,
+            )
 
     def list_appraisals_response(
         self,
@@ -496,6 +893,66 @@ class PerfWebService:
             url=f"/people/perf/appraisals/{appraisal_id}?saved=1", status_code=303
         )
 
+    def pms_start_self_assessment_response(
+        self,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> RedirectResponse:
+        """Start self-assessment phase for PMS queue."""
+        org_id = coerce_uuid(auth.organization_id)
+        svc = PerformanceService(db)
+
+        try:
+            svc.update_appraisal(
+                org_id,
+                coerce_uuid(appraisal_id),
+                status=AppraisalStatus.SELF_ASSESSMENT,
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            return RedirectResponse(
+                url="/people/perf/pms/appraisals/self-assessment?area=reviews&error="
+                + quote_plus(str(exc)),
+                status_code=303,
+            )
+
+        return RedirectResponse(
+            url=f"/people/perf/pms/appraisals/{appraisal_id}/self-assessment?area=reviews",
+            status_code=303,
+        )
+
+    def pms_start_manager_review_response(
+        self,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> RedirectResponse:
+        """Start manager review for PMS queue."""
+        org_id = coerce_uuid(auth.organization_id)
+        svc = PerformanceService(db)
+
+        try:
+            svc.update_appraisal(
+                org_id,
+                coerce_uuid(appraisal_id),
+                status=AppraisalStatus.UNDER_REVIEW,
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            return RedirectResponse(
+                url="/people/perf/pms/appraisals/manager-review?area=reviews&error="
+                + quote_plus(str(exc)),
+                status_code=303,
+            )
+
+        return RedirectResponse(
+            url=f"/people/perf/pms/appraisals/{appraisal_id}/manager-review?area=reviews",
+            status_code=303,
+        )
+
     def self_assessment_form_response(
         self,
         request: Request,
@@ -525,6 +982,38 @@ class PerfWebService:
             request, "people/perf/self_assessment_form.html", context
         )
 
+    def pms_self_assessment_form_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> HTMLResponse | RedirectResponse:
+        """Render PMS self-assessment form."""
+        org_id = coerce_uuid(auth.organization_id)
+        svc = PerformanceService(db)
+
+        try:
+            appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
+        except Exception:
+            return RedirectResponse(
+                url="/people/perf/pms/appraisals/self-assessment?area=reviews",
+                status_code=303,
+            )
+
+        context = base_context(request, auth, "Self Assessment", "pms-reviews", db=db)
+        context["request"] = request
+        context.update(
+            {
+                "appraisal": appraisal,
+                "form_data": {},
+                "error": None,
+            }
+        )
+        return templates.TemplateResponse(
+            request, "people/perf/self_assessment_form.html", context
+        )
+
     async def submit_self_assessment_response(
         self,
         request: Request,
@@ -538,14 +1027,20 @@ class PerfWebService:
         svc = PerformanceService(db)
 
         try:
-            self_rating = parse_int(_get_form_str(form_data, "self_rating") or None)
+            self_rating = parse_int(
+                _get_form_str(form_data, "self_overall_rating")
+                or _get_form_str(form_data, "self_rating")
+                or None
+            )
             if self_rating is None:
                 raise ValueError("Self rating is required")
             svc.submit_self_assessment(
                 org_id,
                 coerce_uuid(appraisal_id),
                 self_overall_rating=self_rating,
-                self_summary=_get_form_str(form_data, "self_comments") or None,
+                self_summary=_get_form_str(form_data, "self_summary")
+                or _get_form_str(form_data, "self_comments")
+                or None,
                 achievements=_get_form_str(form_data, "achievements") or None,
                 challenges=_get_form_str(form_data, "challenges") or None,
                 development_needs=_get_form_str(form_data, "development_needs") or None,
@@ -559,6 +1054,58 @@ class PerfWebService:
             db.rollback()
             appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
             context = base_context(request, auth, "Self Assessment", "perf", db=db)
+            context["request"] = request
+            context.update(
+                {
+                    "appraisal": appraisal,
+                    "form_data": dict(form_data),
+                    "error": str(e),
+                }
+            )
+            return templates.TemplateResponse(
+                request, "people/perf/self_assessment_form.html", context
+            )
+
+    async def pms_submit_self_assessment_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> HTMLResponse | RedirectResponse:
+        """Handle PMS self-assessment submission."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        svc = PerformanceService(db)
+
+        try:
+            self_rating = parse_int(
+                _get_form_str(form_data, "self_overall_rating")
+                or _get_form_str(form_data, "self_rating")
+                or None
+            )
+            if self_rating is None:
+                raise ValueError("Self rating is required")
+            svc.submit_self_assessment(
+                org_id,
+                coerce_uuid(appraisal_id),
+                self_overall_rating=self_rating,
+                self_summary=_get_form_str(form_data, "self_summary")
+                or _get_form_str(form_data, "self_comments")
+                or None,
+                achievements=_get_form_str(form_data, "achievements") or None,
+                challenges=_get_form_str(form_data, "challenges") or None,
+                development_needs=_get_form_str(form_data, "development_needs") or None,
+            )
+            db.commit()
+            return RedirectResponse(
+                url="/people/perf/pms/appraisals/self-assessment?area=reviews&success=Self+assessment+submitted",
+                status_code=303,
+            )
+        except Exception as e:
+            db.rollback()
+            appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
+            context = base_context(request, auth, "Self Assessment", "pms-reviews", db=db)
             context["request"] = request
             context.update(
                 {
@@ -600,6 +1147,38 @@ class PerfWebService:
             request, "people/perf/manager_review_form.html", context
         )
 
+    def pms_manager_review_form_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> HTMLResponse | RedirectResponse:
+        """Render PMS manager review form."""
+        org_id = coerce_uuid(auth.organization_id)
+        svc = PerformanceService(db)
+
+        try:
+            appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
+        except Exception:
+            return RedirectResponse(
+                url="/people/perf/pms/appraisals/manager-review?area=reviews",
+                status_code=303,
+            )
+
+        context = base_context(request, auth, "Manager Review", "pms-reviews", db=db)
+        context["request"] = request
+        context.update(
+            {
+                "appraisal": appraisal,
+                "form_data": {},
+                "error": None,
+            }
+        )
+        return templates.TemplateResponse(
+            request, "people/perf/manager_review_form.html", context
+        )
+
     async def submit_manager_review_response(
         self,
         request: Request,
@@ -614,12 +1193,18 @@ class PerfWebService:
 
         try:
             manager_rating = parse_int(
-                _get_form_str(form_data, "manager_rating") or None
+                _get_form_str(form_data, "manager_overall_rating")
+                or _get_form_str(form_data, "manager_rating")
+                or None
             )
             if manager_rating is None:
                 raise ValueError("Manager rating is required")
 
-            manager_summary = _get_form_str(form_data, "manager_comments") or None
+            manager_summary = (
+                _get_form_str(form_data, "manager_summary")
+                or _get_form_str(form_data, "manager_comments")
+                or None
+            )
             strengths = _get_form_str(form_data, "strengths") or None
             areas_for_improvement = (
                 _get_form_str(form_data, "areas_for_improvement") or None
@@ -645,7 +1230,8 @@ class PerfWebService:
                 coerce_uuid(appraisal_id),
                 manager_overall_rating=manager_rating,
                 manager_summary=manager_summary,
-                manager_recommendations=_get_form_str(form_data, "recommendations")
+                manager_recommendations=_get_form_str(form_data, "manager_recommendations")
+                or _get_form_str(form_data, "recommendations")
                 or None,
             )
             db.commit()
@@ -657,6 +1243,82 @@ class PerfWebService:
             db.rollback()
             appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
             context = base_context(request, auth, "Manager Review", "perf", db=db)
+            context["request"] = request
+            context.update(
+                {
+                    "appraisal": appraisal,
+                    "form_data": dict(form_data),
+                    "error": str(e),
+                }
+            )
+            return templates.TemplateResponse(
+                request, "people/perf/manager_review_form.html", context
+            )
+
+    async def pms_submit_manager_review_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        appraisal_id: str,
+    ) -> HTMLResponse | RedirectResponse:
+        """Handle PMS manager review submission."""
+        form_data = await request.form()
+        org_id = coerce_uuid(auth.organization_id)
+        svc = PerformanceService(db)
+
+        try:
+            manager_rating = parse_int(
+                _get_form_str(form_data, "manager_overall_rating")
+                or _get_form_str(form_data, "manager_rating")
+                or None
+            )
+            if manager_rating is None:
+                raise ValueError("Manager rating is required")
+
+            manager_summary = (
+                _get_form_str(form_data, "manager_summary")
+                or _get_form_str(form_data, "manager_comments")
+                or None
+            )
+            strengths = _get_form_str(form_data, "strengths") or None
+            areas_for_improvement = (
+                _get_form_str(form_data, "areas_for_improvement") or None
+            )
+
+            if strengths or areas_for_improvement:
+                extra_parts = []
+                if strengths:
+                    extra_parts.append(f"Strengths: {strengths}")
+                if areas_for_improvement:
+                    extra_parts.append(
+                        f"Areas for improvement: {areas_for_improvement}"
+                    )
+                extra_text = "\n".join(extra_parts)
+                manager_summary = (
+                    f"{manager_summary}\n\n{extra_text}"
+                    if manager_summary
+                    else extra_text
+                )
+
+            svc.submit_manager_review(
+                org_id,
+                coerce_uuid(appraisal_id),
+                manager_overall_rating=manager_rating,
+                manager_summary=manager_summary,
+                manager_recommendations=_get_form_str(form_data, "manager_recommendations")
+                or _get_form_str(form_data, "recommendations")
+                or None,
+            )
+            db.commit()
+            return RedirectResponse(
+                url="/people/perf/pms/appraisals/manager-review?area=reviews&success=Manager+review+submitted",
+                status_code=303,
+            )
+        except Exception as e:
+            db.rollback()
+            appraisal = svc.get_appraisal(org_id, coerce_uuid(appraisal_id))
+            context = base_context(request, auth, "Manager Review", "pms-reviews", db=db)
             context["request"] = request
             context.update(
                 {

@@ -166,6 +166,21 @@ class InstitutionalWebService:
         elif isinstance(criteria_scores, list):
             criteria_list = criteria_scores
 
+        deduped_criteria_list: list[dict] = []
+        seen_criteria: set[str] = set()
+        for entry in criteria_list:
+            if isinstance(entry, dict):
+                criterion_name = str(entry.get("criteria") or "").strip()
+            else:
+                criterion_name = str(entry).strip()
+            key = criterion_name.lower()
+            if key and key in seen_criteria:
+                continue
+            if key:
+                seen_criteria.add(key)
+            deduped_criteria_list.append(entry)
+        criteria_list = deduped_criteria_list
+
         context = base_context(
             request,
             auth,

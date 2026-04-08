@@ -279,9 +279,11 @@
                 {% endif %}
                 {% if saved %}{{ success_banner("Record saved successfully.") }}{% endif %}
                 {% if (active_module | default(""))[:4] == "pms-" %}
+                {% block pms_section_nav %}
                 <div class="mb-4">
                     {% include "people/perf/pms/_pms_section_nav.html" ignore missing %}
                 </div>
+                {% endblock %}
                 {% endif %}
                 {% block content %}{% endblock %}
             </div>

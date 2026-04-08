@@ -5,6 +5,7 @@ PMS Governance Web Service.
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,6 +15,7 @@ from app.services.common import PaginationParams, coerce_uuid
 from app.services.people.hr import EmployeeFilters
 from app.services.people.hr.employees import EmployeeService
 from app.services.people.perf.governance_service import PMSGovernanceService
+from app.services.people.perf.performance_policy import get_policy_profile
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
 
@@ -25,11 +27,57 @@ logger = logging.getLogger(__name__)
 class GovernanceWebService:
     """Web service for governance, grievances, and stakeholder feedback pages."""
 
+    _deadline_warning_days = 7
+
     @staticmethod
     def _text(value: object | None) -> str:
         if isinstance(value, str):
             return value.strip()
         return ""
+
+    def _grievance_resolution_deadline(self, grievance: object) -> date | None:
+        due_date = getattr(grievance, "due_date", None)
+        if due_date is not None:
+            return due_date
+
+        policy = get_policy_profile("GOVERNMENT_PMS")
+        cycle_year: int | None = None
+        appraisal = getattr(grievance, "appraisal", None)
+        cycle = getattr(appraisal, "cycle", None) if appraisal is not None else None
+        end_date = getattr(cycle, "end_date", None) if cycle is not None else None
+        if end_date is not None:
+            cycle_year = end_date.year
+
+        raised_date = getattr(grievance, "raised_date", None)
+        base_year = cycle_year if cycle_year is not None else (
+            raised_date.year if raised_date is not None else None
+        )
+        if base_year is None:
+            return None
+        return date(
+            base_year + 1,
+            policy.resolution_deadline_month,
+            policy.resolution_deadline_day,
+        )
+
+    def _deadline_meta(self, deadline: date | None, resolved: bool) -> dict[str, object] | None:
+        if deadline is None:
+            return None
+        today = date.today()
+        days_remaining = (deadline - today).days
+        if resolved:
+            state = "resolved"
+        elif days_remaining < 0:
+            state = "overdue"
+        elif days_remaining <= self._deadline_warning_days:
+            state = "approaching"
+        else:
+            state = "on_track"
+        return {
+            "date": deadline,
+            "days_remaining": days_remaining,
+            "state": state,
+        }
 
     def governance_dashboard_response(
         self,
@@ -40,9 +88,62 @@ class GovernanceWebService:
         org_id = coerce_uuid(auth.organization_id)
         svc = PMSGovernanceService(db)
         summary = svc.governance_compliance_summary(org_id)
+        from sqlalchemy import select
+
+        from app.models.people.perf.institutional_performance import InstitutionalPerformance
+        from app.models.people.perf.pms_governance import PMSStakeholderFeedback
+
+        inst_records = list(
+            db.scalars(
+                select(InstitutionalPerformance).where(
+                    InstitutionalPerformance.organization_id == org_id
+                )
+            ).all()
+        )
+        workflow_stages = (
+            "DRAFT",
+            "INTERNAL_REVIEW",
+            "CENTRAL_REVIEW",
+            "APPROVED",
+            "RETURNED",
+            "FINAL_SIGNOFF",
+        )
+        stage_counts = {
+            stage: sum(
+                1 for record in inst_records if (record.workflow_stage or "DRAFT") == stage
+            )
+            for stage in workflow_stages
+        }
+        stage_links = {stage: "/people/perf/pms/institutional" for stage in workflow_stages}
+        stage_hints = {
+            "DRAFT": "Records waiting to be prepared and submitted.",
+            "INTERNAL_REVIEW": "Department reviewers and HR should act here.",
+            "CENTRAL_REVIEW": "Central review records awaiting escalation or approval.",
+            "APPROVED": "Approved records waiting for final signoff.",
+            "RETURNED": "Returned records needing correction and resubmission.",
+            "FINAL_SIGNOFF": "Fully signed-off institutional records.",
+        }
+        feedback_open = len(
+            list(
+                db.scalars(
+                    select(PMSStakeholderFeedback.feedback_id).where(
+                        PMSStakeholderFeedback.organization_id == org_id,
+                        PMSStakeholderFeedback.status != "CLOSED",
+                    )
+                ).all()
+            )
+        )
 
         context = base_context(request, auth, "PMS Governance", "pms-governance", db=db)
-        context.update({"summary": summary})
+        context.update(
+            {
+                "summary": summary,
+                "stage_counts": stage_counts,
+                "stage_links": stage_links,
+                "stage_hints": stage_hints,
+                "feedback_open": feedback_open,
+            }
+        )
         return templates.TemplateResponse(
             request,
             "people/perf/pms/governance_dashboard.html",
@@ -69,6 +170,13 @@ class GovernanceWebService:
         employees = emp_svc.list_employees(
             EmployeeFilters(is_active=True), PaginationParams(limit=500)
         ).items
+        deadline_map = {
+            str(record.grievance_id): self._deadline_meta(
+                self._grievance_resolution_deadline(record),
+                resolved=record.status in ("RESOLVED", "ESCALATED"),
+            )
+            for record in result.items
+        }
         context.update(
             {
                 "records": result.items,
@@ -79,6 +187,7 @@ class GovernanceWebService:
                 "total": result.total,
                 "saved": request.query_params.get("saved"),
                 "error": request.query_params.get("error"),
+                "deadline_map": deadline_map,
             }
         )
         return templates.TemplateResponse(

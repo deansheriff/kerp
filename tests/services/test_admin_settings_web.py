@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+from app.models.finance.core_org import PerformanceMode
 from app.services.admin.settings_web import AdminSettingsWebService
 
 
@@ -12,6 +13,7 @@ class TestAdminSettingsWebServiceUpdateOrganization:
         db = MagicMock()
         org = SimpleNamespace(
             pms_ohcsf_enabled=False,
+            performance_mode=PerformanceMode.PRIVATE,
             legal_name="DotMac",
             functional_currency_code="NGN",
             presentation_currency_code="NGN",
@@ -36,6 +38,7 @@ class TestAdminSettingsWebServiceUpdateOrganization:
         assert error is None
         assert org.legal_name == "DotMac ERP"
         assert org.pms_ohcsf_enabled is True
+        assert org.performance_mode == PerformanceMode.GOVERNMENT_PMS
         mock_pms_config.assert_called_once_with(db)
         mock_pms_config.return_value.activate_ohcsf_pms.assert_called_once()
         db.commit.assert_called_once()
@@ -44,6 +47,7 @@ class TestAdminSettingsWebServiceUpdateOrganization:
         db = MagicMock()
         org = SimpleNamespace(
             pms_ohcsf_enabled=True,
+            performance_mode=PerformanceMode.GOVERNMENT_PMS,
             legal_name="DotMac",
             functional_currency_code="NGN",
             presentation_currency_code="NGN",
@@ -66,7 +70,32 @@ class TestAdminSettingsWebServiceUpdateOrganization:
         assert success is True
         assert error is None
         assert org.pms_ohcsf_enabled is False
+        assert org.performance_mode == PerformanceMode.PRIVATE
         mock_pms_config.assert_not_called()
+        db.commit.assert_called_once()
+
+    def test_setting_performance_mode_updates_org(self) -> None:
+        db = MagicMock()
+        org = SimpleNamespace(
+            pms_ohcsf_enabled=False,
+            performance_mode=PerformanceMode.PRIVATE,
+            legal_name="DotMac",
+            functional_currency_code="NGN",
+            presentation_currency_code="NGN",
+        )
+        db.get.return_value = org
+
+        service = AdminSettingsWebService()
+        success, error = service.update_organization(
+            db,
+            uuid4(),
+            {"performance_mode": "HYBRID"},
+        )
+
+        assert success is True
+        assert error is None
+        assert org.performance_mode == PerformanceMode.HYBRID
+        assert org.pms_ohcsf_enabled is True
         db.commit.assert_called_once()
 
 
@@ -74,7 +103,9 @@ class TestAdminSettingsWebServiceFeatures:
     def test_get_features_context_includes_pms_toggle(self) -> None:
         db = MagicMock()
         org_id = uuid4()
-        db.get.return_value = SimpleNamespace(pms_ohcsf_enabled=True)
+        db.get.return_value = SimpleNamespace(
+            pms_ohcsf_enabled=False, performance_mode=PerformanceMode.GOVERNMENT_PMS
+        )
 
         mock_flag = SimpleNamespace(
             flag_key="example_flag",
@@ -104,7 +135,9 @@ class TestAdminSettingsWebServiceFeatures:
     def test_toggle_feature_enables_pms_and_seeds_defaults(self) -> None:
         db = MagicMock()
         org_id = uuid4()
-        org = SimpleNamespace(pms_ohcsf_enabled=False)
+        org = SimpleNamespace(
+            pms_ohcsf_enabled=False, performance_mode=PerformanceMode.PRIVATE
+        )
         db.get.return_value = org
 
         with patch(
@@ -121,6 +154,7 @@ class TestAdminSettingsWebServiceFeatures:
         assert success is True
         assert error is None
         assert org.pms_ohcsf_enabled is True
+        assert org.performance_mode == PerformanceMode.GOVERNMENT_PMS
         mock_pms_config.assert_called_once_with(db)
         mock_pms_config.return_value.activate_ohcsf_pms.assert_called_once_with(org_id)
         db.commit.assert_called_once()

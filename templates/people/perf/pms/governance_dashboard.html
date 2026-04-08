@@ -27,11 +27,64 @@
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-    {{ stats_card("Institutional Records", summary.institutional_records if summary else 0, "chart", "violet") }}
-    {{ stats_card("Overdue Approvals", summary.overdue_approvals if summary else 0, "clock", "amber") }}
-    {{ stats_card("Open Grievances", summary.open_grievances if summary else 0, "warning", "rose") }}
-    {{ stats_card("Overdue Grievances", summary.overdue_grievances if summary else 0, "calendar", "amber") }}
-    {{ stats_card("Escalated to FCSC", summary.escalated_grievances if summary else 0, "exclamation", "slate") }}
+<div class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        {{ stats_card("Institutional Records", summary.institutional_records if summary else 0, "chart", "violet") }}
+        {{ stats_card("Overdue Approvals", summary.overdue_approvals if summary else 0, "clock", "amber") }}
+        {{ stats_card("Open Grievances", summary.open_grievances if summary else 0, "warning", "rose") }}
+        {{ stats_card("Overdue Grievances", summary.overdue_grievances if summary else 0, "calendar", "amber") }}
+        {{ stats_card("Escalated to FCSC", summary.escalated_grievances if summary else 0, "exclamation", "slate") }}
+    </div>
+
+    <div class="card p-6">
+        <div class="flex items-start justify-between gap-4 mb-5">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Governance Workflow Stages</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">See where institutional records currently sit in the approval chain.</p>
+            </div>
+            <a href="/people/perf/pms/institutional" class="btn btn-secondary">Open Institutional Records</a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {% set stage_roles = {
+                'DRAFT': 'Record owner / planning team',
+                'INTERNAL_REVIEW': 'MDA PRS / MDA HRM',
+                'CENTRAL_REVIEW': 'FMFBNP',
+                'APPROVED': 'OHCSF PMD',
+                'RETURNED': 'Originating team for correction',
+                'FINAL_SIGNOFF': 'CDCU OSGF'
+            } %}
+            {% for stage in ['DRAFT', 'INTERNAL_REVIEW', 'CENTRAL_REVIEW', 'APPROVED', 'RETURNED', 'FINAL_SIGNOFF'] %}
+            <a href="{{ stage_links[stage] }}" class="block rounded-lg border border-slate-200 dark:border-slate-700 p-4 hover:border-violet-300 dark:hover:border-violet-700 transition-colors">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ stage | replace('_', ' ') | title }}</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ stage_counts[stage] }}</p>
+                    </div>
+                    <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{{ loop.index }}</span>
+                </div>
+                <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{{ stage_hints[stage] }}</p>
+                <p class="mt-2 text-xs font-medium text-slate-600 dark:text-slate-300">Acts by: {{ stage_roles[stage] }}</p>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <a href="/people/perf/pms/institutional" class="card p-5 hover:border-violet-300 dark:hover:border-violet-700 transition-colors border border-slate-200 dark:border-slate-700">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Institutional Queue</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ summary.institutional_records if summary else 0 }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Open institutional records and continue governance actions.</p>
+        </a>
+        <a href="/people/perf/pms/grievances" class="card p-5 hover:border-violet-300 dark:hover:border-violet-700 transition-colors border border-slate-200 dark:border-slate-700">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Disputes Queue</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ summary.open_grievances if summary else 0 }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Manage open grievances, deadline pressure, and escalations.</p>
+        </a>
+        <a href="/people/perf/pms/stakeholder-feedback" class="card p-5 hover:border-violet-300 dark:hover:border-violet-700 transition-colors border border-slate-200 dark:border-slate-700">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Feedback Queue</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ feedback_open }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Review stakeholder feedback items that still need action or closure.</p>
+        </a>
+    </div>
 </div>
 {% endblock %}

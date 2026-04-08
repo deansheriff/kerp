@@ -1,5 +1,6 @@
 {% extends "people/base_people.html" %}
 {% from "components/macros.html" import icon_svg %}
+{% set cycles_base = cycles_base_url | default("/people/perf/cycles") %}
 
 {% block page_title %}{% if cycle %}Edit {{ cycle.cycle_name }}{% else %}New Appraisal Cycle{% endif %}{% endblock %}
 
@@ -8,7 +9,7 @@
     <ol class="flex">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/hr/employees" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">People</a></li>
-        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/perf/cycles" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Cycles</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="{{ cycles_base }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Cycles</a></li>
         <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">{% if cycle %}Edit{% else %}New{% endif %}</span></li>
     </ol>
 </nav>
@@ -25,7 +26,7 @@
     </div>
     {% endif %}
 
-    <form method="post" action="{% if cycle %}/people/perf/cycles/{{ cycle.cycle_id }}/edit{% else %}/people/perf/cycles/new{% endif %}" class="space-y-6">
+    <form method="post" action="{% if cycle %}{{ cycles_base }}/{{ cycle.cycle_id }}/edit{% else %}{{ cycles_base }}/new{% endif %}" class="space-y-6">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <!-- Basic Information -->
@@ -168,7 +169,7 @@
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <a href="/people/perf/cycles{% if cycle %}/{{ cycle.cycle_id }}{% endif %}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ cycles_base }}{% if cycle %}/{{ cycle.cycle_id }}{% endif %}" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-primary">
                 {% if cycle %}Save Changes{% else %}Create Cycle{% endif %}
             </button>

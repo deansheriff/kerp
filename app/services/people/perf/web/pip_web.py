@@ -122,12 +122,15 @@ class PIPWebService:
         context = base_context(request, auth, f"PIP {pip.pip_code}", "pms-pips", db=db)
         context["request"] = request
         success = request.query_params.get("saved")
+        error = request.query_params.get("error")
         context.update(
             {
                 "pip": pip,
                 "success": success,
+                "error": error,
                 "improvement_areas": pip.improvement_areas or [],
                 "review_intervals": pip.review_intervals or [],
+                "PIPOutcome": PIPOutcome,
             }
         )
         return templates.TemplateResponse(

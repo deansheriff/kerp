@@ -54,6 +54,30 @@ class CycleWebService:
         return default
 
     @staticmethod
+    def _kras_base_url(request: Request) -> str:
+        if request.url.path.startswith("/people/perf/pms/"):
+            return "/people/perf/pms/kras"
+        return "/people/perf/kras"
+
+    @staticmethod
+    def _kras_active_module(request: Request) -> str:
+        if request.url.path.startswith("/people/perf/pms/"):
+            return "pms-kras"
+        return "perf"
+
+    @staticmethod
+    def _cycles_base_url(request: Request) -> str:
+        if request.url.path.startswith("/people/perf/pms/"):
+            return "/people/perf/pms/cycles"
+        return "/people/perf/cycles"
+
+    @staticmethod
+    def _cycles_active_module(request: Request) -> str:
+        if request.url.path.startswith("/people/perf/pms/"):
+            return "pms-cycles"
+        return "perf"
+
+    @staticmethod
     def _default_pms_template_config() -> dict[str, object]:
         return {
             "objective_weight_pct": 70,
@@ -127,7 +151,10 @@ class CycleWebService:
             pagination=pagination,
         )
 
-        context = base_context(request, auth, "Appraisal Cycles", "perf", db=db)
+        cycles_base_url = self._cycles_base_url(request)
+        context = base_context(
+            request, auth, "Appraisal Cycles", self._cycles_active_module(request), db=db
+        )
         context["request"] = request
         success = request.query_params.get("success")
         context.update(
@@ -136,6 +163,7 @@ class CycleWebService:
                 "status": status,
                 "year": year,
                 "search": search,
+                "cycles_base_url": cycles_base_url,
                 "success": success,
                 "statuses": [s.value for s in AppraisalCycleStatus],
                 "page": result.page,
@@ -156,12 +184,16 @@ class CycleWebService:
         db: Session,
     ) -> HTMLResponse:
         """Render new cycle form."""
-        context = base_context(request, auth, "New Appraisal Cycle", "perf", db=db)
+        cycles_base_url = self._cycles_base_url(request)
+        context = base_context(
+            request, auth, "New Appraisal Cycle", self._cycles_active_module(request), db=db
+        )
         context["request"] = request
         context.update(
             {
                 "cycle": None,
                 "form_data": {},
+                "cycles_base_url": cycles_base_url,
                 "error": None,
             }
         )
@@ -207,17 +239,21 @@ class CycleWebService:
             )
             db.commit()
             return RedirectResponse(
-                url=f"/people/perf/cycles/{cycle.cycle_id}?saved=1",
+                url=f"{self._cycles_base_url(request)}/{cycle.cycle_id}?saved=1",
                 status_code=303,
             )
         except Exception as e:
             db.rollback()
-            context = base_context(request, auth, "New Appraisal Cycle", "perf", db=db)
+            cycles_base_url = self._cycles_base_url(request)
+            context = base_context(
+                request, auth, "New Appraisal Cycle", self._cycles_active_module(request), db=db
+            )
             context["request"] = request
             context.update(
                 {
                     "cycle": None,
                     "form_data": dict(form_data),
+                    "cycles_base_url": cycles_base_url,
                     "error": str(e),
                 }
             )
@@ -242,7 +278,7 @@ class CycleWebService:
             cycle_uuid = coerce_uuid(cycle_id)
             cycle = svc.get_cycle(org_id, cycle_uuid)
         except Exception:
-            return RedirectResponse(url="/people/perf/cycles", status_code=303)
+            return RedirectResponse(url=self._cycles_base_url(request), status_code=303)
 
         appraisals = svc.list_appraisals(
             org_id,
@@ -263,7 +299,10 @@ class CycleWebService:
             "cancelled": int(status_counts.get("CANCELLED", 0) or 0),
         }
 
-        context = base_context(request, auth, cycle.cycle_name, "perf", db=db)
+        cycles_base_url = self._cycles_base_url(request)
+        context = base_context(
+            request, auth, cycle.cycle_name, self._cycles_active_module(request), db=db
+        )
         context["request"] = request
         context.update(
             {
@@ -271,6 +310,7 @@ class CycleWebService:
                 "stats": stats,
                 "appraisals": appraisals.items,
                 "appraisals_total": appraisals.total,
+                "cycles_base_url": cycles_base_url,
                 "success": success,
                 "error": error,
             }
@@ -293,14 +333,22 @@ class CycleWebService:
         try:
             cycle = svc.get_cycle(org_id, coerce_uuid(cycle_id))
         except Exception:
-            return RedirectResponse(url="/people/perf/cycles", status_code=303)
+            return RedirectResponse(url=self._cycles_base_url(request), status_code=303)
 
-        context = base_context(request, auth, f"Edit {cycle.cycle_name}", "perf", db=db)
+        cycles_base_url = self._cycles_base_url(request)
+        context = base_context(
+            request,
+            auth,
+            f"Edit {cycle.cycle_name}",
+            self._cycles_active_module(request),
+            db=db,
+        )
         context["request"] = request
         context.update(
             {
                 "cycle": cycle,
                 "form_data": {},
+                "cycles_base_url": cycles_base_url,
                 "error": None,
             }
         )
@@ -355,20 +403,26 @@ class CycleWebService:
             )
             db.commit()
             return RedirectResponse(
-                url=f"/people/perf/cycles/{cycle_id}?saved=1",
+                url=f"{self._cycles_base_url(request)}/{cycle_id}?saved=1",
                 status_code=303,
             )
         except Exception as e:
             db.rollback()
             cycle = svc.get_cycle(org_id, coerce_uuid(cycle_id))
+            cycles_base_url = self._cycles_base_url(request)
             context = base_context(
-                request, auth, f"Edit {cycle.cycle_name}", "perf", db=db
+                request,
+                auth,
+                f"Edit {cycle.cycle_name}",
+                self._cycles_active_module(request),
+                db=db,
             )
             context["request"] = request
             context.update(
                 {
                     "cycle": cycle,
-                    "form_data": {},
+                    "form_data": dict(form_data),
+                    "cycles_base_url": cycles_base_url,
                     "error": str(e),
                 }
             )
@@ -378,6 +432,7 @@ class CycleWebService:
 
     def activate_cycle_response(
         self,
+        request: Request,
         auth: WebAuthContext,
         db: Session,
         cycle_id: str,
@@ -397,11 +452,13 @@ class CycleWebService:
             db.rollback()
 
         return RedirectResponse(
-            url=f"/people/perf/cycles/{cycle_id}?saved=1", status_code=303
+            url=f"{self._cycles_base_url(request)}?success=Cycle+activated+successfully",
+            status_code=303,
         )
 
     def advance_cycle_response(
         self,
+        request: Request,
         auth: WebAuthContext,
         db: Session,
         cycle_id: str,
@@ -426,11 +483,12 @@ class CycleWebService:
             db.rollback()
 
         return RedirectResponse(
-            url=f"/people/perf/cycles/{cycle_id}?saved=1", status_code=303
+            url=f"{self._cycles_base_url(request)}/{cycle_id}?saved=1", status_code=303
         )
 
     def cancel_cycle_response(
         self,
+        request: Request,
         auth: WebAuthContext,
         db: Session,
         cycle_id: str,
@@ -450,11 +508,12 @@ class CycleWebService:
             db.rollback()
 
         return RedirectResponse(
-            url=f"/people/perf/cycles/{cycle_id}?saved=1", status_code=303
+            url=f"{self._cycles_base_url(request)}/{cycle_id}?saved=1", status_code=303
         )
 
     def delete_cycle_response(
         self,
+        request: Request,
         auth: WebAuthContext,
         db: Session,
         cycle_id: str,
@@ -467,13 +526,13 @@ class CycleWebService:
             svc.delete_cycle(org_id, coerce_uuid(cycle_id))
             db.commit()
             return RedirectResponse(
-                url="/people/perf/cycles?success=Record+deleted+successfully",
+                url=f"{self._cycles_base_url(request)}?success=Record+deleted+successfully",
                 status_code=303,
             )
         except Exception:
             db.rollback()
             return RedirectResponse(
-                url=f"/people/perf/cycles/{cycle_id}", status_code=303
+                url=f"{self._cycles_base_url(request)}/{cycle_id}", status_code=303
             )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -515,7 +574,10 @@ class CycleWebService:
             PaginationParams(limit=100),
         ).items
 
-        context = base_context(request, auth, "Key Result Areas", "perf", db=db)
+        kras_base_url = self._kras_base_url(request)
+        context = base_context(
+            request, auth, "Key Result Areas", self._kras_active_module(request), db=db
+        )
         context["request"] = request
         success = request.query_params.get("success")
         context.update(
@@ -525,6 +587,7 @@ class CycleWebService:
                 "is_active": is_active,
                 "department_id": department_id,
                 "departments": departments,
+                "kras_base_url": kras_base_url,
                 "success": success,
                 "page": result.page,
                 "total_pages": result.total_pages,
@@ -550,12 +613,16 @@ class CycleWebService:
             PaginationParams(limit=100),
         ).items
 
-        context = base_context(request, auth, "New KRA", "perf", db=db)
+        kras_base_url = self._kras_base_url(request)
+        context = base_context(
+            request, auth, "New KRA", self._kras_active_module(request), db=db
+        )
         context["request"] = request
         context.update(
             {
                 "kra": None,
                 "departments": departments,
+                "kras_base_url": kras_base_url,
                 "form_data": {},
                 "error": None,
             }
@@ -591,13 +658,16 @@ class CycleWebService:
             )
             db.commit()
             return RedirectResponse(
-                url=f"/people/perf/kras/{kra.kra_id}?saved=1",
+                url=f"{self._kras_base_url(request)}/{kra.kra_id}?saved=1",
                 status_code=303,
             )
         except Exception as e:
             db.rollback()
             org_svc = OrganizationService(db, org_id)
-            context = base_context(request, auth, "New KRA", "perf", db=db)
+            kras_base_url = self._kras_base_url(request)
+            context = base_context(
+                request, auth, "New KRA", self._kras_active_module(request), db=db
+            )
             context["request"] = request
             context.update(
                 {
@@ -605,6 +675,7 @@ class CycleWebService:
                     "departments": org_svc.list_departments(
                         DepartmentFilters(is_active=True), PaginationParams(limit=100)
                     ).items,
+                    "kras_base_url": kras_base_url,
                     "form_data": dict(form_data),
                     "error": str(e),
                 }
@@ -628,13 +699,17 @@ class CycleWebService:
         try:
             kra = svc.get_kra(org_id, coerce_uuid(kra_id))
         except Exception:
-            return RedirectResponse(url="/people/perf/kras", status_code=303)
+            return RedirectResponse(url=self._kras_base_url(request), status_code=303)
 
-        context = base_context(request, auth, kra.kra_name, "perf", db=db)
+        kras_base_url = self._kras_base_url(request)
+        context = base_context(
+            request, auth, kra.kra_name, self._kras_active_module(request), db=db
+        )
         context["request"] = request
         context.update(
             {
                 "kra": kra,
+                "kras_base_url": kras_base_url,
                 "success": success,
                 "error": None,
             }
@@ -658,9 +733,16 @@ class CycleWebService:
         try:
             kra = svc.get_kra(org_id, coerce_uuid(kra_id))
         except Exception:
-            return RedirectResponse(url="/people/perf/kras", status_code=303)
+            return RedirectResponse(url=self._kras_base_url(request), status_code=303)
 
-        context = base_context(request, auth, f"Edit {kra.kra_name}", "perf", db=db)
+        kras_base_url = self._kras_base_url(request)
+        context = base_context(
+            request,
+            auth,
+            f"Edit {kra.kra_name}",
+            self._kras_active_module(request),
+            db=db,
+        )
         context["request"] = request
         context.update(
             {
@@ -668,6 +750,7 @@ class CycleWebService:
                 "departments": org_svc.list_departments(
                     DepartmentFilters(is_active=True), PaginationParams(limit=100)
                 ).items,
+                "kras_base_url": kras_base_url,
                 "form_data": {},
                 "error": None,
             }
@@ -705,14 +788,21 @@ class CycleWebService:
             )
             db.commit()
             return RedirectResponse(
-                url=f"/people/perf/kras/{kra_id}?saved=1",
+                url=f"{self._kras_base_url(request)}/{kra_id}?saved=1",
                 status_code=303,
             )
         except Exception as e:
             db.rollback()
             org_svc = OrganizationService(db, org_id)
             kra = svc.get_kra(org_id, coerce_uuid(kra_id))
-            context = base_context(request, auth, f"Edit {kra.kra_name}", "perf", db=db)
+            kras_base_url = self._kras_base_url(request)
+            context = base_context(
+                request,
+                auth,
+                f"Edit {kra.kra_name}",
+                self._kras_active_module(request),
+                db=db,
+            )
             context["request"] = request
             context.update(
                 {
@@ -720,7 +810,8 @@ class CycleWebService:
                     "departments": org_svc.list_departments(
                         DepartmentFilters(is_active=True), PaginationParams(limit=100)
                     ).items,
-                    "form_data": {},
+                    "kras_base_url": kras_base_url,
+                    "form_data": dict(form_data),
                     "error": str(e),
                 }
             )
@@ -730,6 +821,7 @@ class CycleWebService:
 
     def toggle_kra_active_response(
         self,
+        request: Request,
         auth: WebAuthContext,
         db: Session,
         kra_id: str,
@@ -746,11 +838,12 @@ class CycleWebService:
             db.rollback()
 
         return RedirectResponse(
-            url=f"/people/perf/kras/{kra_id}?saved=1", status_code=303
+            url=f"{self._kras_base_url(request)}/{kra_id}?saved=1", status_code=303
         )
 
     def delete_kra_response(
         self,
+        request: Request,
         auth: WebAuthContext,
         db: Session,
         kra_id: str,
@@ -763,12 +856,14 @@ class CycleWebService:
             svc.delete_kra(org_id, coerce_uuid(kra_id))
             db.commit()
             return RedirectResponse(
-                url="/people/perf/kras?success=Record+deleted+successfully",
+                url=f"{self._kras_base_url(request)}?success=Record+deleted+successfully",
                 status_code=303,
             )
         except Exception:
             db.rollback()
-            return RedirectResponse(url=f"/people/perf/kras/{kra_id}", status_code=303)
+            return RedirectResponse(
+                url=f"{self._kras_base_url(request)}/{kra_id}", status_code=303
+            )
 
     # ─────────────────────────────────────────────────────────────────────────
     # Templates
@@ -1004,6 +1099,7 @@ class CycleWebService:
                 "success": success,
                 "error": None,
                 "templates_base_url": templates_base_url,
+                "kras_base_url": self._kras_base_url(request),
             }
         )
         return templates.TemplateResponse(

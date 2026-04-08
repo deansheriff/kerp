@@ -1,0 +1,103 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import empty_state, icon_svg, pagination, status_badge %}
+
+{% block page_title %}Quarterly Reviews{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/perf/pms/dashboard" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{{ pms_nav_label }}</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Quarterly Reviews</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {% if success %}
+    <div class="card p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+        <p class="text-sm text-emerald-700 dark:text-emerald-300">{{ success | replace('+', ' ') }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card p-5">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quarterly Reviews</h2>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track the early government PMS appraisal stages from draft through manager review before countersign.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Draft</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ status_counts.get('DRAFT', 0) }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Self-Assessment</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ status_counts.get('SELF_ASSESSMENT', 0) }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pending Review</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ status_counts.get('PENDING_REVIEW', 0) }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Under Review</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ status_counts.get('UNDER_REVIEW', 0) }}</p>
+        </div>
+    </div>
+
+    {% if appraisals %}
+    <div class="card overflow-hidden">
+        <div class="table-container">
+            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead>
+                    <tr class="bg-slate-50 dark:bg-slate-800/50">
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Employee</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Cycle</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Current Stage</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Next Action</th>
+                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Open</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                    {% for appraisal in appraisals %}
+                    {% set review_href = '/people/perf/pms/appraisals/' ~ appraisal.appraisal_id ~ '/self-assessment?area=reviews' if appraisal.status and appraisal.status.value in ['DRAFT', 'SELF_ASSESSMENT'] else '/people/perf/pms/appraisals/' ~ appraisal.appraisal_id ~ '/manager-review?area=reviews' %}
+                    {% set next_label = 'Complete self-assessment' if appraisal.status and appraisal.status.value in ['DRAFT', 'SELF_ASSESSMENT'] else 'Complete manager review' %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+                            {{ appraisal.employee.full_name if appraisal.employee else appraisal.employee_id }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                            {{ appraisal.cycle.cycle_name if appraisal.cycle else appraisal.cycle_id }}
+                        </td>
+                        <td class="px-4 py-3 text-sm">
+                            {{ status_badge(appraisal.status.value if appraisal.status else '', 'sm') }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                            {{ next_label }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <a href="{{ review_href }}" class="btn btn-primary btn-sm">Open</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    {{ empty_state(
+        "No quarterly reviews pending",
+        "There are no draft, self-assessment, or manager review appraisal items right now.",
+        "clipboard-check"
+    ) }}
+    {% endif %}
+
+    {{ pagination(
+        page=page,
+        total_pages=total_pages,
+        total_count=total | default(0),
+        limit=20,
+        show_size_selector=false
+    ) }}
+</div>
+{% endblock %}

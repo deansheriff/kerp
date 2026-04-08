@@ -1,5 +1,6 @@
 {% extends "people/base_people.html" %}
 {% from "components/macros.html" import icon_svg %}
+{% set kras_base = kras_base_url | default("/people/perf/kras") %}
 {% set templates_base = templates_base_url | default("/people/perf/templates") %}
 
 {% block page_title %}{{ template.template_name }}{% endblock %}
@@ -229,7 +230,7 @@
                         {{ icon_svg("plus", "h-4 w-4 mr-2") }}
                         Create Appraisal
                     </a>
-                    <a href="/people/perf/kras" class="btn btn-ghost w-full justify-start">
+                    <a href="{{ kras_base }}" class="btn btn-ghost w-full justify-start">
                         {{ icon_svg("chart", "h-4 w-4 mr-2") }}
                         Manage KRAs
                     </a>

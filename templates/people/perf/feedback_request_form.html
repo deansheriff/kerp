@@ -1,5 +1,6 @@
 {% extends "people/base_people.html" %}
 {% from "components/macros.html" import icon_svg %}
+{% set feedback_base = feedback_base_url | default("/people/perf/feedback") %}
 
 {% block page_title %}Request Feedback{% endblock %}
 
@@ -44,7 +45,7 @@
         </div>
     </div>
 
-    <form method="post" action="/people/perf/feedback/request" class="space-y-6">
+    <form method="post" action="{{ feedback_base }}/request" class="space-y-6">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="appraisal_id" value="{{ appraisal.appraisal_id }}">
 

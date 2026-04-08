@@ -32,16 +32,37 @@
                         <th scope="col">Title</th>
                         <th scope="col" class="hidden md:table-cell">Channel</th>
                         <th scope="col" class="hidden md:table-cell">Raised</th>
+                        <th scope="col" class="hidden lg:table-cell">Deadline</th>
                         <th scope="col" class="text-center">Status</th>
                         <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for record in records %}
+                    {% set deadline = deadline_map.get(record.grievance_id | string) %}
                     <tr>
                         <td class="text-sm font-medium text-slate-900 dark:text-white">{{ record.title }}</td>
                         <td class="hidden md:table-cell text-sm text-slate-600 dark:text-slate-400">{{ record.channel | replace('_', ' ') | title }}</td>
                         <td class="hidden md:table-cell text-sm text-slate-600 dark:text-slate-400">{{ record.raised_date | format_date if record.raised_date else '—' }}</td>
+                        <td class="hidden lg:table-cell text-sm">
+                            {% if deadline %}
+                            <div class="space-y-1">
+                                <div class="text-slate-700 dark:text-slate-300">{{ deadline.date | format_date }}</div>
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                                    {% if deadline.state == 'overdue' %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300
+                                    {% elif deadline.state == 'approaching' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300
+                                    {% elif deadline.state == 'resolved' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300
+                                    {% else %}bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300{% endif %}">
+                                    {% if deadline.state == 'overdue' %}Overdue by {{ deadline.days_remaining | abs }}d
+                                    {% elif deadline.state == 'approaching' %}Due in {{ deadline.days_remaining }}d
+                                    {% elif deadline.state == 'resolved' %}Closed
+                                    {% else %}{{ deadline.days_remaining }}d left{% endif %}
+                                </span>
+                            </div>
+                            {% else %}
+                            <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
                         <td class="text-center">{{ status_badge(record.status, "sm") }}</td>
                         <td class="text-sm">
                             {% if record.status in ['OPEN', 'UNDER_REVIEW'] %}
@@ -85,7 +106,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             {{ empty_state(
                                 title="No grievances",
                                 description="No PMS grievances have been logged.",

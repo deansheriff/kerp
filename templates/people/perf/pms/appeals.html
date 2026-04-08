@@ -60,12 +60,14 @@
                             <th scope="col">Appeal ID</th>
                             <th scope="col">Employee</th>
                             <th scope="col" class="hidden md:table-cell">Filed Date</th>
+                            <th scope="col" class="hidden md:table-cell">Deadline</th>
                             <th scope="col" class="hidden lg:table-cell">Reason (excerpt)</th>
                             <th scope="col" class="text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for appeal in appeals %}
+                        {% set deadline = deadline_map.get(appeal.appeal_id | string) %}
                         <tr class="group">
                             <td>
                                 <a href="/people/perf/pms/appeals/{{ appeal.appeal_id }}"
@@ -83,6 +85,25 @@
                             <td class="hidden md:table-cell text-sm text-slate-500 dark:text-slate-400">
                                 {{ appeal.filed_date.strftime('%d %b %Y') if appeal.filed_date else '—' }}
                             </td>
+                            <td class="hidden md:table-cell text-sm">
+                                {% if deadline %}
+                                <div class="space-y-1">
+                                    <div class="text-slate-700 dark:text-slate-300">{{ deadline.date.strftime('%d %b %Y') }}</div>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                                        {% if deadline.state == 'overdue' %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300
+                                        {% elif deadline.state == 'approaching' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300
+                                        {% elif deadline.state == 'resolved' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300
+                                        {% else %}bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300{% endif %}">
+                                        {% if deadline.state == 'overdue' %}Overdue by {{ deadline.days_remaining | abs }}d
+                                        {% elif deadline.state == 'approaching' %}Due in {{ deadline.days_remaining }}d
+                                        {% elif deadline.state == 'resolved' %}Resolved
+                                        {% else %}{{ deadline.days_remaining }}d left{% endif %}
+                                    </span>
+                                </div>
+                                {% else %}
+                                <span class="text-slate-400">—</span>
+                                {% endif %}
+                            </td>
                             <td class="hidden lg:table-cell text-sm text-slate-500 dark:text-slate-400 max-w-xs truncate">
                                 {{ appeal.reason | truncate(80) if appeal.reason else '—' }}
                             </td>
@@ -92,7 +113,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5">
+                            <td colspan="6">
                                 {{ empty_state(
                                     title="No appeals found",
                                     description="No appraisal appeals have been filed.",
