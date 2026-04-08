@@ -167,17 +167,19 @@
 {% endif %}
 
 {% if invoice %}
-{% include "partials/_brand_context.html" %}
-{% set org_display_name = organization.legal_name if organization and organization.legal_name else (organization.name if organization and organization.name else brand_name) %}
+{% set brand_name_value = brand.name if brand is defined and brand and brand.name else title %}
+{% set document_logo_fallback_url = (org_branding.report_logo_url if org_branding is defined and org_branding and org_branding.report_logo_url else (brand.logo_url if brand is defined and brand and brand.logo_url else "")) %}
+{% set org_display_name = organization.legal_name if organization and organization.legal_name else (organization.name if organization and organization.name else brand_name_value) %}
 {% set org_address = organization.address if organization and organization.address else "" %}
 {% set org_phone = organization.phone if organization and organization.phone else "" %}
 {% set raw_addr = customer.address if customer and customer.address else invoice.billing_address %}
+{% set invoice_logo_url = print_logo_url or document_logo_fallback_url %}
 
 <div class="invoice-print-sheet" aria-hidden="true">
     <div class="print-sheet-header">
         <div class="print-company-info">
-            {% if print_logo_url %}
-            <img src="{{ print_logo_url }}" alt="{{ org_display_name }} logo" class="print-company-logo">
+            {% if invoice_logo_url %}
+            <img src="{{ invoice_logo_url }}" alt="{{ org_display_name }} logo" class="print-company-logo">
             {% else %}
             <div class="print-company-name">{{ org_display_name }}</div>
             {% endif %}
