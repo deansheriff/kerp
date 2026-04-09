@@ -3,6 +3,32 @@
 
 {% block page_title %}Count {{ count.count_number }}{% endblock %}
 
+{% block head %}
+{{ super() }}
+<style>
+    .inventory-count-page .card-header {
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 0;
+    }
+
+    .inventory-count-page .card-header + .p-6,
+    .inventory-count-page .card > .p-6:first-child {
+        padding: 1.25rem 1.5rem;
+    }
+
+    @media (max-width: 640px) {
+        .inventory-count-page .card-header {
+            padding: 1rem;
+        }
+
+        .inventory-count-page .card-header + .p-6,
+        .inventory-count-page .card > .p-6:first-child {
+            padding: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
@@ -49,7 +75,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6 stagger-in">
+<div class="inventory-count-page space-y-6 stagger-in">
     <!-- Count Header -->
     <div class="card p-6">
         <div class="flex flex-wrap items-start justify-between gap-4">

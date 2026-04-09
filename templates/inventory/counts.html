@@ -3,6 +3,21 @@
 
 {% block page_title %}Stock Counts{% endblock %}
 
+{% block head %}
+{{ super() }}
+<style>
+    .inventory-compact-table th {
+        padding: 0.875rem 1rem;
+        font-size: 11px;
+    }
+
+    .inventory-compact-table td {
+        padding: 0.875rem 1rem;
+        font-size: 13px;
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
@@ -21,6 +36,21 @@
 
 {% block content %}
 <div class="space-y-6 stagger-in">
+    {% macro sortable_header(label, key, current_sort, current_sort_dir, extra_class="") -%}
+        {% set next_dir = 'asc' if current_sort != key or current_sort_dir == 'desc' else 'desc' %}
+        {% set icon_name = 'chevron-up-down' %}
+        {% if current_sort == key %}
+            {% set icon_name = 'chevron-up' if current_sort_dir == 'asc' else 'chevron-down' %}
+        {% endif %}
+        <th scope="col" class="{{ extra_class }}">
+            <a href="?page=1&limit={{ limit }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if status %}&status={{ status | urlencode }}{% endif %}{% if warehouse %}&warehouse={{ warehouse | urlencode }}{% endif %}&sort={{ key }}&sort_dir={{ next_dir }}"
+               class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">
+                <span>{{ label }}</span>
+                {{ icon_svg(icon_name, "h-4 w-4") }}
+            </a>
+        </th>
+    {%- endmacro %}
+
     <!-- Stats Row -->
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="card p-4">
@@ -102,18 +132,30 @@
     <!-- Counts Table -->
     <div class="card overflow-hidden">
         {% if counts | default([]) | length > 0 %}
+        {{ pagination(
+            page=page,
+            total_pages=total_pages,
+            total_count=filtered_total,
+            limit=limit,
+            search=search,
+            filters={"status": status, "warehouse": warehouse, "sort": sort, "sort_dir": sort_dir},
+            show_navigation=false,
+            show_size_selector=true,
+            show_summary=true,
+            bordered=false
+        ) }}
         <div class="table-container">
-            <table class="table-ledger">
+            <table class="table table-ledger inventory-compact-table">
                 <thead>
                     <tr>
-                        <th scope="col">Count #</th>
-                        <th scope="col">Date</th>
-                        <th scope="col">Warehouse</th>
-                        <th scope="col">Type</th>
-                        <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">Items</th>
+                        {{ sortable_header("Count #", "count_number", sort, sort_dir) }}
+                        {{ sortable_header("Date", "count_date", sort, sort_dir) }}
+                        {{ sortable_header("Warehouse", "warehouse", sort, sort_dir) }}
+                        {{ sortable_header("Type", "type", sort, sort_dir) }}
+                        {{ sortable_header("Items", "total_items", sort, sort_dir, "text-right") }}
                         <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">Counted</th>
-                        <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">Variance</th>
-                        <th scope="col">Status</th>
+                        {{ sortable_header("Variance", "variance", sort, sort_dir, "text-right") }}
+                        {{ sortable_header("Status", "status", sort, sort_dir) }}
                         <th scope="col" class="w-12 text-xs font-semibold uppercase tracking-wider"></th>
                     </tr>
                 </thead>
@@ -183,7 +225,16 @@
     </div>
 
     {% if counts | default([]) | length > 0 %}
-    {{ pagination(page=page, total_pages=total_pages, total_count=total_count, limit=50, search=search, filters={"status": status, "warehouse": warehouse}) }}
+    {{ pagination(
+        page=page,
+        total_pages=total_pages,
+        total_count=filtered_total,
+        limit=limit,
+        search=search,
+        filters={"status": status, "warehouse": warehouse, "sort": sort, "sort_dir": sort_dir},
+        show_summary=false,
+        show_size_selector=false
+    ) }}
     {% endif %}
     </div>{# /results-container #}
 </div>

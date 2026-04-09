@@ -1411,7 +1411,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
    Reusable pagination component with page size selector
    Usage: {{ pagination(page=1, total_pages=10, total_count=250, limit=50, search=search, filters=filters) }}
    ============================================ #}
-{% macro pagination(page, total_pages, total_count, limit=50, search="", filters={}, show_size_selector=true) %}
+{% macro pagination(page, total_pages, total_count, limit=50, search="", filters={}, show_size_selector=true, show_summary=true, show_navigation=true, bordered=true) %}
 {% set current_page = page | default(1) | int %}
 {% set page_count = total_pages | default(1) | int %}
 {% set result_count = total_count | default(0) | int %}
@@ -1420,10 +1420,11 @@ if (typeof window.searchAutosuggest === 'undefined') {
 {% set encoded_search = search_term|string|urlencode %}
 {% set active_filters = filters | default({}) %}
 {% if result_count > 0 %}
-<div class="border-t border-slate-200 dark:border-slate-700 px-6 py-4">
+<div class="{% if bordered %}border-t border-slate-200 dark:border-slate-700 {% endif %}px-6 py-4">
   <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
     {# Results Info #}
-    <div class="flex items-center gap-4">
+    {% if show_summary %}
+    <div class="flex w-full items-center justify-between gap-4">
       <p class="text-sm text-slate-600 dark:text-slate-300">
         Showing <span class="font-medium text-slate-900 dark:text-white">{{ ((current_page - 1) * page_limit + 1) }}</span>
         to <span class="font-medium text-slate-900 dark:text-white">{{ [current_page * page_limit, result_count]|min }}</span>
@@ -1432,10 +1433,10 @@ if (typeof window.searchAutosuggest === 'undefined') {
 
       {# Page Size Selector #}
       {% if show_size_selector %}
-      <div class="flex items-center gap-2">
+      <div class="ml-auto flex items-center gap-2">
         <label class="text-sm text-slate-500 dark:text-slate-400">Show:</label>
         <select onchange="window.location.href=this.value" class="form-select py-1 text-sm">
-          {% for size in [25, 50, 100, 200] %}
+          {% for size in [10, 25, 50, 100, 200] %}
           {% set ns = namespace(params="page=1" ~ ("&search=" ~ encoded_search if search_term else "")) %}
           {% for key, val in active_filters.items() if val %}
           {% set ns.params = ns.params ~ "&" ~ (key|string|urlencode) ~ "=" ~ (val|string|urlencode) %}
@@ -1446,9 +1447,12 @@ if (typeof window.searchAutosuggest === 'undefined') {
       </div>
       {% endif %}
     </div>
+    {% else %}
+    <div></div>
+    {% endif %}
 
     {# Page Navigation #}
-    {% if page_count > 1 %}
+    {% if show_navigation and page_count > 1 %}
     <nav class="flex items-center gap-1">
       {# Previous Button #}
       {% if current_page > 1 %}
@@ -1639,65 +1643,67 @@ if (typeof window.searchAutosuggest === 'undefined') {
             ], entity_name="customers") }}
    ============================================ #}
 {% macro bulk_action_bar(actions, entity_name="items") %}
-<div x-show="hasSelection"
-     x-cloak
-     x-transition:enter="transition ease-out duration-200"
-     x-transition:enter-start="opacity-0 translate-y-4"
-     x-transition:enter-end="opacity-100 translate-y-0"
-     x-transition:leave="transition ease-in duration-150"
-     x-transition:leave-start="opacity-100 translate-y-0"
-     x-transition:leave-end="opacity-0 translate-y-4"
-     class="bulk-action-bar"
-     :class="{ 'bulk-action-bar-loading': loading }">
-  <div class="bulk-action-bar-content">
-    {# Selection count #}
-    <span class="bulk-selection-count">
-      <span x-text="selectedCount"></span> {{ entity_name }} selected
-    </span>
+<template x-teleport="body">
+  <div x-show="hasSelection"
+       x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 translate-y-4"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100 translate-y-0"
+       x-transition:leave-end="opacity-0 translate-y-4"
+       class="bulk-action-bar"
+       :class="{ 'bulk-action-bar-loading': loading }">
+    <div class="bulk-action-bar-content">
+      {# Selection count #}
+      <span class="bulk-selection-count">
+        <span x-text="selectedCount"></span> {{ entity_name }} selected
+      </span>
 
-    {# Action buttons #}
-    <div class="bulk-actions-group">
-      {% for action in actions %}
-      {% set action_name = action.name | default("", true) %}
-      {% set action_label = action.label | default(action_name, true) %}
-      {% set action_endpoint = action.endpoint | default("", true) %}
-      {% set action_class = action.class | default("btn-secondary", true) %}
-      {% set action_confirm = action.confirm | default("", true) %}
-      {% set action_title = action.title | default("", true) %}
-      {% set action_icon = action.icon | default("", true) %}
-      {% if action_name and action_endpoint %}
-      <button type="button"
-              class="btn btn-sm {{ action_class }}"
-              @click="performAction('{{ action_name }}', '{{ action_endpoint }}', { {% if action_confirm %}confirm: '{{ action_confirm }}'{% endif %} })"
-              :disabled="loading"
-              {% if action_title %}title="{{ action_title }}"{% endif %}>
-        {% if action_icon %}
-        {{ action_icon|safe }}
+      {# Action buttons #}
+      <div class="bulk-actions-group">
+        {% for action in actions %}
+        {% set action_name = action.name | default("", true) %}
+        {% set action_label = action.label | default(action_name, true) %}
+        {% set action_endpoint = action.endpoint | default("", true) %}
+        {% set action_class = action.class | default("btn-secondary", true) %}
+        {% set action_confirm = action.confirm | default("", true) %}
+        {% set action_title = action.title | default("", true) %}
+        {% set action_icon = action.icon | default("", true) %}
+        {% if action_name and action_endpoint %}
+        <button type="button"
+                class="btn btn-sm {{ action_class }}"
+                @click="performAction('{{ action_name }}', '{{ action_endpoint }}', { {% if action_confirm %}confirm: '{{ action_confirm }}'{% endif %} })"
+                :disabled="loading"
+                {% if action_title %}title="{{ action_title }}"{% endif %}>
+          {% if action_icon %}
+          {{ action_icon|safe }}
+          {% endif %}
+          <span>{{ action_label }}</span>
+          {# Loading spinner for this specific action #}
+          <svg x-show="actionInProgress === '{{ action_name }}'" class="ml-1 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </button>
         {% endif %}
-        <span>{{ action_label }}</span>
-        {# Loading spinner for this specific action #}
-        <svg x-show="actionInProgress === '{{ action_name }}'" class="ml-1 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      </button>
-      {% endif %}
-      {% endfor %}
+        {% endfor %}
 
-      {# Clear selection button #}
-      <button type="button"
-              class="btn btn-sm btn-ghost"
-              @click="clearSelection()"
-              :disabled="loading"
-              title="Clear selection">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-        <span class="hidden sm:inline ml-1">Clear</span>
-      </button>
+        {# Clear selection button #}
+        <button type="button"
+                class="btn btn-sm btn-ghost"
+                @click="clearSelection()"
+                :disabled="loading"
+                title="Clear selection">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+          <span class="hidden sm:inline ml-1">Clear</span>
+        </button>
+      </div>
     </div>
   </div>
-</div>
+</template>
 {% endmacro %}
 
 
@@ -1815,6 +1821,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
               x-show="!isDesktop || sidebarCollapsed"
               x-cloak
               class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"
+              data-ui-tooltip="Open sidebar"
               aria-label="Open sidebar">
         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
@@ -1832,6 +1839,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
                 }
               "
               class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white/60 px-2 py-1.5 text-sm font-medium text-slate-600 transition-all {{ a.hover }} hover:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300 {{ a.hover_dark }} dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"
+              data-ui-tooltip="Return to previous page"
               aria-label="Go back">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -1854,6 +1862,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
       <button @click="window.dispatchEvent(new CustomEvent('open-command-palette'))"
               x-show="showSearchControl && viewportWidth >= 640"
               x-cloak
+              data-ui-tooltip="Find a page"
               class="hidden items-center gap-3 rounded-lg border border-slate-200 bg-white/60 px-3 py-2 text-sm text-slate-500 transition-all {{ search_visibility_class }} {{ a.hover }} hover:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400 {{ a.hover_dark }} dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -1867,7 +1876,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
       {{ header_actions_html | safe }}
       <button @click="darkMode = !darkMode"
               class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"
-              :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+              :data-ui-tooltip="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
               aria-label="Toggle theme">
         <template x-if="!darkMode">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1884,23 +1893,82 @@ if (typeof window.searchAutosuggest === 'undefined') {
               open: false,
               notifications: {{ notifications | default([]) | tojson }},
               unreadCount: 0,
-              async init() {
+              markInFlight: false,
+              syncUnreadCount() {
                 this.unreadCount = (this.notifications || []).filter(n => !n.read).length;
+              },
+              async refreshNotifications() {
                 try {
                   const response = await fetch("/notifications/context?limit=5", {
-                    headers: { "Accept": "application/json" }
+                    headers: { "Accept": "application/json" },
+                    cache: "no-store"
                   });
                   if (!response.ok) return;
                   const data = await response.json();
                   if (Array.isArray(data.notifications)) this.notifications = data.notifications;
                   if (typeof data.unread_count === "number") this.unreadCount = data.unread_count;
                 } catch (_error) {
-                  // Keep server-rendered notifications if the fetch fails.
+                  // Keep current UI state if refresh fails.
                 }
+              },
+              async markNotificationRead(notification) {
+                if (!notification || notification.read) return true;
+
+                notification.read = true;
+                this.syncUnreadCount();
+
+                try {
+                  const response = await fetch(`/notifications/${notification.id}/read`, {
+                    method: "POST",
+                    headers: { "Accept": "application/json" }
+                  });
+                  if (!response.ok) throw new Error("Failed to mark notification read");
+                  const data = await response.json();
+                  if (typeof data.unread_count === "number") this.unreadCount = data.unread_count;
+                  return true;
+                } catch (_error) {
+                  notification.read = false;
+                  this.syncUnreadCount();
+                  return false;
+                }
+              },
+              async markAllRead() {
+                if (this.markInFlight || this.unreadCount === 0) return;
+
+                const previous = this.notifications.map(n => ({ ...n }));
+                this.markInFlight = true;
+                this.notifications = this.notifications.map(n => ({ ...n, read: true }));
+                this.unreadCount = 0;
+
+                try {
+                  const response = await fetch("/notifications/mark-all-read", {
+                    method: "POST",
+                    headers: { "Accept": "application/json" }
+                  });
+                  if (!response.ok) throw new Error("Failed to mark all notifications read");
+                  const data = await response.json();
+                  if (typeof data.unread_count === "number") this.unreadCount = data.unread_count;
+                } catch (_error) {
+                  this.notifications = previous;
+                  this.syncUnreadCount();
+                } finally {
+                  this.markInFlight = false;
+                }
+              },
+              async openNotification(notification) {
+                if (!notification) return;
+                await this.markNotificationRead(notification);
+                this.open = false;
+                window.location.href = notification.url || "#";
+              },
+              async init() {
+                this.syncUnreadCount();
+                await this.refreshNotifications();
               }
             }' class="relative">
         <button @click="open = !open"
                 class="relative inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"
+                data-ui-tooltip="Notifications"
                 aria-label="Notifications">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
@@ -1919,21 +1987,43 @@ if (typeof window.searchAutosuggest === 'undefined') {
              x-cloak>
           <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
             <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Notifications</h3>
-            <button @click="open = false" class="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60 rounded px-1 py-0.5">Close</button>
+            <div class="flex items-center gap-3">
+              <button x-show="unreadCount > 0"
+                      @click="markAllRead()"
+                      type="button"
+                      class="text-xs font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60 rounded px-1 py-0.5">
+                Mark all read
+              </button>
+              <button @click="open = false" class="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60 rounded px-1 py-0.5">Close</button>
+            </div>
           </div>
           <div class="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
             <template x-if="notifications.length === 0">
               <div class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">No new notifications</div>
             </template>
             <template x-for="n in notifications" :key="n.id">
-              <a :href="n.url" class="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-b border-slate-100 dark:border-slate-700 last:border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500/60">
-                <div class="mt-1 h-2.5 w-2.5 rounded-full" :class="n.read ? 'bg-slate-300 dark:bg-slate-600' : 'bg-rose-500'"></div>
-                <div class="flex-1">
-                  <p class="text-sm font-medium text-slate-700 dark:text-slate-200" x-text="n.title"></p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400" x-text="n.message"></p>
+              <div class="border-b border-slate-100 dark:border-slate-700 last:border-0">
+                <div class="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <button type="button"
+                          @click="openNotification(n)"
+                          class="flex min-w-0 flex-1 items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500/60 rounded-lg">
+                    <div class="mt-1 h-2.5 w-2.5 rounded-full" :class="n.read ? 'bg-slate-300 dark:bg-slate-600' : 'bg-rose-500'"></div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-start justify-between gap-3">
+                        <p class="text-sm text-slate-700 dark:text-slate-200" :class="{ 'font-semibold': !n.read, 'font-medium': n.read }" x-text="n.title"></p>
+                        <span class="text-xs text-slate-400 flex-shrink-0" x-text="n.time"></span>
+                      </div>
+                      <p class="text-xs text-slate-500 dark:text-slate-400" x-text="n.message"></p>
+                    </div>
+                  </button>
+                  <button x-show="!n.read"
+                          @click.stop="markNotificationRead(n)"
+                          type="button"
+                          class="flex-shrink-0 rounded px-2 py-1 text-[11px] font-medium text-teal-600 hover:bg-teal-50 hover:text-teal-700 dark:text-teal-400 dark:hover:bg-teal-900/20 dark:hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60">
+                    Mark read
+                  </button>
                 </div>
-                <span class="text-xs text-slate-400" x-text="n.time"></span>
-              </a>
+              </div>
             </template>
           </div>
         </div>

@@ -32,7 +32,7 @@
   {% set launcher_modules = launcher_modules + [{"key": "self_service", "label": "Self Service", "href": "/people/self", "icon": "/static/img/illustrations/module-people.png", "accent": "bg-emerald-500"}] %}
 {% endif %}
 {% if "inventory" in modules %}
-  {% set launcher_modules = launcher_modules + [{"key": "inventory", "label": "Inventory", "href": "/inventory/items", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
+  {% set launcher_modules = launcher_modules + [{"key": "inventory", "label": "Inventory", "href": "/inventory", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
 {% endif %}
 {% if "fleet" in modules or "support" in modules or "projects" in modules %}
   {% set launcher_modules = launcher_modules + [{"key": "operations", "label": "Operations", "href": "/operations/dashboard", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
@@ -57,6 +57,7 @@
     @click="open = !open"
     :aria-expanded="open.toString()"
     aria-haspopup="true"
+    data-ui-tooltip="Open module launcher"
     aria-label="Open module launcher"
     class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60">
     <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">

@@ -107,6 +107,17 @@
     {# Items Table with Bulk Selection #}
     <div x-data="bulkActions({ entityName: 'items' })">
         <div class="card">
+            {{ pagination(
+                page=page,
+                total_pages=total_pages,
+                total_count=total_count,
+                limit=limit,
+                search=search,
+                filters={"category": category, "status": status},
+                show_navigation=false,
+                bordered=false
+            ) }}
+
             <div class="space-y-3 p-4 md:hidden">
                 {% for item in items %}
                 <article class="rounded-xl border border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-900/40">
@@ -244,7 +255,8 @@
                 total_count=total_count,
                 limit=limit,
                 search=search,
-                filters={"category": category, "status": status}
+                filters={"category": category, "status": status},
+                show_summary=false
             ) }}
         </div>
 

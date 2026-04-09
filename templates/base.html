@@ -80,6 +80,44 @@
     <script defer src="/static/js/vendor/chart.js"></script>
     <script defer src="/static/js/charts.js?v=20260205b"></script>
 
+    <style>
+        .sidebar-floating-tooltip {
+            position: fixed;
+            z-index: 90;
+            pointer-events: none;
+            max-width: 16rem;
+            border-radius: 0.75rem;
+            background: rgba(15, 23, 42, 0.96);
+            color: #f8fafc;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            line-height: 1.2;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+            opacity: 0;
+            visibility: hidden;
+            transform: translate3d(-50%, -0.25rem, 0) scale(0.98);
+            transform-origin: top center;
+            transition: opacity 80ms ease, transform 80ms ease, visibility 80ms ease;
+            white-space: nowrap;
+        }
+
+        .sidebar-floating-tooltip[data-placement="right"] {
+            transform: translate3d(0, -50%, 0) scale(0.98);
+            transform-origin: left center;
+        }
+
+        .sidebar-floating-tooltip.is-visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translate3d(-50%, 0, 0) scale(1);
+        }
+
+        .sidebar-floating-tooltip.is-visible[data-placement="right"] {
+            transform: translate3d(0, -50%, 0) scale(1);
+        }
+    </style>
+
     {% block head %}{% endblock %}
     {% block page_styles %}{% endblock %}
 </head>
@@ -260,9 +298,27 @@
     </script>
     <script>
         (function() {
+            let tooltip;
+            let activeTarget = null;
+
+            function ensureTooltip() {
+                if (tooltip) {
+                    return tooltip;
+                }
+
+                tooltip = document.createElement('div');
+                tooltip.className = 'sidebar-floating-tooltip';
+                tooltip.setAttribute('role', 'tooltip');
+                document.body.appendChild(tooltip);
+                return tooltip;
+            }
+
             function extractLabel(element) {
-                const explicit = element.getAttribute('data-sidebar-label')
-                    || element.getAttribute('aria-label');
+                const explicit = element.getAttribute('data-ui-tooltip')
+                    || element.getAttribute('data-sidebar-label')
+                    || element.getAttribute('aria-label')
+                    || element.getAttribute('data-native-title')
+                    || element.getAttribute('title');
                 if (explicit) {
                     return explicit.trim();
                 }
@@ -278,30 +334,171 @@
                 return '';
             }
 
-            function syncSidebarTooltip(element) {
+            function isCollapsedSidebarItem(element) {
                 const shell = element.closest('.app-shell');
-                const isCollapsed = !!shell && shell.classList.contains('app-sidebar-collapsed');
-                const label = extractLabel(element);
+                return !!shell && shell.classList.contains('app-sidebar-collapsed');
+            }
 
-                if (isCollapsed && label) {
-                    element.setAttribute('title', label);
-                } else {
-                    element.removeAttribute('title');
+            function shouldShowTooltip(element) {
+                if (element.hasAttribute('data-ui-tooltip')) {
+                    return true;
+                }
+
+                return isCollapsedSidebarItem(element);
+            }
+
+            function findTooltipTarget(node) {
+                if (!node || typeof node.closest !== 'function') {
+                    return null;
+                }
+
+                return node.closest('aside.app-sidebar a, aside.app-sidebar button, [data-ui-tooltip]');
+            }
+
+            function stripNativeTooltip(element) {
+                if (element.hasAttribute('title') && !element.hasAttribute('data-native-title')) {
+                    element.setAttribute('data-native-title', element.getAttribute('title') || '');
+                }
+
+                element.removeAttribute('title');
+            }
+
+            function positionTooltip(element) {
+                const node = ensureTooltip();
+                const rect = element.getBoundingClientRect();
+                if (isCollapsedSidebarItem(element) && !element.hasAttribute('data-ui-tooltip')) {
+                    const top = rect.top + (rect.height / 2);
+                    const preferredLeft = rect.right + 12;
+                    const maxLeft = Math.max(8, window.innerWidth - node.offsetWidth - 8);
+                    const left = Math.min(preferredLeft, maxLeft);
+
+                    node.dataset.placement = 'right';
+                    node.style.top = `${top}px`;
+                    node.style.left = `${left}px`;
+                    return;
+                }
+
+                const top = rect.bottom + 10;
+                const centerLeft = rect.left + (rect.width / 2);
+                const minLeft = (node.offsetWidth / 2) + 8;
+                const maxLeft = window.innerWidth - (node.offsetWidth / 2) - 8;
+                const left = Math.min(Math.max(centerLeft, minLeft), maxLeft);
+
+                node.dataset.placement = 'bottom';
+                node.style.top = `${top}px`;
+                node.style.left = `${left}px`;
+            }
+
+            function hideTooltip() {
+                if (tooltip) {
+                    tooltip.classList.remove('is-visible');
+                }
+
+                activeTarget = null;
+            }
+
+            function showTooltip(element) {
+                stripNativeTooltip(element);
+
+                if (!shouldShowTooltip(element)) {
+                    hideTooltip();
+                    return;
+                }
+
+                const label = extractLabel(element);
+                if (!label) {
+                    hideTooltip();
+                    return;
+                }
+
+                const node = ensureTooltip();
+                node.textContent = label;
+                positionTooltip(element);
+                node.classList.add('is-visible');
+                activeTarget = element;
+            }
+
+            function syncSidebarTooltip(element) {
+                stripNativeTooltip(element);
+
+                if (activeTarget === element) {
+                    showTooltip(element);
                 }
             }
 
             function wireSidebarTooltips(root) {
                 const scope = root || document;
-                scope.querySelectorAll('aside.app-sidebar a, aside.app-sidebar button').forEach(syncSidebarTooltip);
+                scope.querySelectorAll('aside.app-sidebar a, aside.app-sidebar button, [data-ui-tooltip]').forEach(syncSidebarTooltip);
             }
 
             document.addEventListener('DOMContentLoaded', function() {
                 wireSidebarTooltips();
 
-                document.body.addEventListener('mouseover', function(event) {
-                    const target = event.target.closest('aside.app-sidebar a, aside.app-sidebar button');
+                document.body.addEventListener('pointerover', function(event) {
+                    const target = findTooltipTarget(event.target);
                     if (target) {
-                        syncSidebarTooltip(target);
+                        showTooltip(target);
+                    }
+                });
+
+                document.body.addEventListener('pointerout', function(event) {
+                    if (!activeTarget) {
+                        return;
+                    }
+
+                    const target = findTooltipTarget(event.target);
+                    if (target !== activeTarget) {
+                        return;
+                    }
+
+                    const related = event.relatedTarget;
+                    if (related && activeTarget.contains(related)) {
+                        return;
+                    }
+
+                    hideTooltip();
+                });
+
+                document.body.addEventListener('focusin', function(event) {
+                    const target = findTooltipTarget(event.target);
+                    if (target) {
+                        showTooltip(target);
+                    }
+                });
+
+                document.body.addEventListener('focusout', function(event) {
+                    if (!activeTarget) {
+                        return;
+                    }
+
+                    const target = findTooltipTarget(event.target);
+                    if (target !== activeTarget) {
+                        return;
+                    }
+
+                    const related = event.relatedTarget;
+                    if (related && activeTarget.contains(related)) {
+                        return;
+                    }
+
+                    hideTooltip();
+                });
+
+                document.body.addEventListener('click', hideTooltip);
+                window.addEventListener('resize', function() {
+                    if (activeTarget) {
+                        showTooltip(activeTarget);
+                    }
+                });
+                window.addEventListener('scroll', function() {
+                    if (activeTarget) {
+                        positionTooltip(activeTarget);
+                    }
+                }, true);
+
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Escape') {
+                        hideTooltip();
                     }
                 });
 
@@ -309,6 +506,9 @@
                     for (const mutation of mutations) {
                         if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                             wireSidebarTooltips(mutation.target);
+                            if (activeTarget && !shouldShowTooltip(activeTarget)) {
+                                hideTooltip();
+                            }
                         }
                     }
                 });
@@ -320,6 +520,9 @@
 
             document.body.addEventListener('htmx:afterSwap', function(event) {
                 wireSidebarTooltips(event.target);
+                if (activeTarget && !document.body.contains(activeTarget)) {
+                    hideTooltip();
+                }
             });
         })();
     </script>

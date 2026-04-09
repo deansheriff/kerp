@@ -1,6 +1,7 @@
 """Tests for app/services/notification.py."""
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from app.models.notification import EntityType, NotificationChannel, NotificationType
@@ -47,3 +48,48 @@ class TestNotificationServiceCreate:
         )
 
         assert notification.channel == NotificationChannel.IN_APP
+
+
+class TestNotificationServiceMarkRead:
+    """Tests for NotificationService.mark_read."""
+
+    def test_mark_read_scopes_to_recipient_and_organization(self):
+        """mark_read should only update the current recipient within org scope."""
+        db = MagicMock()
+        notification = MagicMock()
+        db.scalar.return_value = notification
+        service = NotificationService()
+        notification_id = uuid.uuid4()
+        recipient_id = uuid.uuid4()
+        organization_id = uuid.uuid4()
+
+        marked = service.mark_read(
+            db=db,
+            notification_id=notification_id,
+            recipient_id=recipient_id,
+            organization_id=organization_id,
+        )
+
+        assert marked is True
+        db.flush.assert_called_once()
+        notification.mark_read.assert_called_once()
+
+        query = db.scalar.call_args.args[0]
+        compiled = str(query)
+        assert "notification.notification_id =" in compiled
+        assert "notification.recipient_id =" in compiled
+        assert "notification.organization_id =" in compiled
+
+    def test_mark_read_returns_false_when_no_rows_updated(self):
+        """mark_read should report failure when nothing was updated."""
+        db = MagicMock()
+        db.scalar.return_value = None
+        service = NotificationService()
+
+        marked = service.mark_read(
+            db=db,
+            notification_id=uuid.uuid4(),
+            recipient_id=uuid.uuid4(),
+        )
+
+        assert marked is False

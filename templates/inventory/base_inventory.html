@@ -97,13 +97,13 @@
 
         <!-- Navigation -->
         <nav class="flex-1 space-y-1 overflow-y-auto p-3" aria-label="Inventory navigation">
-            <!-- Dashboard -->
-            <a href="/"
-               :aria-current="activeModule === 'dashboard' ? 'page' : false"
-               :class="activeModule === 'dashboard' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+            <!-- Overview -->
+            <a href="/inventory"
+               :aria-current="['dashboard','inventory'].includes(activeModule) ? 'page' : false"
+               :class="['dashboard','inventory'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
                 {{ icon_svg("home", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Dashboard</span>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Overview</span>
             </a>
 
             <!-- Section Divider: Inventory -->
@@ -111,12 +111,12 @@
                 <span class="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Inventory</span>
             </div>
 
-            <a href="/inventory"
-               :aria-current="['inventory','items','categories','warehouses','transactions','material_requests','counts','boms','price_lists','lots','inv_reports'].includes(activeModule) ? 'page' : false"
-               :class="['inventory','items','categories','warehouses','transactions','material_requests','counts','boms','price_lists','lots','inv_reports'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+            <a href="/inventory/items"
+               :aria-current="activeModule === 'items' ? 'page' : false"
+               :class="activeModule === 'items' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
                 {{ icon_svg("box", "h-5 w-5 flex-shrink-0") }}
-                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Inventory</span>
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Items</span>
             </a>
 
             <a href="/inventory/quick-entry"

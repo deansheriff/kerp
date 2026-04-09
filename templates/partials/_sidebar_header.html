@@ -46,7 +46,7 @@
     </button>
     <button @click="sidebarCollapsed = false; sidebarCollapsedStored = false; localStorage.setItem('appSidebarCollapsed', false)" x-show="isDesktop && sidebarCollapsed" x-cloak
             class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br {{ module_logo_bg }} text-xs font-semibold uppercase text-white shadow-lg {{ module_logo_shadow }} hover:opacity-90 transition-opacity"
-            aria-label="Expand sidebar" title="Expand sidebar">
+            aria-label="Expand sidebar">
         {% if brand_logo_url %}
         <img src="{{ brand_logo_url }}" alt="{{ brand_name }} logo"
              class="h-10 w-10 rounded-xl object-contain bg-slate-100 p-1 dark:bg-slate-800/80"

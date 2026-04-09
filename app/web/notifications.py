@@ -192,12 +192,27 @@ async def mark_notification_read(
     if not auth.is_authenticated:
         return RedirectResponse(url="/login", status_code=302)
 
-    notification_service.mark_read(db, notification_id)
+    marked = notification_service.mark_read(
+        db,
+        notification_id,
+        recipient_id=auth.person_id,
+        organization_id=auth.organization_id,
+    )
+    if marked:
+        db.commit()
 
-    # Return updated unread count for HTMX
     unread_count = notification_service.get_unread_count(
         db, auth.person_id, auth.organization_id
     )
+
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse(
+            {
+                "ok": marked,
+                "notification_id": str(notification_id),
+                "unread_count": unread_count,
+            }
+        )
 
     return HTMLResponse(
         content=f'<span class="notification-count">{unread_count}</span>',
@@ -215,9 +230,25 @@ async def mark_all_notifications_read(
     if not auth.is_authenticated:
         return RedirectResponse(url="/login", status_code=302)
 
-    notification_service.mark_all_read(db, auth.person_id, auth.organization_id)
+    marked_count = notification_service.mark_all_read(
+        db, auth.person_id, auth.organization_id
+    )
+    if marked_count:
+        db.commit()
 
-    # Redirect back to notifications page
+    unread_count = notification_service.get_unread_count(
+        db, auth.person_id, auth.organization_id
+    )
+
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse(
+            {
+                "ok": True,
+                "marked_count": marked_count,
+                "unread_count": unread_count,
+            }
+        )
+
     return RedirectResponse(url="/notifications", status_code=302)
 
 
@@ -236,6 +267,7 @@ async def notifications_context(
     )
     return JSONResponse(
         {"notifications": notifications, "unread_count": unread_count},
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 
 

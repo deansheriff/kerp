@@ -52,6 +52,17 @@
     <div id="results-container">
     {# Categories Table #}
     <div class="card">
+        {{ pagination(
+            page=page | default(1),
+            total_pages=total_pages | default(1),
+            total_count=total_count | default(categories | length if categories else 0),
+            limit=limit | default(50),
+            search=search,
+            filters={"status": status},
+            show_navigation=false,
+            bordered=false
+        ) }}
+
         <div class="table-container">
             <table class="table">
                 <thead>
@@ -128,7 +139,8 @@
             total_count=total_count | default(categories | length if categories else 0),
             limit=limit | default(50),
             search=search,
-            filters={"status": status}
+            filters={"status": status},
+            show_summary=false
         ) }}
     </div>
     </div>{# /results-container #}

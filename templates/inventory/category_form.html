@@ -3,6 +3,30 @@
 
 {% block page_title %}{{ "Edit Category" if category else "New Category" }}{% endblock %}
 
+{% block head %}
+{{ super() }}
+<style>
+    .inventory-form-page .card-header {
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 0;
+    }
+
+    .inventory-form-page .card-header + .p-6 {
+        padding: 1.25rem 1.5rem;
+    }
+
+    @media (max-width: 640px) {
+        .inventory-form-page .card-header {
+            padding: 1rem;
+        }
+
+        .inventory-form-page .card-header + .p-6 {
+            padding: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
@@ -14,7 +38,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto pb-12">
+<div class="inventory-form-page max-w-3xl mx-auto pb-12">
     <!-- Page Header -->
     <div class="mb-10 stagger-in" style="animation-delay: 0ms;">
         <h2 class="text-3xl font-bold text-slate-900 dark:text-white font-display tracking-tight">

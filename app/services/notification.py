@@ -604,9 +604,20 @@ class NotificationService:
         self,
         db: Session,
         notification_id: uuid.UUID,
+        recipient_id: uuid.UUID | None = None,
+        organization_id: uuid.UUID | None = None,
     ) -> bool:
         """Mark a notification as read."""
-        notification = db.get(Notification, notification_id)
+        query = select(Notification).where(Notification.notification_id == notification_id)
+
+        if recipient_id:
+            query = query.where(Notification.recipient_id == recipient_id)
+
+        if organization_id:
+            query = query.where(Notification.organization_id == organization_id)
+
+        query = query.where(Notification.is_read == False)  # noqa: E712
+        notification = db.scalar(query)
         if not notification:
             return False
 

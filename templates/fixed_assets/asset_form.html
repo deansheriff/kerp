@@ -3,6 +3,30 @@
 
 {% block page_title %}New Asset{% endblock %}
 
+{% block head %}
+{{ super() }}
+<style>
+    .fixed-assets-form-page .card-header {
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 0;
+    }
+
+    .fixed-assets-form-page .card-header + .p-6 {
+        padding: 1.25rem 1.5rem;
+    }
+
+    @media (max-width: 640px) {
+        .fixed-assets-form-page .card-header {
+            padding: 1rem;
+        }
+
+        .fixed-assets-form-page .card-header + .p-6 {
+            padding: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
@@ -14,7 +38,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto pb-12">
+<div class="fixed-assets-form-page max-w-3xl mx-auto pb-12">
     <p class="mb-6 text-sm text-slate-500 dark:text-slate-400">
         Register a fixed asset and capture acquisition details
     </p>
