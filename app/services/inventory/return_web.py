@@ -298,7 +298,10 @@ class InventoryReturnWebService:
 
         source_transaction = None
         if material_request_item is not None:
-            assert material_request is not None
+            if material_request is None:
+                raise ValueError(
+                    "Material request context is required when a request item is provided."
+                )
             source_transaction = db.scalars(
                 select(InventoryTransaction)
                 .where(

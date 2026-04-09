@@ -213,7 +213,8 @@ class PerfWebService:
     ) -> HTMLResponse:
         org_id = coerce_uuid(auth.organization_id)
         config = self._pms_queue_config("self-assessment")
-        assert config is not None
+        if config is None:
+            raise ValueError("Missing PMS queue configuration for self-assessment.")
 
         pagination = PaginationParams.from_page(page, per_page=20)
         query = (
@@ -272,7 +273,8 @@ class PerfWebService:
     ) -> HTMLResponse:
         org_id = coerce_uuid(auth.organization_id)
         config = self._pms_queue_config("manager-review")
-        assert config is not None
+        if config is None:
+            raise ValueError("Missing PMS queue configuration for manager review.")
 
         pagination = PaginationParams.from_page(page, per_page=20)
         query = (

@@ -1,7 +1,6 @@
 """Tests for app/services/notification.py."""
 
 import uuid
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from app.models.notification import EntityType, NotificationChannel, NotificationType

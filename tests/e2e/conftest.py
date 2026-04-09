@@ -142,8 +142,8 @@ def _login_for_tokens(base_url: str, creds: dict[str, str], user_label: str):
                         data = response.json()
                         access_token = data.get("access_token")
                         refresh_token = refresh_token or data.get("refresh_token")
-                    except Exception:
-                        pass
+                    except (ValueError, json.JSONDecodeError):
+                        data = {}
 
                 if not access_token:
                     _skip_or_fail(

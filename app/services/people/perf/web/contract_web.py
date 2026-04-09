@@ -371,7 +371,7 @@ class ContractWebService:
 
             competency_ids = _parse_competency_rows(form_data)
 
-            contract = svc.create_contract(
+            svc.create_contract(
                 org_id,
                 cycle_id=coerce_uuid(cycle_id_str),
                 employee_id=coerce_uuid(employee_id_str),
