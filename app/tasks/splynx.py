@@ -474,9 +474,9 @@ def run_splynx_incremental_sync(
 def run_scheduled_splynx_sync(
     self: Any,
     organization_id: str | None = None,
-    lookback_days: int = 2,
+    lookback_days: int = 2,  # noqa: ARG001 — kept for backward compat
     batch_size: int = 2000,
-    include_credit_notes: bool = True,
+    include_credit_notes: bool = True,  # noqa: ARG001 — kept for backward compat
 ) -> dict[str, Any]:
     """
     Legacy alias — delegates to Tier 1 incremental sync.

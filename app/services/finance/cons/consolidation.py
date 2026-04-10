@@ -394,7 +394,7 @@ class ConsolidationService(ListResponseMixin):
         run_id: UUID,
         investment_account_id: UUID,
         equity_account_id: UUID,
-        goodwill_account_id: UUID,
+        goodwill_account_id: UUID,  # noqa: ARG004 — part of public API
         nci_account_id: UUID,
     ) -> list[EliminationEntry]:
         """

@@ -415,7 +415,7 @@ class LeaseContractService(ListResponseMixin):
         organization_id: UUID,
         lease_id: UUID,
         termination_date: date,
-        termination_reason: str | None = None,
+        termination_reason: str | None = None,  # noqa: ARG004 — part of public API
     ) -> LeaseContract:
         """
         Terminate a lease contract early.

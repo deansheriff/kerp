@@ -307,7 +307,7 @@ class FiscalPeriodService(ListResponseMixin):
         db: Session,
         organization_id: UUID,
         fiscal_period_id: UUID,
-        reopened_by_user_id: UUID,
+        reopened_by_user_id: UUID,  # noqa: ARG004 — part of public API
         reopen_session_id: UUID,
     ) -> FiscalPeriod:
         """

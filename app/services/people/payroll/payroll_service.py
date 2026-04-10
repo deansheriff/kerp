@@ -713,10 +713,10 @@ class PayrollService:
         org_id: UUID,
         entry_id: UUID,
         *,
-        include_attendance: bool = True,
+        include_attendance: bool = True,  # noqa: ARG002 — part of public API
         include_lwp: bool = True,
-        prorate_joiners: bool = True,
-        prorate_exits: bool = True,
+        prorate_joiners: bool = True,  # noqa: ARG002 — part of public API
+        prorate_exits: bool = True,  # noqa: ARG002 — part of public API
     ) -> AutoGenerateResult:
         """
         Generate salary slips with auto-fetched data.

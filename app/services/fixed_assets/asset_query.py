@@ -34,7 +34,6 @@ def _parse_status(value: str | None) -> AssetStatus | None:
             return AssetStatus(value.upper())
         except ValueError:
             return None
-    return None
 
 
 def build_asset_query(

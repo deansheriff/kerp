@@ -9,19 +9,13 @@ These tasks handle:
 """
 
 import logging
-import uuid
 
 from celery import shared_task
 from sqlalchemy.orm import Session
 
-from app.db import SessionLocal
 from app.models.finance.core_org.organization import Organization
-from app.models.sync import IntegrationType, SyncType
+from app.models.sync import IntegrationType
 from app.services.erpnext.client import ERPNextConfig
-from app.services.erpnext.sync.orchestrator import (
-    ERPNextSyncOrchestrator,
-    MigrationConfig,
-)
 
 logger = logging.getLogger(__name__)
 API_SYNC_DISABLED_MSG = "ERPNext API sync is disabled. Use SQL-based sync only."
@@ -82,54 +76,6 @@ def run_full_erpnext_sync(
     )
     return {"success": False, "error": API_SYNC_DISABLED_MSG, "disabled": True}
 
-    with SessionLocal() as db:
-        org = db.get(Organization, uuid.UUID(organization_id))
-        if not org:
-            logger.error("Organization not found: %s", organization_id)
-            return {"success": False, "error": "Organization not found"}
-
-        config_data = _get_erpnext_config(db, org)
-        if not config_data:
-            logger.warning(
-                "ERPNext not configured for organization %s",
-                organization_id,
-            )
-            return {"success": False, "error": "ERPNext not configured"}
-
-        config = MigrationConfig(
-            erpnext_url=config_data.url,
-            erpnext_api_key=config_data.api_key,
-            erpnext_api_secret=config_data.api_secret,
-            erpnext_company=config_data.company,
-            sync_type=SyncType.FULL,
-            entity_types=entity_types,
-        )
-
-        orchestrator = ERPNextSyncOrchestrator(
-            db=db,
-            organization_id=uuid.UUID(organization_id),
-            user_id=uuid.UUID(user_id),
-            config=config,
-        )
-
-        try:
-            history = orchestrator.run()
-            db.commit()
-
-            return {
-                "success": True,
-                "history_id": str(history.history_id),
-                "total_records": history.total_records,
-                "synced_count": history.synced_count,
-                "error_count": history.error_count,
-                "status": history.status.value,
-            }
-
-        except Exception as e:
-            logger.exception("Full sync failed: %s", e)
-            db.rollback()
-            raise self.retry(exc=e)
-
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def run_incremental_erpnext_sync(
@@ -155,48 +101,6 @@ def run_incremental_erpnext_sync(
         API_SYNC_DISABLED_MSG,
     )
     return {"success": False, "error": API_SYNC_DISABLED_MSG, "disabled": True}
-
-    with SessionLocal() as db:
-        org = db.get(Organization, uuid.UUID(organization_id))
-        if not org:
-            return {"success": False, "error": "Organization not found"}
-
-        config_data = _get_erpnext_config(db, org)
-        if not config_data:
-            return {"success": False, "error": "ERPNext not configured"}
-
-        config = MigrationConfig(
-            erpnext_url=config_data.url,
-            erpnext_api_key=config_data.api_key,
-            erpnext_api_secret=config_data.api_secret,
-            erpnext_company=config_data.company,
-            sync_type=SyncType.INCREMENTAL,
-            entity_types=entity_types,
-        )
-
-        orchestrator = ERPNextSyncOrchestrator(
-            db=db,
-            organization_id=uuid.UUID(organization_id),
-            user_id=uuid.UUID(user_id),
-            config=config,
-        )
-
-        try:
-            history = orchestrator.run()
-            db.commit()
-
-            return {
-                "success": True,
-                "history_id": str(history.history_id),
-                "total_records": history.total_records,
-                "synced_count": history.synced_count,
-                "error_count": history.error_count,
-            }
-
-        except Exception as e:
-            logger.exception("Incremental sync failed: %s", e)
-            db.rollback()
-            raise self.retry(exc=e)
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=120)
@@ -231,49 +135,6 @@ def sync_single_entity_type(
         API_SYNC_DISABLED_MSG,
     )
     return {"success": False, "error": API_SYNC_DISABLED_MSG, "disabled": True}
-
-    with SessionLocal() as db:
-        org = db.get(Organization, uuid.UUID(organization_id))
-        if not org:
-            return {"success": False, "error": "Organization not found"}
-
-        config_data = _get_erpnext_config(db, org)
-        if not config_data:
-            return {"success": False, "error": "ERPNext not configured"}
-
-        config = MigrationConfig(
-            erpnext_url=config_data.url,
-            erpnext_api_key=config_data.api_key,
-            erpnext_api_secret=config_data.api_secret,
-            erpnext_company=config_data.company,
-            sync_type=SyncType.INCREMENTAL if incremental else SyncType.FULL,
-            entity_types=[entity_type],
-        )
-
-        orchestrator = ERPNextSyncOrchestrator(
-            db=db,
-            organization_id=uuid.UUID(organization_id),
-            user_id=uuid.UUID(user_id),
-            config=config,
-        )
-
-        try:
-            result = orchestrator.run_single(entity_type)
-            db.commit()
-
-            return {
-                "success": True,
-                "entity_type": entity_type,
-                "total_records": result.total_records,
-                "synced_count": result.synced_count,
-                "skipped_count": result.skipped_count,
-                "error_count": result.error_count,
-            }
-
-        except Exception as e:
-            logger.exception("Single entity sync failed: %s", e)
-            db.rollback()
-            raise self.retry(exc=e)
 
 
 @shared_task

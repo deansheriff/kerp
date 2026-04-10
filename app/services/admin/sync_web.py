@@ -23,11 +23,6 @@ from app.models.sync import (
 )
 from app.services.common_filters import build_active_filters
 from app.services.erpnext.sync.orchestrator import SUPPORTED_ENTITIES, SYNC_PHASES
-from app.tasks.sync import (
-    run_full_erpnext_sync,
-    run_incremental_erpnext_sync,
-    sync_single_entity_type,
-)
 from app.templates import templates
 from app.web.deps import WebAuthContext, brand_context, org_brand_context
 
@@ -345,48 +340,6 @@ class SyncWebService:
             url=f"/admin/sync?error={quote_plus(API_SYNC_DISABLED_MSG)}",
             status_code=302,
         )
-
-        org_id = str(auth.organization_id)
-        user_id = str(auth.user_id)
-
-        try:
-            task = None
-            task_ids = []
-
-            if sync_type == "full":
-                task = run_full_erpnext_sync.delay(org_id, user_id, entity_types)
-                task_ids.append(task.id)
-            elif sync_type == "incremental":
-                task = run_incremental_erpnext_sync.delay(org_id, user_id, entity_types)
-                task_ids.append(task.id)
-            elif sync_type == "entity" and entity_types:
-                # Sync single entity type(s)
-                for entity_type in entity_types:
-                    task = sync_single_entity_type.delay(
-                        org_id, user_id, entity_type, True
-                    )
-                    task_ids.append(task.id)
-            else:
-                # Default to incremental if sync_type is invalid
-                task = run_incremental_erpnext_sync.delay(org_id, user_id, entity_types)
-                task_ids.append(task.id)
-
-            task_id_str = (
-                ", ".join(task_ids)
-                if len(task_ids) > 1
-                else task_ids[0]
-                if task_ids
-                else "unknown"
-            )
-            return RedirectResponse(
-                url=f"/admin/sync?success=Sync+started+(Task+ID:+{quote_plus(task_id_str)})",
-                status_code=302,
-            )
-        except Exception as e:
-            return RedirectResponse(
-                url=f"/admin/sync?error={quote_plus(str(e))}",
-                status_code=302,
-            )
 
     def config_response(
         self,

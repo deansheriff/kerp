@@ -14,30 +14,18 @@ or where an ACC-PAY line was an AP supplier payment.
 
 from __future__ import annotations
 
-import argparse
-import os
 import re
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from app.config import settings
-from app.db import SessionLocal
 from app.models.expense.expense_claim import ExpenseClaim
-from app.models.finance.banking.bank_account import BankAccount
-from app.models.finance.banking.bank_statement import BankStatement, BankStatementLine
 from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus, JournalType
-from app.models.finance.gl.journal_entry_line import JournalEntryLine
-from app.models.sync import SyncEntity
-from app.services.erpnext.client import ERPNextClient, ERPNextConfig
 from app.services.expense.expense_posting_adapter import ExpensePostingAdapter
-from app.services.finance.ap.posting.payment import (
-    post_payment as post_supplier_payment,
-)
-from app.services.finance.banking.bank_reconciliation import BankReconciliationService
 from app.services.finance.gl.journal import JournalInput, JournalLineInput
 from app.services.finance.posting.base import BasePostingAdapter
 
@@ -169,201 +157,8 @@ def _ensure_extra_reimbursement_journal(
 
 
 def main() -> None:
-    print("ERPNext API sync is disabled. Use SQL-based sync tooling.")
+    print("ERPNext API sync is disabled. Use SQL-based sync tooling.")  # noqa: T201
     raise SystemExit(2)
-
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--from-date", default="2025-01-01")
-    ap.add_argument("--to-date", default="2025-12-31")
-    ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
-
-    from_date = date.fromisoformat(args.from_date)
-    to_date = date.fromisoformat(args.to_date)
-
-    cfg = ERPNextConfig(
-        url=os.environ.get("ERPNEXT_URL", ""),
-        api_key=os.environ.get("ERPNEXT_API_KEY", ""),
-        api_secret=os.environ.get("ERPNEXT_API_SECRET", ""),
-        company=os.environ.get("ERPNEXT_COMPANY") or "Dotmac Technologies",
-    )
-
-    stats = Stats()
-    svc = BankReconciliationService()
-
-    with SessionLocal() as db, ERPNextClient(cfg) as client:
-        db.execute(text("SET statement_timeout TO '600s'"))
-        db.execute(text("SET lock_timeout TO '60s'"))
-
-        bank = db.get(BankAccount, PAYSTACK_OPEX_BANK_ACCOUNT_ID)
-        if not bank or bank.organization_id != ORG_ID or not bank.gl_account_id:
-            raise SystemExit("Paystack OPEX bank account missing or not linked to GL")
-        bank_gl_account_id = bank.gl_account_id
-
-        stmt_iter = db.scalars(
-            select(BankStatementLine)
-            .join(
-                BankStatement,
-                BankStatement.statement_id == BankStatementLine.statement_id,
-            )
-            .where(
-                BankStatement.organization_id == ORG_ID,
-                BankStatement.bank_account_id == PAYSTACK_OPEX_BANK_ACCOUNT_ID,
-                BankStatementLine.transaction_date >= from_date,
-                BankStatementLine.transaction_date <= to_date,
-                BankStatementLine.is_matched.is_(False),
-                BankStatementLine.description.ilike("%ACC-PAY-%"),
-            )
-            .order_by(
-                BankStatementLine.transaction_date.asc(),
-                BankStatementLine.line_number.asc(),
-            )
-        ).yield_per(200)
-
-        for stmt_line in stmt_iter:
-            stats = Stats(**{**stats.__dict__, "scanned": stats.scanned + 1})
-            token = _extract_token(stmt_line.description)
-            if not token:
-                stats = Stats(
-                    **{**stats.__dict__, "skipped_no_token": stats.skipped_no_token + 1}
-                )
-                continue
-
-            try:
-                pe = client.get_document("Payment Entry", token)
-            except Exception:
-                stats = Stats(
-                    **{
-                        **stats.__dict__,
-                        "skipped_no_erp_doc": stats.skipped_no_erp_doc + 1,
-                    }
-                )
-                continue
-
-            if args.dry_run:
-                continue
-
-            try:
-                payment_type = pe.get("payment_type")
-                party_type = pe.get("party_type")
-
-                if payment_type == "Pay" and party_type == "Employee":
-                    exp_name = _resolve_expense_claim_name_from_payment_entry(pe)
-                    if not exp_name:
-                        stats = Stats(**{**stats.__dict__, "failed": stats.failed + 1})
-                        continue
-
-                    claim = db.scalar(
-                        select(ExpenseClaim).where(
-                            ExpenseClaim.organization_id == ORG_ID,
-                            ExpenseClaim.erpnext_id == exp_name,
-                        )
-                    )
-                    if not claim:
-                        stats = Stats(
-                            **{
-                                **stats.__dict__,
-                                "skipped_no_claim": stats.skipped_no_claim + 1,
-                            }
-                        )
-                        continue
-
-                    paid_on = date.fromisoformat(str(pe.get("posting_date")))
-                    amount = Decimal(
-                        str(pe.get("paid_amount") or pe.get("received_amount") or "0")
-                    )
-
-                    journal = _ensure_extra_reimbursement_journal(
-                        db,
-                        bank_gl_account_id=bank_gl_account_id,
-                        claim=claim,
-                        token=token,
-                        paid_on=paid_on,
-                        amount=amount,
-                    )
-
-                    bank_jel = db.scalar(
-                        select(JournalEntryLine).where(
-                            JournalEntryLine.journal_entry_id
-                            == journal.journal_entry_id,
-                            JournalEntryLine.account_id == bank_gl_account_id,
-                            JournalEntryLine.credit_amount.isnot(None),
-                            JournalEntryLine.credit_amount > 0,
-                        )
-                    )
-                    if not bank_jel:
-                        raise RuntimeError("No bank journal line found")
-
-                    svc.match_statement_line(
-                        db,
-                        organization_id=ORG_ID,
-                        statement_line_id=stmt_line.line_id,
-                        journal_line_id=bank_jel.line_id,
-                        matched_by=ADMIN_PERSON_ID,
-                        force_match=False,
-                    )
-                    db.commit()
-                    stats = Stats(
-                        **{**stats.__dict__, "employee_fixed": stats.employee_fixed + 1}
-                    )
-                    continue
-
-                if payment_type == "Pay" and party_type == "Supplier":
-                    se = db.scalar(
-                        select(SyncEntity).where(
-                            SyncEntity.organization_id == ORG_ID,
-                            SyncEntity.source_system == "erpnext",
-                            SyncEntity.source_doctype == "Payment Entry",
-                            SyncEntity.source_name == token,
-                        )
-                    )
-                    if not se or not se.target_id:
-                        stats = Stats(**{**stats.__dict__, "failed": stats.failed + 1})
-                        continue
-
-                    post_res = post_supplier_payment(
-                        db,
-                        organization_id=ORG_ID,
-                        payment_id=se.target_id,
-                        posting_date=date.fromisoformat(str(pe.get("posting_date"))),
-                        posted_by_user_id=ADMIN_PERSON_ID,
-                        idempotency_key=f"{ORG_ID}:AP:PAY:{se.target_id}:{token}:post:v1",
-                    )
-                    if not post_res.success or not post_res.journal_entry_id:
-                        raise RuntimeError(post_res.message)
-
-                    # Credit line uses SupplierPayment.bank_account_id (ERPNext account mapping)
-                    credit_jel = db.scalar(
-                        select(JournalEntryLine).where(
-                            JournalEntryLine.journal_entry_id
-                            == post_res.journal_entry_id,
-                            JournalEntryLine.credit_amount.isnot(None),
-                            JournalEntryLine.credit_amount > 0,
-                        )
-                    )
-                    if not credit_jel:
-                        raise RuntimeError("No credit journal line found")
-
-                    svc.match_statement_line(
-                        db,
-                        organization_id=ORG_ID,
-                        statement_line_id=stmt_line.line_id,
-                        journal_line_id=credit_jel.line_id,
-                        matched_by=ADMIN_PERSON_ID,
-                        force_match=False,
-                    )
-                    db.commit()
-                    stats = Stats(
-                        **{**stats.__dict__, "supplier_fixed": stats.supplier_fixed + 1}
-                    )
-                    continue
-
-                stats = Stats(**{**stats.__dict__, "failed": stats.failed + 1})
-            except Exception:
-                db.rollback()
-                stats = Stats(**{**stats.__dict__, "failed": stats.failed + 1})
-
-    print(stats)  # noqa: T201
 
 
 if __name__ == "__main__":

@@ -522,7 +522,7 @@ class DisciplineService:
     def acknowledge_response(
         self,
         response_id: UUID,
-        acknowledged_by_id: UUID | None = None,
+        acknowledged_by_id: UUID | None = None,  # noqa: ARG002 — part of public API
     ) -> CaseResponse:
         """Acknowledge that HR has reviewed the response."""
         response = self.db.get(CaseResponse, response_id)
@@ -1307,7 +1307,7 @@ class DisciplineService:
         self,
         case: DisciplinaryCase,
         action_data: CaseActionCreate,
-        assigned_by_id: UUID | None = None,
+        _assigned_by_id: UUID | None = None,
     ) -> None:
         """
         Trigger mandatory training assignment for corrective actions.

@@ -535,8 +535,8 @@ class PeriodGuardService(ListResponseMixin):
         db: Session,
         organization_id: UUID,
         fiscal_period_id: UUID,
-        reopened_by_user_id: UUID,
-        reopen_reason: str,
+        _reopened_by_user_id: UUID,
+        _reopen_reason: str,
     ) -> tuple[FiscalPeriod, UUID]:
         """
         Reopen a soft-closed period.

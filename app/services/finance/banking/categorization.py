@@ -634,7 +634,7 @@ class TransactionCategorizationService:
         db: Session,
         organization_id: UUID,
         statement_id: UUID,
-        applied_by: UUID | None = None,
+        _applied_by: UUID | None = None,
     ) -> BatchCategorizationResult:
         """
         Run categorization rules against unprocessed statement lines.
@@ -682,7 +682,7 @@ class TransactionCategorizationService:
         db: Session,
         organization_id: UUID,
         bank_account_id: UUID,
-        applied_by: UUID | None = None,
+        _applied_by: UUID | None = None,
     ) -> BatchCategorizationResult:
         """Run categorization rules against unprocessed lines for a bank account.
 
@@ -788,7 +788,7 @@ class TransactionCategorizationService:
         db: Session,
         organization_id: UUID,
         line_id: UUID,
-        accepted_by: UUID | None = None,
+        accepted_by: UUID | None = None,  # noqa: ARG002 — part of public API
     ) -> BankStatementLine:
         """
         Accept a categorization suggestion on a statement line.

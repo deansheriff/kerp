@@ -729,7 +729,7 @@ class SupplierPaymentService(ListResponseMixin):
         db: Session,
         organization_id: UUID,
         payment_id: UUID,
-        cleared_date: date,
+        cleared_date: date,  # noqa: ARG004 — part of public API, not yet used
     ) -> SupplierPayment:
         """
         Mark a payment as cleared (bank reconciliation).

@@ -403,7 +403,7 @@ class OpeningBalanceImporter:
         entry_date: date,
         description: str = "Opening Balance Entry",
         auto_create_accounts: bool = False,
-        post_immediately: bool = False,
+        _post_immediately: bool = False,
     ) -> OpeningBalanceResult:
         """
         Import opening balances and create journal entry.
