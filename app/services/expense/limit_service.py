@@ -1472,8 +1472,7 @@ class ExpenseLimitService(ExpenseServiceBase):
                 func.coalesce(
                     func.sum(ExpenseClaim.total_approved_amount), Decimal("0")
                 )
-            )
-            .where(
+            ).where(
                 ExpenseClaim.organization_id == org_id,
                 ExpenseClaim.approver_id == approver_id,
                 ExpenseClaim.status == ExpenseClaimStatus.PAID,
