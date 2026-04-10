@@ -267,6 +267,17 @@ def _invoice_line_view(line: InvoiceLine, currency_code: str) -> dict:
     }
 
 
+def _compute_receivable(invoice: Invoice) -> Decimal:
+    """Compute effective receivable after deductions."""
+    deductions = invoice.withholding_tax_amount or Decimal("0")
+    if getattr(invoice, "vat_withheld", False):
+        deductions += invoice.tax_amount or Decimal("0")
+    if (getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
+            and invoice.stamp_duty_amount):
+        deductions += invoice.stamp_duty_amount
+    return invoice.total_amount - deductions
+
+
 def _invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
     balance = invoice.total_amount - invoice.amount_paid
     today = date.today()
@@ -283,7 +294,45 @@ def _invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
         "tax_amount": _format_currency(invoice.tax_amount, invoice.currency_code),
         "total_amount": _format_currency(invoice.total_amount, invoice.currency_code),
         "amount_paid": _format_currency(invoice.amount_paid, invoice.currency_code),
+        "amount_paid_raw": float(invoice.amount_paid) if invoice.amount_paid else 0.0,
         "balance": _format_currency(balance, invoice.currency_code),
+        "withholding_tax": _format_currency(
+            invoice.withholding_tax_amount, invoice.currency_code
+        )
+        if invoice.withholding_tax_amount
+        else None,
+        "withholding_tax_raw": float(invoice.withholding_tax_amount)
+        if invoice.withholding_tax_amount
+        else 0,
+        "vat_withheld": getattr(invoice, "vat_withheld", False),
+        "vat_withheld_amount": _format_currency(
+            invoice.tax_amount, invoice.currency_code
+        )
+        if getattr(invoice, "vat_withheld", False)
+        else None,
+        "vat_withheld_amount_raw": float(invoice.tax_amount)
+        if getattr(invoice, "vat_withheld", False)
+        else 0,
+        "stamp_duty": _format_currency(
+            invoice.stamp_duty_amount, invoice.currency_code
+        )
+        if invoice.stamp_duty_amount
+        else None,
+        "stamp_duty_raw": float(invoice.stamp_duty_amount)
+        if invoice.stamp_duty_amount
+        else 0,
+        "stamp_duty_treatment_label": (
+            "Deducted" if getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
+            else "Paid Separately" if getattr(invoice, "stamp_duty_treatment", None) == "PAID_SEPARATELY"
+            else None
+        ),
+        "amount_receivable": _format_currency(
+            _compute_receivable(invoice), invoice.currency_code
+        )
+        if (invoice.withholding_tax_amount or getattr(invoice, "vat_withheld", False)
+            or (invoice.stamp_duty_amount and getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"))
+        else None,
+        "amount_receivable_raw": float(_compute_receivable(invoice)),
         "status": _invoice_status_label(invoice.status),
         "is_overdue": (
             invoice.due_date < today
@@ -533,6 +582,19 @@ class ARWebService:
         invoice_date = _parse_date(data.get("invoice_date")) or date.today()
         due_date = _parse_date(data.get("due_date")) or invoice_date
 
+        wht_code_id = (
+            UUID(data["wht_code_id"]) if data.get("wht_code_id") else None
+        )
+        stamp_duty_code_id = (
+            UUID(data["stamp_duty_code_id"])
+            if data.get("stamp_duty_code_id")
+            else None
+        )
+        stamp_duty_treatment = data.get("stamp_duty_treatment") or None
+        vat_withheld = data.get("vat_withheld") in (
+            "true", "True", True, "on", "1",
+        )
+
         return ARInvoiceInput(
             customer_id=UUID(data["customer_id"]),
             invoice_type=InvoiceType.STANDARD,
@@ -545,6 +607,10 @@ class ARWebService:
             notes=data.get("terms"),
             internal_notes=data.get("notes"),
             lines=lines,
+            wht_code_id=wht_code_id,
+            stamp_duty_code_id=stamp_duty_code_id,
+            stamp_duty_treatment=stamp_duty_treatment,
+            vat_withheld=vat_withheld,
         )
 
     @staticmethod
@@ -1032,25 +1098,72 @@ class ARWebService:
 
         revenue_accounts = _get_accounts(db, org_id, IFRSCategory.REVENUE)
 
+        from app.models.finance.tax.tax_code import TaxCode, TaxType
+
         tax_codes = [
             {
                 "tax_code_id": str(tax.tax_code_id),
                 "tax_code": tax.tax_code,
                 "tax_name": tax.tax_name,
-                "tax_rate": tax.tax_rate,  # Raw rate (e.g., 0.075 or 50.00 for fixed)
+                "tax_rate": tax.tax_rate,
                 "rate": (tax.tax_rate * 100).quantize(Decimal("0.01"))
                 if tax.tax_rate < 1
-                else tax.tax_rate,  # Display rate
+                else tax.tax_rate,
                 "is_inclusive": tax.is_inclusive,
                 "is_compound": tax.is_compound,
             }
-            for tax in tax_code_service.list(
-                db,
-                organization_id=org_id,
-                is_active=True,
-                applies_to_sales=True,
-                limit=200,
-            )
+            for tax in db.scalars(
+                select(TaxCode).where(
+                    TaxCode.organization_id == org_id,
+                    TaxCode.is_active.is_(True),
+                    TaxCode.applies_to_sales.is_(True),
+                    TaxCode.tax_type.notin_(
+                        [TaxType.WITHHOLDING, TaxType.STAMP_DUTY]
+                    ),
+                )
+            ).all()
+        ]
+
+        wht_codes = [
+            {
+                "tax_code_id": str(wht.tax_code_id),
+                "tax_code": wht.tax_code,
+                "tax_name": wht.tax_name,
+                "tax_rate": float(wht.tax_rate),
+                "rate_display": float(
+                    (wht.tax_rate * 100).quantize(Decimal("0.01"))
+                )
+                if wht.tax_rate < 1
+                else float(wht.tax_rate),
+            }
+            for wht in db.scalars(
+                select(TaxCode).where(
+                    TaxCode.organization_id == org_id,
+                    TaxCode.is_active.is_(True),
+                    TaxCode.tax_type == TaxType.WITHHOLDING,
+                )
+            ).all()
+        ]
+
+        stamp_duty_codes = [
+            {
+                "tax_code_id": str(sd.tax_code_id),
+                "tax_code": sd.tax_code,
+                "tax_name": sd.tax_name,
+                "tax_rate": float(sd.tax_rate),
+                "rate_display": float(
+                    (sd.tax_rate * 100).quantize(Decimal("0.01"))
+                )
+                if sd.tax_rate < 1
+                else float(sd.tax_rate),
+            }
+            for sd in db.scalars(
+                select(TaxCode).where(
+                    TaxCode.organization_id == org_id,
+                    TaxCode.is_active.is_(True),
+                    TaxCode.tax_type == TaxType.STAMP_DUTY,
+                )
+            ).all()
         ]
 
         items = db.scalars(
@@ -1078,6 +1191,8 @@ class ARWebService:
             "customers_list": customers_list,
             "revenue_accounts": revenue_accounts,
             "tax_codes": tax_codes,
+            "wht_codes": wht_codes,
+            "stamp_duty_codes": stamp_duty_codes,
             "items": item_options,
             "cost_centers": _get_cost_centers(db, org_id),
             "projects": _get_projects(db, org_id),
