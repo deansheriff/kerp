@@ -10,7 +10,6 @@ from __future__ import annotations
 from uuid import UUID
 
 
-
 ORG_ID = UUID("00000000-0000-0000-0000-000000000001")
 ADMIN_PERSON_ID = UUID("c8e5f2ee-4f9f-46d0-a6c7-22e4f717a58b")
 

@@ -82,11 +82,14 @@ class InventoryReturnWebService:
         org_id = coerce_uuid(organization_id)
         offset = (page - 1) * limit
 
-        total_count = db.scalar(
-            select(func.count())
-            .select_from(InventoryReturn)
-            .where(InventoryReturn.organization_id == org_id)
-        ) or 0
+        total_count = (
+            db.scalar(
+                select(func.count())
+                .select_from(InventoryReturn)
+                .where(InventoryReturn.organization_id == org_id)
+            )
+            or 0
+        )
 
         returns = list(
             db.scalars(
