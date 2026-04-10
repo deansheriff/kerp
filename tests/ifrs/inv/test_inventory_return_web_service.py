@@ -182,3 +182,27 @@ def test_list_context_returns_latest_records() -> None:
     assert context["total_pages"] == 1
     db.scalar.assert_called_once()
     db.scalars.assert_called_once()
+
+
+def test_detail_context_includes_created_by_name() -> None:
+    db = MagicMock()
+    org_id = uuid.uuid4()
+
+    inventory_return = MagicMock()
+    inventory_return.created_by_id = uuid.uuid4()
+
+    scalars_result = MagicMock()
+    scalars_result.first.return_value = inventory_return
+    db.scalars.return_value = scalars_result
+    db.scalar.return_value = "Jane Doe"
+
+    context = InventoryReturnWebService.detail_context(
+        db=db,
+        organization_id=str(org_id),
+        return_id=str(uuid.uuid4()),
+    )
+
+    assert context["inventory_return"] == inventory_return
+    assert context["created_by_name"] == "Jane Doe"
+    db.scalars.assert_called_once()
+    db.scalar.assert_called_once()

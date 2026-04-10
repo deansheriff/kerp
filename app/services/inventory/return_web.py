@@ -460,4 +460,15 @@ class InventoryReturnWebService:
         ).first()
         if not inventory_return:
             return {"inventory_return": None}
-        return {"inventory_return": inventory_return}
+        created_by_name: str | None = None
+        if inventory_return.created_by_id:
+            created_by_name = db.scalar(
+                select(Person.name_expr()).where(
+                    Person.id == inventory_return.created_by_id,
+                    Person.organization_id == org_id,
+                )
+            )
+        return {
+            "inventory_return": inventory_return,
+            "created_by_name": created_by_name,
+        }
