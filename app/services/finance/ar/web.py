@@ -272,8 +272,10 @@ def _compute_receivable(invoice: Invoice) -> Decimal:
     deductions = invoice.withholding_tax_amount or Decimal("0")
     if getattr(invoice, "vat_withheld", False):
         deductions += invoice.tax_amount or Decimal("0")
-    if (getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
-            and invoice.stamp_duty_amount):
+    if (
+        getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
+        and invoice.stamp_duty_amount
+    ):
         deductions += invoice.stamp_duty_amount
     return invoice.total_amount - deductions
 
@@ -313,24 +315,30 @@ def _invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
         "vat_withheld_amount_raw": float(invoice.tax_amount)
         if getattr(invoice, "vat_withheld", False)
         else 0,
-        "stamp_duty": _format_currency(
-            invoice.stamp_duty_amount, invoice.currency_code
-        )
+        "stamp_duty": _format_currency(invoice.stamp_duty_amount, invoice.currency_code)
         if invoice.stamp_duty_amount
         else None,
         "stamp_duty_raw": float(invoice.stamp_duty_amount)
         if invoice.stamp_duty_amount
         else 0,
         "stamp_duty_treatment_label": (
-            "Deducted" if getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
-            else "Paid Separately" if getattr(invoice, "stamp_duty_treatment", None) == "PAID_SEPARATELY"
+            "Deducted"
+            if getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
+            else "Paid Separately"
+            if getattr(invoice, "stamp_duty_treatment", None) == "PAID_SEPARATELY"
             else None
         ),
         "amount_receivable": _format_currency(
             _compute_receivable(invoice), invoice.currency_code
         )
-        if (invoice.withholding_tax_amount or getattr(invoice, "vat_withheld", False)
-            or (invoice.stamp_duty_amount and getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"))
+        if (
+            invoice.withholding_tax_amount
+            or getattr(invoice, "vat_withheld", False)
+            or (
+                invoice.stamp_duty_amount
+                and getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
+            )
+        )
         else None,
         "amount_receivable_raw": float(_compute_receivable(invoice)),
         "status": _invoice_status_label(invoice.status),
@@ -582,17 +590,17 @@ class ARWebService:
         invoice_date = _parse_date(data.get("invoice_date")) or date.today()
         due_date = _parse_date(data.get("due_date")) or invoice_date
 
-        wht_code_id = (
-            UUID(data["wht_code_id"]) if data.get("wht_code_id") else None
-        )
+        wht_code_id = UUID(data["wht_code_id"]) if data.get("wht_code_id") else None
         stamp_duty_code_id = (
-            UUID(data["stamp_duty_code_id"])
-            if data.get("stamp_duty_code_id")
-            else None
+            UUID(data["stamp_duty_code_id"]) if data.get("stamp_duty_code_id") else None
         )
         stamp_duty_treatment = data.get("stamp_duty_treatment") or None
         vat_withheld = data.get("vat_withheld") in (
-            "true", "True", True, "on", "1",
+            "true",
+            "True",
+            True,
+            "on",
+            "1",
         )
 
         return ARInvoiceInput(
@@ -1117,9 +1125,7 @@ class ARWebService:
                     TaxCode.organization_id == org_id,
                     TaxCode.is_active.is_(True),
                     TaxCode.applies_to_sales.is_(True),
-                    TaxCode.tax_type.notin_(
-                        [TaxType.WITHHOLDING, TaxType.STAMP_DUTY]
-                    ),
+                    TaxCode.tax_type.notin_([TaxType.WITHHOLDING, TaxType.STAMP_DUTY]),
                 )
             ).all()
         ]
@@ -1130,9 +1136,7 @@ class ARWebService:
                 "tax_code": wht.tax_code,
                 "tax_name": wht.tax_name,
                 "tax_rate": float(wht.tax_rate),
-                "rate_display": float(
-                    (wht.tax_rate * 100).quantize(Decimal("0.01"))
-                )
+                "rate_display": float((wht.tax_rate * 100).quantize(Decimal("0.01")))
                 if wht.tax_rate < 1
                 else float(wht.tax_rate),
             }
@@ -1151,9 +1155,7 @@ class ARWebService:
                 "tax_code": sd.tax_code,
                 "tax_name": sd.tax_name,
                 "tax_rate": float(sd.tax_rate),
-                "rate_display": float(
-                    (sd.tax_rate * 100).quantize(Decimal("0.01"))
-                )
+                "rate_display": float((sd.tax_rate * 100).quantize(Decimal("0.01")))
                 if sd.tax_rate < 1
                 else float(sd.tax_rate),
             }

@@ -1086,9 +1086,7 @@ class APWebService:
                     TaxCode.organization_id == org_id,
                     TaxCode.is_active.is_(True),
                     TaxCode.applies_to_purchases.is_(True),
-                    TaxCode.tax_type.notin_(
-                        [TaxType.WITHHOLDING, TaxType.STAMP_DUTY]
-                    ),
+                    TaxCode.tax_type.notin_([TaxType.WITHHOLDING, TaxType.STAMP_DUTY]),
                 )
             ).all()
         ]

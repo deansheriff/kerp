@@ -6,8 +6,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-import pytest
-
 from app.services.finance.tax.tax_calculation import TaxCalculationService
 
 
