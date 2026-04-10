@@ -190,11 +190,12 @@ def test_detail_context_includes_created_by_name() -> None:
 
     inventory_return = MagicMock()
     inventory_return.created_by_id = uuid.uuid4()
+    inventory_return.updated_by_id = uuid.uuid4()
 
     scalars_result = MagicMock()
     scalars_result.first.return_value = inventory_return
     db.scalars.return_value = scalars_result
-    db.scalar.return_value = "Jane Doe"
+    db.scalar.side_effect = ["Jane Doe", "John Doe"]
 
     context = InventoryReturnWebService.detail_context(
         db=db,
@@ -204,5 +205,6 @@ def test_detail_context_includes_created_by_name() -> None:
 
     assert context["inventory_return"] == inventory_return
     assert context["created_by_name"] == "Jane Doe"
+    assert context["updated_by_name"] == "John Doe"
     db.scalars.assert_called_once()
-    db.scalar.assert_called_once()
+    assert db.scalar.call_count == 2

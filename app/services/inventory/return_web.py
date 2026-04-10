@@ -442,6 +442,16 @@ class InventoryReturnWebService:
     def detail_context(
         db: Session, organization_id: str, return_id: str
     ) -> dict[str, Any]:
+        def _resolve_person_name(person_id: UUID | None) -> str | None:
+            if not person_id:
+                return None
+            return db.scalar(
+                select(Person.name_expr()).where(
+                    Person.id == person_id,
+                    Person.organization_id == org_id,
+                )
+            )
+
         org_id = coerce_uuid(organization_id)
         inventory_return = db.scalars(
             select(InventoryReturn)
@@ -460,15 +470,10 @@ class InventoryReturnWebService:
         ).first()
         if not inventory_return:
             return {"inventory_return": None}
-        created_by_name: str | None = None
-        if inventory_return.created_by_id:
-            created_by_name = db.scalar(
-                select(Person.name_expr()).where(
-                    Person.id == inventory_return.created_by_id,
-                    Person.organization_id == org_id,
-                )
-            )
+        created_by_name = _resolve_person_name(inventory_return.created_by_id)
+        updated_by_name = _resolve_person_name(inventory_return.updated_by_id)
         return {
             "inventory_return": inventory_return,
             "created_by_name": created_by_name,
+            "updated_by_name": updated_by_name,
         }

@@ -137,6 +137,10 @@ class InventoryReturn(Base):
         UUID(as_uuid=True),
         nullable=True,
     )
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

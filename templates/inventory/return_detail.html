@@ -28,6 +28,7 @@
             <div class="text-right text-sm text-slate-500 dark:text-slate-400">
                 <p>Date: <span class="font-medium text-slate-900 dark:text-white">{{ inventory_return.return_date | format_date if inventory_return.return_date else '-' }}</span></p>
                 <p>Created By: <span class="font-medium text-slate-900 dark:text-white">{{ created_by_name or '-' }}</span></p>
+                <p>Updated By: <span class="font-medium text-slate-900 dark:text-white">{{ updated_by_name or '-' }}</span></p>
                 <p>ID: <span class="font-mono text-xs">{{ inventory_return.return_id }}</span></p>
             </div>
         </div>
