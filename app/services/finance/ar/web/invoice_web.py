@@ -45,7 +45,6 @@ from app.services.finance.ar.web.base import (
 )
 from app.services.finance.common.attachment import AttachmentInput, attachment_service
 from app.services.finance.platform.currency_context import get_currency_context
-from app.services.finance.tax.tax_master import tax_code_service
 from app.services.people.payroll.payslip_pdf import PayslipPDFService
 from app.services.recent_activity import get_recent_activity
 from app.templates import templates
@@ -334,13 +333,58 @@ class InvoiceWebService:
                 "is_inclusive": tax.is_inclusive,
                 "is_compound": tax.is_compound,
             }
-            for tax in tax_code_service.list(
-                db,
-                organization_id=org_id,
-                is_active=True,
-                applies_to_sales=True,
-                limit=200,
-            )
+            for tax in db.scalars(
+                select(TaxCode).where(
+                    TaxCode.organization_id == org_id,
+                    TaxCode.is_active.is_(True),
+                    TaxCode.applies_to_sales.is_(True),
+                    TaxCode.tax_type.notin_(
+                        [TaxType.WITHHOLDING, TaxType.STAMP_DUTY]
+                    ),
+                )
+            ).all()
+        ]
+
+        wht_codes = [
+            {
+                "tax_code_id": str(wht.tax_code_id),
+                "tax_code": wht.tax_code,
+                "tax_name": wht.tax_name,
+                "tax_rate": float(wht.tax_rate),
+                "rate_display": float(
+                    (wht.tax_rate * 100).quantize(Decimal("0.01"))
+                )
+                if wht.tax_rate < 1
+                else float(wht.tax_rate),
+            }
+            for wht in db.scalars(
+                select(TaxCode).where(
+                    TaxCode.organization_id == org_id,
+                    TaxCode.is_active.is_(True),
+                    TaxCode.tax_type == TaxType.WITHHOLDING,
+                )
+            ).all()
+        ]
+
+        stamp_duty_codes = [
+            {
+                "tax_code_id": str(sd.tax_code_id),
+                "tax_code": sd.tax_code,
+                "tax_name": sd.tax_name,
+                "tax_rate": float(sd.tax_rate),
+                "rate_display": float(
+                    (sd.tax_rate * 100).quantize(Decimal("0.01"))
+                )
+                if sd.tax_rate < 1
+                else float(sd.tax_rate),
+            }
+            for sd in db.scalars(
+                select(TaxCode).where(
+                    TaxCode.organization_id == org_id,
+                    TaxCode.is_active.is_(True),
+                    TaxCode.tax_type == TaxType.STAMP_DUTY,
+                )
+            ).all()
         ]
 
         items = list(
@@ -372,6 +416,8 @@ class InvoiceWebService:
             "customers_list": customers_list,
             "revenue_accounts": revenue_accounts,
             "tax_codes": tax_codes,
+            "wht_codes": wht_codes,
+            "stamp_duty_codes": stamp_duty_codes,
             "items": item_options,
             "cost_centers": get_cost_centers(db, org_id),
             "projects": get_projects(db, org_id),
