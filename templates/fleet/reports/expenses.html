@@ -26,7 +26,7 @@
             <div>
                 <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Expenses by Vehicle</h2>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Shows expense claims where a Fleet vehicle was selected.
+                    Shows paid expense claims where a Fleet vehicle was selected.
                 </p>
             </div>
             <a href="/fleet/reports" class="btn btn-secondary">Back</a>
@@ -44,8 +44,8 @@
             {"label": "Claims", "class": "text-right"},
             {"label": "Total", "class": "text-right"}
         ],
-        empty_title="No linked expenses",
-        empty_description="Create an expense claim and assign a Fleet vehicle to start tracking costs."
+        empty_title="No paid linked expenses",
+        empty_description="Assign a Fleet vehicle to an expense claim and mark it paid to start tracking costs here."
     ) %}
         {% for row in vehicle_rows %}
         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">

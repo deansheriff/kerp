@@ -292,7 +292,7 @@ class FleetWebService:
                     .where(
                         ExpenseClaim.organization_id == org_id,
                         ExpenseClaim.vehicle_id.is_not(None),
-                        ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+                        ExpenseClaim.status == ExpenseClaimStatus.PAID,
                     )
                 ).scalar_one()
                 or 0
@@ -360,7 +360,7 @@ class FleetWebService:
                 .where(
                     ExpenseClaim.organization_id == org_id,
                     ExpenseClaim.vehicle_id.is_not(None),
-                    ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+                    ExpenseClaim.status == ExpenseClaimStatus.PAID,
                 )
                 .group_by(ExpenseClaim.vehicle_id)
             ).all()
@@ -418,7 +418,7 @@ class FleetWebService:
         claim_filters = [
             ExpenseClaim.organization_id == org_id,
             ExpenseClaim.vehicle_id == vid,
-            ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+            ExpenseClaim.status == ExpenseClaimStatus.PAID,
             *self._report_date_conditions(
                 ExpenseClaim.claim_date,
                 start_date=start_date,
@@ -439,7 +439,7 @@ class FleetWebService:
                     .where(
                         ExpenseClaim.organization_id == org_id,
                         ExpenseClaim.vehicle_id == vid,
-                        ExpenseClaim.status != ExpenseClaimStatus.CANCELLED,
+                        ExpenseClaim.status == ExpenseClaimStatus.PAID,
                     )
                     .distinct()
                     .order_by(func.extract("year", ExpenseClaim.claim_date).desc())
