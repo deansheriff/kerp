@@ -1,7 +1,7 @@
 """Add stamp_duty_treatment and vat_withheld to ar.invoice.
 
 Revision ID: 20260410_ar_deductions
-Revises: 20260410_repair_expense_claim_action_constraints
+Revises: 20260403_add_appraisal_template_pms_config, 20260410_add_inventory_return_updated_by
 Create Date: 2026-04-10
 """
 
@@ -12,7 +12,10 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20260410_ar_deductions"
-down_revision = "20260410_repair_expense_claim_action_constraints"
+down_revision = (
+    "20260403_add_appraisal_template_pms_config",
+    "20260410_add_inventory_return_updated_by",
+)
 branch_labels = None
 depends_on = None
 

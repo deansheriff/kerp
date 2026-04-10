@@ -218,9 +218,7 @@ class Invoice(Base, VersionedMixin, TrackedMixin):
     stamp_duty_code_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
-    stamp_duty_treatment: Mapped[str | None] = mapped_column(
-        String(20), nullable=True
-    )
+    stamp_duty_treatment: Mapped[str | None] = mapped_column(String(20), nullable=True)
     vat_withheld: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )

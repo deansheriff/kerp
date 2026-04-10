@@ -347,9 +347,7 @@ def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
         "vat_withheld_amount_raw": float(invoice.tax_amount)
         if getattr(invoice, "vat_withheld", False)
         else 0,
-        "stamp_duty": format_currency(
-            invoice.stamp_duty_amount, invoice.currency_code
-        )
+        "stamp_duty": format_currency(invoice.stamp_duty_amount, invoice.currency_code)
         if invoice.stamp_duty_amount
         else None,
         "stamp_duty_raw": float(invoice.stamp_duty_amount)
