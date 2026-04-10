@@ -153,3 +153,32 @@ def test_create_return_from_form_material_request_blocks_over_return() -> None:
             lot_number=None,
             serial_numbers_text=None,
         )
+
+
+def test_list_context_returns_latest_records() -> None:
+    db = MagicMock()
+    org_id = uuid.uuid4()
+
+    first_return = MagicMock()
+    second_return = MagicMock()
+
+    returns_result = MagicMock()
+    returns_result.all.return_value = [first_return, second_return]
+
+    db.scalar.return_value = 2
+    db.scalars.return_value = returns_result
+
+    context = InventoryReturnWebService.list_context(
+        db=db,
+        organization_id=str(org_id),
+        page=1,
+        limit=50,
+    )
+
+    assert context["returns"] == [first_return, second_return]
+    assert context["page"] == 1
+    assert context["limit"] == 50
+    assert context["total_count"] == 2
+    assert context["total_pages"] == 1
+    db.scalar.assert_called_once()
+    db.scalars.assert_called_once()

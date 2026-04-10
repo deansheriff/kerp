@@ -123,6 +123,43 @@ class OperationsInventoryWebService:
             request, "inventory/material_requests.html", context
         )
 
+    def inventory_return_list_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        page: int = 1,
+        limit: int = 50,
+    ) -> HTMLResponse:
+        """Inventory return list page."""
+        context = base_context(request, auth, "Returned Items", "transactions")
+        org_id_str = self._org_id_str(auth)
+        try:
+            context.update(
+                InventoryReturnWebService.list_context(
+                    db,
+                    org_id_str,
+                    page=page,
+                    limit=limit,
+                )
+            )
+        except Exception:
+            logger.exception(
+                "Failed to render inventory returns list",
+                extra={"organization_id": org_id_str},
+            )
+            context.update(
+                {
+                    "returns": [],
+                    "page": page,
+                    "limit": limit,
+                    "total_count": 0,
+                    "total_pages": 1,
+                    "error": "Unable to load returned items right now.",
+                }
+            )
+        return templates.TemplateResponse(request, "inventory/returns.html", context)
+
     def new_material_request_form_response(
         self,
         request: Request,

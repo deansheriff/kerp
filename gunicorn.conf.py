@@ -3,12 +3,24 @@
 import multiprocessing
 import os
 
+
+def _int_env(name: str, default: int) -> int:
+    """Parse integer environment variables with safe fallback."""
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return default
+    try:
+        return int(raw_value)
+    except ValueError:
+        return default
+
+
 # Server socket
 bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8002")
 backlog = 2048
 
 # Worker processes
-workers = int(os.getenv("GUNICORN_WORKERS", multiprocessing.cpu_count() * 2 + 1))
+workers = _int_env("GUNICORN_WORKERS", multiprocessing.cpu_count() * 2 + 1)
 worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 1000
 timeout = 120

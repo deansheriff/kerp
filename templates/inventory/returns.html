@@ -1,0 +1,111 @@
+{% extends "inventory/base_inventory.html" %}
+{% from "components/macros.html" import empty_state, icon_svg, pagination, status_badge %}
+
+{% block page_title %}Returned Items{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/inventory" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Inventory</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Returned Items</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<a href="/inventory/returns/new" class="btn btn-primary">
+    {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
+    New Return
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="card p-6">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Returned Items</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Review stock already returned to store and drill into the posting details.
+                </p>
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                {{ total_count }} return{{ '' if total_count == 1 else 's' }} recorded
+            </p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <div id="results-container" class="card overflow-hidden">
+        {% if returns %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Return #</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Item</th>
+                        <th scope="col">From</th>
+                        <th scope="col">To</th>
+                        <th scope="col" class="text-right">Quantity</th>
+                        <th scope="col">Mode</th>
+                        <th scope="col">Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inventory_return in returns %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td>
+                            <a href="/inventory/returns/{{ inventory_return.return_id }}" class="font-mono text-amber-600 hover:text-amber-700 dark:text-amber-400">
+                                {{ inventory_return.return_number }}
+                            </a>
+                        </td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
+                            {{ inventory_return.return_date | format_date if inventory_return.return_date else '-' }}
+                        </td>
+                        <td>
+                            <p class="text-sm font-medium text-slate-900 dark:text-white">
+                                {{ inventory_return.item.item_code if inventory_return.item else '-' }}
+                            </p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                {{ inventory_return.item.item_name if inventory_return.item else '-' }}
+                            </p>
+                        </td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
+                            {{ inventory_return.source_warehouse.warehouse_name if inventory_return.source_warehouse else '-' }}
+                        </td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
+                            {{ inventory_return.destination_warehouse.warehouse_name if inventory_return.destination_warehouse else '-' }}
+                        </td>
+                        <td class="table-cell-amount text-slate-900 dark:text-white">
+                            {{ '{:,.2f}'.format(inventory_return.quantity or 0) }} {{ inventory_return.uom or '' }}
+                        </td>
+                        <td>{{ status_badge(inventory_return.return_mode.value) }}</td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">
+                            {{ inventory_return.reference if inventory_return.reference else '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12">
+            {{ empty_state("No returned items yet", "Returned stock will appear here once users record returns to store.", "arrow-uturn-left") }}
+        </div>
+        {% endif %}
+
+        {{ pagination(
+            page=page | default(1),
+            total_pages=total_pages | default(1),
+            total_count=total_count | default(returns | length if returns else 0),
+            limit=limit | default(50)
+        ) }}
+    </div>
+</div>
+{% endblock %}

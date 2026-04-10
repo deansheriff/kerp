@@ -32,8 +32,8 @@
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
-        <li><a href="/inventory/items" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Inventory</a></li>
-        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/inventory/transactions" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Transactions</a></li>
+        <li><a href="/inventory" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Inventory</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/inventory/returns" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Returned Items</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Return to Store</span></li>
     </ol>
 </nav>
@@ -184,7 +184,7 @@
         </div>
 
         <div class="flex items-center justify-end gap-3 border-t border-slate-200 pt-6 dark:border-slate-700">
-            <a href="/inventory/transactions" class="btn btn-secondary">Cancel</a>
+            <a href="/inventory/returns" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-primary">
                 {{ icon_svg("check", "w-4 h-4 mr-2") }}
                 Record Return

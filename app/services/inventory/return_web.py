@@ -71,6 +71,52 @@ class InventoryReturnWebService:
         }
 
     @staticmethod
+    def list_context(
+        db: Session,
+        organization_id: str,
+        *,
+        page: int = 1,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Build context for the inventory returns list."""
+        org_id = coerce_uuid(organization_id)
+        offset = (page - 1) * limit
+
+        total_count = db.scalar(
+            select(func.count())
+            .select_from(InventoryReturn)
+            .where(InventoryReturn.organization_id == org_id)
+        ) or 0
+
+        returns = list(
+            db.scalars(
+                select(InventoryReturn)
+                .options(
+                    joinedload(InventoryReturn.item),
+                    joinedload(InventoryReturn.source_warehouse),
+                    joinedload(InventoryReturn.destination_warehouse),
+                    joinedload(InventoryReturn.material_request),
+                )
+                .where(InventoryReturn.organization_id == org_id)
+                .order_by(
+                    InventoryReturn.return_date.desc(),
+                    InventoryReturn.created_at.desc(),
+                )
+                .offset(offset)
+                .limit(limit)
+            ).all()
+        )
+
+        total_pages = max(1, (total_count + limit - 1) // limit)
+        return {
+            "returns": returns,
+            "page": page,
+            "limit": limit,
+            "total_count": total_count,
+            "total_pages": total_pages,
+        }
+
+    @staticmethod
     def material_request_typeahead(
         db: Session,
         organization_id: str,

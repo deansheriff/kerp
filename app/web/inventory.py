@@ -679,6 +679,24 @@ def new_inventory_return_form(
     )
 
 
+@router.get("/returns", response_class=HTMLResponse)
+def inventory_return_list(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=100),
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Inventory returned-items list page."""
+    return operations_inv_web_service.inventory_return_list_response(
+        request=request,
+        auth=auth,
+        db=db,
+        page=page,
+        limit=limit,
+    )
+
+
 @router.post("/returns/new")
 async def create_inventory_return(
     request: Request,
