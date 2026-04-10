@@ -290,14 +290,16 @@ def invoice_line_view(line: InvoiceLine, currency_code: str) -> dict:
 
 def _compute_receivable(invoice: Invoice) -> Decimal:
     """Compute effective receivable after deductions."""
-    deductions = invoice.withholding_tax_amount or Decimal("0")
+    withholding_tax_amount = getattr(invoice, "withholding_tax_amount", Decimal("0"))
+    stamp_duty_amount = getattr(invoice, "stamp_duty_amount", Decimal("0"))
+    deductions = withholding_tax_amount or Decimal("0")
     if getattr(invoice, "vat_withheld", False):
         deductions += invoice.tax_amount or Decimal("0")
     if (
         getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
-        and invoice.stamp_duty_amount
+        and stamp_duty_amount
     ):
-        deductions += invoice.stamp_duty_amount
+        deductions += stamp_duty_amount
     return invoice.total_amount - deductions
 
 
@@ -306,6 +308,8 @@ def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
     balance = invoice.total_amount - invoice.amount_paid
     today = date.today()
     discount_amount = getattr(invoice, "discount_amount", None)
+    withholding_tax_amount = getattr(invoice, "withholding_tax_amount", Decimal("0"))
+    stamp_duty_amount = getattr(invoice, "stamp_duty_amount", Decimal("0"))
     return {
         "invoice_id": invoice.invoice_id,
         "invoice_number": invoice.invoice_number,
@@ -331,12 +335,12 @@ def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
         "balance": format_currency(balance, invoice.currency_code),
         "balance_due": balance,
         "withholding_tax": format_currency(
-            invoice.withholding_tax_amount, invoice.currency_code
+            withholding_tax_amount, invoice.currency_code
         )
-        if invoice.withholding_tax_amount
+        if withholding_tax_amount
         else None,
-        "withholding_tax_raw": float(invoice.withholding_tax_amount)
-        if invoice.withholding_tax_amount
+        "withholding_tax_raw": float(withholding_tax_amount)
+        if withholding_tax_amount
         else 0,
         "vat_withheld": getattr(invoice, "vat_withheld", False),
         "vat_withheld_amount": format_currency(
@@ -347,12 +351,10 @@ def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
         "vat_withheld_amount_raw": float(invoice.tax_amount)
         if getattr(invoice, "vat_withheld", False)
         else 0,
-        "stamp_duty": format_currency(invoice.stamp_duty_amount, invoice.currency_code)
-        if invoice.stamp_duty_amount
+        "stamp_duty": format_currency(stamp_duty_amount, invoice.currency_code)
+        if stamp_duty_amount
         else None,
-        "stamp_duty_raw": float(invoice.stamp_duty_amount)
-        if invoice.stamp_duty_amount
-        else 0,
+        "stamp_duty_raw": float(stamp_duty_amount) if stamp_duty_amount else 0,
         "stamp_duty_treatment_label": (
             "Deducted"
             if getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
@@ -364,10 +366,10 @@ def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
             _compute_receivable(invoice), invoice.currency_code
         )
         if (
-            invoice.withholding_tax_amount
+            withholding_tax_amount
             or getattr(invoice, "vat_withheld", False)
             or (
-                invoice.stamp_duty_amount
+                stamp_duty_amount
                 and getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
             )
         )

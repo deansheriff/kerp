@@ -45,6 +45,7 @@ from app.services.finance.ar.web.base import (
 )
 from app.services.finance.common.attachment import AttachmentInput, attachment_service
 from app.services.finance.platform.currency_context import get_currency_context
+from app.services.finance.tax.tax_master import tax_code_service
 from app.services.people.payroll.payslip_pdf import PayslipPDFService
 from app.services.recent_activity import get_recent_activity
 from app.templates import templates
@@ -321,6 +322,18 @@ class InvoiceWebService:
 
         revenue_accounts = get_accounts(db, org_id, IFRSCategory.REVENUE)
 
+        sale_tax_codes = [
+            tax
+            for tax in tax_code_service.list(
+                db,
+                organization_id=org_id,
+                is_active=True,
+                applies_to_sales=True,
+                limit=200,
+            )
+            if tax.tax_type not in {TaxType.WITHHOLDING, TaxType.STAMP_DUTY}
+        ]
+
         tax_codes = [
             {
                 "tax_code_id": str(tax.tax_code_id),
@@ -333,14 +346,7 @@ class InvoiceWebService:
                 "is_inclusive": tax.is_inclusive,
                 "is_compound": tax.is_compound,
             }
-            for tax in db.scalars(
-                select(TaxCode).where(
-                    TaxCode.organization_id == org_id,
-                    TaxCode.is_active.is_(True),
-                    TaxCode.applies_to_sales.is_(True),
-                    TaxCode.tax_type.notin_([TaxType.WITHHOLDING, TaxType.STAMP_DUTY]),
-                )
-            ).all()
+            for tax in sale_tax_codes
         ]
 
         wht_codes = [
