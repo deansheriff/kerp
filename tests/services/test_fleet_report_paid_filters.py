@@ -103,7 +103,9 @@ class _VehicleServiceStub:
 
 def test_reports_expenses_context_filters_to_paid_claims(monkeypatch):
     db = _FakeDb()
-    monkeypatch.setattr("app.services.fleet.web.fleet_web.inspect", lambda bind: _InspectorStub())
+    monkeypatch.setattr(
+        "app.services.fleet.web.fleet_web.inspect", lambda bind: _InspectorStub()
+    )
     monkeypatch.setattr(
         "app.services.fleet.web.fleet_web.VehicleService",
         _VehicleServiceStub,
@@ -127,7 +129,9 @@ def test_reports_expense_vehicle_context_filters_all_queries_to_paid_claims(
     monkeypatch,
 ):
     db = _FakeDb()
-    monkeypatch.setattr("app.services.fleet.web.fleet_web.inspect", lambda bind: _InspectorStub())
+    monkeypatch.setattr(
+        "app.services.fleet.web.fleet_web.inspect", lambda bind: _InspectorStub()
+    )
     monkeypatch.setattr(
         "app.services.fleet.web.fleet_web.VehicleService",
         _VehicleServiceStub,
@@ -146,9 +150,7 @@ def test_reports_expense_vehicle_context_filters_all_queries_to_paid_claims(
         stmt_text = str(stmt)
         params = stmt.compile().params
         status_params = {
-            key: value
-            for key, value in params.items()
-            if key.startswith("status_")
+            key: value for key, value in params.items() if key.startswith("status_")
         }
 
         assert "expense.expense_claim.status = :" in stmt_text
