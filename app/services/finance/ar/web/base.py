@@ -288,19 +288,6 @@ def invoice_line_view(line: InvoiceLine, currency_code: str) -> dict:
     }
 
 
-def _compute_receivable(invoice: Invoice) -> Decimal:
-    """Compute effective receivable after deductions."""
-    deductions = invoice.withholding_tax_amount or Decimal("0")
-    if getattr(invoice, "vat_withheld", False):
-        deductions += invoice.tax_amount or Decimal("0")
-    if (
-        getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
-        and invoice.stamp_duty_amount
-    ):
-        deductions += invoice.stamp_duty_amount
-    return invoice.total_amount - deductions
-
-
 def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
     """Transform invoice to detail view."""
     balance = invoice.total_amount - invoice.amount_paid
@@ -330,51 +317,6 @@ def invoice_detail_view(invoice: Invoice, customer: Customer | None) -> dict:
         "amount_paid_raw": float(invoice.amount_paid),
         "balance": format_currency(balance, invoice.currency_code),
         "balance_due": balance,
-        "withholding_tax": format_currency(
-            invoice.withholding_tax_amount, invoice.currency_code
-        )
-        if invoice.withholding_tax_amount
-        else None,
-        "withholding_tax_raw": float(invoice.withholding_tax_amount)
-        if invoice.withholding_tax_amount
-        else 0,
-        "vat_withheld": getattr(invoice, "vat_withheld", False),
-        "vat_withheld_amount": format_currency(
-            invoice.tax_amount, invoice.currency_code
-        )
-        if getattr(invoice, "vat_withheld", False)
-        else None,
-        "vat_withheld_amount_raw": float(invoice.tax_amount)
-        if getattr(invoice, "vat_withheld", False)
-        else 0,
-        "stamp_duty": format_currency(
-            invoice.stamp_duty_amount, invoice.currency_code
-        )
-        if invoice.stamp_duty_amount
-        else None,
-        "stamp_duty_raw": float(invoice.stamp_duty_amount)
-        if invoice.stamp_duty_amount
-        else 0,
-        "stamp_duty_treatment_label": (
-            "Deducted"
-            if getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
-            else "Paid Separately"
-            if getattr(invoice, "stamp_duty_treatment", None) == "PAID_SEPARATELY"
-            else None
-        ),
-        "amount_receivable": format_currency(
-            _compute_receivable(invoice), invoice.currency_code
-        )
-        if (
-            invoice.withholding_tax_amount
-            or getattr(invoice, "vat_withheld", False)
-            or (
-                invoice.stamp_duty_amount
-                and getattr(invoice, "stamp_duty_treatment", None) == "DEDUCTED"
-            )
-        )
-        else None,
-        "amount_receivable_raw": float(_compute_receivable(invoice)),
         "status": invoice_status_label(invoice.status),
         "is_overdue": (
             invoice.due_date < today
