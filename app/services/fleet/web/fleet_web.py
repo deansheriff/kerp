@@ -59,6 +59,11 @@ logger = logging.getLogger(__name__)
 class FleetWebService:
     """Web service methods for fleet management pages."""
 
+    REPORT_EXPENSE_CATEGORY_NAMES = (
+        "Vehicle Fuel Expense",
+        "Car Repairs and Maintenance",
+    )
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -342,9 +347,11 @@ class FleetWebService:
         )
 
         vehicle_totals: dict[UUID, dict[str, Any]] = {}
-        if inspector.has_table("expense_claim", schema="expense"):
+        if inspector.has_table("expense_claim_item", schema="expense"):
             from app.models.expense.expense_claim import (
+                ExpenseCategory,
                 ExpenseClaim,
+                ExpenseClaimItem,
                 ExpenseClaimStatus,
             )
             from sqlalchemy import func
@@ -352,15 +359,26 @@ class FleetWebService:
             rows = self.db.execute(
                 sa_select(
                     ExpenseClaim.vehicle_id,
-                    func.count(ExpenseClaim.claim_id).label("claim_count"),
-                    func.coalesce(func.sum(ExpenseClaim.total_claimed_amount), 0).label(
+                    func.count(func.distinct(ExpenseClaim.claim_id)).label(
+                        "claim_count"
+                    ),
+                    func.coalesce(func.sum(ExpenseClaimItem.claimed_amount), 0).label(
                         "total_amount"
                     ),
+                )
+                .select_from(ExpenseClaimItem)
+                .join(ExpenseClaim, ExpenseClaim.claim_id == ExpenseClaimItem.claim_id)
+                .join(
+                    ExpenseCategory,
+                    ExpenseCategory.category_id == ExpenseClaimItem.category_id,
                 )
                 .where(
                     ExpenseClaim.organization_id == org_id,
                     ExpenseClaim.vehicle_id.is_not(None),
                     ExpenseClaim.status == ExpenseClaimStatus.PAID,
+                    ExpenseCategory.category_name.in_(
+                        self.REPORT_EXPENSE_CATEGORY_NAMES
+                    ),
                 )
                 .group_by(ExpenseClaim.vehicle_id)
             ).all()
@@ -430,16 +448,28 @@ class FleetWebService:
         available_years: list[int] = []
 
         if inspector.has_table("expense_claim", schema="expense"):
+            from app.models.expense.expense_claim import ExpenseCategory
+            from app.models.expense.expense_claim import ExpenseClaimItem
             from sqlalchemy import func
 
             available_years = [
                 int(year_value)
                 for year_value in self.db.scalars(
                     sa_select(func.extract("year", ExpenseClaim.claim_date))
+                    .select_from(ExpenseClaimItem)
+                    .join(
+                        ExpenseClaim,
+                        ExpenseClaim.claim_id == ExpenseClaimItem.claim_id,
+                    )
+                    .join(
+                        ExpenseCategory,
+                        ExpenseCategory.category_id == ExpenseClaimItem.category_id,
+                    )
                     .where(
-                        ExpenseClaim.organization_id == org_id,
-                        ExpenseClaim.vehicle_id == vid,
-                        ExpenseClaim.status == ExpenseClaimStatus.PAID,
+                        *claim_filters,
+                        ExpenseCategory.category_name.in_(
+                            self.REPORT_EXPENSE_CATEGORY_NAMES
+                        ),
                     )
                     .distinct()
                     .order_by(func.extract("year", ExpenseClaim.claim_date).desc())
@@ -448,11 +478,25 @@ class FleetWebService:
             ]
             row = self.db.execute(
                 sa_select(
-                    func.count(ExpenseClaim.claim_id).label("claim_count"),
-                    func.coalesce(func.sum(ExpenseClaim.total_claimed_amount), 0).label(
+                    func.count(func.distinct(ExpenseClaim.claim_id)).label(
+                        "claim_count"
+                    ),
+                    func.coalesce(func.sum(ExpenseClaimItem.claimed_amount), 0).label(
                         "total_amount"
                     ),
-                ).where(*claim_filters)
+                )
+                .select_from(ExpenseClaimItem)
+                .join(ExpenseClaim, ExpenseClaim.claim_id == ExpenseClaimItem.claim_id)
+                .join(
+                    ExpenseCategory,
+                    ExpenseCategory.category_id == ExpenseClaimItem.category_id,
+                )
+                .where(
+                    *claim_filters,
+                    ExpenseCategory.category_name.in_(
+                        self.REPORT_EXPENSE_CATEGORY_NAMES
+                    ),
+                )
             ).one()
             claim_count = int(row.claim_count or 0)
             total_amount = row.total_amount or Decimal("0")
@@ -486,6 +530,9 @@ class FleetWebService:
                     )
                     .where(
                         *claim_filters,
+                        ExpenseCategory.category_name.in_(
+                            self.REPORT_EXPENSE_CATEGORY_NAMES
+                        ),
                     )
                     .group_by(ExpenseCategory.category_name)
                     .order_by(total_amount_expr.desc())
@@ -494,17 +541,44 @@ class FleetWebService:
 
             claim_rows = [
                 {
-                    "claim_id": claim.claim_id,
-                    "claim_number": claim.claim_number,
-                    "claim_date": claim.claim_date,
-                    "status": claim.status.value if claim.status else "",
-                    "total_amount": claim.total_claimed_amount or Decimal("0"),
+                    "claim_id": claim_id,
+                    "claim_number": claim_number,
+                    "claim_date": claim_date,
+                    "status": status.value if status else "",
+                    "total_amount": claim_total or Decimal("0"),
                 }
-                for claim in self.db.scalars(
-                    sa_select(ExpenseClaim)
-                    .where(*claim_filters)
+                for claim_id, claim_number, claim_date, status, claim_total in self.db.execute(
+                    sa_select(
+                        ExpenseClaim.claim_id,
+                        ExpenseClaim.claim_number,
+                        ExpenseClaim.claim_date,
+                        ExpenseClaim.status,
+                        func.coalesce(func.sum(ExpenseClaimItem.claimed_amount), 0),
+                    )
+                    .select_from(ExpenseClaimItem)
+                    .join(
+                        ExpenseClaim,
+                        ExpenseClaim.claim_id == ExpenseClaimItem.claim_id,
+                    )
+                    .join(
+                        ExpenseCategory,
+                        ExpenseCategory.category_id == ExpenseClaimItem.category_id,
+                    )
+                    .where(
+                        *claim_filters,
+                        ExpenseCategory.category_name.in_(
+                            self.REPORT_EXPENSE_CATEGORY_NAMES
+                        ),
+                    )
+                    .group_by(
+                        ExpenseClaim.claim_id,
+                        ExpenseClaim.claim_number,
+                        ExpenseClaim.claim_date,
+                        ExpenseClaim.status,
+                    )
                     .order_by(
-                        ExpenseClaim.claim_date.desc(), ExpenseClaim.claim_number.desc()
+                        ExpenseClaim.claim_date.desc(),
+                        ExpenseClaim.claim_number.desc(),
                     )
                     .limit(200)
                 ).all()

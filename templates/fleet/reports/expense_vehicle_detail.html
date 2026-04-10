@@ -54,7 +54,7 @@
         <div class="flex items-start justify-between gap-4">
             <div>
                 <h3 class="text-base font-semibold text-slate-900 dark:text-white">Filter Claims</h3>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Filter totals, category breakdown, and recent claims by date range, year, or month.</p>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Filter fuel and repairs totals, category breakdown, and recent matching claims by date range, year, or month.</p>
             </div>
             <a href="/fleet/reports/expenses/{{ vehicle.vehicle_id }}" class="btn btn-secondary">Clear</a>
         </div>
@@ -83,15 +83,15 @@
     <div class="grid gap-4 lg:grid-cols-2">
         <div class="card p-6">
             <h3 class="text-base font-semibold text-slate-900 dark:text-white">Category Breakdown</h3>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Expense item categories linked to this vehicle.</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Vehicle Fuel Expense and Car Repairs and Maintenance items linked to this vehicle.</p>
             <div class="mt-4">
                 {% call data_table(
                     headers=[
                         {"label": "Category", "class": "text-left"},
                         {"label": "Total", "class": "text-right"}
                     ],
-                    empty_title="No categories yet",
-                    empty_description="This vehicle has no linked expense items."
+                    empty_title="No matching categories yet",
+                    empty_description="This vehicle has no paid fuel or repairs expense items."
                 ) %}
                     {% for row in category_rows %}
                     <tr>
@@ -105,7 +105,7 @@
 
         <div class="card p-6">
             <h3 class="text-base font-semibold text-slate-900 dark:text-white">Recent Claims</h3>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Up to the latest 200 paid claims linked to this vehicle.</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Up to the latest 200 paid claims with matching fuel or repairs records linked to this vehicle.</p>
             <div class="mt-4">
                 {% call data_table(
                     headers=[
@@ -114,8 +114,8 @@
                         {"label": "Status", "class": "text-left"},
                         {"label": "Total", "class": "text-right"}
                     ],
-                    empty_title="No paid linked claims",
-                    empty_description="No paid expense claims are linked to this vehicle yet."
+                    empty_title="No matching paid claims",
+                    empty_description="No paid fuel or repairs expense claims are linked to this vehicle yet."
                 ) %}
                     {% for row in claim_rows %}
                     <tr>

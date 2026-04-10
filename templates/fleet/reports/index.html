@@ -21,7 +21,7 @@
         <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Reports</h2>
         <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Track costs per vehicle using the Fleet link on Expense Claims and AP Invoices.
-            Expense reports include only paid claims, and all records must have a Fleet vehicle assigned.
+            Expense reports include only paid Vehicle Fuel Expense and Car Repairs and Maintenance records with a Fleet vehicle assigned.
         </p>
         {% if not tables_ready %}
         <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
@@ -41,7 +41,7 @@
                         <h3 class="font-semibold text-slate-900 dark:text-white">Expenses</h3>
                         <span class="text-xs text-slate-500 dark:text-slate-400">{{ linked_expense_claims }} paid</span>
                     </div>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Paid expense claims per vehicle, with breakdown by expense category.</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Paid fuel and repairs expense records per vehicle, with breakdown by expense category.</p>
                 </div>
             </div>
         </a>

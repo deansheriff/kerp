@@ -52,7 +52,7 @@ class _FakeDb:
     def execute(self, stmt):
         self.executed.append(stmt)
         stmt_text = str(stmt)
-        if "count(expense.expense_claim.claim_id)" in stmt_text:
+        if "count(distinct(expense.expense_claim.claim_id))" in stmt_text:
             return _FakeExecuteResult(
                 one_result=SimpleNamespace(
                     claim_count=0,
@@ -118,11 +118,16 @@ def test_reports_expenses_context_filters_to_paid_claims(monkeypatch):
         stmt
         for stmt in db.executed
         if "expense.expense_claim.vehicle_id" in str(stmt)
-        and "count(expense.expense_claim.claim_id)" in str(stmt)
+        and "count(distinct(expense.expense_claim.claim_id))" in str(stmt)
     )
+    params = expense_stmt.compile().params
 
     assert "expense.expense_claim.status = :status_1" in str(expense_stmt)
-    assert expense_stmt.compile().params["status_1"] == ExpenseClaimStatus.PAID
+    assert ExpenseClaimStatus.PAID in params.values()
+    assert (
+        tuple(params["category_name_1"])
+        == FleetWebService.REPORT_EXPENSE_CATEGORY_NAMES
+    )
 
 
 def test_reports_expense_vehicle_context_filters_all_queries_to_paid_claims(
@@ -152,6 +157,12 @@ def test_reports_expense_vehicle_context_filters_all_queries_to_paid_claims(
         status_params = {
             key: value for key, value in params.items() if key.startswith("status_")
         }
+        category_values = [
+            value for key, value in params.items() if key.startswith("category_name_")
+        ]
 
         assert "expense.expense_claim.status = :" in stmt_text
         assert ExpenseClaimStatus.PAID in status_params.values()
+        assert FleetWebService.REPORT_EXPENSE_CATEGORY_NAMES in [
+            tuple(value) for value in category_values
+        ]
