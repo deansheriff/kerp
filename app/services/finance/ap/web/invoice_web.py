@@ -332,6 +332,9 @@ class InvoiceWebService:
                     TaxCode.organization_id == org_id,
                     TaxCode.is_active == True,
                     TaxCode.applies_to_purchases == True,
+                    TaxCode.tax_type.notin_(
+                        [TaxType.WITHHOLDING, TaxType.STAMP_DUTY]
+                    ),
                 )
             ).all()
         ]
@@ -432,8 +435,6 @@ class InvoiceWebService:
         ]
 
         # Get WHT codes for withholding tax selection
-        from app.models.finance.tax.tax_code import TaxType
-
         wht_codes = [
             {
                 "tax_code_id": str(wht.tax_code_id),

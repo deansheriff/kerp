@@ -1050,7 +1050,7 @@ class APWebService:
         supplier_id: str | None = None,
         po_id: str | None = None,
     ) -> dict:
-        from app.models.finance.tax.tax_code import TaxCode
+        from app.models.finance.tax.tax_code import TaxCode, TaxType
         from app.models.fixed_assets.asset_category import AssetCategory
         from app.models.inventory.item import Item
 
@@ -1086,6 +1086,9 @@ class APWebService:
                     TaxCode.organization_id == org_id,
                     TaxCode.is_active.is_(True),
                     TaxCode.applies_to_purchases.is_(True),
+                    TaxCode.tax_type.notin_(
+                        [TaxType.WITHHOLDING, TaxType.STAMP_DUTY]
+                    ),
                 )
             ).all()
         ]
