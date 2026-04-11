@@ -133,6 +133,7 @@ class FullSyncResult:
     invoices: SyncResult
     payments: SyncResult
     credit_notes: SyncResult
+    ledger_resolution: dict[str, Any] = field(default_factory=dict)
     total_errors: int = 0
     duration_seconds: float = 0.0
 
@@ -143,6 +144,7 @@ class FullSyncResult:
             "invoices": self.invoices.to_dict(),
             "payments": self.payments.to_dict(),
             "credit_notes": self.credit_notes.to_dict(),
+            "ledger_resolution": self.ledger_resolution,
             "total_errors": self.total_errors,
             "duration_seconds": self.duration_seconds,
         }
@@ -346,14 +348,105 @@ class SplynxSyncService:
         for m in methods:
             self._payment_method_cache[m.id] = m
 
-        # Build bank account mapping by matching names
+        # Primary: map via Splynx bank account IDs (authoritative)
+        self._build_bank_account_mapping_from_splynx_bank_ids()
+        # Fallback: name-based fuzzy matching for any remaining unmapped methods
         self._build_bank_account_mapping()
+
+    def _build_bank_account_mapping_from_splynx_bank_ids(self) -> None:
+        """Map payment methods to ERP bank accounts via Splynx bank account IDs.
+
+        Splynx payment methods reference a ``accounting_bank_account_id``
+        which points to a Splynx bank account.  We fetch those bank accounts,
+        match them to ERP bank accounts by name, then propagate the mapping
+        to every payment method that references that Splynx bank account.
+
+        This is more reliable than name-based fuzzy matching because it
+        uses the same link Splynx itself uses for accounting.
+        """
+        from app.models.finance.banking.bank_account import BankAccount
+
+        # Collect which Splynx bank IDs we need
+        needed_bank_ids = {
+            m.accounting_bank_account_id
+            for m in self._payment_method_cache.values()
+            if m.accounting_bank_account_id
+        }
+        if not needed_bank_ids:
+            return
+
+        try:
+            splynx_bank_accounts = self.client.get_bank_accounts()
+        except Exception:
+            logger.warning(
+                "Could not fetch Splynx bank accounts — "
+                "falling back to name-based mapping"
+            )
+            return
+
+        # Build splynx_bank_id → SplynxBankAccount lookup
+        splynx_banks = {ba.id: ba for ba in splynx_bank_accounts}
+
+        # Load ERP bank accounts (same query as name-based mapper)
+        erp_accounts = list(
+            self.db.scalars(
+                select(BankAccount).where(
+                    BankAccount.organization_id == self.organization_id,
+                    BankAccount.status == "active",
+                )
+            ).all()
+        )
+
+        def _norm(value: str | None) -> str:
+            if not value:
+                return ""
+            return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+        # Build search corpus for each ERP bank account
+        erp_search: list[tuple[UUID, str]] = []
+        for acct in erp_accounts:
+            parts = [acct.bank_name, acct.account_name, acct.account_number]
+            corpus = " ".join(p for p in (_norm(p) for p in parts) if p)
+            erp_search.append((acct.bank_account_id, corpus))
+
+        # For each payment method with a Splynx bank ID, find the ERP match
+        mapped = 0
+        for method_id, method in self._payment_method_cache.items():
+            if method_id in self._bank_account_mapping:
+                continue  # Already mapped
+            if not method.accounting_bank_account_id:
+                continue
+            splynx_bank = splynx_banks.get(method.accounting_bank_account_id)
+            if not splynx_bank:
+                continue
+
+            # Match Splynx bank name against ERP bank accounts
+            splynx_bank_norm = _norm(splynx_bank.name)
+            for erp_id, erp_corpus in erp_search:
+                if splynx_bank_norm and splynx_bank_norm in erp_corpus:
+                    self._bank_account_mapping[method_id] = erp_id
+                    logger.debug(
+                        "Mapped Splynx method '%s' via bank account '%s' "
+                        "(Splynx bank ID %d)",
+                        method.name,
+                        splynx_bank.name,
+                        splynx_bank.id,
+                    )
+                    mapped += 1
+                    break
+
+        if mapped:
+            logger.info(
+                "Mapped %d payment methods via Splynx bank account IDs",
+                mapped,
+            )
 
     def _build_bank_account_mapping(self) -> None:
         """
         Build mapping from Splynx payment method names to ERP bank accounts.
 
         Matches by partial name using ``self._bank_name_mapping``.
+        Only processes methods not already mapped by the bank-ID approach.
         """
         from app.models.finance.banking.bank_account import BankAccount
 
@@ -409,6 +502,8 @@ class SplynxSyncService:
         }
 
         for method_id, method in self._payment_method_cache.items():
+            if method_id in self._bank_account_mapping:
+                continue  # Already mapped via bank-ID approach
             normalized_method_name = _normalize_text(method.name)
 
             for splynx_pattern, erp_pattern in normalized_rules.items():
@@ -429,11 +524,26 @@ class SplynxSyncService:
                         break
                 break
 
+        mapped_count = len(self._bank_account_mapping)
+        total_count = len(self._payment_method_cache)
         logger.info(
             "Built bank account mapping: %d of %d payment methods mapped",
-            len(self._bank_account_mapping),
-            len(self._payment_method_cache),
+            mapped_count,
+            total_count,
         )
+
+        if mapped_count < total_count:
+            unmapped = [
+                f"'{method.name}' (id={mid})"
+                for mid, method in self._payment_method_cache.items()
+                if mid not in self._bank_account_mapping
+            ]
+            logger.warning(
+                "Unmapped Splynx payment methods (will use default bank "
+                "account, may cause reconciliation mismatches): %s. "
+                "Add entries to DEFAULT_BANK_NAME_MAPPING to fix.",
+                ", ".join(unmapped),
+            )
 
     def _get_default_bank_account(self, currency_code: str) -> UUID | None:
         """Get the organization's default active bank account for a currency."""
@@ -1738,12 +1848,14 @@ class SplynxSyncService:
         )
 
     def auto_allocate_unapplied_payments(self) -> dict[str, Any]:
-        """Auto-allocate unapplied Splynx payments to unique open invoices.
+        """Auto-allocate unapplied Splynx payments to open invoices.
 
-        Strict Tier-A policy:
-        - Same customer
-        - Exact amount match against invoice balance due (2dp)
-        - Exactly one invoice candidate
+        Two-tier policy:
+        - Tier A (strict): exact amount match against invoice balance due
+        - Tier B (credit-note-aware): match against balance due minus
+          unapplied credit notes for the same customer
+
+        Both tiers require same customer and exactly one candidate invoice.
         """
         open_statuses = {
             InvoiceStatus.POSTED,
@@ -1781,10 +1893,36 @@ class SplynxSyncService:
             ).all()
         )
 
+        # Build per-customer credit note balance from unapplied credit notes.
+        # Credit notes are Invoice records with type=CREDIT_NOTE and status=POSTED.
+        # amount_paid tracks how much of the CN has been applied; the remainder
+        # is the available credit for this customer.
+        credit_notes = list(
+            self.db.scalars(
+                select(Invoice).where(
+                    Invoice.organization_id == self.organization_id,
+                    Invoice.invoice_type == InvoiceType.CREDIT_NOTE,
+                    Invoice.status == InvoiceStatus.POSTED,
+                )
+            ).all()
+        )
+        customer_credit: dict[UUID, Decimal] = {}
+        for cn in credit_notes:
+            available = cn.total_amount - cn.amount_paid
+            if available > Decimal("0"):
+                customer_credit[cn.customer_id] = (
+                    customer_credit.get(cn.customer_id, Decimal("0")) + available
+                )
+
         def _to_cents(value: Decimal) -> int:
             return int(value.quantize(Decimal("0.01")) * 100)
 
-        invoice_index: dict[tuple[UUID, int], list[Invoice]] = {}
+        # Build two invoice indexes:
+        # 1. Gross balance (Tier A) — exact invoice balance_due
+        # 2. Net balance (Tier B) — balance_due minus customer credit pool
+        #    Only built for customers that actually have credit notes.
+        gross_index: dict[tuple[UUID, int], list[Invoice]] = {}
+        net_index: dict[tuple[UUID, int], list[Invoice]] = {}
         for inv in open_invoices:
             balance_due = getattr(
                 inv, "balance_due", inv.total_amount - inv.amount_paid
@@ -1792,13 +1930,21 @@ class SplynxSyncService:
             if balance_due <= Decimal("0"):
                 continue
             key = (inv.customer_id, _to_cents(balance_due))
-            invoice_index.setdefault(key, []).append(inv)
+            gross_index.setdefault(key, []).append(inv)
+
+            credit = customer_credit.get(inv.customer_id, Decimal("0"))
+            if credit > Decimal("0"):
+                net_balance = balance_due - credit
+                if net_balance > Decimal("0"):
+                    net_key = (inv.customer_id, _to_cents(net_balance))
+                    net_index.setdefault(net_key, []).append(inv)
 
         allocated = 0
         ambiguous = 0
         no_candidate = 0
         errors: list[str] = []
         used_invoice_ids: set[UUID] = set()
+        used_payment_ids: set[UUID] = set()
 
         sorted_payments = sorted(
             unapplied_payments,
@@ -1806,12 +1952,26 @@ class SplynxSyncService:
         )
         for payment in sorted_payments:
             try:
-                key = (payment.customer_id, _to_cents(payment.amount))
+                pmt_key = (payment.customer_id, _to_cents(payment.amount))
+
+                # Tier A: exact match against gross invoice balance
                 candidates = [
                     inv
-                    for inv in invoice_index.get(key, [])
+                    for inv in gross_index.get(pmt_key, [])
                     if inv.invoice_id not in used_invoice_ids
                 ]
+
+                # Tier B: if Tier A found nothing, try net balance
+                # (invoice balance minus customer credit notes)
+                tier_b = False
+                if not candidates:
+                    candidates = [
+                        inv
+                        for inv in net_index.get(pmt_key, [])
+                        if inv.invoice_id not in used_invoice_ids
+                    ]
+                    tier_b = bool(candidates)
+
                 if len(candidates) != 1:
                     if len(candidates) > 1:
                         ambiguous += 1
@@ -1840,7 +2000,17 @@ class SplynxSyncService:
                     invoice.status = InvoiceStatus.POSTED
 
                 used_invoice_ids.add(invoice.invoice_id)
+                used_payment_ids.add(payment.payment_id)
                 allocated += 1
+
+                if tier_b:
+                    logger.info(
+                        "Tier-B allocation: payment %s → invoice %s "
+                        "(credit note offset for customer %s)",
+                        payment.payment_id,
+                        invoice.invoice_number,
+                        payment.customer_id,
+                    )
             except Exception as exc:
                 logger.exception(
                     "Auto-allocation error for payment %s: %s",
@@ -1850,6 +2020,17 @@ class SplynxSyncService:
                 errors.append(f"Payment {payment.payment_id}: {exc}")
 
         self.db.flush()
+
+        still_unapplied = len(sorted_payments) - len(used_payment_ids)
+        if still_unapplied:
+            logger.warning(
+                "%d payments remain unapplied after allocation — "
+                "these likely have invoice_id=0 in Splynx (account-level "
+                "payments without a specific invoice link). Consider syncing "
+                "Splynx /finance/transactions for full ledger resolution.",
+                still_unapplied,
+            )
+
         logger.info(
             "Auto-allocation complete: %d allocated, %d ambiguous, %d no-candidate",
             allocated,
@@ -1862,6 +2043,217 @@ class SplynxSyncService:
             "no_candidate": no_candidate,
             "errors": errors,
         }
+
+    def resolve_payment_invoices_from_ledger(
+        self,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> dict[str, Any]:
+        """Resolve unapplied payment→invoice links from Splynx transaction ledger.
+
+        Splynx's ``/finance/payments`` API returns ``invoice_id=0`` for
+        account-level payments, but the ``/finance/transactions`` ledger
+        shows the full double-entry with the actual ``invoice_id`` each
+        payment settles.  This method:
+
+        1. Loads all Splynx-sourced payments that have no allocation.
+        2. Fetches the transaction ledger for the matching date range.
+        3. Finds ``type=payment`` transactions whose ``document_id``
+           matches a Splynx payment ID and whose ``invoice_id`` links
+           to a synced invoice.
+        4. Creates the missing ``PaymentAllocation`` and updates the
+           invoice ``amount_paid`` / ``status``.
+
+        This is called *after* ``sync_all()`` to backfill links that the
+        payment-level sync could not establish.
+        """
+        results: dict[str, Any] = {
+            "resolved": 0,
+            "already_allocated": 0,
+            "invoice_not_found": 0,
+            "no_ledger_link": 0,
+            "errors": [],
+        }
+
+        # Find unapplied Splynx payments
+        unapplied = list(
+            self.db.scalars(
+                select(CustomerPayment).where(
+                    CustomerPayment.organization_id == self.organization_id,
+                    CustomerPayment.splynx_id.isnot(None),
+                    CustomerPayment.status == PaymentStatus.CLEARED,
+                    ~select(PaymentAllocation.allocation_id)
+                    .where(PaymentAllocation.payment_id == CustomerPayment.payment_id)
+                    .exists(),
+                )
+            ).all()
+        )
+        if not unapplied:
+            logger.info("No unapplied Splynx payments to resolve")
+            return results
+
+        # Build splynx_id → CustomerPayment lookup
+        splynx_id_to_payment: dict[int, CustomerPayment] = {}
+        for pmt in unapplied:
+            if not pmt.splynx_id:
+                continue
+            try:
+                splynx_id_to_payment[int(pmt.splynx_id)] = pmt
+            except (ValueError, TypeError):
+                continue
+
+        logger.info(
+            "Resolving %d unapplied Splynx payments via transaction ledger",
+            len(splynx_id_to_payment),
+        )
+
+        # Fetch transaction ledger from Splynx
+        try:
+            transactions = list(
+                self.client.get_transactions(
+                    date_from=date_from,
+                    date_to=date_to,
+                )
+            )
+        except Exception:
+            logger.exception("Failed to fetch Splynx transaction ledger")
+            results["errors"].append("Failed to fetch transaction ledger")
+            return results
+
+        # Filter to payment-type transactions that match our unapplied payments
+        for txn in transactions:
+            if txn.type != "payment":
+                continue
+            if txn.document_id not in splynx_id_to_payment:
+                continue
+            if not txn.invoice_id:
+                results["no_ledger_link"] += 1
+                continue
+
+            payment = splynx_id_to_payment.pop(txn.document_id)
+
+            # Find the local invoice by Splynx correlation ID
+            correlation_id = f"splynx-inv-{txn.invoice_id}"
+            invoice = self.db.scalar(
+                select(Invoice).where(
+                    Invoice.organization_id == self.organization_id,
+                    Invoice.correlation_id == correlation_id,
+                )
+            )
+            if not invoice:
+                results["invoice_not_found"] += 1
+                logger.debug(
+                    "Ledger links payment %d to invoice %d but invoice not synced yet",
+                    txn.document_id,
+                    txn.invoice_id,
+                )
+                continue
+
+            # Check if an allocation was created between our initial query
+            # and now (race condition guard)
+            existing = self.db.scalar(
+                select(PaymentAllocation.allocation_id).where(
+                    PaymentAllocation.payment_id == payment.payment_id,
+                )
+            )
+            if existing:
+                results["already_allocated"] += 1
+                continue
+
+            try:
+                allocation = PaymentAllocation(
+                    payment_id=payment.payment_id,
+                    invoice_id=invoice.invoice_id,
+                    allocated_amount=payment.amount,
+                    allocation_date=payment.payment_date,
+                )
+                self.db.add(allocation)
+
+                invoice.amount_paid = min(
+                    invoice.total_amount,
+                    invoice.amount_paid + payment.amount,
+                )
+                self._set_invoice_status_from_amount_paid(invoice)
+
+                results["resolved"] += 1
+                logger.info(
+                    "Ledger-resolved: payment %s (Splynx %d) → invoice %s "
+                    "(Splynx inv %d)",
+                    payment.payment_id,
+                    txn.document_id,
+                    invoice.invoice_number,
+                    txn.invoice_id,
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Error resolving payment %s from ledger: %s",
+                    payment.payment_id,
+                    exc,
+                )
+                results["errors"].append(f"Payment {payment.payment_id}: {exc}")
+
+        self.db.flush()
+
+        still_unresolved = len(splynx_id_to_payment)
+        logger.info(
+            "Ledger resolution complete: %d resolved, %d invoice not found, "
+            "%d no ledger link, %d still unresolved",
+            results["resolved"],
+            results["invoice_not_found"],
+            results["no_ledger_link"],
+            still_unresolved,
+        )
+        return results
+
+    def post_unposted_payments(self) -> dict[str, int]:
+        """Post GL journal entries for CLEARED payments that lack them.
+
+        Splynx payments are created with ``status=CLEARED`` during sync
+        but GL posting is deferred.  Without a journal entry the payment
+        is invisible to bank reconciliation.  This method bulk-posts
+        the missing journals using ``CustomerPaymentService.ensure_gl_posted``.
+        """
+        from app.services.finance.ar.customer_payment import CustomerPaymentService
+
+        unposted = list(
+            self.db.scalars(
+                select(CustomerPayment).where(
+                    CustomerPayment.organization_id == self.organization_id,
+                    CustomerPayment.splynx_id.isnot(None),
+                    CustomerPayment.status == PaymentStatus.CLEARED,
+                    CustomerPayment.journal_entry_id.is_(None),
+                    CustomerPayment.amount > 0,
+                )
+            ).all()
+        )
+        if not unposted:
+            return {"posted": 0, "failed": 0, "skipped": 0}
+
+        logger.info(
+            "Posting GL journals for %d unposted Splynx payments", len(unposted)
+        )
+        posted = 0
+        failed = 0
+        skipped = 0
+
+        for payment in unposted:
+            try:
+                if CustomerPaymentService.ensure_gl_posted(self.db, payment):
+                    posted += 1
+                else:
+                    skipped += 1
+            except Exception:
+                logger.exception("GL posting failed for payment %s", payment.payment_id)
+                failed += 1
+
+        self.db.flush()
+        logger.info(
+            "GL posting complete: %d posted, %d failed, %d skipped",
+            posted,
+            failed,
+            skipped,
+        )
+        return {"posted": posted, "failed": failed, "skipped": skipped}
 
     def _set_invoice_status_from_amount_paid(self, invoice: Invoice) -> None:
         """Set invoice status from amount_paid using AR sync rules."""
@@ -2288,12 +2680,25 @@ class SplynxSyncService:
             created_by_user_id=created_by_user_id,
         )
 
+        # Post GL journals for CLEARED payments that lack them — required
+        # for bank reconciliation to see the payments.
+        self.post_unposted_payments()
+
+        # Resolve unapplied payment→invoice links from the transaction
+        # ledger.  This catches payments where Splynx's payment record
+        # has invoice_id=0 but the ledger knows which invoice was settled.
+        ledger_result = self.resolve_payment_invoices_from_ledger(
+            date_from=date_from,
+            date_to=date_to,
+        )
+
         duration = time.time() - start_time
         total_errors = (
             len(customers_result.errors)
             + len(invoices_result.errors)
             + len(payments_result.errors)
             + len(credit_notes_result.errors)
+            + len(ledger_result.get("errors", []))
         )
 
         result = FullSyncResult(
@@ -2301,6 +2706,7 @@ class SplynxSyncService:
             invoices=invoices_result,
             payments=payments_result,
             credit_notes=credit_notes_result,
+            ledger_resolution=ledger_result,
             total_errors=total_errors,
             duration_seconds=round(duration, 2),
         )

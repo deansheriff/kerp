@@ -168,6 +168,39 @@ class SplynxCreditNote:
     items: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass
+class SplynxBankAccount:
+    """Bank account record from Splynx accounting module."""
+
+    id: int
+    name: str
+    bank_name: str | None = None
+    account_number: str | None = None
+    currency: str = settings.default_functional_currency_code
+
+
+@dataclass
+class SplynxTransaction:
+    """Customer ledger transaction from Splynx.
+
+    Each row in the customer's financial history.  The ``invoice_id``
+    field links payment/credit-note transactions to the invoice they
+    settle — this is the authoritative source for payment-to-invoice
+    relationships (more reliable than the ``invoice_id`` on the payment
+    record itself, which is 0 for account-level payments).
+    """
+
+    id: int
+    customer_id: int
+    type: str  # "invoice", "payment", "credit_note", "debit_note"
+    document_id: int  # ID of the source document (payment/invoice/CN)
+    invoice_id: int  # invoice this transaction settles (0 if N/A)
+    date: str
+    debit: Decimal
+    credit: Decimal
+    comment: str | None = None
+
+
 # =============================================================================
 # API Client
 # =============================================================================
@@ -553,6 +586,26 @@ class SplynxClient:
         logger.info("Fetched %d payment methods from Splynx", len(methods))
         return methods
 
+    def get_bank_accounts(self) -> list[SplynxBankAccount]:
+        """Fetch bank accounts configured in Splynx accounting module."""
+        data = self._request("GET", "/finance/bank-accounts")
+
+        accounts: list[SplynxBankAccount] = []
+        for item in data:
+            accounts.append(
+                SplynxBankAccount(
+                    id=int(item.get("id", 0)),
+                    name=item.get("name", ""),
+                    bank_name=item.get("bank_name"),
+                    account_number=item.get("account_number"),
+                    currency=item.get("currency")
+                    or settings.default_functional_currency_code,
+                )
+            )
+
+        logger.info("Fetched %d bank accounts from Splynx", len(accounts))
+        return accounts
+
     def get_payments(
         self,
         date_from: date | None = None,
@@ -648,6 +701,61 @@ class SplynxClient:
                 status=item.get("status", ""),
                 note=item.get("note"),
                 items=item.get("items", []),
+            )
+
+    # =========================================================================
+    # Transaction Ledger Methods
+    # =========================================================================
+
+    def get_transactions(
+        self,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        customer_id: int | None = None,
+    ) -> Generator[SplynxTransaction, None, None]:
+        """
+        Fetch customer ledger transactions.
+
+        This is the authoritative source for payment→invoice links.
+        Each transaction row represents a debit or credit against a
+        customer account, with ``invoice_id`` identifying which invoice
+        is affected (even for payments where the payment record itself
+        has ``invoice_id=0``).
+
+        Args:
+            date_from: Filter transactions after this date
+            date_to: Filter transactions before this date
+            customer_id: Filter by customer ID
+        """
+        params: dict[str, Any] = {}
+
+        if date_from and date_to:
+            params["main_attributes[date][0]"] = "BETWEEN"
+            params["main_attributes[date][1]"] = date_from.isoformat()
+            params["main_attributes[date][2]"] = date_to.isoformat()
+        elif date_from:
+            params["main_attributes[date][0]"] = ">="
+            params["main_attributes[date][1]"] = date_from.isoformat()
+        elif date_to:
+            params["main_attributes[date][0]"] = "<="
+            params["main_attributes[date][1]"] = date_to.isoformat()
+        if customer_id:
+            params["main_attributes[customer_id]"] = customer_id
+
+        logger.info("Fetching Splynx transactions with params: %s", params)
+
+        for item in self._paginate("/finance/transactions", params=params):
+            inv_id_raw = item.get("invoice_id")
+            yield SplynxTransaction(
+                id=int(item.get("id", 0)),
+                customer_id=int(item.get("customer_id", 0)),
+                type=item.get("type", ""),
+                document_id=int(item.get("document_id", 0)),
+                invoice_id=int(inv_id_raw) if inv_id_raw else 0,
+                date=item.get("date", ""),
+                debit=Decimal(str(item.get("debit", 0))),
+                credit=Decimal(str(item.get("credit", 0))),
+                comment=item.get("comment"),
             )
 
     # =========================================================================

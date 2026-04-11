@@ -440,9 +440,6 @@ def run_splynx_incremental_sync(
                 batch_size=batch_size,
                 skip_unchanged=True,
             )
-            auto_alloc = service.auto_allocate_unapplied_payments()
-            if auto_alloc["errors"]:
-                payments.errors.extend(auto_alloc["errors"][:100])
             credit_notes = service.sync_credit_notes(
                 date_from=from_date,
                 date_to=to_date,
@@ -450,6 +447,15 @@ def run_splynx_incremental_sync(
                 batch_size=batch_size,
                 skip_unchanged=True,
             )
+
+            # Post-sync pipeline: GL posting → ledger resolution → heuristic fallback
+            service.post_unposted_payments()
+            service.resolve_payment_invoices_from_ledger(
+                date_from=from_date, date_to=to_date
+            )
+            auto_alloc = service.auto_allocate_unapplied_payments()
+            if auto_alloc["errors"]:
+                payments.errors.extend(auto_alloc["errors"][:100])
 
             sync_results = [customers, invoices, payments, credit_notes]
             return _finalize_sync(
@@ -561,6 +567,12 @@ def run_splynx_daily_reconciliation(
                 batch_size=batch_size,
                 skip_unchanged=True,
             )
+
+            # Post-sync pipeline: GL posting → ledger resolution → heuristic fallback
+            service.post_unposted_payments()
+            service.resolve_payment_invoices_from_ledger(
+                date_from=payment_from_date, date_to=to_date
+            )
             auto_alloc = service.auto_allocate_unapplied_payments()
             if auto_alloc["errors"]:
                 payments.errors.extend(auto_alloc["errors"][:100])
@@ -638,14 +650,18 @@ def run_splynx_full_reconciliation(
                 batch_size=batch_size,
                 skip_unchanged=True,
             )
-            auto_alloc = service.auto_allocate_unapplied_payments()
-            if auto_alloc["errors"]:
-                payments.errors.extend(auto_alloc["errors"][:100])
             credit_notes = service.sync_credit_notes(
                 created_by_user_id=SYSTEM_USER_ID,
                 batch_size=batch_size,
                 skip_unchanged=True,
             )
+
+            # Post-sync pipeline: GL posting → ledger resolution → heuristic fallback
+            service.post_unposted_payments()
+            service.resolve_payment_invoices_from_ledger()
+            auto_alloc = service.auto_allocate_unapplied_payments()
+            if auto_alloc["errors"]:
+                payments.errors.extend(auto_alloc["errors"][:100])
 
             sync_results = [customers, invoices, payments, credit_notes]
             return _finalize_sync(

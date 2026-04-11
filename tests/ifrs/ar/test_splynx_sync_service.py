@@ -784,6 +784,7 @@ class TestAutoAllocateUnappliedPayments:
         db.scalars.side_effect = [
             self._scalars_result([payment]),
             self._scalars_result([invoice]),
+            self._scalars_result([]),  # no credit notes
         ]
 
         summary = svc.auto_allocate_unapplied_payments()
@@ -825,6 +826,7 @@ class TestAutoAllocateUnappliedPayments:
         db.scalars.side_effect = [
             self._scalars_result([payment]),
             self._scalars_result([inv1, inv2]),
+            self._scalars_result([]),  # no credit notes
         ]
 
         summary = svc.auto_allocate_unapplied_payments()
@@ -856,6 +858,7 @@ class TestAutoAllocateUnappliedPayments:
         db.scalars.side_effect = [
             self._scalars_result([payment]),
             self._scalars_result([invoice]),
+            self._scalars_result([]),  # no credit notes
         ]
 
         summary = svc.auto_allocate_unapplied_payments()
