@@ -1018,6 +1018,131 @@ class InterbankCounterpartStrategy(MatchStrategy):
                 ctx.result.errors.append(f"Line {settlement_line.line_number}: {exc}")
 
 
+_PAYROLL_RE = re.compile(r"(?i)\b(?:payroll|salary)\b")
+
+
+@dataclass(frozen=True)
+class PayrollEntryStrategy(MatchStrategy):
+    """Match bank lines to payroll run GL journals.
+
+    Looks for "payroll" or "salary" in the bank line description, then
+    loads payroll entries for the statement's bank account and date range.
+    Matches by amount (total_net_pay) with date proximity.
+    """
+
+    strategy_id: str = "payroll_entry"
+    provider_key: str = "payroll_entry"
+
+    def run(self, service: Any, ctx: ReconciliationRunContext) -> None:
+        if not ctx.policy.allows_strategy(self.strategy_id):
+            return
+        still_unmatched = ctx.still_unmatched_lines()
+        if not still_unmatched:
+            return
+
+        from datetime import timedelta
+
+        from sqlalchemy import select as sa_select
+
+        from app.models.people.payroll.payroll_entry import (
+            PayrollEntry,
+            PayrollEntryStatus,
+        )
+
+        # Collect candidate bank lines that mention payroll/salary
+        candidates: list[BankStatementLine] = []
+        for line in still_unmatched:
+            text = (line.description or "") + " " + (line.reference or "")
+            if _PAYROLL_RE.search(text):
+                candidates.append(line)
+        if not candidates:
+            return
+
+        # Load POSTED payroll entries for this bank account + date range
+        buffer = timedelta(days=7)
+        conditions = [
+            PayrollEntry.organization_id == ctx.organization_id,
+            PayrollEntry.status == PayrollEntryStatus.POSTED,
+            PayrollEntry.journal_entry_id.isnot(None),
+        ]
+        # Filter by bank account if set on the entry
+        # (entries without bank_account_id still eligible — matched by amount)
+        if ctx.statement.period_start and ctx.statement.period_end:
+            conditions.append(
+                PayrollEntry.posting_date >= ctx.statement.period_start - buffer
+            )
+            conditions.append(
+                PayrollEntry.posting_date <= ctx.statement.period_end + buffer
+            )
+
+        entries = list(ctx.db.scalars(sa_select(PayrollEntry).where(*conditions)).all())
+        if not entries:
+            return
+
+        matched_entry_ids = ctx.tracker(self.provider_key)
+
+        # Index entries by net pay amount (in cents) for matching
+        def _to_cents(val: Any) -> int:
+            return int(Decimal(str(val)).quantize(Decimal("0.01")) * 100)
+
+        entry_by_amount: dict[int, list[Any]] = {}
+        for entry in entries:
+            if entry.entry_id in matched_entry_ids:
+                continue
+            if not entry.total_net_pay or entry.total_net_pay <= 0:
+                continue
+            key = _to_cents(entry.total_net_pay)
+            entry_by_amount.setdefault(key, []).append(entry)
+
+        for line in candidates:
+            if line.line_id in ctx.matched_line_ids:
+                continue
+            try:
+                line_cents = _to_cents(abs(line.amount))
+                matching_entries = [
+                    e
+                    for e in entry_by_amount.get(line_cents, [])
+                    if e.entry_id not in matched_entry_ids
+                ]
+                if len(matching_entries) != 1:
+                    continue
+
+                entry = matching_entries[0]
+                correlation = str(entry.entry_id)
+
+                journal_line = service._find_journal_line(
+                    ctx.db,
+                    ctx.organization_id,
+                    correlation,
+                    ctx.bank_account.gl_account_id,
+                    extra_gl_account_ids=ctx.extra_gl_account_ids,
+                )
+                if not journal_line:
+                    continue
+
+                _perform_match(
+                    service,
+                    ctx,
+                    line,
+                    journal_line,
+                    source_type="PAYROLL_ENTRY",
+                    source_id=entry.entry_id,
+                    confidence=90,
+                    explanation=(
+                        f"Payroll {entry.entry_number} "
+                        f"({entry.payroll_month}/{entry.payroll_year})"
+                    ),
+                )
+                matched_entry_ids.add(entry.entry_id)
+            except Exception as exc:
+                service.logger.exception(
+                    "Error matching line %s via payroll: %s",
+                    line.line_id,
+                    exc,
+                )
+                ctx.result.errors.append(f"Line {line.line_number}: {exc}")
+
+
 _ACC_PAY_RE = re.compile(r"ACC-PAY-\d{4}-\d+")
 
 
@@ -1271,6 +1396,7 @@ class ProgrammaticReconciliationEngine:
             UniqueDateAmountStrategy(),
             SupplierPaymentReferenceStrategy(),
             CustomerReceiptReferenceStrategy(),
+            PayrollEntryStrategy(),
             BankFeeStrategy(),
             InterbankCounterpartStrategy(),
             ExpenseReimbursementStrategy(),

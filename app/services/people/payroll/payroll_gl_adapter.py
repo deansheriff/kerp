@@ -288,7 +288,7 @@ class PayrollGLAdapter:
             posting_date=posting_date,
             idempotency_key=idempotency_key,
             source_module="PAYROLL",
-            correlation_id=None,
+            correlation_id=str(s_id),
             posted_by_user_id=user_id,
             success_message="Salary slip posted successfully",
         )
@@ -571,7 +571,7 @@ class PayrollGLAdapter:
             posting_date=posting_date,
             idempotency_key=f"{org_id}:PAYROLL:{slip.slip_id}:post:v1",
             source_module="PAYROLL",
-            correlation_id=None,
+            correlation_id=str(slip.slip_id),
             posted_by_user_id=user_id,
             success_message="Slip journal created and posted",
         )
@@ -788,7 +788,7 @@ class PayrollGLAdapter:
             posting_date=posting_date,
             idempotency_key=f"{org_id}:PAYROLL:RUN:{entry.entry_id}:post:v1",
             source_module="PAYROLL",
-            correlation_id=None,
+            correlation_id=str(entry.entry_id),
             posted_by_user_id=user_id,
             success_message="Run journal created and posted",
         )
@@ -1031,7 +1031,7 @@ class PayrollGLAdapter:
             posting_date=posting_date,
             idempotency_key=idempotency_key,
             source_module="PAYROLL",
-            correlation_id=None,
+            correlation_id=str(e_id),
             posted_by_user_id=user_id,
             success_message="Payroll entry posted successfully",
         )
