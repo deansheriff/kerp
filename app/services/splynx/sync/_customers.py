@@ -237,7 +237,8 @@ class CustomerSyncMixin:
                 Customer.splynx_id.like(f"%,{sid}"),
             ),
         )
-        return self.db.scalar(stmt)
+        result: Customer | None = self.db.scalar(stmt)
+        return result
 
     def _resolve_partner_parent(self, partner_id: int) -> UUID | None:
         """Resolve Splynx partner_id to ERP parent customer_id."""
@@ -249,10 +250,11 @@ class CustomerSyncMixin:
             Customer.organization_id == self.organization_id,
             Customer.splynx_partner_id == str(partner_id),
         )
-        parent = self.db.scalar(stmt)
+        parent: Customer | None = self.db.scalar(stmt)
         if parent:
-            self._partner_cache[partner_id] = parent.customer_id
-            return parent.customer_id
+            cust_id: UUID = parent.customer_id
+            self._partner_cache[partner_id] = cust_id
+            return cust_id
         return None
 
     def _find_existing_customer(
@@ -270,7 +272,7 @@ class CustomerSyncMixin:
                     Customer.primary_contact["splynx_id"].astext
                     == str(splynx_customer.id),
                 )
-                customer = self.db.scalar(stmt)
+                customer: Customer | None = self.db.scalar(stmt)
                 if customer:
                     return customer
             except NotImplementedError:
@@ -303,9 +305,9 @@ class CustomerSyncMixin:
                 Customer.organization_id == self.organization_id,
                 or_(*contact_filters),
             )
-            customer = self.db.scalar(stmt)
-            if customer:
-                return customer
+            customer_match: Customer | None = self.db.scalar(stmt)
+            if customer_match:
+                return customer_match
 
         if name:
             stmt = select(Customer).where(
@@ -315,7 +317,7 @@ class CustomerSyncMixin:
                     func.lower(Customer.trading_name) == name.lower(),
                 ),
             )
-            matches = self.db.scalars(stmt).all()
+            matches: list[Customer] = list(self.db.scalars(stmt).all())
             if len(matches) == 1:
                 return matches[0]
 
@@ -363,16 +365,19 @@ class CustomerSyncMixin:
             self._customer_cache[splynx_customer_id] = customer.customer_id
             return customer.customer_id
 
-        local_id = self._get_synced_entity(EntityType.CUSTOMER, str(splynx_customer_id))
+        local_id: UUID | None = self._get_synced_entity(
+            EntityType.CUSTOMER, str(splynx_customer_id)
+        )
         if local_id:
             self._customer_cache[splynx_customer_id] = local_id
             return local_id
 
         customer_code = self._make_customer_code(splynx_customer_id)
-        customer = self._get_existing_customer(customer_code)
-        if customer:
-            self._customer_cache[splynx_customer_id] = customer.customer_id
-            return customer.customer_id
+        found = self._get_existing_customer(customer_code)
+        if found:
+            found_id: UUID = found.customer_id
+            self._customer_cache[splynx_customer_id] = found_id
+            return found_id
 
         try:
             from app.services.splynx.client import SplynxError

@@ -245,7 +245,7 @@ class BankMappingMixin:
                 BankAccount.created_at.asc(),
             )
         )
-        bank_account_id = self.db.scalar(stmt)
+        bank_account_id: UUID | None = self.db.scalar(stmt)
         if bank_account_id:
             self._default_bank_account_cache[code] = bank_account_id
         return bank_account_id
