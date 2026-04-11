@@ -13,6 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
+from app.models.finance.common.attachment import AttachmentCategory
 from app.models.finance.gl.fiscal_period import FiscalPeriod
 from app.models.inventory import (
     InventoryReturn,
@@ -23,6 +24,7 @@ from app.models.inventory import (
     Warehouse,
 )
 from app.models.inventory.inventory_lot import InventoryLot
+from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 from app.models.inventory.inventory_transaction import (
     InventoryTransaction,
     TransactionType,
@@ -30,6 +32,8 @@ from app.models.inventory.inventory_transaction import (
 from app.models.people.hr import Employee
 from app.models.person import Person
 from app.services.common import coerce_uuid
+from app.services.finance.common import format_file_size
+from app.services.finance.common.attachment import attachment_service
 from app.services.inventory.transaction import (
     InventoryTransactionService,
     TransactionInput,
@@ -348,11 +352,16 @@ class InventoryReturnWebService:
         normalized_lot_number = (lot_number or "").strip() or None
         if normalized_lot_number:
             existing_lot = db.scalars(
-                select(InventoryLot).where(
+                select(InventoryLot)
+                .join(
+                    InventoryLotBalance,
+                    InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                )
+                .where(
                     InventoryLot.organization_id == org_id,
                     InventoryLot.item_id == item_uuid,
                     InventoryLot.lot_number == normalized_lot_number,
-                    InventoryLot.warehouse_id == destination_wh_id,
+                    InventoryLotBalance.warehouse_id == destination_wh_id,
                 )
             ).first()
 
@@ -472,8 +481,34 @@ class InventoryReturnWebService:
             return {"inventory_return": None}
         created_by_name = _resolve_person_name(inventory_return.created_by_id)
         updated_by_name = _resolve_person_name(inventory_return.updated_by_id)
+        attachments = attachment_service.list_for_entity(
+            db,
+            organization_id=org_id,
+            entity_type="INVENTORY_RETURN",
+            entity_id=inventory_return.return_id,
+        )
         return {
             "inventory_return": inventory_return,
             "created_by_name": created_by_name,
             "updated_by_name": updated_by_name,
+            "attachments": [
+                {
+                    "attachment_id": str(attachment.attachment_id),
+                    "file_name": attachment.file_name,
+                    "content_type": attachment.content_type,
+                    "description": attachment.description,
+                    "category": (
+                        attachment.category.value
+                        if isinstance(attachment.category, AttachmentCategory)
+                        else str(attachment.category)
+                    ),
+                    "file_size_display": format_file_size(attachment.file_size),
+                    "download_url": (
+                        f"/inventory/attachments/{attachment.attachment_id}/download"
+                    ),
+                    "is_image": attachment.content_type.lower().startswith("image/"),
+                    "uploaded_at": attachment.uploaded_at,
+                }
+                for attachment in attachments
+            ],
         }

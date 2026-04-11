@@ -224,6 +224,54 @@ class TestCalculateWeightedAverageCost:
         # (0 * 0 + 50 * 12) / 50 = 12.00
         assert result == Decimal("12.000000")
 
+
+class TestLotSnapshotSync:
+    """Tests for compatibility field refresh from lot balances."""
+
+    def test_sync_legacy_lot_snapshot_updates_drifted_snapshot(self):
+        mock_db = MagicMock()
+        warehouse_id = uuid.uuid4()
+        lot = MockInventoryLot(
+            warehouse_id=warehouse_id,
+            quantity_on_hand=Decimal("100"),
+            quantity_allocated=Decimal("10"),
+            quantity_available=Decimal("90"),
+        )
+        lot._mock_balances = {
+            warehouse_id: MockInventoryLot(
+                lot_id=lot.lot_id,
+                warehouse_id=warehouse_id,
+                quantity_on_hand=Decimal("80"),
+                quantity_allocated=Decimal("5"),
+                quantity_available=Decimal("75"),
+                is_quarantined=True,
+            )
+        }
+
+        InventoryTransactionService._sync_legacy_lot_snapshot(mock_db, lot)
+
+        assert lot.quantity_on_hand == Decimal("80")
+        assert lot.quantity_allocated == Decimal("5")
+        assert lot.quantity_available == Decimal("75")
+        assert lot.is_quarantined is True
+
+    def test_sync_legacy_lot_snapshot_clears_empty_snapshot(self):
+        mock_db = MagicMock()
+        lot = MockInventoryLot(
+            quantity_on_hand=Decimal("10"),
+            quantity_allocated=Decimal("2"),
+            quantity_available=Decimal("8"),
+            is_quarantined=True,
+        )
+        lot._mock_balances = {}
+
+        InventoryTransactionService._sync_legacy_lot_snapshot(mock_db, lot)
+
+        assert lot.quantity_on_hand == Decimal("0")
+        assert lot.quantity_allocated == Decimal("0")
+        assert lot.quantity_available == Decimal("0")
+        assert lot.is_quarantined is False
+
     def test_calculate_returns_new_cost_when_total_quantity_zero_or_negative(self):
         """Test when total quantity is zero or negative returns new unit cost."""
         mock_db = MagicMock()
@@ -360,7 +408,7 @@ class TestCreateReceipt:
             )
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_receipt_item_not_found(self):
         """Test receipt fails when item not found."""
@@ -638,7 +686,7 @@ class TestCreateIssue:
             )
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_issue_insufficient_inventory(self):
         """Test issue fails when insufficient inventory."""
@@ -899,6 +947,81 @@ class TestCreateIssue:
         assert exc_info.value.status_code == 400
         assert "Insufficient quantity in lot" in exc_info.value.detail
 
+    def test_create_issue_lot_wrong_warehouse(self):
+        """Test issue fails when lot belongs to a different warehouse."""
+        mock_db = MagicMock()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        wh_id = uuid.uuid4()
+        other_wh_id = uuid.uuid4()
+        lot_id = uuid.uuid4()
+
+        mock_item = MockItem(
+            item_id=item_id,
+            organization_id=org_id,
+            track_lots=True,
+        )
+        mock_warehouse = MockWarehouse(warehouse_id=wh_id, organization_id=org_id)
+        mock_lot = MockInventoryLot(
+            lot_id=lot_id,
+            item_id=item_id,
+            warehouse_id=other_wh_id,
+            quantity_available=Decimal("25"),
+        )
+
+        def mock_get(model_class, id_val):
+            from app.models.inventory.inventory_lot import InventoryLot
+            from app.models.inventory.item import Item
+            from app.models.inventory.warehouse import Warehouse
+
+            if (
+                model_class == Item
+                or str(model_class) == "<class 'app.models.ifrs.inv.item.Item'>"
+            ):
+                return mock_item
+            elif (
+                model_class == Warehouse
+                or str(model_class)
+                == "<class 'app.models.ifrs.inv.warehouse.Warehouse'>"
+            ):
+                return mock_warehouse
+            elif (
+                model_class == InventoryLot
+                or str(model_class)
+                == "<class 'app.models.ifrs.inv.inventory_lot.InventoryLot'>"
+            ):
+                return mock_lot
+            return None
+
+        mock_db.get.side_effect = mock_get
+
+        input_data = create_transaction_input(
+            transaction_type=TransactionType.ISSUE,
+            item_id=item_id,
+            warehouse_id=wh_id,
+            quantity=Decimal("10"),
+            lot_id=lot_id,
+        )
+
+        with (
+            patch.object(
+                InventoryTransactionService,
+                "get_current_balance",
+                return_value=Decimal("100"),
+            ),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            InventoryTransactionService.create_issue(
+                db=mock_db,
+                organization_id=org_id,
+                input=input_data,
+                created_by_user_id=user_id,
+            )
+
+        assert exc_info.value.status_code == 400
+        assert "selected warehouse" in exc_info.value.detail
+
     def test_create_issue_specific_identification_requires_lot(self):
         """Test issue with specific identification costing requires lot ID."""
         mock_db = MagicMock()
@@ -982,6 +1105,7 @@ class TestConsumeFifo:
         result = InventoryTransactionService._consume_fifo(
             db=mock_db,
             item_id=item_id,
+            warehouse_id=uuid.uuid4(),
             quantity=Decimal("50"),
         )
 
@@ -1018,6 +1142,7 @@ class TestConsumeFifo:
         result = InventoryTransactionService._consume_fifo(
             db=mock_db,
             item_id=item_id,
+            warehouse_id=uuid.uuid4(),
             quantity=Decimal("50"),  # 30 from lot1 + 20 from lot2
         )
 
@@ -1047,11 +1172,39 @@ class TestConsumeFifo:
             InventoryTransactionService._consume_fifo(
                 db=mock_db,
                 item_id=item_id,
+                warehouse_id=uuid.uuid4(),
                 quantity=Decimal("50"),  # More than available
             )
 
         assert exc_info.value.status_code == 400
         assert "Insufficient FIFO inventory" in exc_info.value.detail
+
+    def test_consume_fifo_scopes_to_selected_warehouse(self):
+        """Test FIFO only uses lots from the selected warehouse."""
+        mock_db = MagicMock()
+        item_id = uuid.uuid4()
+        warehouse_id = uuid.uuid4()
+
+        in_scope_lot = MockInventoryLot(
+            lot_id=uuid.uuid4(),
+            item_id=item_id,
+            warehouse_id=warehouse_id,
+            quantity_on_hand=Decimal("40"),
+            quantity_allocated=Decimal("0"),
+            unit_cost=Decimal("10.00"),
+        )
+
+        mock_db.scalars.return_value.all.return_value = [in_scope_lot]
+
+        result = InventoryTransactionService._consume_fifo(
+            db=mock_db,
+            item_id=item_id,
+            warehouse_id=warehouse_id,
+            quantity=Decimal("30"),
+        )
+
+        assert result["total_cost"] == Decimal("300.00")
+        assert in_scope_lot.quantity_on_hand == Decimal("10")
 
 
 class TestConsumeFromLot:
@@ -1137,7 +1290,7 @@ class TestCreateAdjustment:
             )
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_negative_adjustment(self):
         """Test creating negative inventory adjustment."""
@@ -1193,7 +1346,7 @@ class TestCreateAdjustment:
             )
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_adjustment_would_go_negative(self):
         """Test adjustment fails when result would be negative inventory."""
@@ -1320,7 +1473,7 @@ class TestCreateTransfer:
             )
 
         assert mock_db.add.call_count == 2  # Issue and receipt transactions
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_transfer_missing_to_warehouse(self):
         """Test transfer fails when to_warehouse_id missing."""
@@ -1407,6 +1560,92 @@ class TestCreateTransfer:
 
         assert exc_info.value.status_code == 400
         assert "Insufficient inventory at source" in exc_info.value.detail
+
+    def test_create_transfer_allows_partial_lot_transfer(self):
+        """Test partial lot transfer updates source and destination balances."""
+        mock_db = MagicMock()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        from_wh_id = uuid.uuid4()
+        to_wh_id = uuid.uuid4()
+        lot_id = uuid.uuid4()
+
+        mock_item = MockItem(
+            item_id=item_id,
+            organization_id=org_id,
+            average_cost=Decimal("10.00"),
+            track_lots=True,
+        )
+        mock_from_warehouse = MockWarehouse(
+            warehouse_id=from_wh_id, organization_id=org_id
+        )
+        mock_to_warehouse = MockWarehouse(warehouse_id=to_wh_id, organization_id=org_id)
+        mock_lot = MockInventoryLot(
+            lot_id=lot_id,
+            organization_id=org_id,
+            item_id=item_id,
+            warehouse_id=from_wh_id,
+            quantity_on_hand=Decimal("100"),
+            quantity_available=Decimal("100"),
+        )
+
+        warehouse_call_count = [0]
+
+        def mock_get(model_class, id_val):
+            from app.models.inventory.inventory_lot import InventoryLot
+            from app.models.inventory.item import Item
+            from app.models.inventory.warehouse import Warehouse
+
+            if (
+                model_class == Item
+                or str(model_class) == "<class 'app.models.ifrs.inv.item.Item'>"
+            ):
+                return mock_item
+            elif (
+                model_class == Warehouse
+                or str(model_class)
+                == "<class 'app.models.ifrs.inv.warehouse.Warehouse'>"
+            ):
+                warehouse_call_count[0] += 1
+                if warehouse_call_count[0] == 1:
+                    return mock_from_warehouse
+                return mock_to_warehouse
+            elif (
+                model_class == InventoryLot
+                or str(model_class)
+                == "<class 'app.models.ifrs.inv.inventory_lot.InventoryLot'>"
+            ):
+                return mock_lot
+            return None
+
+        mock_db.get.side_effect = mock_get
+
+        input_data = create_transaction_input(
+            transaction_type=TransactionType.TRANSFER,
+            item_id=item_id,
+            warehouse_id=from_wh_id,
+            to_warehouse_id=to_wh_id,
+            quantity=Decimal("40"),
+            lot_id=lot_id,
+        )
+
+        with patch.object(
+            InventoryTransactionService, "get_current_balance"
+        ) as mock_balance:
+            mock_balance.side_effect = [Decimal("100"), Decimal("0")]
+            InventoryTransactionService.create_transfer(
+                db=mock_db,
+                organization_id=org_id,
+                input=input_data,
+                created_by_user_id=user_id,
+            )
+
+        balances = mock_lot._mock_balances
+        assert balances[from_wh_id].quantity_on_hand == Decimal("60")
+        assert balances[to_wh_id].quantity_on_hand == Decimal("40")
+        assert mock_lot.quantity_on_hand == Decimal("100")
+        assert mock_lot.warehouse_id is None
 
 
 class TestGet:

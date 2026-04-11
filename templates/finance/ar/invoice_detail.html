@@ -292,6 +292,32 @@
                     <td colspan="4"><strong>Total Amount</strong></td>
                     <td><strong>{{ invoice.total_amount if invoice.total_amount else "0.00" }}</strong></td>
                 </tr>
+                {% if invoice.withholding_tax_raw and invoice.withholding_tax_raw > 0 %}
+                <tr class="print-table-total">
+                    <td colspan="4">WHT</td>
+                    <td class="text-amber-600 dark:text-amber-400">-{{ invoice.withholding_tax }}</td>
+                </tr>
+                {% endif %}
+                {% if invoice.vat_withheld and invoice.vat_withheld_amount %}
+                <tr class="print-table-total">
+                    <td colspan="4">VAT Withheld</td>
+                    <td class="text-amber-600 dark:text-amber-400">-{{ invoice.vat_withheld_amount }}</td>
+                </tr>
+                {% endif %}
+                {% if invoice.stamp_duty_raw and invoice.stamp_duty_raw > 0 %}
+                <tr class="print-table-total">
+                    <td colspan="4">Stamp Duty ({{ invoice.stamp_duty_treatment_label if invoice.stamp_duty_treatment_label else '' }})</td>
+                    <td class="{% if invoice.stamp_duty_treatment_label == 'Deducted' %}text-amber-600 dark:text-amber-400{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+                        {% if invoice.stamp_duty_treatment_label == 'Deducted' %}-{% endif %}{{ invoice.stamp_duty }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if invoice.amount_receivable %}
+                <tr class="print-table-grand-total">
+                    <td colspan="4"><strong>Amount Receivable</strong></td>
+                    <td><strong class="text-teal-700 dark:text-teal-400">{{ invoice.amount_receivable }}</strong></td>
+                </tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
@@ -327,6 +353,30 @@
                         <span>Total Amount</span>
                         <span>{{ invoice.total_amount if invoice.total_amount else "0.00" }}</span>
                     </div>
+                    {% if invoice.withholding_tax_raw and invoice.withholding_tax_raw > 0 %}
+                    <div class="print-summary-row">
+                        <span>WHT</span>
+                        <span class="text-amber-600 dark:text-amber-400">-{{ invoice.withholding_tax }}</span>
+                    </div>
+                    {% endif %}
+                    {% if invoice.vat_withheld and invoice.vat_withheld_amount %}
+                    <div class="print-summary-row">
+                        <span>VAT Withheld</span>
+                        <span class="text-amber-600 dark:text-amber-400">-{{ invoice.vat_withheld_amount }}</span>
+                    </div>
+                    {% endif %}
+                    {% if invoice.stamp_duty_raw and invoice.stamp_duty_raw > 0 %}
+                    <div class="print-summary-row">
+                        <span>Stamp Duty ({{ invoice.stamp_duty_treatment_label if invoice.stamp_duty_treatment_label else '' }})</span>
+                        <span>{% if invoice.stamp_duty_treatment_label == 'Deducted' %}-{% endif %}{{ invoice.stamp_duty }}</span>
+                    </div>
+                    {% endif %}
+                    {% if invoice.amount_receivable %}
+                    <div class="print-summary-row font-semibold">
+                        <span>Amount Receivable</span>
+                        <span class="text-teal-700 dark:text-teal-400">{{ invoice.amount_receivable }}</span>
+                    </div>
+                    {% endif %}
                     <div class="print-summary-row">
                         <span>Amount Paid</span>
                         <span>{{ invoice.amount_paid if invoice.amount_paid else "0.00" }}</span>

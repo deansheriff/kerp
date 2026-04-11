@@ -116,30 +116,44 @@ class OperationsDashboardWebService:
 
         try:
             from app.models.inventory.inventory_lot import InventoryLot
+            from app.models.inventory.inventory_lot_balance import InventoryLotBalance
             from app.models.inventory.item import Item
 
             now = datetime.now().date()
             expiring_soon = now + timedelta(days=30)
 
-            expiring_lots = list(
-                db.scalars(
-                    select(InventoryLot)
+            expiring_lot_rows = list(
+                db.execute(
+                    select(
+                        InventoryLot,
+                        func.sum(InventoryLotBalance.quantity_available).label(
+                            "quantity_available"
+                        ),
+                    )
+                    .join(
+                        InventoryLotBalance,
+                        InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                    )
                     .where(
                         InventoryLot.organization_id == organization_id,
                         InventoryLot.expiry_date.isnot(None),
                         InventoryLot.expiry_date > now,
                         InventoryLot.expiry_date <= expiring_soon,
-                        InventoryLot.quantity_available > 0,
                     )
+                    .group_by(InventoryLot.lot_id)
+                    .having(func.sum(InventoryLotBalance.quantity_available) > 0)
                     .order_by(InventoryLot.expiry_date)
                     .limit(10)
                 ).all()
             )
 
-            for lot in expiring_lots:
+            expiring_lots = []
+            for lot, quantity_available in expiring_lot_rows:
+                lot.quantity_available = quantity_available or 0
                 item = db.get(Item, lot.item_id)
                 if item:
                     lot.item = item
+                expiring_lots.append(lot)
 
             context["expiring_lots"] = expiring_lots
             context["expiring_lots_count"] = len(expiring_lots)

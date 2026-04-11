@@ -604,12 +604,15 @@ def get_inventory_valuation_reconciliation(
 @router.get("/fifo/{item_id}", response_model=FIFOInventoryRead)
 def get_fifo_inventory(
     item_id: UUID,
+    warehouse_id: UUID | None = Query(default=None),
     organization_id: UUID = Depends(require_organization_id),
     auth: dict = Depends(require_tenant_permission("inventory:valuation:read")),
     db: Session = Depends(get_db),
 ):
     """Get current FIFO inventory state for an item."""
-    return fifo_valuation_service.get_fifo_inventory(db, organization_id, item_id)
+    return fifo_valuation_service.get_fifo_inventory(
+        db, organization_id, item_id, warehouse_id
+    )
 
 
 from app.services.inventory import (  # noqa: E402
@@ -618,6 +621,50 @@ from app.services.inventory import (  # noqa: E402
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_lot(lot) -> LotRead:
+    balances = list(getattr(lot, "balances", []) or [])
+    if balances:
+        quantity_on_hand = sum(
+            (getattr(balance, "quantity_on_hand", Decimal("0")) or Decimal("0"))
+            for balance in balances
+        )
+        quantity_available = sum(
+            (getattr(balance, "quantity_available", Decimal("0")) or Decimal("0"))
+            for balance in balances
+        )
+        is_quarantined = any(
+            bool(getattr(balance, "is_quarantined", False)) for balance in balances
+        )
+        is_active = any(
+            (getattr(balance, "quantity_on_hand", Decimal("0")) or Decimal("0")) > 0
+            or bool(getattr(balance, "is_active", False))
+            for balance in balances
+        )
+    else:
+        quantity_on_hand = getattr(lot, "quantity_on_hand", Decimal("0"))
+        quantity_available = getattr(lot, "quantity_available", Decimal("0"))
+        is_quarantined = bool(getattr(lot, "is_quarantined", False))
+        is_active = bool(getattr(lot, "is_active", False))
+
+    return LotRead(
+        lot_id=lot.lot_id,
+        item_id=lot.item_id,
+        lot_number=lot.lot_number,
+        received_date=lot.received_date,
+        expiry_date=getattr(lot, "expiry_date", None),
+        initial_quantity=getattr(lot, "initial_quantity", Decimal("0")),
+        quantity_on_hand=quantity_on_hand,
+        quantity_available=quantity_available,
+        unit_cost=lot.unit_cost,
+        is_quarantined=is_quarantined,
+        is_active=is_active,
+    )
+
+
+def _serialize_lot_list(lots: list) -> list[LotRead]:
+    return [_serialize_lot(lot) for lot in lots]
 
 
 @router.post("/lots", response_model=LotRead, status_code=status.HTTP_201_CREATED)
@@ -654,7 +701,8 @@ def get_expiring_lots(
 ):
     """Get lots expiring within specified days."""
     lots = lot_serial_service.get_expiring_lots(db, organization_id, days_ahead)
-    return ListResponse(items=lots, count=len(lots), limit=len(lots), offset=0)
+    items = _serialize_lot_list(lots)
+    return ListResponse(items=items, count=len(items), limit=len(items), offset=0)
 
 
 @router.get("/lots/expired", response_model=ListResponse[LotRead])
@@ -665,7 +713,8 @@ def get_expired_lots(
 ):
     """Get already expired lots."""
     lots = lot_serial_service.get_expired_lots(db, organization_id)
-    return ListResponse(items=lots, count=len(lots), limit=len(lots), offset=0)
+    items = _serialize_lot_list(lots)
+    return ListResponse(items=items, count=len(items), limit=len(items), offset=0)
 
 
 @router.get("/lots/{lot_id}", response_model=LotRead)
@@ -676,7 +725,8 @@ def get_lot(
     db: Session = Depends(get_db),
 ):
     """Get a lot by ID."""
-    return lot_serial_service.get(db, str(lot_id), organization_id)
+    lot = lot_serial_service.get(db, str(lot_id), organization_id)
+    return _serialize_lot(lot) if lot else None
 
 
 @router.get("/lots", response_model=ListResponse[LotRead])
@@ -702,7 +752,8 @@ def list_lots(
         limit=limit,
         offset=offset,
     )
-    return ListResponse(items=lots, count=len(lots), limit=limit, offset=offset)
+    items = _serialize_lot_list(lots)
+    return ListResponse(items=items, count=len(items), limit=limit, offset=offset)
 
 
 @router.post("/lots/{lot_id}/allocate", response_model=LotRead)
@@ -715,8 +766,10 @@ def allocate_from_lot(
     db: Session = Depends(get_db),
 ):
     """Allocate quantity from a lot."""
-    return lot_serial_service.allocate_from_lot(
-        db, organization_id, lot_id, quantity, reference
+    return _serialize_lot(
+        lot_serial_service.allocate_from_lot(
+            db, organization_id, lot_id, quantity, reference
+        )
     )
 
 
@@ -729,7 +782,9 @@ def deallocate_from_lot(
     db: Session = Depends(get_db),
 ):
     """Release allocation from a lot."""
-    return lot_serial_service.deallocate_from_lot(db, organization_id, lot_id, quantity)
+    return _serialize_lot(
+        lot_serial_service.deallocate_from_lot(db, organization_id, lot_id, quantity)
+    )
 
 
 @router.post("/lots/{lot_id}/consume", response_model=LotRead)
@@ -741,7 +796,9 @@ def consume_from_lot(
     db: Session = Depends(get_db),
 ):
     """Consume quantity from a lot."""
-    return lot_serial_service.consume_from_lot(db, organization_id, lot_id, quantity)
+    return _serialize_lot(
+        lot_serial_service.consume_from_lot(db, organization_id, lot_id, quantity)
+    )
 
 
 @router.post("/lots/{lot_id}/quarantine", response_model=LotRead)
@@ -753,7 +810,9 @@ def quarantine_lot(
     db: Session = Depends(get_db),
 ):
     """Place a lot in quarantine."""
-    return lot_serial_service.quarantine_lot(db, organization_id, lot_id, reason)
+    return _serialize_lot(
+        lot_serial_service.quarantine_lot(db, organization_id, lot_id, reason)
+    )
 
 
 @router.post("/lots/{lot_id}/release-quarantine", response_model=LotRead)
@@ -765,7 +824,9 @@ def release_quarantine(
     db: Session = Depends(get_db),
 ):
     """Release a lot from quarantine."""
-    return lot_serial_service.release_quarantine(db, organization_id, lot_id, qc_status)
+    return _serialize_lot(
+        lot_serial_service.release_quarantine(db, organization_id, lot_id, qc_status)
+    )
 
 
 @router.get("/lots/{lot_id}/traceability", response_model=LotTraceabilityRead)

@@ -7,6 +7,8 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
 
+from unittest.mock import patch
+
 
 class TestInvWebServiceHelpers:
     """Tests for inventory web service helper functions."""
@@ -363,3 +365,167 @@ class TestInvWebServiceListTransactions:
         assert result["limit"] == 25
         assert result["offset"] == 50
         assert result["total_pages"] == 4
+
+
+class TestInvTransactionWebService:
+    """Tests for manual inventory transaction web adapters."""
+
+    def test_create_transaction_response_passes_receipt_lot_number(self):
+        """Receipt adapter should preserve the entered lot number."""
+        from app.services.inventory.web import InventoryTransactionWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        warehouse_id = uuid.uuid4()
+        fiscal_period_id = uuid.uuid4()
+
+        mock_auth = MagicMock()
+        mock_auth.organization_id = org_id
+        mock_auth.user_id = user_id
+
+        mock_db = MagicMock()
+        mock_fiscal_period = MagicMock()
+        mock_fiscal_period.fiscal_period_id = fiscal_period_id
+        mock_db.scalars.return_value.first.return_value = mock_fiscal_period
+
+        with patch(
+            "app.services.inventory.transaction.InventoryTransactionService.create_receipt"
+        ) as mock_create_receipt:
+            response = InventoryTransactionWebService.create_transaction_response(
+                request=MagicMock(),
+                auth=mock_auth,
+                transaction_type="RECEIPT",
+                item_id=str(item_id),
+                warehouse_id=str(warehouse_id),
+                quantity="5",
+                unit_cost="10",
+                transaction_date="2026-04-10",
+                reference="REF-1",
+                notes=None,
+                lot_number="LOT-APR-001",
+                db=mock_db,
+            )
+
+        txn_input = mock_create_receipt.call_args.args[2]
+        assert txn_input.lot_number == "LOT-APR-001"
+        assert txn_input.lot_id is None
+        assert response.status_code == 303
+
+    def test_create_transaction_response_resolves_issue_lot_number_to_lot_id(self):
+        """Issue adapter should resolve a lot number to a warehouse-scoped lot id."""
+        from app.services.inventory.web import InventoryTransactionWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        warehouse_id = uuid.uuid4()
+        fiscal_period_id = uuid.uuid4()
+        lot_id = uuid.uuid4()
+
+        mock_auth = MagicMock()
+        mock_auth.organization_id = org_id
+        mock_auth.user_id = user_id
+
+        mock_db = MagicMock()
+        mock_fiscal_period = MagicMock()
+        mock_fiscal_period.fiscal_period_id = fiscal_period_id
+        mock_db.scalars.return_value.first.return_value = mock_fiscal_period
+
+        with (
+            patch(
+                "app.services.inventory.web._resolve_lot_id_for_item_warehouse",
+                return_value=lot_id,
+            ) as mock_resolve,
+            patch(
+                "app.services.inventory.transaction.InventoryTransactionService.create_issue"
+            ) as mock_create_issue,
+        ):
+            response = InventoryTransactionWebService.create_transaction_response(
+                request=MagicMock(),
+                auth=mock_auth,
+                transaction_type="ISSUE",
+                item_id=str(item_id),
+                warehouse_id=str(warehouse_id),
+                quantity="2",
+                unit_cost="10",
+                transaction_date="2026-04-10",
+                reference="REF-2",
+                notes=None,
+                lot_number="LOT-APR-002",
+                db=mock_db,
+            )
+
+        txn_input = mock_create_issue.call_args.args[2]
+        mock_resolve.assert_called_once_with(
+            mock_db,
+            organization_id=org_id,
+            item_id=item_id,
+            warehouse_id=warehouse_id,
+            lot_number="LOT-APR-002",
+        )
+        assert txn_input.lot_id == lot_id
+        assert txn_input.lot_number == "LOT-APR-002"
+        assert response.status_code == 303
+
+    def test_create_transfer_response_resolves_lot_number_from_source_warehouse(self):
+        """Transfer adapter should resolve the entered lot against the source warehouse."""
+        from app.services.inventory.web import InventoryTransactionWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        from_warehouse_id = uuid.uuid4()
+        to_warehouse_id = uuid.uuid4()
+        fiscal_period_id = uuid.uuid4()
+        lot_id = uuid.uuid4()
+
+        mock_auth = MagicMock()
+        mock_auth.organization_id = org_id
+        mock_auth.user_id = user_id
+
+        mock_db = MagicMock()
+        mock_fiscal_period = MagicMock()
+        mock_fiscal_period.fiscal_period_id = fiscal_period_id
+        mock_item = MagicMock()
+        mock_item.organization_id = org_id
+        mock_item.average_cost = Decimal("12.50")
+        mock_item.base_uom = "EA"
+        mock_item.currency_code = "USD"
+        mock_db.scalars.return_value.first.return_value = mock_fiscal_period
+        mock_db.get.return_value = mock_item
+
+        with (
+            patch(
+                "app.services.inventory.web._resolve_lot_id_for_item_warehouse",
+                return_value=lot_id,
+            ) as mock_resolve,
+            patch(
+                "app.services.inventory.transaction.InventoryTransactionService.create_transfer"
+            ) as mock_create_transfer,
+        ):
+            response = InventoryTransactionWebService.create_transfer_response(
+                request=MagicMock(),
+                auth=mock_auth,
+                item_id=str(item_id),
+                from_warehouse_id=str(from_warehouse_id),
+                to_warehouse_id=str(to_warehouse_id),
+                quantity="8",
+                transaction_date="2026-04-10",
+                reference="REF-3",
+                notes=None,
+                lot_number="LOT-APR-003",
+                db=mock_db,
+            )
+
+        txn_input = mock_create_transfer.call_args.kwargs["input"]
+        mock_resolve.assert_called_once_with(
+            mock_db,
+            organization_id=org_id,
+            item_id=item_id,
+            warehouse_id=from_warehouse_id,
+            lot_number="LOT-APR-003",
+        )
+        assert txn_input.lot_id == lot_id
+        assert txn_input.lot_number == "LOT-APR-003"
+        assert response.status_code == 303

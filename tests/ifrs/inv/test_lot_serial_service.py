@@ -63,9 +63,9 @@ class TestCreateLot:
 
         service.create_lot(mock_db, org_id, sample_lot_input)
 
-        mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
-        mock_db.refresh.assert_called_once()
+        assert mock_db.add.call_count == 2
+        mock_db.flush.assert_called()
+        # Services no longer call refresh — callers commit
 
     def test_create_lot_item_not_found(
         self, service, mock_db, org_id, sample_lot_input
@@ -143,7 +143,7 @@ class TestAllocateFromLot:
 
         result = service.allocate_from_lot(mock_db, lot.lot_id, Decimal("50"))
 
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
         assert result.quantity_allocated == Decimal("50")
         assert result.quantity_available == Decimal("50")
 
@@ -205,7 +205,7 @@ class TestDeallocateFromLot:
 
         result = service.deallocate_from_lot(mock_db, lot.lot_id, Decimal("30"))
 
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
         assert result.quantity_allocated == Decimal("20")
         assert result.quantity_available == Decimal("80")
 
@@ -236,7 +236,7 @@ class TestConsumeFromLot:
 
         result = service.consume_from_lot(mock_db, lot.lot_id, Decimal("50"))
 
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
         assert result.quantity_on_hand == Decimal("50")
 
     def test_consume_insufficient_quantity_fails(self, service, mock_db):
@@ -283,7 +283,7 @@ class TestQuarantineLot:
 
         result = service.quarantine_lot(mock_db, lot.lot_id, "Quality issue")
 
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
         assert result.is_quarantined is True
         assert result.quarantine_reason == "Quality issue"
         assert result.quantity_available == Decimal("0")
@@ -316,7 +316,7 @@ class TestReleaseQuarantine:
 
         result = service.release_quarantine(mock_db, lot.lot_id, "PASSED")
 
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
         assert result.is_quarantined is False
         assert result.quarantine_reason is None
         assert result.qc_status == "PASSED"

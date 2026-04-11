@@ -278,6 +278,7 @@ class TestGetItemCost:
     ):
         """Should consume from multiple lots in FIFO order."""
         from app.models.inventory.inventory_lot import InventoryLot
+        from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 
         inventory_item.costing_method = CostingMethod.FIFO
         db.flush()
@@ -286,34 +287,51 @@ class TestGetItemCost:
         lot1 = InventoryLot(
             organization_id=org_id,
             item_id=inventory_item.item_id,
-            warehouse_id=warehouse.warehouse_id,
             lot_number="LOT-A",
             received_date=date(2024, 1, 1),  # Older
             initial_quantity=Decimal("30"),
-            quantity_on_hand=Decimal("30"),
-            quantity_available=Decimal("30"),
             unit_cost=Decimal("8.00"),  # Cheaper
             is_active=True,
-            is_quarantined=False,
         )
 
         # Create second lot (newer, more expensive)
         lot2 = InventoryLot(
             organization_id=org_id,
             item_id=inventory_item.item_id,
-            warehouse_id=warehouse.warehouse_id,
             lot_number="LOT-B",
             received_date=date(2024, 1, 15),  # Newer
             initial_quantity=Decimal("50"),
-            quantity_on_hand=Decimal("50"),
-            quantity_available=Decimal("50"),
             unit_cost=Decimal("12.00"),  # More expensive
             is_active=True,
-            is_quarantined=False,
         )
 
         db.add(lot1)
         db.add(lot2)
+        db.flush()
+        db.add_all(
+            [
+                InventoryLotBalance(
+                    organization_id=org_id,
+                    lot_id=lot1.lot_id,
+                    warehouse_id=warehouse.warehouse_id,
+                    quantity_on_hand=Decimal("30"),
+                    quantity_allocated=Decimal("0"),
+                    quantity_available=Decimal("30"),
+                    is_active=True,
+                    is_quarantined=False,
+                ),
+                InventoryLotBalance(
+                    organization_id=org_id,
+                    lot_id=lot2.lot_id,
+                    warehouse_id=warehouse.warehouse_id,
+                    quantity_on_hand=Decimal("50"),
+                    quantity_allocated=Decimal("0"),
+                    quantity_available=Decimal("50"),
+                    is_active=True,
+                    is_quarantined=False,
+                ),
+            ]
+        )
         db.flush()
 
         # Request 50 units: 30 from lot1 @ 8.00, 20 from lot2 @ 12.00

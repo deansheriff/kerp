@@ -25,6 +25,8 @@ from sqlalchemy.orm import Session
 
 from app.models.finance.ar.invoice import Invoice
 from app.models.finance.ar.invoice_line import InvoiceLine
+from app.models.inventory.inventory_lot import InventoryLot
+from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 from app.models.inventory.inventory_transaction import TransactionType
 from app.models.inventory.item import CostingMethod, Item
 from app.models.inventory.item_category import ItemCategory
@@ -147,8 +149,6 @@ class ARInventoryIntegration:
         Returns:
             CostingResult with unit cost and total cost
         """
-        from app.models.inventory.inventory_lot import InventoryLot
-
         # Determine cost based on costing method
         if item.costing_method == CostingMethod.STANDARD_COST:
             unit_cost = item.standard_cost or Decimal("0")
@@ -167,14 +167,16 @@ class ARInventoryIntegration:
         elif item.costing_method == CostingMethod.FIFO:
             # For FIFO, we need to calculate from lots
             org_uuid = coerce_uuid(organization_id)
-            lots = db.scalars(
-                select(InventoryLot)
+            lot_rows = db.execute(
+                select(InventoryLotBalance, InventoryLot)
+                .join(InventoryLot, InventoryLotBalance.lot_id == InventoryLot.lot_id)
                 .where(
                     InventoryLot.organization_id == org_uuid,
                     InventoryLot.item_id == item.item_id,
-                    InventoryLot.quantity_on_hand > 0,
-                    InventoryLot.is_active == True,
-                    InventoryLot.is_quarantined == False,
+                    InventoryLotBalance.warehouse_id == warehouse_id,
+                    InventoryLotBalance.quantity_on_hand > 0,
+                    InventoryLotBalance.is_active == True,
+                    InventoryLotBalance.is_quarantined == False,
                 )
                 .order_by(InventoryLot.received_date.asc())
             ).all()
@@ -183,11 +185,11 @@ class ARInventoryIntegration:
             total_cost = Decimal("0")
             first_lot_id = None
 
-            for lot in lots:
+            for balance, lot in lot_rows:
                 if remaining <= 0:
                     break
 
-                consume_qty = min(lot.quantity_on_hand, remaining)
+                consume_qty = min(balance.quantity_on_hand, remaining)
                 total_cost += consume_qty * lot.unit_cost
                 remaining -= consume_qty
 
@@ -197,8 +199,8 @@ class ARInventoryIntegration:
             if remaining > 0:
                 # Not enough inventory - use last known cost for remainder
                 last_cost = (
-                    lots[-1].unit_cost
-                    if lots
+                    lot_rows[-1][1].unit_cost
+                    if lot_rows
                     else (item.last_purchase_cost or Decimal("0"))
                 )
                 total_cost += remaining * last_cost
@@ -437,7 +439,10 @@ class ARInventoryIntegration:
 
             except HTTPException as e:
                 errors.append(f"Line {line.line_number}: {e.detail}")
-            except Exception as e:
+            except (ValueError, TypeError, ArithmeticError) as e:
+                logger.exception(
+                    "Inventory transaction failed for line %s", line.line_number
+                )
                 errors.append(
                     f"Line {line.line_number}: Inventory transaction failed - {str(e)}"
                 )

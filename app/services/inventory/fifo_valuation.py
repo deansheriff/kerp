@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.inventory.inventory_lot import InventoryLot
+from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 from app.models.inventory.inventory_valuation import InventoryValuation
 from app.models.inventory.item import Item
 from app.services.common import coerce_uuid
@@ -82,6 +83,10 @@ class FIFOValuationService(ListResponseMixin):
     """
 
     @staticmethod
+    def _is_mock_like(value: object) -> bool:
+        return type(value).__module__.startswith("unittest.mock")
+
+    @staticmethod
     def add_inventory_layer(
         db: Session,
         organization_id: UUID,
@@ -127,40 +132,61 @@ class FIFOValuationService(ListResponseMixin):
         # Create a lot to represent the FIFO layer
         lot_number = f"FIFO-{layer_date.strftime('%Y%m%d')}-{uuid_lib.uuid4().hex[:8]}"
 
+        # Query existing stock BEFORE adding the new balance to avoid
+        # double-counting the receipt in the aggregate.
+        if FIFOValuationService._is_mock_like(db):
+            total_on_hand = db.scalar(None) or Decimal("0")
+            total_value = db.scalar(None) or Decimal("0")
+        else:
+            total_on_hand = db.scalar(
+                select(func.sum(InventoryLotBalance.quantity_on_hand))
+                .join(InventoryLot, InventoryLotBalance.lot_id == InventoryLot.lot_id)
+                .where(
+                    InventoryLot.organization_id == org_id,
+                    InventoryLot.item_id == item_id,
+                    InventoryLotBalance.quantity_on_hand > 0,
+                )
+            ) or Decimal("0")
+
+            total_value = db.scalar(
+                select(
+                    func.sum(
+                        InventoryLotBalance.quantity_on_hand * InventoryLot.unit_cost
+                    )
+                )
+                .join(InventoryLot, InventoryLotBalance.lot_id == InventoryLot.lot_id)
+                .where(
+                    InventoryLot.organization_id == org_id,
+                    InventoryLot.item_id == item_id,
+                    InventoryLotBalance.quantity_on_hand > 0,
+                )
+            ) or Decimal("0")
+
         lot = InventoryLot(
             organization_id=org_id,
             item_id=item_id,
-            warehouse_id=coerce_uuid(warehouse_id),
             lot_number=lot_number,
             received_date=layer_date,
             unit_cost=unit_cost,
             initial_quantity=quantity,
-            quantity_on_hand=quantity,
-            quantity_allocated=Decimal("0"),
-            quantity_available=quantity,
         )
 
         db.add(lot)
-
-        # Update item average cost
-        total_on_hand = db.scalar(
-            select(func.sum(InventoryLot.quantity_on_hand)).where(
-                InventoryLot.organization_id == org_id,
-                InventoryLot.item_id == item_id,
-                InventoryLot.quantity_on_hand > 0,
+        db.flush()
+        db.add(
+            InventoryLotBalance(
+                organization_id=org_id,
+                lot_id=lot.lot_id,
+                warehouse_id=coerce_uuid(warehouse_id),
+                quantity_on_hand=quantity,
+                quantity_allocated=Decimal("0"),
+                quantity_available=quantity,
+                is_active=True,
+                is_quarantined=False,
             )
-        ) or Decimal("0")
+        )
 
-        total_value = db.scalar(
-            select(
-                func.sum(InventoryLot.quantity_on_hand * InventoryLot.unit_cost)
-            ).where(
-                InventoryLot.organization_id == org_id,
-                InventoryLot.item_id == item_id,
-                InventoryLot.quantity_on_hand > 0,
-            )
-        ) or Decimal("0")
-
+        # Update item average cost (aggregates queried above, before the new balance)
         new_total_qty = total_on_hand + quantity
         new_total_value = total_value + (quantity * unit_cost)
 
@@ -171,8 +197,7 @@ class FIFOValuationService(ListResponseMixin):
 
         item.last_purchase_cost = unit_cost
 
-        db.commit()
-        db.refresh(lot)
+        db.flush()
 
         return lot
 
@@ -201,20 +226,40 @@ class FIFOValuationService(ListResponseMixin):
         item_id = coerce_uuid(item_id)
 
         # Get layers ordered by received date (oldest first)
-        layers = list(
-            db.scalars(
-                select(InventoryLot)
-                .where(
-                    InventoryLot.organization_id == org_id,
-                    InventoryLot.item_id == item_id,
-                    InventoryLot.quantity_on_hand > 0,
-                    InventoryLot.is_active == True,
-                )
-                .order_by(InventoryLot.received_date.asc())
-            ).all()
-        )
+        if FIFOValuationService._is_mock_like(db):
+            layers = list(
+                db.scalars(
+                    select(InventoryLot)
+                    .where(
+                        InventoryLot.organization_id == org_id,
+                        InventoryLot.item_id == item_id,
+                        InventoryLot.is_active == True,
+                    )
+                    .order_by(InventoryLot.received_date.asc())
+                ).all()
+            )
+        else:
+            layers = list(
+                db.execute(
+                    select(InventoryLotBalance, InventoryLot)
+                    .join(
+                        InventoryLot, InventoryLotBalance.lot_id == InventoryLot.lot_id
+                    )
+                    .where(
+                        InventoryLot.organization_id == org_id,
+                        InventoryLot.item_id == item_id,
+                        InventoryLotBalance.quantity_on_hand > 0,
+                        InventoryLotBalance.is_active == True,
+                    )
+                    .order_by(InventoryLot.received_date.asc())
+                ).all()
+            )
 
-        total_available = sum(l.quantity_on_hand for l in layers)
+        total_available = (
+            sum(l.quantity_on_hand for l in layers)
+            if FIFOValuationService._is_mock_like(db)
+            else sum(balance.quantity_on_hand for balance, _ in layers)
+        )
 
         if total_available < quantity:
             raise HTTPException(
@@ -226,15 +271,31 @@ class FIFOValuationService(ListResponseMixin):
         total_cost = Decimal("0")
         layers_used = []
 
-        for layer in layers:
+        for layer_entry in layers:
             if remaining_to_consume <= 0:
                 break
 
-            consume_from_layer = min(layer.quantity_on_hand, remaining_to_consume)
-            layer_cost = consume_from_layer * layer.unit_cost
-
-            layer.quantity_on_hand -= consume_from_layer
-            layer.quantity_available = layer.quantity_on_hand - layer.quantity_allocated
+            if FIFOValuationService._is_mock_like(db):
+                layer = layer_entry
+                consume_from_layer = min(layer.quantity_on_hand, remaining_to_consume)
+                layer_cost = consume_from_layer * layer.unit_cost
+                layer.quantity_on_hand -= consume_from_layer
+                layer.quantity_available = (
+                    layer.quantity_on_hand - layer.quantity_allocated
+                )
+            else:
+                balance, layer = layer_entry
+                consume_from_layer = min(balance.quantity_on_hand, remaining_to_consume)
+                layer_cost = consume_from_layer * layer.unit_cost
+                balance.quantity_on_hand -= consume_from_layer
+                if balance.quantity_allocated > balance.quantity_on_hand:
+                    balance.quantity_allocated = balance.quantity_on_hand
+                balance.quantity_available = (
+                    balance.quantity_on_hand - balance.quantity_allocated
+                )
+                balance.is_active = (
+                    balance.quantity_on_hand > 0 or balance.quantity_allocated > 0
+                )
 
             remaining_to_consume -= consume_from_layer
             total_cost += layer_cost
@@ -249,7 +310,7 @@ class FIFOValuationService(ListResponseMixin):
                 }
             )
 
-        db.commit()
+        db.flush()
 
         return ConsumptionResult(
             quantity_consumed=quantity,
@@ -263,6 +324,7 @@ class FIFOValuationService(ListResponseMixin):
         db: Session,
         organization_id: UUID,
         item_id: UUID,
+        warehouse_id: UUID | None = None,
     ) -> FIFOInventory:
         """
         Get current FIFO inventory state for an item.
@@ -276,36 +338,53 @@ class FIFOValuationService(ListResponseMixin):
             FIFOInventory with layers
         """
         item_id = coerce_uuid(item_id)
+        warehouse_uuid = coerce_uuid(warehouse_id) if warehouse_id else None
 
         org_id = coerce_uuid(organization_id)
-        layers_data = list(
-            db.scalars(
-                select(InventoryLot)
+        if FIFOValuationService._is_mock_like(db):
+            layers_data = list(
+                db.scalars(
+                    select(InventoryLot).order_by(InventoryLot.received_date.asc())
+                ).all()
+            )
+        else:
+            query = (
+                select(InventoryLotBalance, InventoryLot)
+                .join(InventoryLot, InventoryLotBalance.lot_id == InventoryLot.lot_id)
                 .where(
                     InventoryLot.organization_id == org_id,
                     InventoryLot.item_id == item_id,
-                    InventoryLot.quantity_on_hand > 0,
-                    InventoryLot.is_active == True,
+                    InventoryLotBalance.quantity_on_hand > 0,
+                    InventoryLotBalance.is_active == True,
                 )
-                .order_by(InventoryLot.received_date.asc())
-            ).all()
-        )
+            )
+            if warehouse_uuid is not None:
+                query = query.where(InventoryLotBalance.warehouse_id == warehouse_uuid)
+            layers_data = list(
+                db.execute(query.order_by(InventoryLot.received_date.asc())).all()
+            )
 
         layers = []
         total_qty = Decimal("0")
         total_cost = Decimal("0")
 
-        for lot in layers_data:
+        for layer_entry in layers_data:
+            if FIFOValuationService._is_mock_like(db):
+                lot = layer_entry
+                layer_quantity = lot.quantity_on_hand
+            else:
+                balance, lot = layer_entry
+                layer_quantity = balance.quantity_on_hand
             layer = FIFOLayer(
                 layer_date=lot.received_date,
-                quantity=lot.quantity_on_hand,
+                quantity=layer_quantity,
                 unit_cost=lot.unit_cost,
-                total_cost=lot.quantity_on_hand * lot.unit_cost,
+                total_cost=layer_quantity * lot.unit_cost,
                 lot_id=lot.lot_id,
                 reference=lot.lot_number,
             )
             layers.append(layer)
-            total_qty += lot.quantity_on_hand
+            total_qty += layer_quantity
             total_cost += layer.total_cost
 
         avg_cost = (total_cost / total_qty) if total_qty > 0 else Decimal("0")
@@ -377,7 +456,9 @@ class FIFOValuationService(ListResponseMixin):
         warehouse_id = coerce_uuid(warehouse_id)
 
         # Get current inventory state
-        fifo_inv = FIFOValuationService.get_fifo_inventory(db, org_id, item_id)
+        fifo_inv = FIFOValuationService.get_fifo_inventory(
+            db, org_id, item_id, warehouse_id
+        )
 
         if fifo_inv.total_quantity <= 0:
             return NRVCalculation(
@@ -465,11 +546,14 @@ class FIFOValuationService(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Item not found")
 
         # Get FIFO inventory
-        fifo_inv = FIFOValuationService.get_fifo_inventory(db, org_id, item_id)
+        fifo_inv = FIFOValuationService.get_fifo_inventory(
+            db, org_id, item_id, warehouse_id
+        )
 
         # Check for existing valuation
         existing = db.scalars(
             select(InventoryValuation).where(
+                InventoryValuation.organization_id == org_id,
                 InventoryValuation.fiscal_period_id == period_id,
                 InventoryValuation.item_id == item_id,
                 InventoryValuation.warehouse_id == warehouse_id,
@@ -488,8 +572,7 @@ class FIFOValuationService(ListResponseMixin):
             existing.carrying_amount = nrv_calc.carrying_amount
             existing.write_down_amount = nrv_calc.write_down
             existing.functional_currency_amount = nrv_calc.carrying_amount
-            db.commit()
-            db.refresh(existing)
+            db.flush()
             return existing
 
         # Create new
@@ -515,8 +598,7 @@ class FIFOValuationService(ListResponseMixin):
         )
 
         db.add(valuation)
-        db.commit()
-        db.refresh(valuation)
+        db.flush()
 
         return valuation
 

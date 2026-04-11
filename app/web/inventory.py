@@ -713,6 +713,34 @@ async def create_inventory_return(
     )
 
 
+@router.get("/attachments/{attachment_id}/download")
+def download_inventory_attachment(
+    attachment_id: str,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Download an inventory attachment file."""
+    return operations_inv_web_service.download_attachment_response(
+        attachment_id=attachment_id,
+        auth=auth,
+        db=db,
+    )
+
+
+@router.post("/attachments/{attachment_id}/delete")
+def delete_inventory_attachment(
+    attachment_id: str,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Delete an inventory attachment file."""
+    return operations_inv_web_service.delete_attachment_response(
+        attachment_id=attachment_id,
+        auth=auth,
+        db=db,
+    )
+
+
 @router.get("/returns/material-requests/search")
 def inventory_return_material_request_search(
     q: str = Query(..., min_length=1),

@@ -15,6 +15,12 @@
 
 {% block content %}
 <div class="space-y-6">
+    {% if error %}
+    <div class="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+        {{ error }}
+    </div>
+    {% endif %}
+
     <div class="card p-6">
         <div class="flex items-start justify-between gap-4">
             <div>
@@ -104,5 +110,59 @@
         </a>
     </div>
     {% endif %}
+
+    <div class="card p-6">
+        <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+                <h3 class="font-semibold text-slate-900 dark:text-white">Attached Images</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Photos uploaded when this return was recorded.</p>
+            </div>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ attachments | length if attachments else 0 }} file(s)</span>
+        </div>
+
+        {% if attachments %}
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {% for attachment in attachments %}
+            <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/30">
+                <a href="{{ attachment.download_url }}" class="block transition hover:border-amber-300 hover:bg-white dark:hover:border-amber-700">
+                    {% if attachment.is_image %}
+                    <img
+                        src="{{ attachment.download_url }}"
+                        alt="{{ attachment.file_name }}"
+                        class="h-48 w-full object-cover"
+                        loading="lazy"
+                    >
+                    {% endif %}
+                </a>
+                <div class="space-y-1 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-slate-900 dark:text-white">{{ attachment.file_name }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ attachment.file_size_display }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ attachment.uploaded_at_display }}</p>
+                        </div>
+                        <form action="/inventory/attachments/{{ attachment.attachment_id }}/delete" method="POST" onsubmit="return confirm('Delete this image?');">
+                            {{ request.state.csrf_form | safe }}
+                            <button
+                                type="submit"
+                                class="rounded p-2 text-slate-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                                title="Delete image"
+                                aria-label="Delete image"
+                            >
+                                {{ icon_svg("trash", "h-4 w-4") }}
+                            </button>
+                        </form>
+                    </div>
+                    {% if attachment.description %}
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ attachment.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-500 dark:text-slate-400">No images attached.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

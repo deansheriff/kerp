@@ -15,7 +15,7 @@
 
 {% block header_actions %}
 <form method="post" action="/inventory/lots/{{ lot.lot_id }}/toggle-quarantine"
-      onsubmit="return confirm('{{ 'Release from quarantine?' if lot.is_quarantined else 'Place in quarantine?' }}');">
+      onsubmit="return confirm('{{ 'Release all warehouse balances from quarantine?' if lot.is_quarantined else 'Place all warehouse balances in quarantine?' }}');">
     {{ request.state.csrf_form | safe }}
     <button type="submit" class="btn btn-secondary {{ 'text-emerald-600 hover:text-emerald-700' if lot.is_quarantined else 'text-amber-600 hover:text-amber-700' }}">
         {% if lot.is_quarantined %}
@@ -47,7 +47,7 @@
                     <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                         Expired
                     </span>
-                    {% elif lot.quantity_available <= 0 %}
+                    {% elif lot.total_available <= 0 %}
                     <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                         Depleted
                     </span>
@@ -80,19 +80,19 @@
             <div>
                 <p class="text-sm text-slate-500 dark:text-slate-400">Quantity On Hand</p>
                 <p class="mt-1 font-medium font-mono text-2xl text-slate-900 dark:text-white">
-                    {{ '{:,.2f}'.format(lot.quantity_on_hand or 0) }}
+                    {{ '{:,.2f}'.format(lot.total_on_hand or 0) }}
                 </p>
             </div>
             <div>
                 <p class="text-sm text-slate-500 dark:text-slate-400">Allocated</p>
                 <p class="mt-1 font-medium font-mono text-2xl text-amber-600">
-                    {{ '{:,.2f}'.format(lot.quantity_allocated or 0) }}
+                    {{ '{:,.2f}'.format(lot.total_allocated or 0) }}
                 </p>
             </div>
             <div>
                 <p class="text-sm text-slate-500 dark:text-slate-400">Available</p>
-                <p class="mt-1 font-medium font-mono text-2xl {{ 'text-emerald-600' if (lot.quantity_available or 0) > 0 else 'text-slate-500' }}">
-                    {{ '{:,.2f}'.format(lot.quantity_available or 0) }}
+                <p class="mt-1 font-medium font-mono text-2xl {{ 'text-emerald-600' if (lot.total_available or 0) > 0 else 'text-slate-500' }}">
+                    {{ '{:,.2f}'.format(lot.total_available or 0) }}
                 </p>
             </div>
         </div>
@@ -105,8 +105,8 @@
             <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Lot Information</h3>
             <dl class="space-y-3">
                 <div class="flex justify-between">
-                    <dt class="text-sm text-slate-500 dark:text-slate-400">Warehouse</dt>
-                    <dd class="font-medium text-slate-900 dark:text-white">{{ lot.warehouse.warehouse_name if lot.warehouse else '-' }}</dd>
+                    <dt class="text-sm text-slate-500 dark:text-slate-400">Warehouses</dt>
+                    <dd class="font-medium text-slate-900 dark:text-white">{{ balance_rows | length }}</dd>
                 </div>
                 <div class="flex justify-between">
                     <dt class="text-sm text-slate-500 dark:text-slate-400">Manufacture Date</dt>
@@ -139,6 +139,56 @@
                 </div>
             </dl>
         </div>
+    </div>
+
+    <!-- Warehouse Balances -->
+    <div class="card overflow-hidden">
+        <div class="border-b border-slate-200 dark:border-slate-700 px-6 py-4">
+            <h3 class="font-semibold text-slate-900 dark:text-white">Warehouse Balances</h3>
+        </div>
+        {% if balance_rows | default([]) | length > 0 %}
+        <div class="table-container">
+            <table class="table-ledger">
+                <thead>
+                    <tr>
+                        <th scope="col">Warehouse</th>
+                        <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">On Hand</th>
+                        <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">Allocated</th>
+                        <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">Available</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">QC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for balance in balance_rows %}
+                    <tr>
+                        <td>{{ balance.warehouse_name }}</td>
+                        <td class="text-right font-mono">{{ '{:,.2f}'.format(balance.quantity_on_hand or 0) }}</td>
+                        <td class="text-right font-mono">{{ '{:,.2f}'.format(balance.quantity_allocated or 0) }}</td>
+                        <td class="text-right font-mono">{{ '{:,.2f}'.format(balance.quantity_available or 0) }}</td>
+                        <td>
+                            {% if balance.is_quarantined %}
+                            {{ icon_svg("warning", "h-4 w-4 inline mr-1 text-amber-500") }} Quarantined
+                            {% elif (balance.quantity_on_hand or 0) <= 0 and (balance.quantity_allocated or 0) <= 0 %}
+                            Depleted
+                            {% else %}
+                            Available
+                            {% endif %}
+                            {% if balance.quarantine_reason %}
+                            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ balance.quarantine_reason }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ balance.qc_status or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
+            No warehouse balances recorded for this lot.
+        </div>
+        {% endif %}
     </div>
 
     <!-- Transaction History -->

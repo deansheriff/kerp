@@ -124,8 +124,8 @@ class TestCreateReceipt:
             service.create_receipt(mock_db, org_id, sample_receipt_input, user_id)
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
-        mock_db.refresh.assert_called_once()
+        mock_db.flush.assert_called()
+        # Services no longer call refresh — callers commit
 
     def test_create_receipt_item_not_found(
         self, service, mock_db, org_id, user_id, sample_receipt_input
@@ -213,7 +213,7 @@ class TestCreateIssue:
             service.create_issue(mock_db, org_id, sample_issue_input, user_id)
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_issue_insufficient_inventory(
         self, service, mock_db, org_id, user_id, sample_issue_input
@@ -301,7 +301,7 @@ class TestCreateAdjustment:
             service.create_adjustment(mock_db, org_id, input_data, user_id)
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_negative_adjustment(self, service, mock_db, org_id, user_id):
         """Test successful negative adjustment."""
@@ -433,7 +433,7 @@ class TestCreateTransfer:
 
         # Should create 2 transactions (issue and receipt)
         assert mock_db.add.call_count == 2
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_transfer_no_destination_fails(
         self, service, mock_db, org_id, user_id

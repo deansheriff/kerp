@@ -337,6 +337,24 @@ class LotRead(BaseModel):
     is_active: bool
 
 
+class LotBalanceRead(BaseModel):
+    """Warehouse-scoped lot balance response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lot_balance_id: UUID
+    lot_id: UUID
+    organization_id: UUID
+    warehouse_id: UUID | None
+    quantity_on_hand: Decimal
+    quantity_allocated: Decimal
+    quantity_available: Decimal
+    is_quarantined: bool
+    is_active: bool
+    quarantine_reason: str | None
+    qc_status: str | None
+
+
 class LotTraceabilityRead(BaseModel):
     """Lot traceability response."""
 
@@ -372,5 +390,6 @@ __all__ = [
     "AddLayerCreate",
     "LotCreate",
     "LotRead",
+    "LotBalanceRead",
     "LotTraceabilityRead",
 ]

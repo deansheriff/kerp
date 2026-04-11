@@ -19,7 +19,8 @@ from app.models.finance.ar.invoice import Invoice, InvoiceStatus, InvoiceType
 from app.models.finance.ar.invoice_line import InvoiceLine
 from app.models.finance.gl.fiscal_period import FiscalPeriod
 from app.models.finance.gl.journal_entry import JournalType
-from app.models.finance.tax.tax_code import TaxCode
+from app.models.finance.ar.invoice_line_tax import InvoiceLineTax
+from app.models.finance.tax.tax_code import TaxCode, TaxType
 from app.services.common import coerce_uuid
 from app.services.finance.ar.ar_inventory_integration import ARInventoryIntegration
 from app.services.finance.ar.posting.helpers import create_tax_transactions
@@ -280,29 +281,159 @@ def post_invoice(
             delta,
         )
 
-    # Debit line (AR Control account)
-    total_functional = invoice.functional_currency_amount
+    # ── WHT debit line ─────────────────────────────────────────────
+    wht_amount = getattr(invoice, "withholding_tax_amount", None) or Decimal("0")
+    wht_code_id = getattr(invoice, "withholding_tax_code_id", None)
+    if wht_amount > Decimal("0") and wht_code_id:
+        wht_code = db.get(TaxCode, wht_code_id)
+        if wht_code and wht_code.tax_paid_account_id:
+            wht_functional = wht_amount * exchange_rate
+            if invoice.invoice_type == InvoiceType.CREDIT_NOTE:
+                journal_lines.append(
+                    JournalLineInput(
+                        account_id=wht_code.tax_paid_account_id,
+                        debit_amount=Decimal("0"),
+                        credit_amount=abs(wht_amount),
+                        debit_amount_functional=Decimal("0"),
+                        credit_amount_functional=abs(wht_functional),
+                        description=f"AR Credit Note WHT reversal: {invoice.invoice_number}",
+                    )
+                )
+            else:
+                journal_lines.append(
+                    JournalLineInput(
+                        account_id=wht_code.tax_paid_account_id,
+                        debit_amount=wht_amount,
+                        credit_amount=Decimal("0"),
+                        debit_amount_functional=wht_functional,
+                        credit_amount_functional=Decimal("0"),
+                        description=f"AR Invoice WHT receivable: {invoice.invoice_number}",
+                    )
+                )
+
+    # ── VAT withheld debit line ────────────────────────────────────
+    vat_withheld_amount = Decimal("0")
+    if getattr(invoice, "vat_withheld", False) and invoice.tax_amount > Decimal("0"):
+        vat_withheld_amount = invoice.tax_amount
+        # Find VAT tax codes used on invoice lines to get the tax_paid_account_id
+        vat_account_ids = set(
+            db.scalars(
+                select(TaxCode.tax_paid_account_id)
+                .join(InvoiceLineTax, InvoiceLineTax.tax_code_id == TaxCode.tax_code_id)
+                .join(InvoiceLine, InvoiceLine.line_id == InvoiceLineTax.line_id)
+                .where(
+                    InvoiceLine.invoice_id == invoice.invoice_id,
+                    TaxCode.tax_type.in_([TaxType.VAT, TaxType.GST]),
+                    TaxCode.tax_paid_account_id.isnot(None),
+                )
+            ).all()
+        )
+        # Fall back to tax_collected_account_id if tax_paid not configured
+        if not vat_account_ids:
+            vat_account_ids = set(
+                db.scalars(
+                    select(TaxCode.tax_collected_account_id)
+                    .join(
+                        InvoiceLineTax,
+                        InvoiceLineTax.tax_code_id == TaxCode.tax_code_id,
+                    )
+                    .join(InvoiceLine, InvoiceLine.line_id == InvoiceLineTax.line_id)
+                    .where(
+                        InvoiceLine.invoice_id == invoice.invoice_id,
+                        TaxCode.tax_type.in_([TaxType.VAT, TaxType.GST]),
+                        TaxCode.tax_collected_account_id.isnot(None),
+                    )
+                ).all()
+            )
+
+        vat_withheld_functional = vat_withheld_amount * exchange_rate
+        for vat_account_id in vat_account_ids:
+            if vat_account_id is None:
+                continue
+            if invoice.invoice_type == InvoiceType.CREDIT_NOTE:
+                journal_lines.append(
+                    JournalLineInput(
+                        account_id=vat_account_id,
+                        debit_amount=Decimal("0"),
+                        credit_amount=abs(vat_withheld_amount),
+                        debit_amount_functional=Decimal("0"),
+                        credit_amount_functional=abs(vat_withheld_functional),
+                        description=f"AR Credit Note VAT withheld reversal: {invoice.invoice_number}",
+                    )
+                )
+            else:
+                journal_lines.append(
+                    JournalLineInput(
+                        account_id=vat_account_id,
+                        debit_amount=vat_withheld_amount,
+                        credit_amount=Decimal("0"),
+                        debit_amount_functional=vat_withheld_functional,
+                        credit_amount_functional=Decimal("0"),
+                        description=f"AR Invoice VAT withheld at source: {invoice.invoice_number}",
+                    )
+                )
+
+    # ── Stamp duty debit line (only when DEDUCTED) ─────────────────
+    stamp_duty_deducted = Decimal("0")
+    stamp_duty_amount = getattr(invoice, "stamp_duty_amount", None) or Decimal("0")
+    stamp_duty_code_id = getattr(invoice, "stamp_duty_code_id", None)
+    stamp_duty_treatment = getattr(invoice, "stamp_duty_treatment", None)
+    if (
+        stamp_duty_amount > Decimal("0")
+        and stamp_duty_code_id
+        and stamp_duty_treatment == "DEDUCTED"
+    ):
+        stamp_duty_deducted = stamp_duty_amount
+        sd_code = db.get(TaxCode, stamp_duty_code_id)
+        if sd_code and sd_code.tax_expense_account_id:
+            sd_functional = stamp_duty_amount * exchange_rate
+            if invoice.invoice_type == InvoiceType.CREDIT_NOTE:
+                journal_lines.append(
+                    JournalLineInput(
+                        account_id=sd_code.tax_expense_account_id,
+                        debit_amount=Decimal("0"),
+                        credit_amount=abs(stamp_duty_amount),
+                        debit_amount_functional=Decimal("0"),
+                        credit_amount_functional=abs(sd_functional),
+                        description=f"AR Credit Note stamp duty reversal: {invoice.invoice_number}",
+                    )
+                )
+            else:
+                journal_lines.append(
+                    JournalLineInput(
+                        account_id=sd_code.tax_expense_account_id,
+                        debit_amount=stamp_duty_amount,
+                        credit_amount=Decimal("0"),
+                        debit_amount_functional=sd_functional,
+                        credit_amount_functional=Decimal("0"),
+                        description=f"AR Invoice stamp duty: {invoice.invoice_number}",
+                    )
+                )
+
+    # ── AR Control debit (reduced by deductions) ───────────────────
+    ar_amount = (
+        invoice.total_amount - wht_amount - vat_withheld_amount - stamp_duty_deducted
+    )
+    ar_functional = ar_amount * exchange_rate
 
     if invoice.invoice_type == InvoiceType.CREDIT_NOTE:
-        # Credit note: credit AR (reduce receivable)
         journal_lines.append(
             JournalLineInput(
                 account_id=invoice.ar_control_account_id,
                 debit_amount=Decimal("0"),
-                credit_amount=abs(invoice.total_amount),
+                credit_amount=abs(ar_amount),
                 debit_amount_functional=Decimal("0"),
-                credit_amount_functional=abs(total_functional),
+                credit_amount_functional=abs(ar_functional),
                 description=f"AR Credit Note: {customer.legal_name}",
             )
         )
     else:
-        # Standard: debit AR (increase receivable)
         journal_lines.append(
             JournalLineInput(
                 account_id=invoice.ar_control_account_id,
-                debit_amount=invoice.total_amount,
+                debit_amount=ar_amount,
                 credit_amount=Decimal("0"),
-                debit_amount_functional=total_functional,
+                debit_amount_functional=ar_functional,
                 credit_amount_functional=Decimal("0"),
                 description=f"AR Invoice: {customer.legal_name}",
             )

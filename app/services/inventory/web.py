@@ -73,6 +73,34 @@ def _try_uuid(value: str | None) -> UUID | None:
         return None
 
 
+def _resolve_lot_id_for_item_warehouse(
+    db: Session,
+    *,
+    organization_id: UUID,
+    item_id: UUID,
+    warehouse_id: UUID,
+    lot_number: str | None,
+) -> UUID | None:
+    """Resolve a user-entered lot number to a warehouse-scoped lot id."""
+    from app.models.inventory.inventory_lot import InventoryLot
+    from app.models.inventory.inventory_lot_balance import InventoryLotBalance
+
+    normalized_lot_number = (lot_number or "").strip()
+    if not normalized_lot_number:
+        return None
+
+    return db.scalars(
+        select(InventoryLot.lot_id)
+        .join(InventoryLotBalance, InventoryLotBalance.lot_id == InventoryLot.lot_id)
+        .where(
+            InventoryLot.organization_id == organization_id,
+            InventoryLot.item_id == item_id,
+            InventoryLot.lot_number == normalized_lot_number,
+            InventoryLotBalance.warehouse_id == warehouse_id,
+        )
+    ).first()
+
+
 def _get_batch_stock_quantities(
     db: Session,
     organization_id: UUID,
@@ -91,6 +119,7 @@ def _get_batch_stock_quantities(
     }
     """
     from app.models.inventory.inventory_lot import InventoryLot
+    from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 
     if not item_ids:
         return {}
@@ -142,8 +171,9 @@ def _get_batch_stock_quantities(
     reserved_stmt = (
         select(
             InventoryLot.item_id,
-            func.sum(InventoryLot.quantity_allocated).label("reserved"),
+            func.sum(InventoryLotBalance.quantity_allocated).label("reserved"),
         )
+        .join(InventoryLotBalance, InventoryLotBalance.lot_id == InventoryLot.lot_id)
         .where(
             InventoryLot.organization_id == organization_id,
             InventoryLot.item_id.in_(item_ids),
@@ -1944,6 +1974,18 @@ class InventoryTransactionWebService:
                 unit_cost=cost,
                 uom="",  # Will be filled from item
                 currency_code="",  # Will be filled from item
+                lot_id=(
+                    _resolve_lot_id_for_item_warehouse(
+                        db,
+                        organization_id=org_id,
+                        item_id=UUID(item_id),
+                        warehouse_id=UUID(warehouse_id),
+                        lot_number=lot_number,
+                    )
+                    if transaction_type == "ISSUE"
+                    else None
+                ),
+                lot_number=lot_number,
                 reference=reference,
                 source_document_type="MANUAL",
             )
@@ -2028,6 +2070,14 @@ class InventoryTransactionWebService:
                 unit_cost=item.average_cost or Decimal("0"),
                 uom=item.base_uom,
                 currency_code=item.currency_code,
+                lot_id=_resolve_lot_id_for_item_warehouse(
+                    db,
+                    organization_id=org_id,
+                    item_id=UUID(item_id),
+                    warehouse_id=UUID(from_warehouse_id),
+                    lot_number=lot_number,
+                ),
+                lot_number=lot_number,
                 reference=reference,
             )
 

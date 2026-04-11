@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session, selectinload
 from starlette.datastructures import UploadFile
 
 from app.services.common_filters import build_active_filters
+from app.services.finance.common.attachment import AttachmentInput, attachment_service
 from app.services.finance.platform.currency_context import get_currency_context
 from app.services.finance.platform.org_context import org_context_service
 from app.services.inventory.material_request_web import MaterialRequestWebService
@@ -29,6 +30,15 @@ from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
 
 logger = logging.getLogger(__name__)
+
+_RETURN_IMAGE_CONTENT_TYPES = frozenset(
+    {
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+    }
+)
 
 
 def _safe_form_text(value: object) -> str:
@@ -60,6 +70,57 @@ def _form_value(form_data: object, key: str) -> object:
 
 class OperationsInventoryWebService:
     """Service layer for operations inventory web routes."""
+
+    @staticmethod
+    def _extract_uploads(form_data: object, key: str) -> list[UploadFile]:
+        """Collect uploaded files from multipart form data."""
+        if form_data is None:
+            return []
+        getter = getattr(form_data, "getlist", None)
+        if callable(getter):
+            values = getter(key)
+        else:
+            value = _form_value(form_data, key)
+            values = value if isinstance(value, list) else [value]
+        return [
+            upload
+            for upload in values
+            if isinstance(upload, UploadFile) and (upload.filename or "").strip()
+        ]
+
+    @staticmethod
+    def _validate_return_image_uploads(uploads: list[UploadFile]) -> None:
+        """Ensure only supported image uploads are accepted."""
+        for upload in uploads:
+            content_type = (upload.content_type or "").lower().strip()
+            if content_type not in _RETURN_IMAGE_CONTENT_TYPES:
+                raise ValueError(
+                    "Only image files are allowed. Accepted formats: JPG, PNG, GIF, WEBP."
+                )
+
+    @staticmethod
+    def _save_return_image_uploads(
+        db: Session,
+        organization_id,
+        user_id,
+        return_id: str,
+        uploads: list[UploadFile],
+    ) -> None:
+        """Persist uploaded return images as attachments."""
+        for upload in uploads:
+            attachment_service.save_file(
+                db=db,
+                organization_id=organization_id,
+                input=AttachmentInput(
+                    entity_type="INVENTORY_RETURN",
+                    entity_id=return_id,
+                    file_name=upload.filename or "return-image",
+                    content_type=upload.content_type or "application/octet-stream",
+                    description="Inventory return image",
+                ),
+                file_content=upload.file,
+                uploaded_by=user_id,
+            )
 
     @staticmethod
     def _org_id_str(auth: WebAuthContext) -> str:
@@ -444,7 +505,9 @@ class OperationsInventoryWebService:
         serial_numbers = (
             _safe_form_text(_form_value(form_data, "serial_numbers")) or None
         )
+        image_uploads = self._extract_uploads(form_data, "images")
         try:
+            self._validate_return_image_uploads(image_uploads)
             inventory_return = InventoryReturnWebService.create_from_form(
                 db=db,
                 organization_id=org_id,
@@ -462,6 +525,14 @@ class OperationsInventoryWebService:
                 serial_numbers_text=serial_numbers,
             )
             db.commit()
+            if image_uploads:
+                self._save_return_image_uploads(
+                    db=db,
+                    organization_id=org_id,
+                    user_id=user_id,
+                    return_id=str(inventory_return.return_id),
+                    uploads=image_uploads,
+                )
             return RedirectResponse(
                 f"/inventory/returns/{inventory_return.return_id}",
                 status_code=303,
@@ -493,8 +564,77 @@ class OperationsInventoryWebService:
         )
         if not context.get("inventory_return"):
             return RedirectResponse("/inventory/transactions", status_code=302)
+        attachments = context.get("attachments") or []
+        for attachment in attachments:
+            if attachment.get("uploaded_at") is not None:
+                attachment["uploaded_at_display"] = attachment["uploaded_at"].strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            else:
+                attachment["uploaded_at_display"] = "-"
+            attachment["file_size_display"] = attachment.get("file_size_display", "-")
+        context["error"] = request.query_params.get("error")
         return templates.TemplateResponse(
             request, "inventory/return_detail.html", context
+        )
+
+    def download_attachment_response(
+        self,
+        attachment_id: str,
+        auth: WebAuthContext,
+        db: Session,
+    ) -> RedirectResponse:
+        """Download an inventory attachment via authenticated file proxy."""
+        if auth.organization_id is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        attachment = attachment_service.get(
+            db,
+            auth.organization_id,
+            attachment_id,
+        )
+        if not attachment or attachment.organization_id != auth.organization_id:
+            return RedirectResponse(
+                url="/inventory/returns?error=Attachment+not+found",
+                status_code=303,
+            )
+        return RedirectResponse(
+            url=f"/files/attachments/{attachment_id}",
+            status_code=302,
+        )
+
+    def delete_attachment_response(
+        self,
+        attachment_id: str,
+        auth: WebAuthContext,
+        db: Session,
+    ) -> RedirectResponse:
+        """Delete an inventory return attachment."""
+        if auth.organization_id is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        attachment = attachment_service.get(
+            db,
+            auth.organization_id,
+            attachment_id,
+        )
+        if not attachment or attachment.organization_id != auth.organization_id:
+            return RedirectResponse(
+                url="/inventory/returns?error=Attachment+not+found",
+                status_code=303,
+            )
+
+        entity_type = attachment.entity_type
+        entity_id = attachment.entity_id
+        attachment_service.delete(db, attachment_id, auth.organization_id)
+
+        redirect_map = {
+            "INVENTORY_RETURN": f"/inventory/returns/{entity_id}",
+        }
+        redirect_url = redirect_map.get(entity_type, "/inventory/returns")
+        return RedirectResponse(
+            url=f"{redirect_url}?success=Attachment+deleted",
+            status_code=303,
         )
 
     def submit_material_request_response(
@@ -1092,118 +1232,251 @@ class OperationsInventoryWebService:
     ) -> HTMLResponse:
         """Lots and serial numbers list page."""
         from app.models.inventory.inventory_lot import InventoryLot
+        from app.models.inventory.inventory_lot_balance import InventoryLotBalance
+        from app.models.inventory.item import Item
         from app.models.inventory.warehouse import Warehouse
 
         context = base_context(request, auth, "Lots & Serial Numbers", "lots")
         org_id = auth.organization_id
         per_page = 50
         today = date_type.today()
+        from datetime import timedelta
 
-        # Summary stats (unfiltered)
-        base_filter = InventoryLot.organization_id == org_id
+        expiry_cutoff = today + timedelta(days=30)
+
+        base_lot_filter = InventoryLot.organization_id == org_id
+
         total_count = (
-            db.scalar(select(func.count()).select_from(InventoryLot).where(base_filter))
+            db.scalar(
+                select(func.count(func.distinct(InventoryLot.lot_id)))
+                .select_from(InventoryLot)
+                .where(base_lot_filter)
+            )
             or 0
         )
         available_count = (
             db.scalar(
-                select(func.count())
+                select(func.count(func.distinct(InventoryLot.lot_id)))
                 .select_from(InventoryLot)
+                .join(
+                    InventoryLotBalance,
+                    InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                )
                 .where(
-                    base_filter,
-                    InventoryLot.quantity_available > 0,
-                    InventoryLot.is_quarantined.is_(False),
+                    base_lot_filter,
+                    InventoryLotBalance.quantity_available > 0,
+                    InventoryLotBalance.is_quarantined.is_(False),
                 )
             )
             or 0
         )
         expiring_count = (
             db.scalar(
-                select(func.count())
+                select(func.count(func.distinct(InventoryLot.lot_id)))
                 .select_from(InventoryLot)
+                .join(
+                    InventoryLotBalance,
+                    InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                )
                 .where(
-                    base_filter,
+                    base_lot_filter,
                     InventoryLot.expiry_date.isnot(None),
-                    InventoryLot.expiry_date <= today,
+                    InventoryLot.expiry_date > today,
+                    InventoryLot.expiry_date <= expiry_cutoff,
+                    InventoryLotBalance.quantity_on_hand > 0,
                 )
             )
             or 0
         )
         quarantine_count = (
             db.scalar(
-                select(func.count())
+                select(func.count(func.distinct(InventoryLot.lot_id)))
                 .select_from(InventoryLot)
-                .where(base_filter, InventoryLot.is_quarantined.is_(True))
+                .join(
+                    InventoryLotBalance,
+                    InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                )
+                .where(base_lot_filter, InventoryLotBalance.is_quarantined.is_(True))
             )
             or 0
         )
 
-        # Build filtered query
-        stmt = select(InventoryLot).where(base_filter)
+        # Build filtered lot-id query first, then load full rows separately.
+        lot_ids_stmt = (
+            select(
+                InventoryLot.lot_id,
+                func.max(InventoryLot.created_at).label("sort_created_at"),
+            )
+            .join(Item, InventoryLot.item_id == Item.item_id)
+            .outerjoin(
+                InventoryLotBalance, InventoryLotBalance.lot_id == InventoryLot.lot_id
+            )
+            .where(base_lot_filter)
+        )
         if status == "available":
-            stmt = stmt.where(
-                InventoryLot.quantity_available > 0,
-                InventoryLot.is_quarantined.is_(False),
+            lot_ids_stmt = lot_ids_stmt.where(
+                InventoryLotBalance.quantity_available > 0,
+                InventoryLotBalance.is_quarantined.is_(False),
             )
         elif status == "quarantine":
-            stmt = stmt.where(InventoryLot.is_quarantined.is_(True))
+            lot_ids_stmt = lot_ids_stmt.where(
+                InventoryLotBalance.is_quarantined.is_(True)
+            )
         elif status == "expired":
-            stmt = stmt.where(
+            lot_ids_stmt = lot_ids_stmt.where(
                 InventoryLot.expiry_date.isnot(None),
                 InventoryLot.expiry_date < today,
+                InventoryLotBalance.quantity_on_hand > 0,
             )
         elif status == "depleted":
-            stmt = stmt.where(InventoryLot.quantity_on_hand <= 0)
+            lot_ids_stmt = lot_ids_stmt.where(
+                func.coalesce(InventoryLotBalance.quantity_on_hand, 0) <= 0
+            )
         if warehouse:
             from uuid import UUID as UUID_Type
 
             try:
                 wh_id = UUID_Type(warehouse)
-                stmt = stmt.where(InventoryLot.warehouse_id == wh_id)
+                lot_ids_stmt = lot_ids_stmt.where(
+                    InventoryLotBalance.warehouse_id == wh_id
+                )
             except ValueError:
                 pass
         if search:
             term = f"%{search}%"
-            stmt = stmt.where(InventoryLot.lot_number.ilike(term))
+            lot_ids_stmt = lot_ids_stmt.where(
+                or_(
+                    InventoryLot.lot_number.ilike(term),
+                    Item.item_code.ilike(term),
+                    Item.item_name.ilike(term),
+                )
+            )
+
+        lot_ids_stmt = lot_ids_stmt.group_by(InventoryLot.lot_id)
 
         # Pagination
         filtered_total = (
-            db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+            db.scalar(select(func.count()).select_from(lot_ids_stmt.subquery())) or 0
         )
         total_pages = max(1, ceil(filtered_total / per_page))
 
-        stmt = (
-            stmt.options(
-                selectinload(InventoryLot.item),
-                selectinload(InventoryLot.warehouse),
-            )
-            .order_by(InventoryLot.created_at.desc())
-            .offset((page - 1) * per_page)
-            .limit(per_page)
+        paged_lot_rows = list(
+            db.execute(
+                lot_ids_stmt.order_by(func.max(InventoryLot.created_at).desc())
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+            ).all()
         )
-        lots = list(db.scalars(stmt).all())
+        paged_lot_ids = [row.lot_id for row in paged_lot_rows]
+        lots = []
+        if paged_lot_ids:
+            stmt = (
+                select(InventoryLot)
+                .where(InventoryLot.lot_id.in_(paged_lot_ids))
+                .options(
+                    selectinload(InventoryLot.item),
+                    selectinload(InventoryLot.balances),
+                )
+            )
+            lots = list(db.scalars(stmt).all())
+            lot_order = {lot_id: index for index, lot_id in enumerate(paged_lot_ids)}
+            lots.sort(key=lambda lot: lot_order.get(lot.lot_id, len(lot_order)))
+
+        warehouse_ids: set = set()
+        for lot in lots:
+            for balance in getattr(lot, "balances", []) or []:
+                if balance.warehouse_id:
+                    warehouse_ids.add(balance.warehouse_id)
+
+        warehouse_map = {}
+        if warehouse_ids:
+            warehouse_map = {
+                wh.warehouse_id: wh
+                for wh in db.scalars(
+                    select(Warehouse).where(Warehouse.warehouse_id.in_(warehouse_ids))
+                ).all()
+            }
+
+        for lot in lots:
+            balances = list(getattr(lot, "balances", []) or [])
+            lot.total_on_hand = sum(
+                (balance.quantity_on_hand or 0) for balance in balances
+            )
+            lot.total_allocated = sum(
+                (balance.quantity_allocated or 0) for balance in balances
+            )
+            lot.total_available = sum(
+                (balance.quantity_available or 0) for balance in balances
+            )
+            lot.remaining_quantity = lot.total_on_hand
+            lot.is_quarantined = any(
+                bool(balance.is_quarantined) for balance in balances
+            )
+            active_warehouse_names = [
+                warehouse_map[balance.warehouse_id].warehouse_name
+                for balance in balances
+                if balance.warehouse_id in warehouse_map
+                and (
+                    (balance.quantity_on_hand or 0) > 0
+                    or (balance.quantity_allocated or 0) > 0
+                )
+            ]
+            distinct_names = sorted(set(active_warehouse_names))
+            if len(distinct_names) == 1:
+                lot.display_warehouse = distinct_names[0]
+            elif len(distinct_names) > 1:
+                lot.display_warehouse = f"Multiple ({len(distinct_names)})"
+            else:
+                lot.display_warehouse = "-"
 
         # Expiring lots (within 30 days)
-        from datetime import timedelta
-
-        expiry_cutoff = today + timedelta(days=30)
-        expiring_lots_stmt = (
-            select(InventoryLot)
-            .where(
-                base_filter,
-                InventoryLot.expiry_date.isnot(None),
-                InventoryLot.expiry_date > today,
-                InventoryLot.expiry_date <= expiry_cutoff,
-                InventoryLot.quantity_on_hand > 0,
-            )
-            .options(
-                selectinload(InventoryLot.item),
-                selectinload(InventoryLot.warehouse),
-            )
-            .order_by(InventoryLot.expiry_date)
-            .limit(10)
+        expiring_lot_rows = list(
+            db.execute(
+                select(
+                    InventoryLot.lot_id,
+                    func.min(InventoryLot.expiry_date).label("sort_expiry_date"),
+                )
+                .join(
+                    InventoryLotBalance,
+                    InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                )
+                .where(
+                    base_lot_filter,
+                    InventoryLot.expiry_date.isnot(None),
+                    InventoryLot.expiry_date > today,
+                    InventoryLot.expiry_date <= expiry_cutoff,
+                    InventoryLotBalance.quantity_on_hand > 0,
+                )
+                .group_by(InventoryLot.lot_id)
+                .order_by(func.min(InventoryLot.expiry_date))
+                .limit(10)
+            ).all()
         )
-        expiring_lots = list(db.scalars(expiring_lots_stmt).all())
+        expiring_lot_ids = [row.lot_id for row in expiring_lot_rows]
+        expiring_lots = []
+        if expiring_lot_ids:
+            expiring_lots = list(
+                db.scalars(
+                    select(InventoryLot)
+                    .where(InventoryLot.lot_id.in_(expiring_lot_ids))
+                    .options(
+                        selectinload(InventoryLot.item),
+                        selectinload(InventoryLot.balances),
+                    )
+                ).all()
+            )
+            expiring_order = {
+                lot_id: index for index, lot_id in enumerate(expiring_lot_ids)
+            }
+            expiring_lots.sort(
+                key=lambda lot: expiring_order.get(lot.lot_id, len(expiring_order))
+            )
+
+        for lot in expiring_lots:
+            balances = list(getattr(lot, "balances", []) or [])
+            lot.total_on_hand = sum(
+                (balance.quantity_on_hand or 0) for balance in balances
+            )
 
         # Warehouses for filter dropdown
         warehouses = list(
@@ -1902,7 +2175,6 @@ class OperationsInventoryWebService:
 
         from app.models.inventory.inventory_lot import InventoryLot
         from app.models.inventory.inventory_transaction import InventoryTransaction
-        from app.models.inventory.item import Item
         from app.models.inventory.warehouse import Warehouse
 
         context = base_context(request, auth, "Lot Detail", "lots")
@@ -1912,19 +2184,69 @@ class OperationsInventoryWebService:
         except ValueError:
             return RedirectResponse("/inventory/lots", status_code=302)
 
-        lot = db.get(InventoryLot, lid)
+        lot = db.scalars(
+            select(InventoryLot)
+            .options(
+                selectinload(InventoryLot.item),
+                selectinload(InventoryLot.balances),
+            )
+            .where(InventoryLot.lot_id == lid)
+        ).first()
         if not lot or lot.organization_id != auth.organization_id:
             return RedirectResponse("/inventory/lots", status_code=302)
 
-        # Load related item and warehouse
-        if lot.item_id:
-            item = db.get(Item, lot.item_id)
-            if item:
-                lot.item = item
-        if lot.warehouse_id:
-            warehouse = db.get(Warehouse, lot.warehouse_id)
-            if warehouse:
-                lot.warehouse = warehouse
+        warehouse_ids = [
+            balance.warehouse_id
+            for balance in getattr(lot, "balances", []) or []
+            if balance.warehouse_id
+        ]
+        warehouse_map = {}
+        if warehouse_ids:
+            warehouse_map = {
+                wh.warehouse_id: wh
+                for wh in db.scalars(
+                    select(Warehouse).where(Warehouse.warehouse_id.in_(warehouse_ids))
+                ).all()
+            }
+
+        balance_rows = []
+        total_on_hand = 0
+        total_allocated = 0
+        total_available = 0
+        any_quarantined = False
+        for balance in sorted(
+            list(getattr(lot, "balances", []) or []),
+            key=lambda row: (
+                warehouse_map.get(row.warehouse_id).warehouse_name
+                if row.warehouse_id in warehouse_map
+                else ""
+            ),
+        ):
+            warehouse_name = (
+                warehouse_map[balance.warehouse_id].warehouse_name
+                if balance.warehouse_id in warehouse_map
+                else "-"
+            )
+            balance_rows.append(
+                {
+                    "warehouse_name": warehouse_name,
+                    "quantity_on_hand": balance.quantity_on_hand or 0,
+                    "quantity_allocated": balance.quantity_allocated or 0,
+                    "quantity_available": balance.quantity_available or 0,
+                    "is_quarantined": bool(balance.is_quarantined),
+                    "quarantine_reason": balance.quarantine_reason,
+                    "qc_status": balance.qc_status,
+                }
+            )
+            total_on_hand += balance.quantity_on_hand or 0
+            total_allocated += balance.quantity_allocated or 0
+            total_available += balance.quantity_available or 0
+            any_quarantined = any_quarantined or bool(balance.is_quarantined)
+
+        lot.total_on_hand = total_on_hand
+        lot.total_allocated = total_allocated
+        lot.total_available = total_available
+        lot.is_quarantined = any_quarantined
 
         # Recent transactions for this lot
         transactions = list(
@@ -1942,6 +2264,7 @@ class OperationsInventoryWebService:
         context.update(
             {
                 "lot": lot,
+                "balance_rows": balance_rows,
                 "transactions": transactions,
                 "now": dt_cls.now(UTC),
             }
@@ -1958,6 +2281,7 @@ class OperationsInventoryWebService:
         from uuid import UUID as UUID_Type
 
         from app.models.inventory.inventory_lot import InventoryLot
+        from app.services.inventory.lot_serial import lot_serial_service
 
         org_id = auth.organization_id
         if org_id is None:
@@ -1972,11 +2296,16 @@ class OperationsInventoryWebService:
         if not lot or lot.organization_id != org_id:
             return RedirectResponse("/inventory/lots", status_code=303)
 
-        lot.is_quarantined = not lot.is_quarantined
-        if not lot.is_quarantined:
-            lot.quarantine_reason = None
         try:
-            db.commit()
+            if lot.is_quarantined:
+                lot_serial_service.release_quarantine(db, org_id, lid, "PASSED")
+            else:
+                lot_serial_service.quarantine_lot(
+                    db,
+                    org_id,
+                    lid,
+                    "Manual quarantine from inventory lot page",
+                )
         except Exception as e:
             db.rollback()
             logger.warning("Failed to toggle quarantine for lot %s: %s", lot_id, e)

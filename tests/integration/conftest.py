@@ -819,21 +819,31 @@ def ar_invoice(db: Session, org_id: uuid.UUID, customer, user_id: uuid.UUID):
 def inventory_lot(db: Session, org_id: uuid.UUID, inventory_item, warehouse):
     """Create an inventory lot for testing."""
     from app.models.inventory.inventory_lot import InventoryLot
+    from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 
     lot = InventoryLot(
         organization_id=org_id,
         item_id=inventory_item.item_id,
-        warehouse_id=warehouse.warehouse_id,
         lot_number="LOT-001",
         received_date=date(2024, 1, 1),
         initial_quantity=Decimal("100"),
-        quantity_on_hand=Decimal("100"),
-        quantity_available=Decimal("100"),
         unit_cost=Decimal("10.00"),
         is_active=True,
-        is_quarantined=False,
     )
     db.add(lot)
+    db.flush()
+    db.add(
+        InventoryLotBalance(
+            organization_id=org_id,
+            lot_id=lot.lot_id,
+            warehouse_id=warehouse.warehouse_id,
+            quantity_on_hand=Decimal("100"),
+            quantity_allocated=Decimal("0"),
+            quantity_available=Decimal("100"),
+            is_active=True,
+            is_quarantined=False,
+        )
+    )
     db.flush()
     return lot
 

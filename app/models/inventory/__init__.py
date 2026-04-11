@@ -6,6 +6,7 @@ from app.models.inventory.bom import BillOfMaterials, BOMComponent, BOMType
 from app.models.inventory.inventory_count import CountStatus, InventoryCount
 from app.models.inventory.inventory_count_line import InventoryCountLine
 from app.models.inventory.inventory_lot import InventoryLot
+from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 from app.models.inventory.inventory_return import InventoryReturn, InventoryReturnMode
 from app.models.inventory.inventory_transaction import (
     InventoryTransaction,
@@ -38,6 +39,7 @@ __all__ = [
     "Warehouse",
     "WarehouseLocation",
     "InventoryLot",
+    "InventoryLotBalance",
     "InventoryReturn",
     "InventoryReturnMode",
     "InventoryTransaction",

@@ -114,7 +114,7 @@
                     <tr>
                         <th scope="col">Lot Number</th>
                         <th scope="col">Item</th>
-                        <th scope="col">Warehouse</th>
+                        <th scope="col">Warehouses</th>
                         <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">Initial Qty</th>
                         <th scope="col" class="text-right text-xs font-semibold uppercase tracking-wider">Remaining</th>
                         <th scope="col">Expiry Date</th>
@@ -133,7 +133,7 @@
                                 <span>{{ lot.item.item_name if lot.item else '-' }}</span>
                             </div>
                         </td>
-                        <td>{{ lot.warehouse.warehouse_name if lot.warehouse else '-' }}</td>
+                        <td>{{ lot.display_warehouse or '-' }}</td>
                         <td class="text-right font-mono">{{ '{:,.2f}'.format(lot.initial_quantity or 0) }}</td>
                         <td class="text-right font-mono {{ 'text-rose-600' if (lot.remaining_quantity or 0) <= 0 else '' }}">
                             {{ '{:,.2f}'.format(lot.remaining_quantity or 0) }}

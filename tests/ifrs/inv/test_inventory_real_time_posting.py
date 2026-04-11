@@ -98,7 +98,7 @@ def test_create_receipt_real_time_posts_and_updates_wac():
 
     mock_post.assert_called_once()
     assert item.average_cost == Decimal("10.500000")
-    db.commit.assert_called_once()
+    db.flush.assert_called()
 
 
 def test_create_issue_manual_mode_skips_gl_posting():
@@ -155,7 +155,7 @@ def test_create_issue_manual_mode_skips_gl_posting():
         )
 
     mock_post.assert_not_called()
-    db.commit.assert_called_once()
+    db.flush.assert_called()
 
 
 def test_create_adjustment_real_time_posts():
@@ -207,4 +207,4 @@ def test_create_adjustment_real_time_posts():
         )
 
     mock_post.assert_called_once()
-    db.commit.assert_called_once()
+    db.flush.assert_called()

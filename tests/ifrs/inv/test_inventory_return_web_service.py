@@ -196,15 +196,30 @@ def test_detail_context_includes_created_by_name() -> None:
     scalars_result.first.return_value = inventory_return
     db.scalars.return_value = scalars_result
     db.scalar.side_effect = ["Jane Doe", "John Doe"]
+    attachment = MagicMock()
+    attachment.attachment_id = uuid.uuid4()
+    attachment.file_name = "return-image.png"
+    attachment.content_type = "image/png"
+    attachment.description = "Photo evidence"
+    attachment.category.value = "OTHER"
+    attachment.file_size = 2048
+    attachment.uploaded_at = None
 
-    context = InventoryReturnWebService.detail_context(
-        db=db,
-        organization_id=str(org_id),
-        return_id=str(uuid.uuid4()),
-    )
+    with patch(
+        "app.services.inventory.return_web.attachment_service.list_for_entity",
+        return_value=[attachment],
+    ):
+        context = InventoryReturnWebService.detail_context(
+            db=db,
+            organization_id=str(org_id),
+            return_id=str(uuid.uuid4()),
+        )
 
     assert context["inventory_return"] == inventory_return
     assert context["created_by_name"] == "Jane Doe"
     assert context["updated_by_name"] == "John Doe"
+    assert len(context["attachments"]) == 1
+    assert context["attachments"][0]["file_name"] == "return-image.png"
+    assert context["attachments"][0]["is_image"] is True
     db.scalars.assert_called_once()
     assert db.scalar.call_count == 2

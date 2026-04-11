@@ -87,8 +87,8 @@ class TestAddInventoryLayer:
             layer_date=date.today(),
         )
 
-        mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        assert mock_db.add.call_count == 2
+        mock_db.flush.assert_called()
 
     def test_add_layer_item_not_found(self, service, mock_db, org_id):
         """Test layer addition with invalid item."""
@@ -119,7 +119,7 @@ class TestConsumeInventoryFifo:
 
         result = service.consume_inventory_fifo(mock_db, org_id, uuid4(), Decimal("60"))
 
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
         assert result.quantity_consumed == Decimal("60")
         # First 50 units at $10 + next 10 units at $12 = 500 + 120 = 620
         assert result.total_cost == Decimal("620")
@@ -309,6 +309,36 @@ class TestCalculateWriteDown:
         assert result.write_down == Decimal("0")
         assert result.carrying_amount == Decimal("0")
 
+    def test_write_down_uses_warehouse_scoped_fifo_inventory(
+        self, service, mock_db, org_id
+    ):
+        fifo_inv = FIFOInventory(
+            item_id=uuid4(),
+            layers=[],
+            total_quantity=Decimal("10"),
+            total_cost=Decimal("100"),
+            weighted_average_cost=Decimal("10"),
+        )
+        item_id = uuid4()
+        warehouse_id = uuid4()
+
+        with patch.object(
+            FIFOValuationService, "get_fifo_inventory", return_value=fifo_inv
+        ) as mock_get_fifo_inventory:
+            service.calculate_write_down(
+                mock_db,
+                org_id,
+                item_id,
+                warehouse_id,
+                uuid4(),
+                date.today(),
+                estimated_selling_price=Decimal("15.00"),
+            )
+
+        mock_get_fifo_inventory.assert_called_once_with(
+            mock_db, org_id, item_id, warehouse_id
+        )
+
 
 class TestCreateValuationRecord:
     """Tests for create_valuation_record method."""
@@ -352,7 +382,7 @@ class TestCreateValuationRecord:
             )
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.flush.assert_called()
 
     def test_create_valuation_item_not_found(self, service, mock_db, org_id):
         """Test creating valuation for non-existent item."""
@@ -383,6 +413,50 @@ class TestCreateValuationRecord:
             )
 
         assert exc.value.status_code == 404
+
+    def test_create_valuation_uses_warehouse_scoped_fifo_inventory(
+        self, service, mock_db, org_id
+    ):
+        item = MockItem(organization_id=org_id, base_uom="EACH")
+        item.costing_method = CostingMethod.WEIGHTED_AVERAGE
+        warehouse_id = uuid4()
+        mock_db.scalars.return_value.first.side_effect = [item, None]
+
+        fifo_inv = FIFOInventory(
+            item_id=item.item_id,
+            layers=[],
+            total_quantity=Decimal("100"),
+            total_cost=Decimal("1000.00"),
+            weighted_average_cost=Decimal("10.00"),
+        )
+
+        nrv_calc = NRVCalculation(
+            item_id=item.item_id,
+            cost=Decimal("1000.00"),
+            estimated_selling_price=Decimal("12.00"),
+            costs_to_complete=Decimal("0"),
+            selling_costs=Decimal("1.00"),
+            nrv=Decimal("1100.00"),
+            carrying_amount=Decimal("1000.00"),
+            write_down=Decimal("0"),
+        )
+
+        with patch.object(
+            FIFOValuationService, "get_fifo_inventory", return_value=fifo_inv
+        ) as mock_get_fifo_inventory:
+            service.create_valuation_record(
+                mock_db,
+                org_id,
+                item.item_id,
+                warehouse_id,
+                uuid4(),
+                date.today(),
+                nrv_calc,
+            )
+
+        mock_get_fifo_inventory.assert_called_once_with(
+            mock_db, org_id, item.item_id, warehouse_id
+        )
 
 
 class TestGetValuationSummary:
