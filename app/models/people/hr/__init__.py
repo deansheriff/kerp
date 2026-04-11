@@ -46,6 +46,30 @@ from app.models.people.hr.job_description import (
     JobDescriptionCompetency,
     JobDescriptionStatus,
 )
+from app.models.people.hr.succession import (
+    ImpactLevel,
+    ReadinessLevel,
+    RiskLevel,
+    SuccessionCandidate,
+    SuccessionPlan,
+    SuccessionPlanStatus,
+)
+from app.models.people.hr.survey import (
+    QuestionType,
+    Survey,
+    SurveyAnswer,
+    SurveyQuestion,
+    SurveyResponse,
+    SurveyStatus,
+    SurveyType,
+    TargetAudience,
+)
+from app.models.people.hr.grievance import (
+    Grievance,
+    GrievanceCategory,
+    GrievanceSeverity,
+    GrievanceStatus,
+)
 from app.models.people.hr.lifecycle import (
     ActivityStatus,
     BoardingStatus,
@@ -58,6 +82,12 @@ from app.models.people.hr.lifecycle import (
     EmployeeTransfer,
     EmployeeTransferDetail,
     SeparationType,
+)
+
+from app.models.people.hr.salary_review import (
+    ReviewType,
+    SalaryReview,
+    SalaryReviewStatus,
 )
 
 __all__ = [
@@ -103,9 +133,34 @@ __all__ = [
     "Competency",
     "JobDescription",
     "JobDescriptionCompetency",
+    # Grievance
+    "Grievance",
+    "GrievanceCategory",
+    "GrievanceSeverity",
+    "GrievanceStatus",
+    # Salary Review
+    "SalaryReview",
+    "SalaryReviewStatus",
+    "ReviewType",
     # HR Documents / Handbook
     "DocumentCategory",
     "DocumentStatus",
     "HRDocument",
     "HRDocumentAcknowledgment",
+    # Survey
+    "Survey",
+    "SurveyQuestion",
+    "SurveyResponse",
+    "SurveyAnswer",
+    "SurveyType",
+    "SurveyStatus",
+    "TargetAudience",
+    "QuestionType",
+    # Succession Planning
+    "SuccessionPlan",
+    "SuccessionCandidate",
+    "SuccessionPlanStatus",
+    "ReadinessLevel",
+    "RiskLevel",
+    "ImpactLevel",
 ]
