@@ -160,8 +160,17 @@ class PaymentBatchService(ListResponseMixin):
         invoice_ids: list[UUID],
         created_by_user_id: UUID,
         currency_code: str | None = None,
+        invoice_amounts: dict[UUID, Decimal] | None = None,
+        invoice_wht_amounts: dict[UUID, Decimal] | None = None,
     ) -> APPaymentBatch:
-        """Create a payment batch and grouped draft payments from selected invoices."""
+        """Create a payment batch and grouped draft payments from selected invoices.
+
+        Args:
+            invoice_amounts: Optional per-invoice payment amounts. If not
+                provided, full ``balance_due`` is used for each invoice.
+            invoice_wht_amounts: Optional per-invoice withholding tax amounts.
+                Deducted from the payment amount (net = amount - wht).
+        """
         from app.services.finance.ap.supplier_payment import (
             PaymentAllocationInput,
             SupplierPaymentInput,
@@ -282,20 +291,46 @@ class PaymentBatchService(ListResponseMixin):
                     status_code=400,
                     detail=f"Invoice {invoice.invoice_number} has no outstanding balance",
                 )
+
+            # Per-invoice amount: use provided amount or full balance_due
+            pay_amount = (invoice_amounts or {}).get(
+                invoice.invoice_id, invoice.balance_due
+            )
+            if pay_amount <= Decimal("0"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Payment amount for {invoice.invoice_number} must be positive",
+                )
+            if pay_amount > invoice.balance_due:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Payment amount {pay_amount} for {invoice.invoice_number} "
+                        f"exceeds outstanding balance {invoice.balance_due}"
+                    ),
+                )
+
             allocations_by_supplier[invoice.supplier_id].append(
                 PaymentAllocationInput(
                     invoice_id=invoice.invoice_id,
-                    amount=invoice.balance_due,
+                    amount=pay_amount,
                 )
             )
 
+        # Aggregate WHT per supplier from per-invoice WHT amounts
+        wht_by_supplier: dict[UUID, Decimal] = defaultdict(Decimal)
+        if invoice_wht_amounts:
+            for inv_id, wht in invoice_wht_amounts.items():
+                if inv_id in invoice_map and wht > Decimal("0"):
+                    wht_by_supplier[invoice_map[inv_id].supplier_id] += wht
+
         for supplier_id, allocations in allocations_by_supplier.items():
+            gross = sum((allocation.amount for allocation in allocations), Decimal("0"))
+            wht = wht_by_supplier.get(supplier_id, Decimal("0"))
             payment_items.append(
                 BatchPaymentItem(
                     supplier_id=supplier_id,
-                    amount=sum(
-                        (allocation.amount for allocation in allocations), Decimal("0")
-                    ),
+                    amount=gross - wht,
                     invoice_ids=[allocation.invoice_id for allocation in allocations],
                 )
             )
@@ -305,6 +340,12 @@ class PaymentBatchService(ListResponseMixin):
 
         try:
             for supplier_id, allocations in allocations_by_supplier.items():
+                gross = sum(
+                    (allocation.amount for allocation in allocations), Decimal("0")
+                )
+                wht = wht_by_supplier.get(supplier_id, Decimal("0"))
+                net = gross - wht
+
                 payment = supplier_payment_service.create_payment(
                     db=db,
                     organization_id=org_id,
@@ -313,10 +354,9 @@ class PaymentBatchService(ListResponseMixin):
                         payment_date=batch_date,
                         payment_method=payment_method_enum,
                         currency_code=resolved_currency,
-                        amount=sum(
-                            (allocation.amount for allocation in allocations),
-                            Decimal("0"),
-                        ),
+                        amount=net,
+                        gross_amount=gross if wht > Decimal("0") else None,
+                        wht_amount=wht,
                         bank_account_id=bank_id,
                         allocations=allocations,
                     ),

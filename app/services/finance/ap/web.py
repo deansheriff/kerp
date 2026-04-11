@@ -3817,6 +3817,21 @@ class APWebService:
             if auth.person_id is None:
                 raise ValueError("Authenticated person is required")
 
+            # Parse per-invoice amounts and WHT from form fields
+            # Form sends: amount_{invoice_id} and wht_{invoice_id}
+            invoice_amounts: dict[UUID, Decimal] = {}
+            invoice_wht_amounts: dict[UUID, Decimal] = {}
+            for inv_id_str in invoice_ids:
+                inv_uuid = coerce_uuid(inv_id_str)
+                amt_str = (data.get(f"amount_{inv_id_str}") or "").strip()
+                if amt_str:
+                    invoice_amounts[inv_uuid] = Decimal(amt_str)
+                wht_str = (data.get(f"wht_{inv_id_str}") or "").strip()
+                if wht_str:
+                    wht_val = Decimal(wht_str)
+                    if wht_val > Decimal("0"):
+                        invoice_wht_amounts[inv_uuid] = wht_val
+
             batch = payment_batch_service.create_batch_from_invoice_ids(
                 db=db,
                 organization_id=_require_org_id(auth),
@@ -3826,6 +3841,8 @@ class APWebService:
                 invoice_ids=[coerce_uuid(invoice_id) for invoice_id in invoice_ids],
                 created_by_user_id=coerce_uuid(auth.person_id),
                 currency_code=currency_code,
+                invoice_amounts=invoice_amounts or None,
+                invoice_wht_amounts=invoice_wht_amounts or None,
             )
             return RedirectResponse(
                 url=(
