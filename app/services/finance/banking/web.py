@@ -2457,7 +2457,7 @@ class BankingWebService:
             **kwargs,
         )
         rule.is_active = is_active
-        db.flush()
+        db.commit()
         return RedirectResponse(
             url="/finance/banking/rules?success=Rule+created",
             status_code=303,
@@ -2514,7 +2514,7 @@ class BankingWebService:
                 request, "finance/banking/rule_form.html", context
             )
 
-        db.flush()
+        db.commit()
         return RedirectResponse(
             url="/finance/banking/rules?success=Rule+updated",
             status_code=303,

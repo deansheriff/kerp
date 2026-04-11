@@ -137,7 +137,7 @@ class ExpenseAdvancesWebMixin:
             advance = svc.disburse_advance(
                 org_id, coerce_uuid(advance_id), payment_reference=payment_reference
             )
-            db.flush()
+            db.commit()
             post_cash_advance_disbursement.delay(
                 organization_id=str(org_id),
                 advance_id=str(advance.advance_id),
@@ -164,7 +164,7 @@ class ExpenseAdvancesWebMixin:
                 user_id=str(auth.user_id),
                 settlement_amount=settlement_amount,
             )
-            db.flush()
+            db.commit()
         except (ExpenseServiceError, ValueError, TypeError) as e:
             logger.warning("Failed to settle advance %s: %s", advance_id, e)
             db.rollback()
