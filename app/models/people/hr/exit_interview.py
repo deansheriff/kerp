@@ -28,9 +28,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
-if TYPE_CHECKING:
-    from datetime import date as date_type
+from datetime import date as date_type
 
+if TYPE_CHECKING:
     from app.models.finance.core_org.organization import Organization
     from app.models.people.hr.employee import Employee
     from app.models.people.hr.lifecycle import EmployeeSeparation
