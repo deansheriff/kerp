@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from html import escape
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, Request, UploadFile
@@ -1157,3 +1158,38 @@ class PaymentWebService:
                 url=f"/finance/ap/payments/{payment_id}?error=Upload+failed",
                 status_code=303,
             )
+
+    def download_batch_bank_file_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        batch_id: str,
+        *,
+        bank_format: str = "zenith",
+    ) -> Any:
+        """Generate and download bank upload file for a payment batch."""
+        from starlette.responses import Response
+
+        from app.services.finance.ap.payment_batch import PaymentBatchService
+
+        if not auth.organization_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        result = PaymentBatchService.generate_bank_file(
+            db=db,
+            organization_id=auth.organization_id,
+            batch_id=coerce_uuid(batch_id),
+            bank_format=bank_format,
+        )
+        db.commit()
+
+        return Response(
+            content=result["content"],
+            media_type=result["content_type"],
+            headers={
+                "Content-Disposition": f'attachment; filename="{result["filename"]}"',
+                "X-Payment-Count": str(result["payment_count"]),
+                "X-Total-Amount": str(result["total_amount"]),
+            },
+        )

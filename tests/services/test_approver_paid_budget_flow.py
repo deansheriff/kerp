@@ -21,7 +21,9 @@ def _make_claim(
     claim.approver_id = approver_id
     claim.total_claimed_amount = total_claimed
     claim.total_approved_amount = total_approved
+    claim.net_payable_amount = total_approved
     claim.advance_adjusted = Decimal("0")
+    claim.claim_number = "EXP-TEST-001"
     claim.claim_date = date(2026, 4, 9)
     claim.items = []
     claim.employee = None
