@@ -959,7 +959,7 @@ class ARInvoiceService(ListResponseMixin):
                 user_id=user_id,
             )
         except Exception:
-            logger.exception("Ignored exception")
+            logger.exception("Workflow event failed for invoice %s", inv_id)
 
         fire_audit_event(
             db=db,
@@ -1060,7 +1060,7 @@ class ARInvoiceService(ListResponseMixin):
                 user_id=user_id,
             )
         except Exception:
-            logger.exception("Ignored exception")
+            logger.exception("Workflow event failed for invoice %s", inv_id)
 
         fire_audit_event(
             db=db,
@@ -1140,7 +1140,7 @@ class ARInvoiceService(ListResponseMixin):
                 user_id=user_id,
             )
         except Exception:
-            logger.exception("Ignored exception")
+            logger.exception("Workflow event failed for invoice %s", inv_id)
 
         fire_audit_event(
             db=db,
@@ -1369,7 +1369,7 @@ class ARInvoiceService(ListResponseMixin):
                 user_id=coerce_uuid(cancelled_by_user_id),
             )
         except Exception:
-            logger.exception("Ignored exception")
+            logger.exception("Workflow event failed for invoice %s", inv_id)
 
         fire_audit_event(
             db=db,

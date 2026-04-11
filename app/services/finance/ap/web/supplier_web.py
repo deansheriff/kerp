@@ -731,7 +731,9 @@ class SupplierWebService:
 
         except Exception as e:
             db.rollback()
-            logger.exception("create_supplier_response: failed")
+            logger.exception(
+                "create_supplier_response failed for org %s", auth.organization_id
+            )
             context = base_context(request, auth, "New Supplier", "ap")
             context.update(self.supplier_form_context(db, str(auth.organization_id)))
             context["error"] = str(e)

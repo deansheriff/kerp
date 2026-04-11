@@ -1,5 +1,6 @@
 import uuid
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
@@ -25,8 +26,10 @@ def _new_claim(org_id: uuid.UUID, status: ExpenseClaimStatus) -> ExpenseClaim:
         purpose="Test claim",
         currency_code="NGN",
         status=status,
-        total_claimed_amount=0,
-        advance_adjusted=0,
+        total_claimed_amount=Decimal("10000"),
+        total_approved_amount=Decimal("10000"),
+        net_payable_amount=Decimal("10000"),
+        advance_adjusted=Decimal("0"),
     )
 
 

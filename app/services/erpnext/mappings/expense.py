@@ -7,6 +7,7 @@ Maps ERPNext Expense DocTypes to DotMac expense schema:
 """
 
 import logging
+from decimal import Decimal
 from typing import Any
 
 from app.config import settings
@@ -216,10 +217,11 @@ class ExpenseClaimMapping(DocTypeMapping):
         # Set currency default
         result["currency_code"] = settings.default_functional_currency_code
 
-        # Set net payable
+        # Set net payable (approved minus any cash advance already adjusted)
         approved = result.get("total_approved_amount")
+        advance_adjusted = result.get("advance_adjusted") or Decimal("0")
         if approved:
-            result["net_payable_amount"] = approved
+            result["net_payable_amount"] = Decimal(str(approved)) - advance_adjusted
 
         # Some ERPNext versions expose paid date/reference only on full doc.
         paid_on = parse_date(record.get("paid_on")) or parse_date(

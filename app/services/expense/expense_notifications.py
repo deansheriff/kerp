@@ -158,7 +158,14 @@ class ExpenseNotificationService:
         """
         approver_email = _employee_work_email(approver)
         if not approver_email:
-            logger.warning("No email for approver %s", approver.employee_id)
+            approver_name = _employee_full_name(approver) or "unknown"
+            logger.warning(
+                "No email for approver %s (%s) — cannot send approval "
+                "notification for claim %s",
+                approver.employee_id,
+                approver_name,
+                claim.claim_number,
+            )
             return False
 
         claimant_name = "An employee"
@@ -386,7 +393,14 @@ class ExpenseNotificationService:
         """
         approver_email = _employee_work_email(approver)
         if not approver_email:
-            logger.warning("No email for approver %s", approver.employee_id)
+            approver_name = _employee_full_name(approver) or "unknown"
+            logger.warning(
+                "No email for approver %s (%s) — cannot send reminder "
+                "notification for claim %s",
+                approver.employee_id,
+                approver_name,
+                claim.claim_number,
+            )
             return False
 
         claimant_name = "An employee"

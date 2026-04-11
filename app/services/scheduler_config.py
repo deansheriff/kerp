@@ -316,7 +316,7 @@ def _builtin_beat_schedule() -> dict[str, dict]:
         "notification-cleanup": {
             "task": "app.tasks.data_health.cleanup_old_notifications",
             "schedule": crontab(hour=3, minute=0),  # 3:00 AM daily
-            "kwargs": {"read_days": 30, "unread_days": 90},
+            "kwargs": {"read_days": 7, "unread_days": 30},
         },
         "feature-flag-archival": {
             "task": "app.tasks.feature_flags.archive_expired_feature_flags",

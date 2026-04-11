@@ -661,6 +661,10 @@ def poll_stuck_expense_transfers() -> dict:
     from app.services.finance.payments.paystack_client import PaystackConfig
     from app.services.settings_spec import resolve_value
 
+    # After this many failed poll attempts (every 2 min), mark as FAILED.
+    # 10 attempts = ~20 minutes of retrying before giving up.
+    MAX_POLL_ATTEMPTS = 10
+
     logger.info("Polling stuck expense transfers")
 
     results: dict[str, Any] = {
@@ -668,6 +672,7 @@ def poll_stuck_expense_transfers() -> dict:
         "completed": 0,
         "failed": 0,
         "still_pending": 0,
+        "abandoned": 0,
         "errors": [],
     }
 
@@ -713,6 +718,7 @@ def poll_stuck_expense_transfers() -> dict:
                 PaymentIntent.source_type == "EXPENSE_CLAIM",
                 PaymentIntent.transfer_code.isnot(None),
                 PaymentIntent.created_at < cutoff,
+                PaymentIntent.poll_count < MAX_POLL_ATTEMPTS,
             )
         ).all()
 
@@ -750,6 +756,7 @@ def poll_stuck_expense_transfers() -> dict:
             for intent in intents:
                 try:
                     results["intents_checked"] += 1
+                    intent.poll_count += 1
 
                     # Some intents can remain PENDING despite having a transfer_code.
                     # Promote to PROCESSING so poll_transfer_status can reconcile them.
@@ -767,25 +774,48 @@ def poll_stuck_expense_transfers() -> dict:
                         results["still_pending"] += 1
 
                 except Exception as e:
+                    error_msg = str(e)
+                    intent.last_poll_error = error_msg
                     logger.error(
-                        "Failed to poll transfer %s: %s",
+                        "Failed to poll transfer %s (attempt %d/%d): %s",
                         intent.intent_id,
+                        intent.poll_count,
+                        MAX_POLL_ATTEMPTS,
                         e,
                     )
-                    results["errors"].append(
-                        {
-                            "intent_id": str(intent.intent_id),
-                            "error": str(e),
+
+                    if intent.poll_count >= MAX_POLL_ATTEMPTS:
+                        intent.status = PaymentIntentStatus.FAILED
+                        intent.gateway_response = {
+                            **(intent.gateway_response or {}),
+                            "poll_abandoned": True,
+                            "poll_attempts": intent.poll_count,
+                            "last_error": error_msg,
                         }
-                    )
+                        logger.warning(
+                            "Transfer %s marked FAILED after %d poll attempts: %s",
+                            intent.intent_id,
+                            intent.poll_count,
+                            error_msg,
+                        )
+                        results["abandoned"] += 1
+                    else:
+                        results["errors"].append(
+                            {
+                                "intent_id": str(intent.intent_id),
+                                "error": error_msg,
+                                "poll_count": intent.poll_count,
+                            }
+                        )
 
             db.commit()
 
     logger.info(
-        "Transfer polling complete: %d checked, %d completed, %d failed",
+        "Transfer polling complete: %d checked, %d completed, %d failed, %d abandoned",
         results["intents_checked"],
         results["completed"],
         results["failed"],
+        results["abandoned"],
     )
 
     return results

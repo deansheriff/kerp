@@ -338,6 +338,11 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             )
         if not claim.items:
             raise ExpenseServiceError("Cannot submit claim with no items")
+        total = claim.total_claimed_amount or Decimal("0")
+        if total <= Decimal("0"):
+            raise ExpenseServiceError(
+                "Cannot submit claim with zero or negative amount"
+            )
         if not self._begin_action(org_id, claim_id, ExpenseClaimActionType.SUBMIT):
             return SubmitClaimResult(claim=claim)
 
@@ -1167,6 +1172,22 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             raise ExpenseClaimStatusError(
                 claim.status.value, ExpenseClaimStatus.PAID.value
             )
+
+        # Recalculate net_payable_amount if missing (can happen with
+        # ERPNext-synced claims that were imported directly to PAID).
+        if claim.net_payable_amount is None and claim.total_approved_amount:
+            claim.net_payable_amount = claim.total_approved_amount - (
+                claim.advance_adjusted or Decimal("0")
+            )
+            self.db.flush()
+
+        payable = claim.net_payable_amount or Decimal("0")
+        if payable <= Decimal("0"):
+            raise ValueError(
+                f"Cannot mark claim {claim.claim_number} as PAID — "
+                f"net_payable_amount is {payable}"
+            )
+
         if not self._begin_action(org_id, claim_id, ExpenseClaimActionType.MARK_PAID):
             return claim
         try:

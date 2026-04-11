@@ -325,7 +325,7 @@ class SalesOrderService:
                 user_id=coerce_uuid(submitted_by),
             )
         except Exception:
-            logger.exception("Ignored exception")
+            logger.exception("Workflow event failed for sales order %s", so_id)
 
         db.flush()
         return so
@@ -367,7 +367,7 @@ class SalesOrderService:
                 user_id=coerce_uuid(approved_by),
             )
         except Exception:
-            logger.exception("Ignored exception")
+            logger.exception("Workflow event failed for sales order %s", so_id)
 
         db.flush()
         return so

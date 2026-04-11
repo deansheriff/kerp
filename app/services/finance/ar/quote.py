@@ -432,7 +432,7 @@ class QuoteService:
                 new_values={"status": "REJECTED"},
             )
         except Exception:
-            logger.exception("Ignored exception")
+            logger.exception("Workflow event failed for quote %s", quote.quote_id)
 
         db.flush()
         return quote

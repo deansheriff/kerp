@@ -1134,6 +1134,19 @@ class ExpenseReimbursementStrategy(MatchStrategy):
                         )
                     continue
 
+                # Skip claims with no payable amount — these need manual
+                # data correction (e.g. ERPNext-synced claims with null
+                # net_payable_amount). Avoids repeated warnings each run.
+                payable = claim.net_payable_amount or Decimal("0")
+                if payable <= Decimal("0"):
+                    logger.debug(
+                        "Skipping reimbursement posting for claim %s — "
+                        "net_payable_amount is %s (needs data fix)",
+                        claim.claim_number,
+                        payable,
+                    )
+                    continue
+
                 # Create reimbursement journal via the posting adapter
                 correlation_id = f"exp-reimb-{claim.claim_id}"
                 posting_result = ExpensePostingAdapter.post_expense_reimbursement(

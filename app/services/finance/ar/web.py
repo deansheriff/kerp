@@ -15,7 +15,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, load_only
 
 from app.config import settings
@@ -928,7 +928,11 @@ class ARWebService:
 
         conditions = [Invoice.organization_id == org_id]
         base_stmt = select(Invoice, Customer).join(
-            Customer, Invoice.customer_id == Customer.customer_id
+            Customer,
+            and_(
+                Invoice.customer_id == Customer.customer_id,
+                Customer.organization_id == org_id,
+            ),
         )
 
         if customer_id:
@@ -1332,7 +1336,11 @@ class ARWebService:
 
         conditions = [CustomerPayment.organization_id == org_id]
         base_stmt = select(CustomerPayment, Customer).join(
-            Customer, CustomerPayment.customer_id == Customer.customer_id
+            Customer,
+            and_(
+                CustomerPayment.customer_id == Customer.customer_id,
+                Customer.organization_id == org_id,
+            ),
         )
 
         if customer_id:
@@ -1504,7 +1512,7 @@ class ARWebService:
                             }
                         )
             except Exception:
-                logger.exception("Ignored exception")
+                logger.exception("Failed to load existing allocations for receipt form")
 
         # Determine selected customer (if provided)
         selected_customer_id = None
@@ -1996,7 +2004,11 @@ class ARWebService:
             Invoice.invoice_type == InvoiceType.CREDIT_NOTE,
         ]
         base_stmt = select(Invoice, Customer).join(
-            Customer, Invoice.customer_id == Customer.customer_id
+            Customer,
+            and_(
+                Invoice.customer_id == Customer.customer_id,
+                Customer.organization_id == org_id,
+            ),
         )
 
         if customer_id:

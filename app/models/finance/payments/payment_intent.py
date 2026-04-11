@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, Enum, Numeric, String, func, text
+from sqlalchemy import DateTime, Enum, Integer, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -208,6 +208,20 @@ class PaymentIntent(Base):
         DateTime(timezone=True),
         nullable=True,
         comment="When this intent expires",
+    )
+
+    # Transfer polling circuit breaker
+    poll_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+        comment="Number of times this transfer has been polled for status",
+    )
+    last_poll_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Last error message from transfer status polling",
     )
 
     # Timestamps

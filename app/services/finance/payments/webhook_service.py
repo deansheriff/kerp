@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models.finance.payments.payment_intent import PaymentIntent
+from app.models.finance.payments.payment_intent import PaymentDirection, PaymentIntent
 from app.models.finance.payments.payment_webhook import PaymentWebhook, WebhookStatus
 from app.services.finance.payments.payment_service import PaymentService
 from app.services.finance.payments.paystack_client import PaystackClient, PaystackConfig
@@ -222,17 +222,43 @@ class WebhookService:
         )
         expected_currency = intent.currency_code.upper()
 
-        # Allow 1 kobo tolerance for rounding differences
+        # Direction-aware tolerance for rounding differences.
+        # Collections (INBOUND): strict 1 kobo — mismatches could mean
+        # an invoice is incorrectly marked as fully paid.
+        # Transfers (OUTBOUND): 5 kobo — Paystack may include minor fee
+        # adjustments, and the money has already left the account.  Rejecting
+        # the webhook just creates a stuck intent.
+        is_outbound = intent.direction == PaymentDirection.OUTBOUND
+        max_tolerance_kobo = 5 if is_outbound else 1
         amount_diff = abs(paystack_amount_kobo - expected_amount_kobo)
-        if amount_diff > 1:
+
+        if amount_diff > max_tolerance_kobo:
             logger.error(
-                f"SECURITY: Amount mismatch in {event_type}! "
-                f"Expected {expected_amount_kobo} kobo, got {paystack_amount_kobo} kobo. "
-                f"Intent: {intent.intent_id}, Reference: {intent.paystack_reference}"
+                "SECURITY: Amount mismatch in %s! "
+                "Expected %s kobo, got %s kobo (diff: %s, tolerance: %s). "
+                "Intent: %s, Reference: %s",
+                event_type,
+                expected_amount_kobo,
+                paystack_amount_kobo,
+                amount_diff,
+                max_tolerance_kobo,
+                intent.intent_id,
+                intent.paystack_reference,
             )
             raise ValueError(
                 f"Amount mismatch: expected {expected_amount_kobo} kobo, "
                 f"received {paystack_amount_kobo} kobo"
+            )
+
+        if amount_diff > 0:
+            logger.warning(
+                "Minor amount discrepancy in %s: expected %s kobo, got %s "
+                "kobo (diff: %s). Intent: %s",
+                event_type,
+                expected_amount_kobo,
+                paystack_amount_kobo,
+                amount_diff,
+                intent.intent_id,
             )
 
         if paystack_currency != expected_currency:

@@ -722,17 +722,18 @@ class FinanceReminderService:
             "Please follow up with customer."
         )
 
+        # Throttle: one notification per invoice per recipient per 7 days.
+        # Previous daily creation was the primary driver of notification table
+        # bloat (3.2M+ rows).  Severity escalation (DUE_SOON → OVERDUE → ALERT)
+        # still goes through because notification_type changes at each tier.
+        since = datetime.combine(
+            date.today() - timedelta(days=7),
+            datetime.min.time(),
+        )
+
         sent = 0
         for recipient_id in recipient_ids:
-            if self._notification_sent_today(
-                invoice.organization_id,
-                EntityType.INVOICE,
-                invoice.invoice_id,
-                recipient_id,
-            ):
-                continue
-
-            self.notification_service.create(
+            result = self.notification_service.create_if_not_sent_since(
                 self.db,
                 organization_id=invoice.organization_id,
                 recipient_id=recipient_id,
@@ -741,10 +742,12 @@ class FinanceReminderService:
                 notification_type=notification_type,
                 title=title,
                 message=message,
+                since=since,
                 channel=NotificationChannel.IN_APP,  # Don't email for every invoice
                 action_url=f"/finance/ar/invoices/{invoice.invoice_id}",
             )
-            sent += 1
+            if result:
+                sent += 1
 
         return sent
 

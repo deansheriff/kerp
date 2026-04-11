@@ -945,7 +945,9 @@ class InvoiceWebService:
 
         except Exception as e:
             db.rollback()
-            logger.exception("create_invoice_response: failed")
+            logger.exception(
+                "create_invoice_response failed for org %s", auth.organization_id
+            )
             if "application/json" in content_type:
                 return JSONResponse(
                     status_code=400,

@@ -938,6 +938,24 @@ class PaymentService:
                     detail=f"Cannot initiate transfer - claim status is '{locked_claim.status.value}'",
                 )
 
+            # Pre-check approver budgets BEFORE calling Paystack.
+            # Once the transfer is initiated, the money leaves the account
+            # and cannot be recalled by a budget check failure.
+            if locked_claim.approver_id is not None:
+                from app.services.expense.expense_service import ExpenseService
+
+                expense_svc = ExpenseService(self.db)
+                expense_svc._validate_approver_monthly_budget(
+                    self.organization_id,
+                    locked_claim,
+                    locked_claim.approver_id,
+                )
+                expense_svc._validate_approver_weekly_budget(
+                    self.organization_id,
+                    locked_claim,
+                    locked_claim.approver_id,
+                )
+
         # Amount in kobo - use round to avoid truncation
         amount_kobo = int(
             (Decimal(intent.amount) * Decimal("100")).to_integral_value(
@@ -1112,24 +1130,38 @@ class PaymentService:
         # Use locked_intent from here on
         intent = locked_intent
 
-        # Update expense claim status
+        # Update expense claim status.
+        # mark_paid() must not prevent intent completion — the money has
+        # already left the Paystack balance.  If it fails (e.g. budget
+        # exhaustion race), log the error so it can be resolved manually
+        # but still mark the intent COMPLETED below.
         claim = None
         if intent.source_type == "EXPENSE_CLAIM" and intent.source_id:
             claim = self.db.get(ExpenseClaim, intent.source_id)
             if claim:
-                from app.services.expense.expense_service import ExpenseService
+                try:
+                    from app.services.expense.expense_service import ExpenseService
 
-                claim = ExpenseService(self.db).mark_paid(
-                    self.organization_id,
-                    claim.claim_id,
-                    payment_reference=intent.paystack_reference,
-                    payment_date=completed_at.date(),
-                    send_notification=False,
-                )
+                    claim = ExpenseService(self.db).mark_paid(
+                        self.organization_id,
+                        claim.claim_id,
+                        payment_reference=intent.paystack_reference,
+                        payment_date=completed_at.date(),
+                        send_notification=False,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to mark claim %s as PAID after successful "
+                        "transfer %s — requires manual resolution",
+                        intent.source_id,
+                        intent.intent_id,
+                    )
             else:
                 logger.warning(
-                    f"Expense claim not found for transfer intent {intent.intent_id}. "
-                    f"source_id={intent.source_id}. Payment marked complete but claim not updated."
+                    "Expense claim not found for transfer intent %s. "
+                    "source_id=%s. Payment marked complete but claim not updated.",
+                    intent.intent_id,
+                    intent.source_id,
                 )
 
         # Store fee amount (convert from kobo to Naira)
@@ -1452,10 +1484,7 @@ class PaymentService:
             Updated PaymentIntent
         """
         if intent.direction != PaymentDirection.OUTBOUND:
-            raise HTTPException(
-                status_code=400,
-                detail="Can only poll transfer status for OUTBOUND payments",
-            )
+            raise ValueError("Can only poll transfer status for OUTBOUND payments")
 
         if intent.status != PaymentIntentStatus.PROCESSING:
             logger.debug(f"Intent {intent.intent_id} not in PROCESSING state")
@@ -1465,8 +1494,10 @@ class PaymentService:
             logger.warning(f"Intent {intent.intent_id} has no transfer_code")
             return intent
 
+        # Paystack's /transfer/verify/{reference} looks up by the merchant's
+        # reference (paystack_reference), NOT by the transfer_code (TRF_xxx).
         with PaystackClient(paystack_config) as client:
-            result = client.verify_transfer(intent.transfer_code)
+            result = client.verify_transfer(intent.paystack_reference)
 
         if result.status == "success":
             self.process_successful_transfer(

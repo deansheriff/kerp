@@ -104,6 +104,7 @@ def _make_claim(
     claim_id: uuid.UUID | None = None,
     org_id: uuid.UUID | None = None,
     status: ExpenseClaimStatus = ExpenseClaimStatus.APPROVED,
+    approver_id: uuid.UUID | None = None,
 ) -> SimpleNamespace:
     """Build a lightweight expense claim for unit tests."""
     return SimpleNamespace(
@@ -112,11 +113,15 @@ def _make_claim(
         claim_number="EXP-001",
         status=status,
         net_payable_amount=Decimal("50000.00"),
+        total_approved_amount=Decimal("50000.00"),
+        total_claimed_amount=Decimal("50000.00"),
+        claim_date=None,
         paid_on=None,
         payment_reference=None,
         created_by_id=uuid.uuid4(),
         reimbursement_journal_id=None,
         employee_id=uuid.uuid4(),
+        approver_id=approver_id,
         recipient_bank_code="058",
         recipient_bank_name="GTBank",
         recipient_account_number="0123456789",
@@ -768,13 +773,16 @@ class TestPollTransferStatus:
             patch(
                 "app.services.finance.payments.payment_service.PaystackClient",
                 return_value=client_cm,
-            ),
+            ) as mock_client_cls,
             _patch_expense_mark_paid(db),
         ):
             result = svc.poll_transfer_status(intent, _CFG)
 
         assert result.status == PaymentIntentStatus.COMPLETED
         assert claim.status == ExpenseClaimStatus.PAID
+        # Verify we use paystack_reference (not transfer_code) for Paystack lookup
+        client = mock_client_cls.return_value.__enter__.return_value
+        client.verify_transfer.assert_called_once_with(intent.paystack_reference)
 
     def test_failed_from_paystack_marks_failed(self) -> None:
         """Polling finds failure → mark_transfer_failed called."""
@@ -900,7 +908,7 @@ class TestPollTransferStatus:
 
         svc = self._svc(db, org_id)
 
-        with pytest.raises(HTTPException):
+        with pytest.raises(ValueError, match="OUTBOUND"):
             svc.poll_transfer_status(intent, _CFG)
 
 
@@ -1182,21 +1190,47 @@ class TestEdgeCases:
         result = svc.poll_transfer_status(intent, _CFG)
         assert result.status == PaymentIntentStatus.COMPLETED
 
-    def test_exactly_1_kobo_tolerance_boundary(self) -> None:
-        """Exactly 1 kobo difference is accepted, 2 kobo is rejected."""
+    def test_kobo_tolerance_outbound_transfer(self) -> None:
+        """OUTBOUND transfers allow up to 5 kobo tolerance for fee rounding."""
         db = MagicMock()
         svc = WebhookService(db)
-        intent = _make_intent(amount=Decimal("100.00"))
+        intent = _make_intent(
+            amount=Decimal("100.00"), direction=PaymentDirection.OUTBOUND
+        )
 
         # 1 kobo diff → OK
         svc._validate_amount_and_currency(
             intent, {"amount": 10001, "currency": "NGN"}, "transfer.success"
         )
 
-        # 2 kobo diff → rejected
+        # 5 kobo diff → OK (within OUTBOUND tolerance)
+        svc._validate_amount_and_currency(
+            intent, {"amount": 10005, "currency": "NGN"}, "transfer.success"
+        )
+
+        # 6 kobo diff → rejected (exceeds OUTBOUND tolerance)
         with pytest.raises(ValueError, match="Amount mismatch"):
             svc._validate_amount_and_currency(
-                intent, {"amount": 10002, "currency": "NGN"}, "transfer.success"
+                intent, {"amount": 10006, "currency": "NGN"}, "transfer.success"
+            )
+
+    def test_kobo_tolerance_inbound_collection(self) -> None:
+        """INBOUND collections keep strict 1 kobo tolerance."""
+        db = MagicMock()
+        svc = WebhookService(db)
+        intent = _make_intent(
+            amount=Decimal("100.00"), direction=PaymentDirection.INBOUND
+        )
+
+        # 1 kobo diff → OK
+        svc._validate_amount_and_currency(
+            intent, {"amount": 10001, "currency": "NGN"}, "charge.success"
+        )
+
+        # 2 kobo diff → rejected (strict for INBOUND)
+        with pytest.raises(ValueError, match="Amount mismatch"):
+            svc._validate_amount_and_currency(
+                intent, {"amount": 10002, "currency": "NGN"}, "charge.success"
             )
 
     def test_fractional_amount_kobo_conversion(self) -> None:

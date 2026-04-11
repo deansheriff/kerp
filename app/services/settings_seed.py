@@ -1,7 +1,10 @@
+import logging
 import os
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.models.domain_settings import SettingValueType
 from app.services.domain_settings import (
@@ -156,6 +159,39 @@ def seed_audit_settings(db: Session) -> None:
     )
 
 
+def _sync_scheduler_connection(
+    db: Session,
+    key: str,
+    value: str,
+) -> None:
+    """Ensure the DB-stored scheduler URL matches the current env value.
+
+    Connection settings contain credentials that may be rotated.
+    ``ensure_by_key`` only inserts if missing — this also updates
+    stale values so the DB never serves an old password.
+    """
+    from app.models.domain_settings import DomainSetting, SettingDomain
+
+    existing = db.scalar(
+        select(DomainSetting).where(
+            DomainSetting.domain == SettingDomain.scheduler,
+            DomainSetting.key == key,
+        )
+    )
+    if existing:
+        if existing.value_text != value:
+            logger.info("Updating stale scheduler setting: %s", key)
+            existing.value_text = value
+            db.flush()
+    else:
+        scheduler_settings.ensure_by_key(
+            db,
+            key=key,
+            value_type=SettingValueType.string,
+            value_text=value,
+        )
+
+
 def seed_scheduler_settings(db: Session) -> None:
     broker = (
         os.getenv("CELERY_BROKER_URL")
@@ -167,18 +203,9 @@ def seed_scheduler_settings(db: Session) -> None:
         or os.getenv("REDIS_URL")
         or "redis://localhost:6379/1"
     )
-    scheduler_settings.ensure_by_key(
-        db,
-        key="broker_url",
-        value_type=SettingValueType.string,
-        value_text=broker,
-    )
-    scheduler_settings.ensure_by_key(
-        db,
-        key="result_backend",
-        value_type=SettingValueType.string,
-        value_text=backend,
-    )
+    # Connection URLs contain credentials — always sync with current env.
+    _sync_scheduler_connection(db, "broker_url", broker)
+    _sync_scheduler_connection(db, "result_backend", backend)
     scheduler_settings.ensure_by_key(
         db,
         key="timezone",
