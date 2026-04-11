@@ -178,24 +178,15 @@ class InventoryTransactionService(ListResponseMixin):
             return
 
         lot.quantity_on_hand = sum(
-            (
-                balance.quantity_on_hand or Decimal("0")
-                for balance in balances
-            ),
+            (balance.quantity_on_hand or Decimal("0") for balance in balances),
             Decimal("0"),
         )
         lot.quantity_allocated = sum(
-            (
-                balance.quantity_allocated or Decimal("0")
-                for balance in balances
-            ),
+            (balance.quantity_allocated or Decimal("0") for balance in balances),
             Decimal("0"),
         )
         lot.quantity_available = sum(
-            (
-                balance.quantity_available or Decimal("0")
-                for balance in balances
-            ),
+            (balance.quantity_available or Decimal("0") for balance in balances),
             Decimal("0"),
         )
         lot.is_active = any(
@@ -933,9 +924,7 @@ class InventoryTransactionService(ListResponseMixin):
                 bal.quantity_available = bal.quantity_on_hand - (
                     bal.quantity_allocated or Decimal("0")
                 )
-                bal.is_active = (
-                    bal.quantity_on_hand > 0 or bal.quantity_allocated > 0
-                )
+                bal.is_active = bal.quantity_on_hand > 0 or bal.quantity_allocated > 0
                 InventoryTransactionService._sync_legacy_lot_snapshot(db, lot)
 
                 remaining -= consume_qty

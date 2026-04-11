@@ -627,14 +627,25 @@ logger = logging.getLogger(__name__)
 def _serialize_lot(lot: InventoryLot) -> LotRead:
     balances = list(getattr(lot, "balances", []) or [])
     if balances:
-        quantity_on_hand = Decimal(str(sum(
-            (getattr(balance, "quantity_on_hand", Decimal("0")) or Decimal("0"))
-            for balance in balances
-        )))
-        quantity_available = Decimal(str(sum(
-            (getattr(balance, "quantity_available", Decimal("0")) or Decimal("0"))
-            for balance in balances
-        )))
+        quantity_on_hand = Decimal(
+            str(
+                sum(
+                    (getattr(balance, "quantity_on_hand", Decimal("0")) or Decimal("0"))
+                    for balance in balances
+                )
+            )
+        )
+        quantity_available = Decimal(
+            str(
+                sum(
+                    (
+                        getattr(balance, "quantity_available", Decimal("0"))
+                        or Decimal("0")
+                    )
+                    for balance in balances
+                )
+            )
+        )
         is_quarantined = any(
             bool(getattr(balance, "is_quarantined", False)) for balance in balances
         )
@@ -644,8 +655,12 @@ def _serialize_lot(lot: InventoryLot) -> LotRead:
             for balance in balances
         )
     else:
-        quantity_on_hand = Decimal(str(getattr(lot, "quantity_on_hand", Decimal("0")) or "0"))
-        quantity_available = Decimal(str(getattr(lot, "quantity_available", Decimal("0")) or "0"))
+        quantity_on_hand = Decimal(
+            str(getattr(lot, "quantity_on_hand", Decimal("0")) or "0")
+        )
+        quantity_available = Decimal(
+            str(getattr(lot, "quantity_available", Decimal("0")) or "0")
+        )
         is_quarantined = bool(getattr(lot, "is_quarantined", False))
         is_active = bool(getattr(lot, "is_active", False))
 

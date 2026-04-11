@@ -391,7 +391,7 @@ class FIFOValuationService(ListResponseMixin):
                 query = query.where(InventoryLotBalance.warehouse_id == warehouse_uuid)
             layer_rows_data = cast(
                 list[tuple[InventoryLotBalance, InventoryLot]],
-                db.execute(query.order_by(InventoryLot.received_date.asc())).all()
+                db.execute(query.order_by(InventoryLot.received_date.asc())).all(),
             )
 
         layers = []
