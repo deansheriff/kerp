@@ -19,8 +19,13 @@ depends_on = None
 def upgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
-    columns = {column["name"] for column in inspector.get_columns("inventory_lot", schema="inv")}
-    indexes = {index["name"] for index in inspector.get_indexes("inventory_lot", schema="inv")}
+    columns = {
+        column["name"]
+        for column in inspector.get_columns("inventory_lot", schema="inv")
+    }
+    indexes = {
+        index["name"] for index in inspector.get_indexes("inventory_lot", schema="inv")
+    }
 
     if "idx_lot_warehouse" in indexes:
         op.drop_index("idx_lot_warehouse", table_name="inventory_lot", schema="inv")
@@ -41,7 +46,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
-    columns = {column["name"] for column in inspector.get_columns("inventory_lot", schema="inv")}
+    columns = {
+        column["name"]
+        for column in inspector.get_columns("inventory_lot", schema="inv")
+    }
 
     if "warehouse_id" not in columns:
         op.add_column(

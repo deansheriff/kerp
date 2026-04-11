@@ -69,9 +69,10 @@ def upgrade() -> None:
             schema=SCHEMA_NAME,
         )
     }
-    claim_id_is_keyed = claim_pk.get("constrained_columns") == ["claim_id"] or (
-        "claim_id",
-    ) in claim_unique_sets
+    claim_id_is_keyed = (
+        claim_pk.get("constrained_columns") == ["claim_id"]
+        or ("claim_id",) in claim_unique_sets
+    )
 
     foreign_key_names = {
         fk["name"]
