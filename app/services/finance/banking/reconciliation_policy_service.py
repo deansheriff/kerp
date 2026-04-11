@@ -27,8 +27,16 @@ DEFAULT_ENABLED_PROVIDER_KEYS = frozenset(
     }
 )
 
-DEFAULT_FEE_KEYWORDS = ("fee", "charge", "commission", "levy")
-DEFAULT_TRANSFER_KEYWORDS = ("settlement",)
+DEFAULT_FEE_KEYWORDS = ("fee", "charge", "commission", "levy", "stamp duty")
+DEFAULT_TRANSFER_KEYWORDS = (
+    "settlement",
+    "nip cr",
+    "nip dr",
+    "transfer",
+    "rvl bulk",
+    "interbank",
+    "intra bank",
+)
 DEFAULT_DEPOSIT_KEYWORDS = ()
 DOTMAC_COMPAT_DEPOSIT_KEYWORDS = ("paystack", "psst10")
 
