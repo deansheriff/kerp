@@ -154,6 +154,136 @@
     </div>
     {% endif %}
 
+    <!-- Mono Connect Integration -->
+    {% if mono_enabled %}
+    <div class="card p-6" x-data='{ syncing: false, linkingMono: false }'>
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                {{ icon_svg("building", "h-5 w-5 text-blue-600 dark:text-blue-400") }}
+                <h3 class="text-lg font-medium text-slate-900 dark:text-white">Mono Connect</h3>
+            </div>
+            {% if account.mono_account_id %}
+            <span class="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                {{ icon_svg("check-circle", "h-3.5 w-3.5") }}
+                Connected
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                Not connected
+            </span>
+            {% endif %}
+        </div>
+
+        {% if account.mono_account_id %}
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            This account is linked to Mono. Bank statements are synced automatically.
+        </p>
+        <div class="flex items-center gap-3">
+            <button
+                @click="syncing = true; fetch('/api/v1/banking/accounts/{{ account.bank_account_id }}/sync-mono', { method: 'POST', headers: { 'Authorization': 'Bearer ' + document.cookie.match(/access_token=([^;]+)/)?.[1] } }).then(r => r.json()).then(data => { syncing = false; window.showToast(data.message || 'Sync complete', data.status === 'success' ? 'success' : 'error'); if(data.status === 'success') setTimeout(() => location.reload(), 1500); }).catch(() => { syncing = false; window.showToast('Sync failed', 'error'); })"
+                :disabled="syncing"
+                class="btn btn-secondary btn-sm">
+                <template x-if="!syncing">
+                    <span class="flex items-center gap-1.5">
+                        {{ icon_svg("refresh", "h-4 w-4") }}
+                        Sync Now
+                    </span>
+                </template>
+                <template x-if="syncing">
+                    <span class="flex items-center gap-1.5">
+                        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Syncing...
+                    </span>
+                </template>
+            </button>
+            <form method="POST" action="/finance/banking/accounts/{{ account.bank_account_id }}/unlink-mono"
+                  onsubmit="return confirm('Disconnect this bank account from Mono? You can reconnect later.')">
+                {{ request.state.csrf_form | safe }}
+                <button type="submit" class="btn btn-ghost btn-sm text-slate-500 hover:text-rose-600">
+                    Disconnect
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            Connect this bank account via Mono to automatically pull bank statements for reconciliation.
+        </p>
+        <!-- Mono Connect SDK v2 via jsDelivr CDN -->
+        <script src="https://cdn.jsdelivr.net/npm/@mono.co/connect.js@2.2.0/index.min.js"></script>
+
+        <button
+            :disabled="linkingMono"
+            id="mono-connect-btn"
+            class="btn btn-primary btn-sm">
+            {{ icon_svg("external-link", "h-4 w-4") }}
+            Connect via Mono
+        </button>
+
+        <script>
+            (function() {
+                var btn = document.getElementById('mono-connect-btn');
+                if (!btn) return;
+
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    // SDK v2 UMD exposes window["@mono.co/connect.js"].default
+                    var MonoSDK = window["@mono.co/connect.js"];
+                    var ConnectClass = MonoSDK && (MonoSDK.default || MonoSDK);
+
+                    if (!ConnectClass) {
+                        window.showToast('Mono Connect widget failed to load. Check your internet connection.', 'error');
+                        return;
+                    }
+
+                    var accountId = '{{ account.bank_account_id }}';
+                    var monoKey = '{{ mono_public_key }}';
+
+                    var connect = new ConnectClass({
+                        key: monoKey,
+                        data: {
+                            customer: {
+                                name: '{{ user.name if user and user.name else "User" }}',
+                                email: '{{ mono_user_email if mono_user_email else "user@example.com" }}'
+                            }
+                        },
+                        onSuccess: function(response) {
+                            var code = response.code;
+                            window.showToast('Linking account...', 'info');
+                            fetch('/api/v1/banking/accounts/' + accountId + '/link-mono', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ code: code })
+                            })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.status === 'success') {
+                                    window.showToast('Bank account connected successfully!', 'success');
+                                    setTimeout(function() { location.reload(); }, 1500);
+                                } else {
+                                    window.showToast(data.detail || 'Failed to link account', 'error');
+                                }
+                            })
+                            .catch(function() {
+                                window.showToast('Failed to link account', 'error');
+                            });
+                        },
+                        onClose: function() {
+                            console.log('Mono Connect widget closed');
+                        }
+                    });
+                    connect.setup();
+                    connect.open();
+                });
+            })();
+        </script>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Notes -->
     {% if account.notes %}
     <div class="card p-6">

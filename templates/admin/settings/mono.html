@@ -1,0 +1,152 @@
+{% extends "admin/base_admin.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Mono Connect Configuration{% endblock %}
+{% block page_subtitle %}Configure Mono Connect for automatic bank statement retrieval{% endblock %}
+
+{% block content %}
+{% set settings_map = settings if settings is defined else {} %}
+{% set mono_enabled = settings_map.get('mono_enabled', {}) %}
+{% set mono_public_key = settings_map.get('mono_public_key', {}) %}
+{% set mono_secret_key = settings_map.get('mono_secret_key', {}) %}
+{% set mono_webhook_secret = settings_map.get('mono_webhook_secret', {}) %}
+
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+        <a href="/admin/settings/hub" class="hover:text-accent-600 dark:hover:text-accent-400 transition-colors">Settings</a>
+        {{ icon_svg("chevron-right", "h-4 w-4") }}
+        <a href="/admin/settings/payments" class="hover:text-accent-600 dark:hover:text-accent-400 transition-colors">Payment Providers</a>
+        {{ icon_svg("chevron-right", "h-4 w-4") }}
+        <span class="font-medium text-slate-900 dark:text-white">Mono Connect</span>
+    </nav>
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Mono Connect</h2>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Connect bank accounts to automatically pull statements for reconciliation.
+            </p>
+        </div>
+    </div>
+
+    <!-- Success Message -->
+    {% if request.query_params.get('saved') %}
+    <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4 dark:bg-emerald-900/20 dark:border-emerald-800">
+        <div class="flex items-center gap-3">
+            {{ icon_svg("check", "h-5 w-5 text-emerald-600 dark:text-emerald-400") }}
+            <p class="text-sm text-emerald-700 dark:text-emerald-300">Mono Connect settings updated successfully.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Error Message -->
+    {% if error %}
+    <div class="rounded-lg bg-rose-50 border border-rose-200 p-4 dark:bg-rose-900/20 dark:border-rose-800">
+        <div class="flex items-center gap-3">
+            {{ icon_svg("exclamation-circle", "h-5 w-5 text-rose-600 dark:text-rose-400") }}
+            <p class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/admin/settings/banking/mono" class="space-y-6">
+        {{ request.state.csrf_form | safe }}
+
+        <!-- Enable/Disable -->
+        <div class="admin-card p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Enable Mono Connect</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        Allow linking bank accounts via Mono to pull statements automatically
+                    </p>
+                </div>
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="mono_enabled" value="true"
+                           {{ 'checked' if mono_enabled.get('value') else '' }}
+                           class="h-4 w-4 rounded border-slate-300 text-accent-600 focus:ring-accent-500 dark:border-slate-600 dark:bg-slate-800">
+                </label>
+            </div>
+        </div>
+
+        <!-- API Credentials -->
+        <div class="admin-card p-6">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-1">API Credentials</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Get your API keys from <a href="https://app.mono.co/apps" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">app.mono.co/apps</a>
+            </p>
+            <div class="grid gap-6">
+                <div>
+                    <label for="mono_public_key" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Public Key</label>
+                    <input type="text" id="mono_public_key" name="mono_public_key"
+                           value="{{ mono_public_key.get('value', '') if mono_public_key.get('value') else '' }}"
+                           placeholder="live_pk_xxxxxxxxxxxxxxxx"
+                           class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-accent-500 focus:ring-accent-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Used in the Mono Connect widget (frontend, safe to expose)</p>
+                </div>
+                <div>
+                    <label for="mono_secret_key" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Secret Key</label>
+                    <input type="password" id="mono_secret_key" name="mono_secret_key"
+                           placeholder="{{ '••••••••' if mono_secret_key.get('has_value') else 'live_sk_xxxxxxxxxxxxxxxx' }}"
+                           class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-accent-500 focus:ring-accent-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for server-side API calls. Leave blank to keep existing key.</p>
+                </div>
+                <div>
+                    <label for="mono_webhook_secret" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Webhook Secret</label>
+                    <input type="password" id="mono_webhook_secret" name="mono_webhook_secret"
+                           placeholder="{{ '••••••••' if mono_webhook_secret.get('has_value') else '' }}"
+                           class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-accent-500 focus:ring-accent-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Secret for verifying incoming Mono webhooks. Set this in the Mono dashboard.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- How It Works -->
+        <div class="admin-card p-6">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-3">How It Works</h2>
+            <div class="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                <div class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold flex items-center justify-center">1</span>
+                    <p>Configure your API keys above and enable Mono Connect.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold flex items-center justify-center">2</span>
+                    <p>Go to <strong>Banking > Accounts</strong> and open any bank account.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold flex items-center justify-center">3</span>
+                    <p>Click <strong>"Connect via Mono"</strong> and authenticate with your bank.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold flex items-center justify-center">4</span>
+                    <p>Bank statements are synced automatically every 30 minutes and fed into the reconciliation pipeline.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Webhook URL Info -->
+        <div class="admin-card p-6">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-2">Webhook URL</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                Add this URL in your Mono dashboard under webhook settings:
+            </p>
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5">
+                <code class="text-sm font-mono text-slate-700 dark:text-slate-300 flex-1 break-all">{{ request.base_url }}api/v1/banking/webhook/mono</code>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-end gap-4 py-4">
+            <a href="/admin/settings/payments" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 dark:text-slate-300 dark:bg-slate-800 dark:border-slate-600 dark:hover:bg-slate-700 transition-colors">
+                Cancel
+            </a>
+            <button type="submit" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-accent-600 hover:bg-accent-700 focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 transition-colors">
+                {{ icon_svg("check", "h-4 w-4 mr-1.5") }}
+                Save Changes
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

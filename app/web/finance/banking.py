@@ -181,6 +181,27 @@ def view_bank_account(
     return banking_web_service.account_detail_response(request, auth, db, account_id)
 
 
+@router.post("/accounts/{account_id}/unlink-mono", response_class=HTMLResponse)
+def unlink_mono_web(
+    request: Request,
+    account_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+):
+    """Disconnect a bank account from Mono Connect."""
+    from uuid import UUID
+
+    from app.services.finance.banking import bank_account_service
+
+    account = bank_account_service.get_by_id(db, UUID(account_id))
+    if account and account.organization_id == auth.organization_id:
+        account.mono_account_id = None
+        db.commit()
+    return RedirectResponse(
+        url=f"/finance/banking/accounts/{account_id}", status_code=303
+    )
+
+
 @router.get("/accounts/{account_id}/edit", response_class=HTMLResponse)
 def edit_bank_account_form(
     request: Request,

@@ -1649,6 +1649,48 @@ async def admin_settings_paystack_update(
     )
 
 
+@router.get("/settings/banking/mono", response_class=HTMLResponse)
+def admin_settings_mono(
+    request: Request,
+    db: Session = Depends(get_db),
+    auth: WebAuthContext = Depends(optional_web_auth),
+):
+    """Mono Connect settings page."""
+    context = _admin_base_context(request, auth, "Mono Connect Settings", db)
+    if auth and auth.organization_id:
+        context.update(
+            admin_settings_web_service.get_mono_context(db, auth.organization_id)
+        )
+    return templates.TemplateResponse(request, "admin/settings/mono.html", context)
+
+
+@router.post("/settings/banking/mono", response_class=HTMLResponse)
+async def admin_settings_mono_update(
+    request: Request,
+    db: Session = Depends(get_db),
+    auth: WebAuthContext = Depends(optional_web_auth),
+):
+    """Update Mono Connect settings."""
+    form = await request.form()
+    data = dict(form)
+
+    if auth and auth.organization_id:
+        success, error = admin_settings_web_service.update_mono(
+            db, auth.organization_id, data
+        )
+        if not success:
+            context = _admin_base_context(request, auth, "Mono Connect Settings", db)
+            context.update(
+                admin_settings_web_service.get_mono_context(db, auth.organization_id)
+            )
+            context["error"] = error
+            return templates.TemplateResponse(
+                request, "admin/settings/mono.html", context
+            )
+
+    return RedirectResponse(url="/admin/settings/banking/mono?saved=1", status_code=303)
+
+
 @router.get("/settings/coach", response_class=HTMLResponse)
 def admin_settings_coach(
     request: Request,

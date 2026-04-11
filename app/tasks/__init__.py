@@ -56,6 +56,7 @@ from app.tasks.finance import (
     refresh_analysis_cubes,
     refresh_stale_balances,
     release_expired_stock_reservations,
+    sync_mono_transactions,
     sync_paystack_transactions,
 )
 from app.tasks.fleet import (
@@ -168,6 +169,7 @@ __all__ = [
     "process_scheduled_workflow_rules",
     # Finance tasks
     "sync_paystack_transactions",
+    "sync_mono_transactions",
     "refresh_analysis_cubes",
     "refresh_stale_balances",
     "release_expired_stock_reservations",

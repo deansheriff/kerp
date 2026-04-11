@@ -7,6 +7,7 @@ FastAPI routers for IFRS accounting system.
 from app.api.finance.analysis import router as analysis_router
 from app.api.finance.ap import router as ap_router
 from app.api.finance.ar import router as ar_router
+from app.api.finance.banking import mono_webhook_router
 from app.api.finance.banking import router as banking_router
 from app.api.finance.cons import router as cons_router
 from app.api.finance.fx import router as fx_router
@@ -35,6 +36,7 @@ __all__ = [
     "search_router",
     "payments_router",
     "payments_webhook_router",
+    "mono_webhook_router",
     "ipsas_router",
     "fx_router",
     "analysis_router",

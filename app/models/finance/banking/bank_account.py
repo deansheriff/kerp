@@ -152,6 +152,11 @@ class BankAccount(Base):
     contact_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # External provider linking
+    mono_account_id: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, index=True
+    )
+
     # Flags
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
     allow_overdraft: Mapped[bool] = mapped_column(Boolean, default=False)

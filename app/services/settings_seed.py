@@ -557,6 +557,15 @@ def seed_scheduled_tasks(db: Session) -> None:
             "args_json": [],
             "kwargs_json": {"days_back": 1},
         },
+        {
+            "name": "Banking: Mono Statement Sync",
+            "task_name": "app.tasks.finance.sync_mono_transactions",
+            "schedule_type": ScheduleType.interval,
+            "interval_seconds": 1800,  # Every 30 minutes
+            "enabled": True,
+            "args_json": [],
+            "kwargs_json": {"days_back": 3},
+        },
     ]
 
     for task_def in default_tasks:

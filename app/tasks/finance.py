@@ -649,6 +649,47 @@ def sync_paystack_transactions(days_back: int = 1) -> dict[str, Any]:
 
 
 @shared_task
+def sync_mono_transactions(days_back: int = 3) -> dict[str, Any]:
+    """
+    Sync Mono Connect transactions to bank statements for reconciliation.
+
+    Fetches transactions from all Mono-linked bank accounts and creates
+    bank statement lines for auto-reconciliation.
+
+    Args:
+        days_back: Number of days to look back (default: 3 for overlap safety)
+
+    Returns:
+        Dict with sync statistics
+    """
+    logger.info("Starting Mono sync for last %d days", days_back)
+
+    with SessionLocal() as db:
+        from app.services.finance.banking.mono_sync import MonoSyncService
+
+        sync_svc = MonoSyncService(db)
+
+        if not sync_svc.is_configured():
+            logger.info("Mono Connect not configured, skipping sync")
+            return {"success": True, "message": "Mono not configured", "skipped": True}
+
+        results = sync_svc.sync_all_linked_accounts(
+            days_back=days_back,
+        )
+
+        db.commit()
+
+    logger.info(
+        "Mono sync complete: %s accounts synced, %s transactions, %s errors",
+        results.get("accounts_synced", 0),
+        results.get("total_transactions", 0),
+        results.get("total_errors", 0),
+    )
+
+    return results
+
+
+@shared_task
 def rebuild_account_balances() -> dict[str, Any]:
     """
     Safety-net: rebuild all account balances from posted_ledger_line.

@@ -2576,6 +2576,27 @@ class BankingWebService:
                 account_id,
             )
         )
+
+        # Mono Connect integration context
+        from app.models.domain_settings import SettingDomain
+        from app.services.settings_spec import resolve_value
+
+        mono_enabled = resolve_value(db, SettingDomain.banking, "mono_enabled")
+        context["mono_enabled"] = bool(mono_enabled)
+        if mono_enabled:
+            context["mono_public_key"] = str(
+                resolve_value(db, SettingDomain.banking, "mono_public_key") or ""
+            )
+
+            # Get user email for Mono customer data
+            if auth.person_id:
+                from app.models.person import Person
+
+                person = db.get(Person, auth.person_id)
+                context["mono_user_email"] = person.email if person else ""
+            else:
+                context["mono_user_email"] = ""
+
         return templates.TemplateResponse(
             request, "finance/banking/account_detail.html", context
         )

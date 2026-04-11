@@ -568,6 +568,8 @@ class AdminSettingsWebService:
         # Check which payment providers are configured
         paystack_enabled = resolve_value(db, SettingDomain.payments, "paystack_enabled")
 
+        mono_enabled = resolve_value(db, SettingDomain.banking, "mono_enabled")
+
         providers = [
             {
                 "name": "Paystack",
@@ -576,6 +578,14 @@ class AdminSettingsWebService:
                 "configured": bool(paystack_enabled),
                 "url": "/admin/settings/payments/paystack",
                 "icon": "credit-card",
+            },
+            {
+                "name": "Mono Connect",
+                "slug": "mono",
+                "description": "Connect bank accounts for automatic statement retrieval",
+                "configured": bool(mono_enabled),
+                "url": "/admin/settings/banking/mono",
+                "icon": "building",
             },
         ]
 
@@ -601,6 +611,84 @@ class AdminSettingsWebService:
         from app.services.finance.settings_web import settings_web_service
 
         return settings_web_service.update_payments_settings(db, organization_id, data)
+
+    # ========== Mono Connect Settings ==========
+
+    def get_mono_context(
+        self, db: Session, organization_id: uuid.UUID
+    ) -> dict[str, Any]:
+        """Get Mono Connect settings for the form."""
+        mono_keys = [
+            "mono_enabled",
+            "mono_public_key",
+            "mono_secret_key",
+            "mono_webhook_secret",
+        ]
+        settings_map: dict[str, Any] = {}
+        for key in mono_keys:
+            value = resolve_value(db, SettingDomain.banking, key)
+            has_value = value is not None and str(value).strip() != ""
+            settings_map[key] = {
+                "value": value,
+                "has_value": has_value,
+            }
+        return {"settings": settings_map}
+
+    def update_mono(
+        self,
+        db: Session,
+        organization_id: uuid.UUID,
+        data: dict[str, Any],
+    ) -> tuple[bool, str | None]:
+        """Update Mono Connect settings."""
+        try:
+            banking_svc = DomainSettings(SettingDomain.banking)
+
+            secret_keys = {"mono_secret_key", "mono_webhook_secret"}
+            mono_keys = [
+                "mono_enabled",
+                "mono_public_key",
+                "mono_secret_key",
+                "mono_webhook_secret",
+            ]
+
+            # Ensure unchecked checkbox persists as false
+            data.setdefault("mono_enabled", "false")
+
+            for key in mono_keys:
+                value = data.get(key, "")
+
+                # Skip empty secret fields (keep existing value)
+                if key in secret_keys and not str(value).strip():
+                    continue
+
+                # Coerce boolean
+                value_text: str | None
+                if key == "mono_enabled":
+                    value = str(value).lower() in ("true", "1", "on", "yes")
+                    value_text = str(value)
+                else:
+                    value_text = str(value).strip() if value else None
+
+                banking_svc.upsert_by_key(
+                    db,
+                    key,
+                    DomainSettingUpdate(
+                        value_type=(
+                            SettingValueType.boolean
+                            if key == "mono_enabled"
+                            else SettingValueType.string
+                        ),
+                        value_text=value_text,
+                        is_secret=key in secret_keys,
+                    ),
+                )
+
+            db.flush()
+            return True, None
+        except Exception as e:
+            logger.exception("Failed to update Mono settings")
+            return False, str(e)
 
     # ========== Coach / AI Settings ==========
 
