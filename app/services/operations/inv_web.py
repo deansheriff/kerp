@@ -6,6 +6,7 @@ import json
 import logging
 from datetime import timezone
 from datetime import date as date_type
+from typing import Any, cast
 
 try:
     from datetime import UTC  # type: ignore
@@ -1398,17 +1399,15 @@ class OperationsInventoryWebService:
             }
 
         for lot in lots:
+            lot_view = cast(Any, lot)
             balances = list(getattr(lot, "balances", []) or [])
-            lot.total_on_hand = sum(
-                (balance.quantity_on_hand or 0) for balance in balances
-            )
-            lot.total_allocated = sum(
-                (balance.quantity_allocated or 0) for balance in balances
-            )
-            lot.total_available = sum(
-                (balance.quantity_available or 0) for balance in balances
-            )
-            lot.remaining_quantity = lot.total_on_hand
+            t_on_hand = sum((balance.quantity_on_hand or 0) for balance in balances)
+            t_allocated = sum((balance.quantity_allocated or 0) for balance in balances)
+            t_available = sum((balance.quantity_available or 0) for balance in balances)
+            lot_view.total_on_hand = t_on_hand
+            lot_view.total_allocated = t_allocated
+            lot_view.total_available = t_available
+            lot_view.remaining_quantity = t_on_hand
             lot.is_quarantined = any(
                 bool(balance.is_quarantined) for balance in balances
             )
@@ -1423,11 +1422,11 @@ class OperationsInventoryWebService:
             ]
             distinct_names = sorted(set(active_warehouse_names))
             if len(distinct_names) == 1:
-                lot.display_warehouse = distinct_names[0]
+                lot_view.display_warehouse = distinct_names[0]
             elif len(distinct_names) > 1:
-                lot.display_warehouse = f"Multiple ({len(distinct_names)})"
+                lot_view.display_warehouse = f"Multiple ({len(distinct_names)})"
             else:
-                lot.display_warehouse = "-"
+                lot_view.display_warehouse = "-"
 
         # Expiring lots (within 30 days)
         expiring_lot_rows = list(
@@ -1473,8 +1472,9 @@ class OperationsInventoryWebService:
             )
 
         for lot in expiring_lots:
+            lot_view = cast(Any, lot)
             balances = list(getattr(lot, "balances", []) or [])
-            lot.total_on_hand = sum(
+            lot_view.total_on_hand = sum(
                 (balance.quantity_on_hand or 0) for balance in balances
             )
 
@@ -2217,8 +2217,8 @@ class OperationsInventoryWebService:
         for balance in sorted(
             list(getattr(lot, "balances", []) or []),
             key=lambda row: (
-                warehouse_map.get(row.warehouse_id).warehouse_name
-                if row.warehouse_id in warehouse_map
+                wh.warehouse_name
+                if (wh := warehouse_map.get(row.warehouse_id)) is not None
                 else ""
             ),
         ):
@@ -2243,9 +2243,10 @@ class OperationsInventoryWebService:
             total_available += balance.quantity_available or 0
             any_quarantined = any_quarantined or bool(balance.is_quarantined)
 
-        lot.total_on_hand = total_on_hand
-        lot.total_allocated = total_allocated
-        lot.total_available = total_available
+        lot_view = cast(Any, lot)
+        lot_view.total_on_hand = total_on_hand
+        lot_view.total_allocated = total_allocated
+        lot_view.total_available = total_available
         lot.is_quarantined = any_quarantined
 
         # Recent transactions for this lot

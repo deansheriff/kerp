@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import and_, case, func, or_, select
@@ -56,7 +56,7 @@ def _get_balance_for_lot(
         balances = getattr(lot, "_mock_balances", None)
         if balances is None:
             balances = {}
-            lot._mock_balances = balances
+            cast(Any, lot)._mock_balances = balances
         balance = balances.get(wh_id)
         if balance is None and (
             create_if_missing or getattr(lot, "warehouse_id", None) in (wh_id, None)

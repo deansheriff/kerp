@@ -350,7 +350,7 @@ class LotSerialService(ListResponseMixin):
             total_allocated = lot.quantity_allocated
 
         if quantity_value > total_allocated:
-            quantity_value = total_allocated
+            quantity_value = Decimal(str(total_allocated))
 
         remaining = quantity_value
         if balances:
