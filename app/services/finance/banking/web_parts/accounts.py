@@ -557,7 +557,7 @@ class BankingAccountWebService:
             account = bank_account_service.create(
                 db, org_id, data, coerce_uuid(user_id) if user_id else None
             )
-            db.flush()
+            db.commit()
             return RedirectResponse(
                 url=f"/finance/banking/accounts/{account.bank_account_id}",
                 status_code=303,
@@ -622,7 +622,7 @@ class BankingAccountWebService:
                 data,
                 coerce_uuid(user_id) if user_id else None,
             )
-            db.flush()
+            db.commit()
             return RedirectResponse(
                 url=f"/finance/banking/accounts/{account_id}",
                 status_code=303,

@@ -639,7 +639,7 @@ class BankingReconciliationWebService:
                 created_by=user_id,
                 force_match=force_match,
             )
-            db.flush()
+            db.commit()
         except HTTPException:
             raise
         except (ValueError, RuntimeError, KeyError) as e:
@@ -681,7 +681,7 @@ class BankingReconciliationWebService:
                 notes=body.get("notes"),
                 created_by=user_id,
             )
-            db.flush()
+            db.commit()
         except HTTPException:
             raise
         except (ValueError, RuntimeError, KeyError) as e:

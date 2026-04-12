@@ -332,7 +332,7 @@ class BankingPayeeWebService:
             )
             db.add(payee)
             db.flush()
-            db.flush()
+            db.commit()
             logger.info("Created payee %s: %s", payee.payee_id, payee.payee_name)
             return RedirectResponse(
                 url="/finance/banking/payees",
@@ -388,8 +388,7 @@ class BankingPayeeWebService:
                 UUID(str(form["customer_id"])) if form.get("customer_id") else None
             )
             payee.notes = str(form.get("notes", "")) or None
-            db.flush()
-            db.flush()
+            db.commit()
             logger.info("Updated payee %s: %s", payee.payee_id, payee.payee_name)
             return RedirectResponse(
                 url="/finance/banking/payees",
