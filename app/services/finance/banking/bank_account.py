@@ -369,6 +369,32 @@ class BankAccountService:
 
         return bank_account
 
+    def unlink_mono(
+        self,
+        db: Session,
+        organization_id: UUID,
+        bank_account_id: UUID,
+        *,
+        require_linked: bool = False,
+        updated_by: UUID | None = None,
+    ) -> BankAccount | None:
+        """Remove a Mono Connect link from a tenant-scoped bank account."""
+        org_id = coerce_uuid(organization_id)
+        bank_account = db.get(BankAccount, bank_account_id)
+        if not bank_account or bank_account.organization_id != org_id:
+            return None
+
+        if require_linked and not bank_account.mono_account_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Bank account is not linked to Mono",
+            )
+
+        bank_account.mono_account_id = None
+        bank_account.updated_by = updated_by
+        db.flush()
+        return bank_account
+
     def get_gl_balance(
         self,
         db: Session,

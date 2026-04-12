@@ -1,28 +1,30 @@
-"""Programmatic reconciliation facade.
+"""Modular programmatic reconciliation components."""
 
-The providers, strategies, helpers, and engine live in ``programmatic_parts``.
-This module keeps the historical import path stable.
-"""
-
-from __future__ import annotations
-
-from app.services.finance.banking.programmatic_parts import (
-    BankFeeStrategy,
+from app.services.finance.banking.programmatic_parts.engine import (
+    ProgrammaticReconciliationEngine,
+)
+from app.services.finance.banking.programmatic_parts.helpers import (
+    build_extra_gl_account_ids,
+)
+from app.services.finance.banking.programmatic_parts.payment_strategies import (
     CustomerPaymentReferenceStrategy,
-    CustomerReceiptProvider,
     CustomerReceiptReferenceStrategy,
+    PaymentIntentReferenceStrategy,
+    SupplierPaymentReferenceStrategy,
+    UniqueDateAmountStrategy,
+)
+from app.services.finance.banking.programmatic_parts.providers import (
+    CustomerReceiptProvider,
+    PaymentIntentProvider,
+    SplynxCustomerPaymentProvider,
+    SupplierPaymentProvider,
+)
+from app.services.finance.banking.programmatic_parts.special_strategies import (
+    BankFeeStrategy,
     ExpenseReimbursementStrategy,
     InterbankCounterpartStrategy,
     LegacyCustomRuleStrategy,
-    PaymentIntentProvider,
-    PaymentIntentReferenceStrategy,
     PayrollEntryStrategy,
-    ProgrammaticReconciliationEngine,
-    SplynxCustomerPaymentProvider,
-    SupplierPaymentProvider,
-    SupplierPaymentReferenceStrategy,
-    UniqueDateAmountStrategy,
-    build_extra_gl_account_ids,
 )
 
 __all__ = [
