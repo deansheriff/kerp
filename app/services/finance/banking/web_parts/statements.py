@@ -1797,7 +1797,7 @@ class BankingStatementWebService:
             )
 
         return RedirectResponse(
-            url="/finance/banking/statements?success=Statement+deleted",
+            url="/finance/banking/statements/imports?success=Statement+deleted",
             status_code=303,
         )
 
