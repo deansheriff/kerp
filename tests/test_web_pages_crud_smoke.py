@@ -401,6 +401,9 @@ _INFRA_ERRORS = (
     "no such column",
     "OperationalError",
     "ProgrammingError",
+    # SQLite dialect can't render PostgreSQL-only types (ARRAY, JSONB ops, etc.)
+    "can't render element of type",
+    "CompileError",
     # Placeholder UUID entity not found (expected for detail/edit pages)
     "not found",
     "Not Found",
