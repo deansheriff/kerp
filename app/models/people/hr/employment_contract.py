@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from datetime import date
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -29,8 +30,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-
-from datetime import date as date_type
 
 if TYPE_CHECKING:
     from app.models.finance.automation.document_template import DocumentTemplate
@@ -112,13 +111,13 @@ class EmploymentContract(Base):
     )
 
     # Dates
-    start_date: Mapped[date_type] = mapped_column(Date, nullable=False)
-    end_date: Mapped[date_type | None] = mapped_column(
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
         comment="Null for permanent contracts",
     )
-    probation_end_date: Mapped[date_type | None] = mapped_column(
+    probation_end_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
     )

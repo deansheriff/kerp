@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from datetime import date
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -27,8 +28,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-
-from datetime import date as date_type
 
 if TYPE_CHECKING:
     from app.models.finance.core_org.organization import Organization
@@ -116,7 +115,7 @@ class ExitInterview(Base):
     )
 
     # Interview details
-    interview_date: Mapped[date_type | None] = mapped_column(Date, nullable=True)
+    interview_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     overall_experience: Mapped[OverallExperience | None] = mapped_column(
         Enum(OverallExperience, name="hr_overall_experience"),
         nullable=True,
