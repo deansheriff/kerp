@@ -7,9 +7,10 @@ for reconciliation.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -18,6 +19,7 @@ try:
 except ImportError:  # pragma: no cover
     UTC = timezone.utc
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -94,6 +96,125 @@ class MonoSyncService:
             return True
         except ValueError:
             return False
+
+    def link_account(
+        self,
+        organization_id: UUID,
+        bank_account_id: UUID,
+        code: str,
+    ) -> dict:
+        """Exchange a Mono widget code and link it to a bank account."""
+        account = self.db.get(BankAccount, bank_account_id)
+        if not account or account.organization_id != organization_id:
+            raise HTTPException(status_code=404, detail="Bank account not found")
+
+        if not self.is_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="Mono Connect is not configured",
+            )
+
+        if not code:
+            raise HTTPException(
+                status_code=400,
+                detail="Authorization code is required",
+            )
+
+        config = self._get_mono_config()
+        try:
+            with MonoClient(config) as client:
+                result = client.exchange_token(code)
+        except MonoError as exc:
+            raise HTTPException(status_code=400, detail=str(exc.message)) from exc
+
+        account.mono_account_id = result.account_id
+        self.db.flush()
+        return {
+            "status": "success",
+            "message": "Bank account linked to Mono successfully",
+            "data": {"mono_account_id": result.account_id},
+        }
+
+    def sync_account_by_id(
+        self,
+        organization_id: UUID,
+        bank_account_id: UUID,
+        *,
+        days_back: int,
+        user_id: UUID | None = None,
+    ) -> dict:
+        """Sync Mono transactions for a tenant-scoped bank account."""
+        account = self.db.get(BankAccount, bank_account_id)
+        if not account or account.organization_id != organization_id:
+            raise HTTPException(status_code=404, detail="Bank account not found")
+
+        if not account.mono_account_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Bank account is not linked to Mono",
+            )
+
+        to_date = date.today()
+        from_date = to_date - timedelta(days=days_back)
+        result = self.sync_account(account, from_date, to_date, user_id)
+        if not result.success:
+            raise HTTPException(status_code=502, detail=result.message)
+
+        return {
+            "status": "success",
+            "message": result.message,
+            "data": {
+                "transactions_synced": result.transactions_synced,
+                "duplicates_skipped": result.duplicates_skipped,
+                "total_credits": str(result.total_credits),
+                "total_debits": str(result.total_debits),
+            },
+        }
+
+    def process_webhook(self, header_secret: str, raw_body: bytes) -> dict:
+        """Verify and process a Mono webhook payload."""
+        if not header_secret:
+            raise HTTPException(status_code=400, detail="Missing webhook secret")
+
+        configured_secret = resolve_value(
+            self.db,
+            SettingDomain.banking,
+            "mono_webhook_secret",
+        )
+        if not configured_secret:
+            raise HTTPException(
+                status_code=500,
+                detail="Mono webhook secret not configured",
+            )
+
+        config = MonoConfig(webhook_secret=str(configured_secret))
+        client = MonoClient(config)
+        if not client.verify_webhook(header_secret):
+            raise HTTPException(status_code=401, detail="Invalid webhook secret")
+
+        try:
+            payload = json.loads(raw_body)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
+
+        event = payload.get("event", "")
+        event_data = payload.get("data", {})
+        logger.info("Mono webhook received: event=%s", event)
+
+        if event == "mono.events.account_updated":
+            data_status = event_data.get("meta", {}).get("data_status", "")
+            account_id = event_data.get("account", {}).get("id", "")
+            logger.info(
+                "Account updated: mono_id=%s, data_status=%s",
+                account_id,
+                data_status,
+            )
+        elif event == "mono.events.account_connected":
+            logger.info("Account connected via webhook: %s", event_data)
+        else:
+            logger.info("Unhandled Mono event: %s", event)
+
+        return {"status": "success", "message": f"Webhook {event} processed"}
 
     def get_linked_accounts(
         self, organization_id: UUID | None = None

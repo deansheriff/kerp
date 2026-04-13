@@ -189,16 +189,11 @@ def unlink_mono_web(
     db: Session = Depends(get_db),
 ):
     """Disconnect a bank account from Mono Connect."""
-    from uuid import UUID
-
-    from app.services.finance.banking import bank_account_service
-
-    account = bank_account_service.get_by_id(db, UUID(account_id))
-    if account and account.organization_id == auth.organization_id:
-        account.mono_account_id = None
-        db.commit()
-    return RedirectResponse(
-        url=f"/finance/banking/accounts/{account_id}", status_code=303
+    return banking_web_service.unlink_mono_response(
+        request,
+        auth,
+        db,
+        account_id,
     )
 
 

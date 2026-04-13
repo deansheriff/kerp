@@ -818,40 +818,13 @@ def link_mono_account(
 
     Request body: ``{"code": "<mono_widget_auth_code>"}``
     """
-    from app.services.finance.banking.mono_client import MonoClient, MonoError
     from app.services.finance.banking.mono_sync import MonoSyncService
 
-    organization_id = _get_org_id(auth)
-    account = bank_account_service.get(db, organization_id, account_id)
-
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
-
-    sync_svc = MonoSyncService(db)
-    if not sync_svc.is_configured():
-        raise HTTPException(status_code=400, detail="Mono Connect is not configured")
-
-    code = payload.get("code", "")
-    if not code:
-        raise HTTPException(status_code=400, detail="Authorization code is required")
-
-    # Exchange code for account ID
-    config = sync_svc._get_mono_config()
-    try:
-        with MonoClient(config) as client:
-            result = client.exchange_token(code)
-    except MonoError as exc:
-        raise HTTPException(status_code=400, detail=str(exc.message))
-
-    # Update the bank account
-    account.mono_account_id = result.account_id
-    db.flush()
-
-    return {
-        "status": "success",
-        "message": "Bank account linked to Mono successfully",
-        "data": {"mono_account_id": result.account_id},
-    }
+    return MonoSyncService(db).link_account(
+        _get_org_id(auth),
+        account_id,
+        str(payload.get("code", "")),
+    )
 
 
 @router.post("/accounts/{account_id}/unlink-mono")
@@ -862,18 +835,16 @@ def unlink_mono_account(
 ):
     """Remove Mono Connect link from a bank account."""
     organization_id = _get_org_id(auth)
-    account = bank_account_service.get(db, organization_id, account_id)
+    account = bank_account_service.unlink_mono(
+        db,
+        organization_id,
+        account_id,
+        require_linked=True,
+        updated_by=_get_user_id(auth),
+    )
 
     if not account:
         raise HTTPException(status_code=404, detail="Bank account not found")
-
-    if not account.mono_account_id:
-        raise HTTPException(
-            status_code=400, detail="Bank account is not linked to Mono"
-        )
-
-    account.mono_account_id = None
-    db.flush()
 
     return {"status": "success", "message": "Mono link removed"}
 
@@ -891,41 +862,14 @@ def sync_mono_account(
     Fetches transactions for the specified lookback period and creates
     bank statement lines.
     """
-    from datetime import timedelta
-
     from app.services.finance.banking.mono_sync import MonoSyncService
 
-    organization_id = _get_org_id(auth)
-    account = bank_account_service.get(db, organization_id, account_id)
-
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
-
-    if not account.mono_account_id:
-        raise HTTPException(
-            status_code=400, detail="Bank account is not linked to Mono"
-        )
-
-    sync_svc = MonoSyncService(db)
-    to_date = date.today()
-    from_date = to_date - timedelta(days=days_back)
-
-    user_id = auth.get("person_id")
-    result = sync_svc.sync_account(account, from_date, to_date, user_id)
-
-    if not result.success:
-        raise HTTPException(status_code=502, detail=result.message)
-
-    return {
-        "status": "success",
-        "message": result.message,
-        "data": {
-            "transactions_synced": result.transactions_synced,
-            "duplicates_skipped": result.duplicates_skipped,
-            "total_credits": str(result.total_credits),
-            "total_debits": str(result.total_debits),
-        },
-    }
+    return MonoSyncService(db).sync_account_by_id(
+        _get_org_id(auth),
+        account_id,
+        days_back=days_back,
+        user_id=_get_user_id(auth),
+    )
 
 
 # Webhook endpoint — no auth required, uses secret verification
@@ -943,60 +887,9 @@ async def mono_webhook(
     Verifies the request using the mono-webhook-secret header and processes
     account connection and data update events.
     """
-    import json as json_mod
-    import logging as _logging
+    from app.services.finance.banking.mono_sync import MonoSyncService
 
-    from app.models.domain_settings import SettingDomain
-    from app.services.finance.banking.mono_client import MonoClient, MonoConfig
-    from app.services.settings_spec import resolve_value
-
-    wh_logger = _logging.getLogger(__name__ + ".mono_webhook")
-
-    # Read webhook secret from header
-    header_secret = request.headers.get("mono-webhook-secret", "")
-    if not header_secret:
-        raise HTTPException(status_code=400, detail="Missing webhook secret")
-
-    # Get configured webhook secret
-    configured_secret = resolve_value(db, SettingDomain.banking, "mono_webhook_secret")
-    if not configured_secret:
-        raise HTTPException(
-            status_code=500, detail="Mono webhook secret not configured"
-        )
-
-    # Verify — only webhook_secret is needed for signature check
-    config = MonoConfig(webhook_secret=str(configured_secret))
-    client = MonoClient(config)
-    if not client.verify_webhook(header_secret):
-        raise HTTPException(status_code=401, detail="Invalid webhook secret")
-
-    # Parse payload
-    raw_body = await request.body()
-    try:
-        payload = json_mod.loads(raw_body)
-    except json_mod.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
-
-    event = payload.get("event", "")
-    event_data = payload.get("data", {})
-
-    wh_logger.info("Mono webhook received: event=%s", event)
-
-    # Handle events
-    if event == "mono.events.account_updated":
-        data_status = event_data.get("meta", {}).get("data_status", "")
-        account_id = event_data.get("account", {}).get("id", "")
-        wh_logger.info(
-            "Account updated: mono_id=%s, data_status=%s",
-            account_id,
-            data_status,
-        )
-        # Could trigger sync here if data_status == "AVAILABLE"
-
-    elif event == "mono.events.account_connected":
-        wh_logger.info("Account connected via webhook: %s", event_data)
-
-    else:
-        wh_logger.info("Unhandled Mono event: %s", event)
-
-    return {"status": "success", "message": f"Webhook {event} processed"}
+    return MonoSyncService(db).process_webhook(
+        request.headers.get("mono-webhook-secret", ""),
+        await request.body(),
+    )

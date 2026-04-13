@@ -30,9 +30,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
-if TYPE_CHECKING:
-    from datetime import date as date_type
+from datetime import date as date_type
 
+if TYPE_CHECKING:
     from app.models.finance.automation.document_template import DocumentTemplate
     from app.models.finance.automation.generated_document import GeneratedDocument
     from app.models.finance.core_org.organization import Organization
