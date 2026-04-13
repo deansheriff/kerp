@@ -1,5 +1,7 @@
 """Project web attachments import handlers."""
 
+from uuid import UUID
+
 from app.services.pm.web.project_parts.base import (
     Depends,
     File,
@@ -23,6 +25,12 @@ from app.services.pm.web.project_parts.base import (
     require_projects_access,
     templates,
 )
+
+
+def _require_auth_uuid(value: UUID | None) -> UUID:
+    if value is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return value
 
 
 def project_expenses(
@@ -123,17 +131,19 @@ async def upload_project_attachment(
             url=f"/projects/{project.project_code}/attachments?error=No+file+provided",
             status_code=303,
         )
+    uploaded_by_id = _require_auth_uuid(auth.person_id)
+    description_text = description if isinstance(description, str) else None
 
     attachment, error = project_attachment_service.save_file(
         db=db,
         organization_id=org_id,
         entity_type="PROJECT",
         entity_id=project.project_id,
-        filename=file.filename,
+        filename=file.filename or "attachment",
         file_data=file.file,
         content_type=file.content_type or "application/octet-stream",
-        uploaded_by_id=auth.person_id,
-        description=description if description else None,
+        uploaded_by_id=uploaded_by_id,
+        description=description_text if description_text else None,
     )
 
     if error:
@@ -312,10 +322,12 @@ async def project_import_preview(
 ):
     """Preview project import with validation and column mapping."""
     try:
+        organization_id = _require_auth_uuid(auth.organization_id)
+        user_id = _require_auth_uuid(auth.person_id)
         result = await project_import_web_service.preview_import(
             db=db,
-            organization_id=auth.organization_id,
-            user_id=auth.person_id,
+            organization_id=organization_id,
+            user_id=user_id,
             entity_type=entity_type,
             file=file,
         )
@@ -342,6 +354,8 @@ async def project_execute_import(
     import json
 
     try:
+        organization_id = _require_auth_uuid(auth.organization_id)
+        user_id = _require_auth_uuid(auth.person_id)
         skip_dups = skip_duplicates is not None and skip_duplicates.lower() in (
             "true",
             "1",
@@ -353,8 +367,8 @@ async def project_execute_import(
 
         result = await project_import_web_service.execute_import(
             db=db,
-            organization_id=auth.organization_id,
-            user_id=auth.person_id,
+            organization_id=organization_id,
+            user_id=user_id,
             entity_type=entity_type,
             file=file,
             skip_duplicates=skip_dups,

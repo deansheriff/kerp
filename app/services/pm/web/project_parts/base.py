@@ -249,7 +249,7 @@ def _template_tasks_payload(db: Session, template_id):
         ).all()
     )
 
-    deps_map = {}
+    deps_map: dict[object, list[object]] = {}
     for dep in deps:
         deps_map.setdefault(dep.template_task_id, []).append(
             dep.depends_on_template_task_id

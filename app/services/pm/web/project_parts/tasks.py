@@ -237,7 +237,7 @@ def project_tasks(
 
     # Compute subtask counts for each parent task
     tasks = result.items
-    subtask_counts = {}
+    subtask_counts: dict[str, int] = {}
     for task in tasks:
         if task.parent_task_id:
             parent_id = str(task.parent_task_id)
