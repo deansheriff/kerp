@@ -255,45 +255,6 @@ async def create_approver_limit(
 
 
 @router.post(
-    "/limits/approvers/{approver_limit_id}/adjust-budget",
-    response_class=HTMLResponse,
-)
-async def adjust_approver_budget(
-    request: Request,
-    approver_limit_id: UUID,
-    auth: WebAuthContext = Depends(_require_policies_manage),
-    db: Session = Depends(get_db),
-):
-    """Create a budget adjustment for a specific month."""
-    return await expense_limit_web_service.adjust_budget_response(
-        request=request,
-        approver_limit_id=approver_limit_id,
-        auth=auth,
-        db=db,
-    )
-
-
-@router.post(
-    "/limits/approvers/{approver_limit_id}/adjustments/{adjustment_id}/delete",
-    response_class=HTMLResponse,
-)
-async def delete_budget_adjustment(
-    request: Request,
-    approver_limit_id: UUID,
-    adjustment_id: UUID,
-    auth: WebAuthContext = Depends(_require_policies_manage),
-    db: Session = Depends(get_db),
-):
-    """Delete a budget adjustment."""
-    return expense_limit_web_service.delete_budget_adjustment_response(
-        approver_limit_id=approver_limit_id,
-        adjustment_id=adjustment_id,
-        auth=auth,
-        db=db,
-    )
-
-
-@router.post(
     "/limits/approvers/{approver_limit_id}/delete", response_class=HTMLResponse
 )
 async def delete_approver_limit(

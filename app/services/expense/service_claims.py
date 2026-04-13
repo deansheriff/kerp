@@ -923,23 +923,6 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             )
             raise ApproverAuthorityError(claim_amount, max_amount)
 
-    def _validate_approver_monthly_budget(
-        self,
-        org_id: UUID,
-        claim: ExpenseClaim,
-        approver_id: UUID,
-        *,
-        expense_date: date | None = None,
-    ) -> None:
-        from app.services.expense.limit_service import ExpenseLimitService
-
-        ExpenseLimitService(self.db, self.ctx).check_approver_monthly_budget(
-            org_id,
-            approver_id,
-            claim.total_approved_amount or claim.total_claimed_amount or Decimal("0"),
-            expense_date or claim.claim_date or date.today(),
-        )
-
     def _validate_approver_weekly_budget(
         self,
         org_id: UUID,
@@ -1196,12 +1179,6 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                     payment_date or date.today(),
                     datetime.min.time(),
                     tzinfo=UTC,
-                )
-                self._validate_approver_monthly_budget(
-                    org_id,
-                    claim,
-                    claim.approver_id,
-                    expense_date=payment_as_of.date(),
                 )
                 self._validate_approver_weekly_budget(
                     org_id,

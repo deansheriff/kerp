@@ -43,7 +43,6 @@ from app.models.expense.expense_claim_action import (
     ExpenseClaimActionStatus,
     ExpenseClaimActionType,
 )
-from app.models.expense.limit_rule import ExpenseApproverBudgetAdjustment
 from app.services.common import PaginatedResult, PaginationParams
 from app.services.expense.service_common import ExpenseServiceBase
 
@@ -88,28 +87,6 @@ class ExpenseLimitExceededError(ExpenseLimitServiceError):
     def __init__(self, message: str, rule: ExpenseLimitRule):
         self.rule = rule
         super().__init__(message)
-
-
-class ApproverBudgetExhaustedError(ExpenseLimitServiceError):
-    """Approver's monthly approval budget is exhausted."""
-
-    def __init__(
-        self,
-        budget: Decimal,
-        used: Decimal,
-        claim_amount: Decimal,
-        expense_month: str,
-    ):
-        self.budget = budget
-        self.used = used
-        self.claim_amount = claim_amount
-        self.expense_month = expense_month
-        remaining = budget - used
-        super().__init__(
-            f"Monthly approval budget for {expense_month} exhausted. "
-            f"Budget: {budget:,.2f}, Used: {used:,.2f}, "
-            f"Remaining: {remaining:,.2f}, Claim: {claim_amount:,.2f}."
-        )
 
 
 class ApproverWeeklyBudgetExhaustedError(ExpenseLimitServiceError):
@@ -376,7 +353,6 @@ class ExpenseLimitService(ExpenseServiceBase):
         max_approval_amount: Decimal,
         scope_id: UUID | None = None,
         weekly_approval_budget: Decimal | None = None,
-        monthly_approval_budget: Decimal | None = None,
         currency_code: str | None = None,
         dimension_filters: dict | None = None,
         escalate_to_employee_id: UUID | None = None,
@@ -392,7 +368,6 @@ class ExpenseLimitService(ExpenseServiceBase):
             scope_id=scope_id,
             max_approval_amount=max_approval_amount,
             weekly_approval_budget=weekly_approval_budget,
-            monthly_approval_budget=monthly_approval_budget,
             currency_code=resolved_currency_code,
             dimension_filters=dimension_filters or {},
             escalate_to_employee_id=escalate_to_employee_id,
@@ -426,123 +401,6 @@ class ExpenseLimitService(ExpenseServiceBase):
         limit = self.get_approver_limit(org_id, approver_limit_id)
         self.db.delete(limit)
         self.db.flush()
-
-    # =========================================================================
-    # Budget Adjustments
-    # =========================================================================
-
-    def create_budget_adjustment(
-        self,
-        org_id: UUID,
-        approver_limit_id: UUID,
-        *,
-        month: date,
-        additional_amount: Decimal,
-        reason: str,
-        adjusted_by_id: UUID,
-    ) -> ExpenseApproverBudgetAdjustment:
-        """Create a one-time additive budget adjustment for a specific month.
-
-        Args:
-            org_id: Organization ID
-            approver_limit_id: The approver limit to adjust
-            month: Target month (will be normalized to 1st of month)
-            additional_amount: Amount to add to the base budget
-            reason: Audit trail explanation (required)
-            adjusted_by_id: Person ID of who made the adjustment
-
-        Raises:
-            ValueError: If adjustment already exists for this limit+month,
-                        or if the approver limit doesn't exist
-        """
-        # Validate the parent limit exists and belongs to org
-        self.get_approver_limit(org_id, approver_limit_id)
-
-        # Normalize to first of month
-        adjustment_month = month.replace(day=1)
-
-        # Check for duplicate
-        existing = self.db.scalar(
-            select(ExpenseApproverBudgetAdjustment).where(
-                ExpenseApproverBudgetAdjustment.approver_limit_id == approver_limit_id,
-                ExpenseApproverBudgetAdjustment.adjustment_month == adjustment_month,
-            )
-        )
-        if existing:
-            month_label = adjustment_month.strftime("%B %Y")
-            raise ValueError(
-                f"An adjustment already exists for {month_label}. "
-                "Delete the existing adjustment first."
-            )
-
-        adjustment = ExpenseApproverBudgetAdjustment(
-            organization_id=org_id,
-            approver_limit_id=approver_limit_id,
-            adjustment_month=adjustment_month,
-            additional_amount=additional_amount,
-            reason=reason,
-            adjusted_by_id=adjusted_by_id,
-        )
-        self.db.add(adjustment)
-        self.db.flush()
-        logger.info(
-            "Created budget adjustment %s for limit %s month %s: %s",
-            adjustment.adjustment_id,
-            approver_limit_id,
-            adjustment_month,
-            additional_amount,
-        )
-        return adjustment
-
-    def list_budget_adjustments(
-        self,
-        org_id: UUID,
-        approver_limit_id: UUID,
-    ) -> list[ExpenseApproverBudgetAdjustment]:
-        """List all budget adjustments for an approver limit."""
-        return list(
-            self.db.scalars(
-                select(ExpenseApproverBudgetAdjustment)
-                .where(
-                    ExpenseApproverBudgetAdjustment.organization_id == org_id,
-                    ExpenseApproverBudgetAdjustment.approver_limit_id
-                    == approver_limit_id,
-                )
-                .order_by(ExpenseApproverBudgetAdjustment.adjustment_month.desc())
-            ).all()
-        )
-
-    def delete_budget_adjustment(self, org_id: UUID, adjustment_id: UUID) -> None:
-        """Delete a budget adjustment."""
-        adjustment = self.db.scalar(
-            select(ExpenseApproverBudgetAdjustment).where(
-                ExpenseApproverBudgetAdjustment.adjustment_id == adjustment_id,
-                ExpenseApproverBudgetAdjustment.organization_id == org_id,
-            )
-        )
-        if not adjustment:
-            raise ValueError(f"Budget adjustment {adjustment_id} not found")
-        self.db.delete(adjustment)
-        self.db.flush()
-        logger.info("Deleted budget adjustment %s", adjustment_id)
-
-    def get_budget_adjustment_for_month(
-        self,
-        approver_limit_id: UUID,
-        month: date,
-    ) -> Decimal:
-        """Get the adjustment amount for a specific limit+month.
-
-        Returns Decimal("0") if no adjustment exists.
-        """
-        month_start = month.replace(day=1)
-        amount = self.db.scalar(
-            select(ExpenseApproverBudgetAdjustment.additional_amount).where(
-                ExpenseApproverBudgetAdjustment.approver_limit_id == approver_limit_id,
-                ExpenseApproverBudgetAdjustment.adjustment_month == month_start,
-            )
-        )
-        return amount if amount is not None else Decimal("0")
 
     # =========================================================================
     # Weekly Budget Resets
@@ -1561,124 +1419,6 @@ class ExpenseLimitService(ExpenseServiceBase):
         ).first()
         if role_row is not None:
             return role_row[0], role_row[1]
-
-        return None
-
-    # Legacy monthly budget logic intentionally preserved for compatibility.
-    def check_approver_monthly_budget(
-        self,
-        org_id: UUID,
-        approver_id: UUID,
-        claim_amount: Decimal,
-        expense_date: date,
-    ) -> None:
-        """Check if approver has remaining monthly budget for the expense month."""
-        from app.models.people.hr.employee import Employee
-
-        approver = self.db.get(Employee, approver_id)
-        if not approver:
-            return  # Unknown approver — skip
-
-        budget_info = self._get_approver_monthly_budget(org_id, approver)
-        if budget_info is None:
-            return  # No monthly budget configured — unlimited
-
-        budget, limit_id = budget_info
-
-        # Calculate period bounds for the expense month
-        month_start = expense_date.replace(day=1)
-        if month_start.month == 12:
-            next_month = date(month_start.year + 1, 1, 1)
-        else:
-            next_month = date(month_start.year, month_start.month + 1, 1)
-
-        # Apply any one-time budget adjustment for this month
-        adjustment = self.get_budget_adjustment_for_month(limit_id, expense_date)
-        effective_budget = budget + adjustment
-
-        # Sum already-paid claims for this approver in the payment month.
-        used = self.db.scalar(
-            select(
-                func.coalesce(
-                    func.sum(ExpenseClaim.total_approved_amount), Decimal("0")
-                )
-            ).where(
-                ExpenseClaim.organization_id == org_id,
-                ExpenseClaim.approver_id == approver_id,
-                ExpenseClaim.status == ExpenseClaimStatus.PAID,
-                ExpenseClaim.paid_on.isnot(None),
-                ExpenseClaim.paid_on >= month_start,
-                ExpenseClaim.paid_on < next_month,
-            )
-        ) or Decimal("0")
-
-        if used + claim_amount > effective_budget:
-            expense_month_label = expense_date.strftime("%B %Y")
-            raise ApproverBudgetExhaustedError(
-                budget=effective_budget,
-                used=used,
-                claim_amount=claim_amount,
-                expense_month=expense_month_label,
-            )
-
-    def _get_approver_monthly_budget(
-        self,
-        org_id: UUID,
-        employee: Employee,
-    ) -> tuple[Decimal, UUID] | None:
-        """Get the monthly approval budget for an employee.
-
-        Checks in priority order: employee-specific -> grade -> designation.
-        """
-        # Employee-specific limit
-        emp_row = self.db.execute(
-            select(
-                ExpenseApproverLimit.monthly_approval_budget,
-                ExpenseApproverLimit.approver_limit_id,
-            ).where(
-                ExpenseApproverLimit.organization_id == org_id,
-                ExpenseApproverLimit.is_active == True,
-                ExpenseApproverLimit.scope_type == "EMPLOYEE",
-                ExpenseApproverLimit.scope_id == employee.employee_id,
-                ExpenseApproverLimit.monthly_approval_budget.isnot(None),
-            )
-        ).first()
-        if emp_row is not None:
-            return emp_row[0], emp_row[1]
-
-        # Grade-based limit
-        if employee.grade_id:
-            grade_row = self.db.execute(
-                select(
-                    ExpenseApproverLimit.monthly_approval_budget,
-                    ExpenseApproverLimit.approver_limit_id,
-                ).where(
-                    ExpenseApproverLimit.organization_id == org_id,
-                    ExpenseApproverLimit.is_active == True,
-                    ExpenseApproverLimit.scope_type == "GRADE",
-                    ExpenseApproverLimit.scope_id == employee.grade_id,
-                    ExpenseApproverLimit.monthly_approval_budget.isnot(None),
-                )
-            ).first()
-            if grade_row is not None:
-                return grade_row[0], grade_row[1]
-
-        # Designation-based limit
-        if employee.designation_id:
-            desig_row = self.db.execute(
-                select(
-                    ExpenseApproverLimit.monthly_approval_budget,
-                    ExpenseApproverLimit.approver_limit_id,
-                ).where(
-                    ExpenseApproverLimit.organization_id == org_id,
-                    ExpenseApproverLimit.is_active == True,
-                    ExpenseApproverLimit.scope_type == "DESIGNATION",
-                    ExpenseApproverLimit.scope_id == employee.designation_id,
-                    ExpenseApproverLimit.monthly_approval_budget.isnot(None),
-                )
-            ).first()
-            if desig_row is not None:
-                return desig_row[0], desig_row[1]
 
         return None
 

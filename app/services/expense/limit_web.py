@@ -593,9 +593,6 @@ class ExpenseLimitWebService:
             max_items=100,
         )
 
-        # Budget adjustments
-        adjustments = service.list_budget_adjustments(org_id, approver_limit_id)
-
         # Current week usage stats
         current_week_usage = self._build_current_week_usage(db, org_id, limit, service)
 
@@ -606,7 +603,6 @@ class ExpenseLimitWebService:
                 "scope_label": scope_label,
                 "scoped_approvers": scoped_employees,
                 "scoped_approvers_truncated": is_truncated,
-                "adjustments": adjustments,
                 "current_week_usage": current_week_usage,
             }
         )
@@ -685,8 +681,6 @@ class ExpenseLimitWebService:
         scope_id = self._get_approver_scope_id(form, scope_type)
         max_approval_amount = _safe_form_text(form.get("max_approval_amount"))
         weekly_approval_budget = _safe_form_text(form.get("weekly_approval_budget"))
-        # Legacy monthly field intentionally disabled.
-        # monthly_approval_budget = _safe_form_text(form.get("monthly_approval_budget"))
         can_approve_own = _safe_form_text(form.get("can_approve_own_expenses")) in {
             "1",
             "true",
@@ -796,8 +790,6 @@ class ExpenseLimitWebService:
         scope_id = _safe_form_text(form.get("scope_id"))
         max_approval_amount = _safe_form_text(form.get("max_approval_amount"))
         weekly_approval_budget = _safe_form_text(form.get("weekly_approval_budget"))
-        # Legacy monthly field intentionally disabled.
-        # monthly_approval_budget = _safe_form_text(form.get("monthly_approval_budget"))
         can_approve_own = _safe_form_text(form.get("can_approve_own_expenses")) in {
             "1",
             "true",
@@ -890,115 +882,6 @@ class ExpenseLimitWebService:
             )
             return templates.TemplateResponse(
                 request, "expense/limits/approver_form.html", context
-            )
-
-    async def adjust_budget_response(
-        self,
-        request: Request,
-        approver_limit_id: UUID,
-        auth: WebAuthContext,
-        db: Session,
-    ) -> RedirectResponse:
-        """Create a budget adjustment for a specific month."""
-        org_id = coerce_uuid(auth.organization_id)
-        service = ExpenseLimitService(db)
-
-        form = getattr(request.state, "csrf_form", None)
-        if form is None:
-            form = await request.form()
-
-        month_str = _safe_form_text(form.get("adjustment_month"))
-        amount_str = _safe_form_text(form.get("additional_amount"))
-        reason = _safe_form_text(form.get("reason"))
-
-        detail_url = f"/expense/limits/approvers/{approver_limit_id}"
-
-        # Validate
-        errors: list[str] = []
-        month_date: date | None = None
-        if month_str:
-            try:
-                # <input type="month"> sends "YYYY-MM"; normalise to 1st
-                if len(month_str) == 7 and month_str[4] == "-":
-                    month_date = date.fromisoformat(month_str + "-01")
-                else:
-                    month_date = date.fromisoformat(month_str)
-            except ValueError:
-                errors.append("Invalid month")
-        else:
-            errors.append("Month is required")
-
-        amount_value: Decimal | None = None
-        if amount_str:
-            try:
-                amount_value = Decimal(amount_str)
-                if amount_value == Decimal("0"):
-                    errors.append("Amount must not be zero")
-            except (ValueError, ArithmeticError):
-                errors.append("Invalid amount")
-        else:
-            errors.append("Amount is required")
-
-        if not reason:
-            errors.append("Reason is required")
-
-        if errors:
-            error_msg = "; ".join(errors)
-            return RedirectResponse(
-                url=f"{detail_url}?error={error_msg}",
-                status_code=303,
-            )
-
-        try:
-            if month_date is None or amount_value is None:
-                raise ValueError("Missing required form values")
-            service.create_budget_adjustment(
-                org_id,
-                approver_limit_id,
-                month=month_date,
-                additional_amount=amount_value,
-                reason=reason,
-                adjusted_by_id=coerce_uuid(auth.person_id),
-            )
-            db.commit()
-            return RedirectResponse(
-                url=f"{detail_url}?success=Budget+adjustment+saved",
-                status_code=303,
-            )
-        except Exception as e:
-            db.rollback()
-            logger.exception("Failed to create budget adjustment")
-            return RedirectResponse(
-                url=f"{detail_url}?error={e}",
-                status_code=303,
-            )
-
-    def delete_budget_adjustment_response(
-        self,
-        approver_limit_id: UUID,
-        adjustment_id: UUID,
-        auth: WebAuthContext,
-        db: Session,
-    ) -> RedirectResponse:
-        """Delete a budget adjustment."""
-        org_id = coerce_uuid(auth.organization_id)
-        service = ExpenseLimitService(db)
-
-        detail_url = f"/expense/limits/approvers/{approver_limit_id}"
-
-        try:
-            service.delete_budget_adjustment(org_id, adjustment_id)
-            db.commit()
-            return RedirectResponse(
-                url=f"{detail_url}?success=Adjustment+deleted",
-                status_code=303,
-            )
-        except Exception as e:
-            db.rollback()
-            logger.exception("Failed to delete budget adjustment")
-            return RedirectResponse(
-                url=f"{detail_url}?error={e}",
-                status_code=303,
             )
 
     def delete_approver_limit_response(

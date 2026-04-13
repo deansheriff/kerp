@@ -938,18 +938,13 @@ class PaymentService:
                     detail=f"Cannot initiate transfer - claim status is '{locked_claim.status.value}'",
                 )
 
-            # Pre-check approver budgets BEFORE calling Paystack.
+            # Pre-check approver budget BEFORE calling Paystack.
             # Once the transfer is initiated, the money leaves the account
             # and cannot be recalled by a budget check failure.
             if locked_claim.approver_id is not None:
                 from app.services.expense.expense_service import ExpenseService
 
                 expense_svc = ExpenseService(self.db)
-                expense_svc._validate_approver_monthly_budget(
-                    self.organization_id,
-                    locked_claim,
-                    locked_claim.approver_id,
-                )
                 expense_svc._validate_approver_weekly_budget(
                     self.organization_id,
                     locked_claim,

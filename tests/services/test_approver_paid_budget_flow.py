@@ -65,7 +65,6 @@ def test_mark_paid_validates_budget_using_paid_event():
     svc._set_action_status = MagicMock()
 
     with (
-        patch.object(svc, "_validate_approver_monthly_budget") as mock_monthly_budget,
         patch.object(svc, "_validate_approver_weekly_budget") as mock_weekly_budget,
     ):
         svc.mark_paid(
@@ -76,12 +75,6 @@ def test_mark_paid_validates_budget_using_paid_event():
             send_notification=False,
         )
 
-    mock_monthly_budget.assert_called_once_with(
-        org_id,
-        claim,
-        approver_id,
-        expense_date=date(2026, 4, 10),
-    )
     _, _, weekly_approver_id = mock_weekly_budget.call_args.args
     assert weekly_approver_id == approver_id
     assert mock_weekly_budget.call_args.kwargs["approval_at"].date() == date(
