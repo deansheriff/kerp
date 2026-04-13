@@ -77,31 +77,39 @@ class ExpenseServiceError(Exception):
     """Base error for expense service."""
 
 
-class ExpenseCategoryNotFoundError(ExpenseServiceError):
+class ExpenseNotFoundError(ExpenseServiceError):
+    """Base for expense domain resources that can't be located.
+
+    A FastAPI exception handler in ``app.errors`` translates this to HTTP 404
+    so routes don't need per-call-site try/except blocks.
+    """
+
+
+class ExpenseCategoryNotFoundError(ExpenseNotFoundError):
     def __init__(self, category_id: UUID):
         self.category_id = category_id
         super().__init__(f"Expense category {category_id} not found")
 
 
-class ExpenseClaimNotFoundError(ExpenseServiceError):
+class ExpenseClaimNotFoundError(ExpenseNotFoundError):
     def __init__(self, claim_id: UUID):
         self.claim_id = claim_id
         super().__init__(f"Expense claim {claim_id} not found")
 
 
-class CashAdvanceNotFoundError(ExpenseServiceError):
+class CashAdvanceNotFoundError(ExpenseNotFoundError):
     def __init__(self, advance_id: UUID):
         self.advance_id = advance_id
         super().__init__(f"Cash advance {advance_id} not found")
 
 
-class CorporateCardNotFoundError(ExpenseServiceError):
+class CorporateCardNotFoundError(ExpenseNotFoundError):
     def __init__(self, card_id: UUID):
         self.card_id = card_id
         super().__init__(f"Corporate card {card_id} not found")
 
 
-class CardTransactionNotFoundError(ExpenseServiceError):
+class CardTransactionNotFoundError(ExpenseNotFoundError):
     def __init__(self, transaction_id: UUID):
         self.transaction_id = transaction_id
         super().__init__(f"Card transaction {transaction_id} not found")

@@ -430,6 +430,31 @@ def register_error_handlers(app) -> None:
             headers={"Retry-After": str(exc.retry_after)},
         )
 
+    from app.services.expense.service_common import ExpenseNotFoundError
+
+    @app.exception_handler(ExpenseNotFoundError)
+    async def expense_not_found_error_handler(
+        request: Request, exc: ExpenseNotFoundError
+    ):
+        """Handle expense domain not-found errors (404)."""
+        logger.warning(
+            "Expense resource not found on %s %s: %s",
+            request.method,
+            request.url.path,
+            exc,
+        )
+        if _is_html_request(request):
+            return templates.TemplateResponse(
+                request,
+                "errors/404.html",
+                {},
+                status_code=404,
+            )
+        return JSONResponse(
+            status_code=404,
+            content=_error_payload("not_found", str(exc), None),
+        )
+
     @app.exception_handler(LeaveServiceError)
     async def leave_service_error_handler(request: Request, exc: LeaveServiceError):
         """Handle leave service validation/overlap errors (409)."""
