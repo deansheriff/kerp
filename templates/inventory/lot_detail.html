@@ -14,19 +14,25 @@
 {% endblock %}
 
 {% block header_actions %}
-<form method="post" action="/inventory/lots/{{ lot.lot_id }}/toggle-quarantine"
-      onsubmit="return confirm('{{ 'Release all warehouse balances from quarantine?' if lot.is_quarantined else 'Place all warehouse balances in quarantine?' }}');">
-    {{ request.state.csrf_form | safe }}
-    <button type="submit" class="btn btn-secondary {{ 'text-emerald-600 hover:text-emerald-700' if lot.is_quarantined else 'text-amber-600 hover:text-amber-700' }}">
-        {% if lot.is_quarantined %}
-        {{ icon_svg("check-circle", "h-4 w-4 mr-2") }}
-        Release
-        {% else %}
-        {{ icon_svg("warning", "h-4 w-4 mr-2") }}
-        Quarantine
-        {% endif %}
-    </button>
-</form>
+<div class="flex items-center gap-3">
+    <a href="/inventory/serials?lot={{ lot.lot_id }}" class="btn btn-ghost">
+        {{ icon_svg("ticket", "h-4 w-4 mr-2") }}
+        View Serials
+    </a>
+    <form method="post" action="/inventory/lots/{{ lot.lot_id }}/toggle-quarantine"
+          onsubmit="return confirm('{{ 'Release all warehouse balances from quarantine?' if lot.is_quarantined else 'Place all warehouse balances in quarantine?' }}');">
+        {{ request.state.csrf_form | safe }}
+        <button type="submit" class="btn btn-secondary {{ 'text-emerald-600 hover:text-emerald-700' if lot.is_quarantined else 'text-amber-600 hover:text-amber-700' }}">
+            {% if lot.is_quarantined %}
+            {{ icon_svg("check-circle", "h-4 w-4 mr-2") }}
+            Release
+            {% else %}
+            {{ icon_svg("warning", "h-4 w-4 mr-2") }}
+            Quarantine
+            {% endif %}
+        </button>
+    </form>
+</div>
 {% endblock %}
 
 {% block content %}

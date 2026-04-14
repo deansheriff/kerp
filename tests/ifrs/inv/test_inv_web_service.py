@@ -405,12 +405,112 @@ class TestInvTransactionWebService:
                 notes=None,
                 lot_number="LOT-APR-001",
                 db=mock_db,
+                lot_service_start_date="2026-04-01",
+                lot_service_end_date="2027-03-31",
+                lot_provider_reference="CIRCUIT-12345",
+                lot_document_reference="SLA-987",
             )
 
         txn_input = mock_create_receipt.call_args.args[2]
         assert txn_input.lot_number == "LOT-APR-001"
+        assert txn_input.lot_manufacture_date == date(2026, 4, 1)
+        assert txn_input.lot_expiry_date == date(2027, 3, 31)
+        assert txn_input.lot_supplier_lot_number == "CIRCUIT-12345"
+        assert txn_input.lot_certificate_of_analysis == "SLA-987"
         assert txn_input.lot_id is None
         assert response.status_code == 303
+
+    def test_create_transaction_response_auto_generates_receipt_serials(self):
+        """Receipt adapter should generate serials when auto-generate is selected."""
+        from app.services.inventory.web import InventoryTransactionWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        warehouse_id = uuid.uuid4()
+        fiscal_period_id = uuid.uuid4()
+
+        mock_auth = MagicMock()
+        mock_auth.organization_id = org_id
+        mock_auth.user_id = user_id
+
+        mock_item = MagicMock()
+        mock_item.organization_id = org_id
+        mock_item.item_code = "LAPTOP"
+
+        mock_db = MagicMock()
+        mock_db.get.return_value = mock_item
+        mock_fiscal_period = MagicMock()
+        mock_fiscal_period.fiscal_period_id = fiscal_period_id
+        mock_db.scalars.return_value.first.return_value = mock_fiscal_period
+
+        with (
+            patch(
+                "app.services.inventory.web._generate_receipt_serial_numbers",
+                return_value=["LAPTOP-20260410-0001", "LAPTOP-20260410-0002"],
+            ) as mock_generate,
+            patch(
+                "app.services.inventory.transaction.InventoryTransactionService.create_receipt"
+            ) as mock_create_receipt,
+        ):
+            response = InventoryTransactionWebService.create_transaction_response(
+                request=MagicMock(),
+                auth=mock_auth,
+                transaction_type="RECEIPT",
+                item_id=str(item_id),
+                warehouse_id=str(warehouse_id),
+                quantity="2",
+                unit_cost="10",
+                transaction_date="2026-04-10",
+                reference="REF-1",
+                notes=None,
+                lot_number=None,
+                db=mock_db,
+                serial_auto_generate=True,
+                serial_prefix="LAPTOP",
+            )
+
+        mock_generate.assert_called_once()
+        txn_input = mock_create_receipt.call_args.args[2]
+        assert txn_input.serial_numbers == [
+            "LAPTOP-20260410-0001",
+            "LAPTOP-20260410-0002",
+        ]
+        assert response.status_code == 303
+
+    def test_create_transaction_response_rejects_manual_and_auto_serials(self):
+        """Receipt adapter should not accept manual serials and auto-generation together."""
+        from app.services.inventory.web import InventoryTransactionWebService
+
+        mock_auth = MagicMock()
+        mock_auth.organization_id = uuid.uuid4()
+        mock_auth.user_id = uuid.uuid4()
+
+        with patch(
+            "app.services.inventory.transaction.InventoryTransactionService.create_receipt"
+        ) as mock_create_receipt:
+            response = InventoryTransactionWebService.create_transaction_response(
+                request=MagicMock(),
+                auth=mock_auth,
+                transaction_type="RECEIPT",
+                item_id=str(uuid.uuid4()),
+                warehouse_id=str(uuid.uuid4()),
+                quantity="2",
+                unit_cost="10",
+                transaction_date="2026-04-10",
+                reference="REF-1",
+                notes=None,
+                lot_number=None,
+                db=MagicMock(),
+                serial_numbers="SN-001\nSN-002",
+                serial_auto_generate=True,
+            )
+
+        mock_create_receipt.assert_not_called()
+        assert response.status_code == 303
+        assert (
+            "Use%20either%20manual%20serial%20numbers" in response.headers["location"]
+        )
 
     def test_create_transaction_response_resolves_issue_lot_number_to_lot_id(self):
         """Issue adapter should resolve a lot number to a warehouse-scoped lot id."""

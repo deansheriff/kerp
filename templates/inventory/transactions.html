@@ -1,11 +1,31 @@
 {% extends "inventory/base_inventory.html" %}
-{% from "components/macros.html" import empty_state %}
+{% from "components/macros.html" import empty_state, icon_svg %}
 
 {% block page_title %}Inventory Transactions{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    <p class="text-sm text-slate-500 dark:text-slate-400">Track stock movements and adjustments</p>
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <p class="text-sm text-slate-500 dark:text-slate-400">Track stock movements and adjustments</p>
+        <div class="flex flex-wrap gap-2">
+            <a href="/inventory/transactions/receipt/new" class="btn btn-primary">
+                {{ icon_svg("plus", "h-4 w-4 mr-2") }}
+                New Receipt
+            </a>
+            <a href="/inventory/transactions/issue/new" class="btn btn-secondary">
+                {{ icon_svg("minus", "h-4 w-4 mr-2") }}
+                New Issue
+            </a>
+            <a href="/inventory/transactions/transfer/new" class="btn btn-secondary">
+                {{ icon_svg("switch-horizontal", "h-4 w-4 mr-2") }}
+                New Transfer
+            </a>
+            <a href="/inventory/transactions/adjustment/new" class="btn btn-secondary">
+                {{ icon_svg("calculator", "h-4 w-4 mr-2") }}
+                New Adjustment
+            </a>
+        </div>
+    </div>
 
     {% if transactions %}
     <div class="card">

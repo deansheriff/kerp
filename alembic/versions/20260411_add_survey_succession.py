@@ -22,6 +22,50 @@ depends_on = None
 
 def upgrade() -> None:
     bind = op.get_bind()
+    # Some staging databases were created from early HR scripts that left
+    # department/designation ids without primary-key constraints. The columns
+    # are still unique and non-null, so add the missing constraints before this
+    # migration creates foreign keys to them.
+    op.execute("""
+    DO $$
+    BEGIN
+        IF to_regclass('hr.department') IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM pg_constraint
+               WHERE conrelid = 'hr.department'::regclass
+                 AND contype = 'p'
+           )
+           AND NOT EXISTS (
+               SELECT department_id
+               FROM hr.department
+               GROUP BY department_id
+               HAVING department_id IS NULL OR count(*) > 1
+           )
+        THEN
+            ALTER TABLE hr.department
+            ADD CONSTRAINT department_pkey PRIMARY KEY (department_id);
+        END IF;
+
+        IF to_regclass('hr.designation') IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM pg_constraint
+               WHERE conrelid = 'hr.designation'::regclass
+                 AND contype = 'p'
+           )
+           AND NOT EXISTS (
+               SELECT designation_id
+               FROM hr.designation
+               GROUP BY designation_id
+               HAVING designation_id IS NULL OR count(*) > 1
+           )
+        THEN
+            ALTER TABLE hr.designation
+            ADD CONSTRAINT designation_pkey PRIMARY KEY (designation_id);
+        END IF;
+    END $$;
+    """)
 
     # ------------------------------------------------------------------
     # Enum types (idempotent via ensure_enum)

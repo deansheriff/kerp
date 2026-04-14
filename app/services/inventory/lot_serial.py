@@ -249,9 +249,7 @@ class LotSerialService(ListResponseMixin):
 
         balances = LotSerialService._get_lot_balances(db, lot)
 
-        if any(balance.is_quarantined for balance in balances) or (
-            not balances and getattr(lot, "is_quarantined", False)
-        ):
+        if any(balance.is_quarantined for balance in balances):
             raise HTTPException(
                 status_code=400, detail=f"Lot {lot.lot_number} is quarantined"
             )
@@ -259,8 +257,6 @@ class LotSerialService(ListResponseMixin):
         total_available = sum(
             (balance.quantity_available or Decimal("0")) for balance in balances
         )
-        if not balances and LotSerialService._is_mock_like(db):
-            total_available = lot.quantity_available
 
         if quantity_value > total_available:
             raise HTTPException(
@@ -286,9 +282,6 @@ class LotSerialService(ListResponseMixin):
                     balance.quantity_allocated or Decimal("0")
                 )
                 remaining -= allocate_qty
-        else:
-            lot.quantity_allocated += quantity_value
-            lot.quantity_available = lot.quantity_on_hand - lot.quantity_allocated
 
         if reference:
             lot.allocation_reference = reference
@@ -346,8 +339,6 @@ class LotSerialService(ListResponseMixin):
         total_allocated = sum(
             (balance.quantity_allocated or Decimal("0")) for balance in balances
         )
-        if not balances and LotSerialService._is_mock_like(db):
-            total_allocated = lot.quantity_allocated
 
         if quantity_value > total_allocated:
             quantity_value = Decimal(str(total_allocated))
@@ -366,9 +357,6 @@ class LotSerialService(ListResponseMixin):
                     balance.quantity_allocated or Decimal("0")
                 )
                 remaining -= release_qty
-        else:
-            lot.quantity_allocated -= quantity_value
-            lot.quantity_available = lot.quantity_on_hand - lot.quantity_allocated
 
         LotSerialService._sync_legacy_lot_snapshot(db, lot)
 
@@ -424,8 +412,6 @@ class LotSerialService(ListResponseMixin):
         total_on_hand = sum(
             (balance.quantity_on_hand or Decimal("0")) for balance in balances
         )
-        if not balances and LotSerialService._is_mock_like(db):
-            total_on_hand = lot.quantity_on_hand
 
         if quantity_value > total_on_hand:
             raise HTTPException(
@@ -453,18 +439,6 @@ class LotSerialService(ListResponseMixin):
                 )
                 remaining -= consume_qty
             LotSerialService._sync_legacy_lot_snapshot(db, lot)
-        else:
-            lot.quantity_on_hand -= quantity_value
-
-            # Also reduce allocated if necessary
-            if lot.quantity_allocated > lot.quantity_on_hand:
-                lot.quantity_allocated = lot.quantity_on_hand
-
-            lot.quantity_available = lot.quantity_on_hand - lot.quantity_allocated
-
-            # Deactivate if depleted
-            if lot.quantity_on_hand <= 0:
-                lot.is_active = False
 
         db.flush()
 
@@ -517,10 +491,6 @@ class LotSerialService(ListResponseMixin):
                 balance.quarantine_reason = reason
                 balance.quantity_available = Decimal("0")
             LotSerialService._sync_legacy_lot_snapshot(db, lot)
-        else:
-            lot.is_quarantined = True
-            lot.quarantine_reason = reason
-            lot.quantity_available = Decimal("0")
 
         db.flush()
 
@@ -584,11 +554,6 @@ class LotSerialService(ListResponseMixin):
                     balance.quantity_allocated or Decimal("0")
                 )
             LotSerialService._sync_legacy_lot_snapshot(db, lot)
-        else:
-            lot.is_quarantined = False
-            lot.quarantine_reason = None
-            lot.qc_status = qc_status
-            lot.quantity_available = lot.quantity_on_hand - lot.quantity_allocated
 
         db.flush()
 
@@ -619,17 +584,19 @@ class LotSerialService(ListResponseMixin):
         return list(
             db.scalars(
                 select(InventoryLot)
-                .join(
-                    InventoryLotBalance,
-                    InventoryLotBalance.lot_id == InventoryLot.lot_id,
-                )
                 .join(Item, InventoryLot.item_id == Item.item_id)
                 .where(Item.organization_id == org_id)
                 .where(InventoryLot.expiry_date <= cutoff_date)
                 .where(InventoryLot.expiry_date >= date.today())
-                .where(InventoryLotBalance.quantity_on_hand > 0)
+                .where(
+                    select(InventoryLotBalance.lot_balance_id)
+                    .where(
+                        InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                        InventoryLotBalance.quantity_on_hand > 0,
+                    )
+                    .exists()
+                )
                 .where(InventoryLot.is_active.is_(True))
-                .group_by(InventoryLot.lot_id)
                 .order_by(InventoryLot.expiry_date.asc())
             ).all()
         )
@@ -654,16 +621,18 @@ class LotSerialService(ListResponseMixin):
         return list(
             db.scalars(
                 select(InventoryLot)
-                .join(
-                    InventoryLotBalance,
-                    InventoryLotBalance.lot_id == InventoryLot.lot_id,
-                )
                 .join(Item, InventoryLot.item_id == Item.item_id)
                 .where(Item.organization_id == org_id)
                 .where(InventoryLot.expiry_date < date.today())
-                .where(InventoryLotBalance.quantity_on_hand > 0)
+                .where(
+                    select(InventoryLotBalance.lot_balance_id)
+                    .where(
+                        InventoryLotBalance.lot_id == InventoryLot.lot_id,
+                        InventoryLotBalance.quantity_on_hand > 0,
+                    )
+                    .exists()
+                )
                 .where(InventoryLot.is_active.is_(True))
-                .group_by(InventoryLot.lot_id)
                 .order_by(InventoryLot.expiry_date.asc())
             ).all()
         )
@@ -708,14 +677,20 @@ class LotSerialService(ListResponseMixin):
 
         item = db.get(Item, lot.item_id)
 
-        total_remaining = (
-            db.scalar(
+        if LotSerialService._is_mock_like(db):
+            total_remaining = sum(
+                (
+                    balance.quantity_on_hand or Decimal("0")
+                    for balance in LotSerialService._get_lot_balances(db, lot)
+                ),
+                Decimal("0"),
+            )
+        else:
+            total_remaining = db.scalar(
                 select(func.sum(InventoryLotBalance.quantity_on_hand)).where(
                     InventoryLotBalance.lot_id == lot.lot_id
                 )
-            )
-            or lot.quantity_on_hand
-        )
+            ) or Decimal("0")
 
         return LotTraceability(
             lot_id=lot.lot_id,

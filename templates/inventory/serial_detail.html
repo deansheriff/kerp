@@ -1,0 +1,198 @@
+{% extends "inventory/base_inventory.html" %}
+{% from "components/macros.html" import empty_state, status_badge, icon_svg %}
+
+{% block page_title %}Serial {{ serial.serial_number }}{% endblock %}
+
+{% macro serial_status_pill(serial) -%}
+    {% set effective_status = "INACTIVE" if not serial.is_active else serial.status %}
+    {% if effective_status == "AVAILABLE" %}
+    <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Available</span>
+    {% elif effective_status == "ISSUED" %}
+    <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">Issued</span>
+    {% elif effective_status == "RESERVED" %}
+    <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Reserved</span>
+    {% elif effective_status == "DAMAGED" %}
+    <span class="inline-flex items-center rounded-full bg-rose-100 px-3 py-1 text-sm font-medium text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">Damaged</span>
+    {% elif effective_status == "TRANSFERRED" %}
+    <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Transferred</span>
+    {% elif effective_status == "INACTIVE" %}
+    <span class="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">Inactive</span>
+    {% else %}
+    {{ status_badge(effective_status) }}
+    {% endif %}
+{%- endmacro %}
+
+{% macro usability_card(serial, warehouse) -%}
+    {% if serial.is_active and serial.status == "AVAILABLE" and warehouse %}
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-900/20">
+        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Can be used</p>
+        <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-200">This serial is available in stock and can be issued or transferred.</p>
+    </div>
+    {% elif serial.is_active and serial.status == "AVAILABLE" and not warehouse %}
+    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-900/20">
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Needs warehouse</p>
+        <p class="mt-1 text-sm text-amber-800 dark:text-amber-200">This serial is marked available but has no current warehouse, so it should not be used until corrected.</p>
+    </div>
+    {% else %}
+    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Not usable</p>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">This serial is not available for normal issue or transfer.</p>
+    </div>
+    {% endif %}
+{%- endmacro %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/inventory/items" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Inventory</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/inventory/serials" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Serial Numbers</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">{{ serial.serial_number }}</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center gap-3">
+    {{ serial_status_pill(serial) }}
+    {% if item %}
+    <a href="/inventory/items/{{ item.item_id }}" class="btn btn-ghost">
+        {{ icon_svg("box", "h-4 w-4 mr-2") }}
+        View Item
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 stagger-in">
+    <div class="card p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h2 class="text-xl font-semibold text-slate-900 dark:text-white font-mono">
+                        {{ serial.serial_number }}
+                    </h2>
+                    {{ serial_status_pill(serial) }}
+                </div>
+                {% if item %}
+                <p class="mt-2 text-slate-600 dark:text-slate-300">
+                    <span class="font-mono text-sm">{{ item.item_code }}</span> - {{ item.item_name }}
+                </p>
+                {% endif %}
+            </div>
+            <div class="text-right text-sm text-slate-500 dark:text-slate-400">
+                <p>Created: <span class="font-medium text-slate-900 dark:text-white">{{ serial.created_at | format_datetime if serial.created_at else '-' }}</span></p>
+                <p>ID: <span class="font-mono text-xs">{{ serial.serial_id }}</span></p>
+            </div>
+        </div>
+
+        <div class="mt-6">
+            {{ usability_card(serial, warehouse) }}
+        </div>
+
+        <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Current Warehouse</p>
+                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ warehouse.warehouse_name if warehouse else '-' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Can Be Used?</p>
+                <p class="mt-1 font-medium text-slate-900 dark:text-white">
+                    {% if serial.is_active and serial.status == "AVAILABLE" and warehouse %}
+                    Yes
+                    {% else %}
+                    No
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Lot</p>
+                <p class="mt-1 font-medium text-slate-900 dark:text-white">
+                    {% if lot %}
+                    <a href="/inventory/lots/{{ lot.lot_id }}" class="font-mono text-amber-700 hover:text-amber-800 dark:text-amber-300">{{ lot.lot_number }}</a>
+                    {% else %}
+                    -
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Last Updated</p>
+                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ serial.updated_at | format_datetime if serial.updated_at else '-' }}</p>
+            </div>
+        </div>
+
+        {% if serial.notes %}
+        <div class="mt-6 rounded-lg bg-slate-50 p-4 text-sm text-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+            {{ serial.notes }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card overflow-hidden">
+        <div class="border-b border-slate-200 dark:border-slate-700 px-6 py-4">
+            <h3 class="font-semibold text-slate-900 dark:text-white">Movement History</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Full audit trail for receipt, transfer, issue, return, and adjustment activity.</p>
+        </div>
+        {% if movement_rows | default([]) | length > 0 %}
+        <div class="table-container">
+            <table class="table-ledger">
+                <thead>
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Movement</th>
+                        <th scope="col">From</th>
+                        <th scope="col">To</th>
+                        <th scope="col">Lot</th>
+                        <th scope="col">Reference</th>
+                        <th scope="col">User</th>
+                        <th scope="col">Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in movement_rows %}
+                    {% set movement = row.movement %}
+                    {% set txn = row.transaction %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td>{{ movement.created_at | format_datetime if movement.created_at else '-' }}</td>
+                        <td>
+                            <div class="flex flex-col">
+                                {{ status_badge(movement.movement_type) }}
+                                <span class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ row.movement_label }}</span>
+                            </div>
+                        </td>
+                        <td>{{ row.from_warehouse.warehouse_name if row.from_warehouse else '-' }}</td>
+                        <td>{{ row.to_warehouse.warehouse_name if row.to_warehouse else '-' }}</td>
+                        <td>
+                            {% if row.lot %}
+                            <a href="/inventory/lots/{{ row.lot.lot_id }}" class="font-mono text-amber-700 hover:text-amber-800 dark:text-amber-300">{{ row.lot.lot_number }}</a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if txn %}
+                            <a href="/inventory/transactions/{{ txn.transaction_id }}" class="font-mono text-amber-700 hover:text-amber-800 dark:text-amber-300">
+                                {{ row.transaction_reference }}
+                            </a>
+                            {% if row.transaction_type %}
+                            <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">{{ row.transaction_type | replace('_', ' ') | title }}</span>
+                            {% endif %}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>{{ row.actor_name or '-' }}</td>
+                        <td>{{ movement.reason or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-12">
+            {{ empty_state("No movement history", "This serial number has no recorded movements yet.") }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

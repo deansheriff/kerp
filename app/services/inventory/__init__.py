@@ -63,6 +63,10 @@ from app.services.inventory.price_list import (
     ResolvedPrice,
     price_list_service,
 )
+from app.services.inventory.serial import (
+    InventorySerialService,
+    inventory_serial_service,
+)
 from app.services.inventory.stock_reservation import (
     ReservationConfig,
     ReservationResult,
@@ -134,6 +138,8 @@ __all__ = [
     "lot_serial_service",
     "LotInput",
     "LotTraceability",
+    "InventorySerialService",
+    "inventory_serial_service",
     # Balance
     "InventoryBalanceService",
     "inventory_balance_service",

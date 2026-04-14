@@ -591,6 +591,8 @@ class GoodsReceiptService(ListResponseMixin):
                     uom=item.base_uom,
                     currency_code=item.currency_code,
                     location_id=line.location_id,
+                    lot_number=line.lot_number,
+                    serial_numbers=line.serial_numbers,
                     source_document_type="GOODS_RECEIPT",
                     source_document_id=receipt.receipt_id,
                     source_document_line_id=line.line_id,

@@ -25,6 +25,52 @@
         }
     }
 </style>
+<script>
+    window.inventoryIssueForm = function () {
+        return {
+            items: {{ items_list | tojson }},
+            availableSerials: {{ available_serials_list | tojson }},
+            selectedItemId: "",
+            itemSearch: "",
+            itemDropdownOpen: false,
+            selectedWarehouseId: "",
+            quantity: "",
+            serialNumbersText: "",
+            selectedSerialNumbers: [],
+            get filteredItems() {
+                const term = this.itemSearch.trim().toLowerCase();
+                if (!term) return this.items;
+                return this.items.filter((item) => `${item.item_code} ${item.item_name}`.toLowerCase().includes(term));
+            },
+            get selectedItem() {
+                return this.items.find((item) => item.item_id === this.selectedItemId) || null;
+            },
+            selectItem(item) {
+                this.selectedItemId = item.item_id;
+                this.itemSearch = `${item.item_code} - ${item.item_name}`;
+                this.itemDropdownOpen = false;
+                this.resetSerials();
+            },
+            get tracksSerials() {
+                return Boolean(this.selectedItem && this.selectedItem.track_serial_numbers);
+            },
+            get filteredSerials() {
+                if (!this.tracksSerials || !this.selectedWarehouseId) return [];
+                return this.availableSerials.filter((serial) => serial.item_id === this.selectedItemId && serial.warehouse_id === this.selectedWarehouseId);
+            },
+            syncSerialText() {
+                this.serialNumbersText = this.selectedSerialNumbers.join("\n");
+                if (this.selectedSerialNumbers.length > 0) {
+                    this.quantity = String(this.selectedSerialNumbers.length);
+                }
+            },
+            resetSerials() {
+                this.selectedSerialNumbers = [];
+                this.serialNumbersText = "";
+            }
+        };
+    };
+</script>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -43,7 +89,7 @@
         Record inventory issued from a warehouse
     </p>
 
-    <form method="post" action="/inventory/transactions/issue/new" class="space-y-6">
+    <form method="post" action="/inventory/transactions/issue/new" class="space-y-6" x-data="inventoryIssueForm()">
         {{ request.state.csrf_form | safe }}
         <!-- Transaction Details -->
         <div class="card stagger-in" style="animation-delay: 50ms;">
@@ -62,19 +108,42 @@
             <div class="p-6 grid gap-6 sm:grid-cols-2">
                 <div>
                     <label class="form-label">Item <span class="text-rose-500">*</span></label>
-                    <select name="item_id" required class="form-select">
-                        <option value="">Select item</option>
-                        {% for item in items_list %}
-                        <option value="{{ item.item_id }}" data-cost="{{ item.average_cost }}">
-                            {{ item.item_code }} - {{ item.item_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    <div class="relative" @click.outside="itemDropdownOpen = false">
+                        <input type="hidden" name="item_id" :value="selectedItemId" required>
+                        <input type="search"
+                               class="form-input pr-10"
+                               placeholder="Search or select item..."
+                               x-model="itemSearch"
+                               @focus="itemDropdownOpen = true"
+                               @input="selectedItemId = ''; resetSerials(); itemDropdownOpen = true">
+                        <button type="button"
+                                class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600"
+                                @click="itemDropdownOpen = !itemDropdownOpen">
+                            {{ icon_svg("chevron-down", "h-4 w-4") }}
+                        </button>
+                        <div class="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                             x-show="itemDropdownOpen" x-cloak>
+                            <template x-for="item in filteredItems.slice(0, 100)" :key="item.item_id">
+                                <button type="button"
+                                        class="block w-full px-3 py-2 text-left text-sm hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                        @click="selectItem(item)">
+                                    <span class="block font-mono text-xs text-slate-500" x-text="item.item_code"></span>
+                                    <span class="block text-slate-900 dark:text-white" x-text="item.item_name"></span>
+                                </button>
+                            </template>
+                            <p class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400" x-show="filteredItems.length > 100">
+                                Showing first 100 matches. Type more to narrow the list.
+                            </p>
+                            <p class="px-3 py-2 text-sm text-slate-500 dark:text-slate-400" x-show="filteredItems.length === 0">
+                                No matching items found.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <div>
                     <label class="form-label">Warehouse <span class="text-rose-500">*</span></label>
-                    <select name="warehouse_id" required class="form-select">
+                    <select name="warehouse_id" required class="form-select" x-model="selectedWarehouseId" @change="resetSerials()">
                         <option value="">Select warehouse</option>
                         {% for wh in warehouses_list %}
                         <option value="{{ wh.warehouse_id }}">{{ wh.warehouse_code }} - {{ wh.warehouse_name }}</option>
@@ -84,7 +153,7 @@
 
                 <div>
                     <label class="form-label">Quantity <span class="text-rose-500">*</span></label>
-                    <input type="number" name="quantity" required min="0.0001" step="any" placeholder="0" class="form-input">
+                    <input type="number" name="quantity" required min="0.0001" step="any" placeholder="0" class="form-input" x-model="quantity">
                 </div>
 
                 <div>
@@ -111,6 +180,42 @@
                 <div>
                     <label class="form-label">Lot Number</label>
                     <input type="text" name="lot_number" placeholder="Specific lot to issue from" class="form-input">
+                </div>
+
+                <div class="sm:col-span-2" x-show="tracksSerials" x-cloak>
+                    <label class="form-label">Serial Numbers</label>
+                    <textarea name="serial_numbers" rows="3" placeholder="Choose available serials below, or enter one serial per line." class="form-input resize-none" x-model="serialNumbersText"></textarea>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Only available serials in the selected warehouse can be issued.</p>
+                </div>
+
+                <div class="sm:col-span-2 rounded-lg border border-rose-200 bg-rose-50/70 p-4 dark:border-rose-900/60 dark:bg-rose-900/20"
+                     x-show="tracksSerials" x-cloak>
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Available serials</h3>
+                            <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">Select the exact units being issued from this warehouse.</p>
+                        </div>
+                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-900/50 dark:text-slate-200" x-text="`${selectedSerialNumbers.length} selected`"></span>
+                    </div>
+
+                    <p class="mt-3 text-sm text-slate-500 dark:text-slate-400" x-show="!selectedWarehouseId">Select a warehouse to see available serials.</p>
+                    <p class="mt-3 text-sm text-slate-500 dark:text-slate-400" x-show="selectedWarehouseId && filteredSerials.length === 0">No available serials found for this item in the selected warehouse.</p>
+
+                    <div class="mt-3 max-h-64 space-y-2 overflow-y-auto" x-show="filteredSerials.length > 0">
+                        <template x-for="serial in filteredSerials" :key="serial.serial_id">
+                            <label class="flex cursor-pointer items-start gap-3 rounded-md bg-white p-3 text-sm shadow-sm hover:bg-rose-50 dark:bg-slate-900/50 dark:hover:bg-rose-900/20">
+                                <input type="checkbox"
+                                       class="mt-1 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                                       :value="serial.serial_number"
+                                       x-model="selectedSerialNumbers"
+                                       @change="syncSerialText()">
+                                <span>
+                                    <span class="block font-mono font-medium text-slate-900 dark:text-white" x-text="serial.serial_number"></span>
+                                    <span class="block text-xs text-slate-500 dark:text-slate-400" x-show="serial.lot_number" x-text="`Lot: ${serial.lot_number}`"></span>
+                                </span>
+                            </label>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>

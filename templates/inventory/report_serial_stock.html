@@ -1,0 +1,166 @@
+{% extends "inventory/base_inventory.html" %}
+{% from "components/macros.html" import pagination, compact_filters, filter_custom_select_field, icon_svg, empty_state %}
+
+{% block page_title %}Serial Stock by Warehouse{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/inventory/items" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Inventory</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/inventory/reports" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Reports</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Serial Stock by Warehouse</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<button onclick="window.print()" class="btn btn-secondary">
+    {{ icon_svg("printer", "h-4 w-4 mr-2") }}
+    Print
+</button>
+<a href="/inventory/serials?status=usable" class="btn btn-secondary">
+    {{ icon_svg("list-bullet", "h-4 w-4 mr-2") }}
+    Open Serials
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 stagger-in">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Serial Stock by Warehouse</h2>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Shows only serials that are active, available, and currently assigned to a warehouse.
+        </p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+        <div class="card p-4">
+            <p class="text-sm text-slate-500 dark:text-slate-400">Available Serials</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-white font-display">{{ summary.total_serials | default(0) }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-sm text-slate-500 dark:text-slate-400">Warehouses</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-white font-display">{{ summary.warehouse_count | default(0) }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-sm text-slate-500 dark:text-slate-400">Serialized Items</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-white font-display">{{ summary.item_count | default(0) }}</p>
+        </div>
+    </div>
+
+    {% if selected_item or selected_warehouse %}
+    <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-900/20">
+        <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Filtered report</p>
+        <p class="mt-1 text-sm text-indigo-900 dark:text-indigo-100">
+            {% if selected_item %}
+            Item: <span class="font-mono">{{ selected_item.item_code }}</span> - {{ selected_item.item_name }}.
+            {% endif %}
+            {% if selected_warehouse %}
+            Warehouse: {{ selected_warehouse.warehouse_name }}.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+
+    {% call(filter_attrs) compact_filters(
+        base_url="/inventory/reports/serial-stock",
+        active_filters=active_filters | default([]),
+        show_search=true,
+        search=search,
+        search_placeholder="Search serial, item, warehouse, or lot..."
+    ) %}
+        {% call filter_custom_select_field("warehouse", "Warehouse", filter_attrs) %}
+            {% for wh in warehouses | default([]) %}
+            <option value="{{ wh.warehouse_id }}" {{ 'selected' if warehouse == wh.warehouse_id|string else '' }}>
+                {{ wh.warehouse_name }}
+            </option>
+            {% endfor %}
+        {% endcall %}
+        {% call filter_custom_select_field("item", "Item", filter_attrs) %}
+            {% for filter_item in items | default([]) %}
+            <option value="{{ filter_item.item_id }}" {{ 'selected' if item == filter_item.item_id|string else '' }}>
+                {{ filter_item.item_code }} - {{ filter_item.item_name }}
+            </option>
+            {% endfor %}
+        {% endcall %}
+    {% endcall %}
+
+    <div id="results-container">
+        <div class="card overflow-hidden">
+            {% if serial_rows | default([]) | length > 0 %}
+            <div class="table-container">
+                <table class="table-ledger">
+                    <thead>
+                        <tr>
+                            <th scope="col">Warehouse</th>
+                            <th scope="col">Item</th>
+                            <th scope="col">Serial Number</th>
+                            <th scope="col">Lot</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in serial_rows %}
+                        {% set serial = row.serial %}
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td>
+                                <div class="flex flex-col">
+                                    <span class="font-medium text-slate-900 dark:text-white">{{ row.warehouse.warehouse_name }}</span>
+                                    <span class="text-xs font-mono text-slate-500">{{ row.warehouse.warehouse_code }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="flex flex-col">
+                                    <a href="/inventory/items/{{ row.item.item_id }}" class="font-medium text-amber-700 hover:text-amber-800 dark:text-amber-300">
+                                        {{ row.item.item_name }}
+                                    </a>
+                                    <span class="text-xs font-mono text-slate-500">{{ row.item.item_code }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <a href="/inventory/serials/{{ serial.serial_id }}" class="font-mono font-medium text-slate-900 hover:text-amber-700 dark:text-white dark:hover:text-amber-300">
+                                    {{ serial.serial_number }}
+                                </a>
+                            </td>
+                            <td>
+                                {% if row.lot %}
+                                <a href="/inventory/lots/{{ row.lot.lot_id }}" class="font-mono text-amber-700 hover:text-amber-800 dark:text-amber-300">{{ row.lot.lot_number }}</a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Available</span>
+                            </td>
+                            <td>{{ serial.created_at | format_datetime if serial.created_at else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="px-6 py-12">
+                {{ empty_state(
+                    title="No available serial stock",
+                    description="No active available serials were found for the selected filters.",
+                    action_url="/inventory/serials",
+                    action_label="View Serial Register"
+                ) }}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if serial_rows | default([]) | length > 0 %}
+        {{ pagination(
+            page=page,
+            total_pages=total_pages,
+            total_count=total_count,
+            limit=limit,
+            search=search,
+            filters={"warehouse": warehouse, "item": item}
+        ) }}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

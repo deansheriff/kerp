@@ -25,6 +25,50 @@
         }
     }
 </style>
+<script>
+    window.inventoryReceiptForm = function () {
+        return {
+            items: {{ items_list | tojson }},
+            selectedItemId: "",
+            itemSearch: "",
+            itemDropdownOpen: false,
+            quantity: "",
+            autoGenerateSerials: false,
+            serialPrefix: "",
+            get filteredItems() {
+                const term = this.itemSearch.trim().toLowerCase();
+                if (!term) return this.items;
+                return this.items.filter((item) => `${item.item_code} ${item.item_name}`.toLowerCase().includes(term));
+            },
+            get selectedItem() {
+                return this.items.find((item) => item.item_id === this.selectedItemId) || null;
+            },
+            selectItem(item) {
+                this.selectedItemId = item.item_id;
+                this.itemSearch = `${item.item_code} - ${item.item_name}`;
+                this.itemDropdownOpen = false;
+            },
+            get tracksSerials() {
+                return Boolean(this.selectedItem && this.selectedItem.track_serial_numbers);
+            },
+            get tracksLots() {
+                return Boolean(this.selectedItem && this.selectedItem.track_lots);
+            },
+            get serialBase() {
+                const prefix = (this.serialPrefix || (this.selectedItem ? this.selectedItem.item_code : "SERIAL")).toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "SERIAL";
+                const today = "{{ today | replace('-', '') }}";
+                return `${prefix}-${today}`;
+            },
+            get previewCount() {
+                const parsed = Number(this.quantity);
+                return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 3) : 0;
+            },
+            get previewSerials() {
+                return Array.from({ length: this.previewCount }, (_, index) => `${this.serialBase}-${String(index + 1).padStart(4, "0")}`);
+            }
+        };
+    };
+</script>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -43,7 +87,8 @@
         Record inventory received into a warehouse
     </p>
 
-    <form method="post" action="/inventory/transactions/receipt/new" class="space-y-6">
+    <form method="post" action="/inventory/transactions/receipt/new" class="space-y-6"
+          x-data="inventoryReceiptForm()">
         {{ request.state.csrf_form | safe }}
         <!-- Transaction Details -->
         <div class="card stagger-in" style="animation-delay: 50ms;">
@@ -62,14 +107,37 @@
             <div class="p-6 grid gap-6 sm:grid-cols-2">
                 <div>
                     <label class="form-label">Item <span class="text-rose-500">*</span></label>
-                    <select name="item_id" required class="form-select">
-                        <option value="">Select item</option>
-                        {% for item in items_list %}
-                        <option value="{{ item.item_id }}" data-cost="{{ item.average_cost }}">
-                            {{ item.item_code }} - {{ item.item_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    <div class="relative" @click.outside="itemDropdownOpen = false">
+                        <input type="hidden" name="item_id" :value="selectedItemId" required>
+                        <input type="search"
+                               class="form-input pr-10"
+                               placeholder="Search or select item..."
+                               x-model="itemSearch"
+                               @focus="itemDropdownOpen = true"
+                               @input="selectedItemId = ''; itemDropdownOpen = true">
+                        <button type="button"
+                                class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600"
+                                @click="itemDropdownOpen = !itemDropdownOpen">
+                            {{ icon_svg("chevron-down", "h-4 w-4") }}
+                        </button>
+                        <div class="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                             x-show="itemDropdownOpen" x-cloak>
+                            <template x-for="item in filteredItems.slice(0, 100)" :key="item.item_id">
+                                <button type="button"
+                                        class="block w-full px-3 py-2 text-left text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                        @click="selectItem(item)">
+                                    <span class="block font-mono text-xs text-slate-500" x-text="item.item_code"></span>
+                                    <span class="block text-slate-900 dark:text-white" x-text="item.item_name"></span>
+                                </button>
+                            </template>
+                            <p class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400" x-show="filteredItems.length > 100">
+                                Showing first 100 matches. Type more to narrow the list.
+                            </p>
+                            <p class="px-3 py-2 text-sm text-slate-500 dark:text-slate-400" x-show="filteredItems.length === 0">
+                                No matching items found.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <div>
@@ -84,7 +152,7 @@
 
                 <div>
                     <label class="form-label">Quantity <span class="text-rose-500">*</span></label>
-                    <input type="number" name="quantity" required min="0.0001" step="any" placeholder="0" class="form-input">
+                    <input type="number" name="quantity" required min="0.0001" step="any" placeholder="0" class="form-input" x-model="quantity">
                 </div>
 
                 <div>
@@ -107,9 +175,95 @@
                     <textarea name="notes" rows="2" placeholder="Additional notes" class="form-input resize-none"></textarea>
                 </div>
 
-                <div>
-                    <label class="form-label">Lot Number</label>
-                    <input type="text" name="lot_number" placeholder="Optional lot/batch number" class="form-input">
+                <div class="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-900/20"
+                     x-show="tracksLots" x-cloak>
+                    <div class="mb-4">
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Service lot details</h3>
+                        <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                            Use this for ISP stock or services that must be grouped for reporting, warranty, SLA, provider circuit, or expiry tracking.
+                        </p>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="form-label">Service Batch / Lot Number <span class="text-rose-500">*</span></label>
+                            <input type="text"
+                                   name="lot_number"
+                                   placeholder="Example: CIRCUIT-APR-001"
+                                   class="form-input"
+                                   :required="tracksLots"
+                                   :disabled="!tracksLots">
+                        </div>
+
+                        <div>
+                            <label class="form-label">Provider / Circuit Reference</label>
+                            <input type="text"
+                                   name="lot_provider_reference"
+                                   placeholder="Carrier circuit ID, provider batch, or vendor ref"
+                                   class="form-input"
+                                   :disabled="!tracksLots">
+                        </div>
+
+                        <div>
+                            <label class="form-label">Service Start Date</label>
+                            <input type="date"
+                                   name="lot_service_start_date"
+                                   class="form-input"
+                                   :disabled="!tracksLots">
+                        </div>
+
+                        <div>
+                            <label class="form-label">Service End / Expiry Date</label>
+                            <input type="date"
+                                   name="lot_service_end_date"
+                                   class="form-input"
+                                   :disabled="!tracksLots">
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <label class="form-label">SLA / Provisioning Document Reference</label>
+                            <input type="text"
+                                   name="lot_document_reference"
+                                   placeholder="SLA, installation order, acceptance document, or provisioning ref"
+                                   class="form-input"
+                                   :disabled="!tracksLots">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sm:col-span-2" x-show="tracksSerials" x-cloak>
+                    <label class="form-label">Serial Numbers</label>
+                    <textarea name="serial_numbers" rows="3" placeholder="For serial-tracked items, enter one serial per line or separate with commas." class="form-input resize-none" :disabled="autoGenerateSerials"></textarea>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Serial-tracked quantities must have exactly one serial number per unit.</p>
+                </div>
+
+                <div class="sm:col-span-2" x-show="tracksSerials" x-cloak>
+                    <label class="inline-flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                        <input type="checkbox" name="serial_auto_generate" value="1" class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" x-model="autoGenerateSerials">
+                        <span>
+                            <span class="block text-sm font-medium text-slate-900 dark:text-white">Auto-generate serial numbers</span>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">Use this when the items do not already have manufacturer serial numbers.</span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-900/20"
+                     x-show="tracksSerials && autoGenerateSerials" x-cloak>
+                    <label class="form-label">Optional Serial Prefix</label>
+                    <input type="text" name="serial_prefix" placeholder="Defaults to item code" class="form-input" x-model="serialPrefix">
+                    <p class="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+                        Quantity controls how many serials are created. Manual serial input is disabled while auto-generate is selected.
+                    </p>
+                    <div class="mt-3 rounded-md bg-white/70 p-3 text-xs text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
+                        <p class="font-medium text-slate-900 dark:text-white">Preview</p>
+                        <template x-if="previewSerials.length === 0">
+                            <p class="mt-1">Enter a whole-number quantity to preview generated serials.</p>
+                        </template>
+                        <template x-for="serial in previewSerials" :key="serial">
+                            <p class="mt-1 font-mono" x-text="serial"></p>
+                        </template>
+                        <p class="mt-1" x-show="Number(quantity) > 3">...and more based on quantity.</p>
+                    </div>
                 </div>
             </div>
         </div>

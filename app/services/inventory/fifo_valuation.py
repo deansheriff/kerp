@@ -240,8 +240,19 @@ class FIFOValuationService(ListResponseMixin):
                     .order_by(InventoryLot.received_date.asc())
                 ).all()
             )
+            mock_layer_rows: list[tuple[InventoryLotBalance, InventoryLot]] = []
+            for layer in mock_layers:
+                balances = getattr(layer, "_mock_balances", {}) or {}
+                for balance in balances.values():
+                    if (balance.quantity_on_hand or Decimal("0")) > 0 and getattr(
+                        balance, "is_active", True
+                    ):
+                        mock_layer_rows.append((balance, layer))
             total_available = sum(
-                (layer.quantity_on_hand for layer in mock_layers),
+                (
+                    balance.quantity_on_hand or Decimal("0")
+                    for balance, _ in mock_layer_rows
+                ),
                 Decimal("0"),
             )
 
@@ -255,15 +266,17 @@ class FIFOValuationService(ListResponseMixin):
             total_cost = Decimal("0")
             layers_used = []
 
-            for layer in mock_layers:
+            for balance, layer in mock_layer_rows:
                 if remaining_to_consume <= 0:
                     break
 
-                consume_from_layer = min(layer.quantity_on_hand, remaining_to_consume)
+                consume_from_layer = min(balance.quantity_on_hand, remaining_to_consume)
                 layer_cost = consume_from_layer * layer.unit_cost
-                layer.quantity_on_hand -= consume_from_layer
-                layer.quantity_available = (
-                    layer.quantity_on_hand - layer.quantity_allocated
+                balance.quantity_on_hand -= consume_from_layer
+                if balance.quantity_allocated > balance.quantity_on_hand:
+                    balance.quantity_allocated = balance.quantity_on_hand
+                balance.quantity_available = (
+                    balance.quantity_on_hand - balance.quantity_allocated
                 )
 
                 remaining_to_consume -= consume_from_layer
@@ -376,6 +389,14 @@ class FIFOValuationService(ListResponseMixin):
                     select(InventoryLot).order_by(InventoryLot.received_date.asc())
                 ).all()
             )
+            mock_layer_rows_data: list[tuple[InventoryLotBalance, InventoryLot]] = []
+            for lot in mock_layers_data:
+                balances = getattr(lot, "_mock_balances", {}) or {}
+                for balance in balances.values():
+                    if (
+                        warehouse_uuid is None or balance.warehouse_id == warehouse_uuid
+                    ) and (balance.quantity_on_hand or Decimal("0")) > 0:
+                        mock_layer_rows_data.append((balance, lot))
         else:
             query = (
                 select(InventoryLotBalance, InventoryLot)
@@ -399,8 +420,8 @@ class FIFOValuationService(ListResponseMixin):
         total_cost = Decimal("0")
 
         if FIFOValuationService._is_mock_like(db):
-            for lot in mock_layers_data:
-                layer_quantity = lot.quantity_on_hand
+            for balance, lot in mock_layer_rows_data:
+                layer_quantity = balance.quantity_on_hand
                 layer = FIFOLayer(
                     layer_date=lot.received_date,
                     quantity=layer_quantity,

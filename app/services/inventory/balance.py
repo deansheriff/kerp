@@ -42,37 +42,31 @@ def _get_balance_for_lot(
     create_if_missing: bool = False,
 ) -> InventoryLotBalance | None:
     """Fetch or initialize a warehouse balance for a lot."""
-    wh_id = (
-        coerce_uuid(warehouse_id)
-        if warehouse_id
-        else getattr(lot, "warehouse_id", None)
-    )
+    wh_id = coerce_uuid(warehouse_id) if warehouse_id else None
 
     if _is_mock_like(db):
         if warehouse_id is None:
             return cast(
-                InventoryLotBalance | None, getattr(lot, "_mock_default_balance", lot)
+                InventoryLotBalance | None,
+                getattr(lot, "_mock_default_balance", None),
             )
         balances = getattr(lot, "_mock_balances", None)
         if balances is None:
             balances = {}
             cast(Any, lot)._mock_balances = balances
         balance = balances.get(wh_id)
-        if balance is None and (
-            create_if_missing or getattr(lot, "warehouse_id", None) in (wh_id, None)
-        ):
-            seeded = getattr(lot, "warehouse_id", None) in (wh_id, None)
+        if balance is None and create_if_missing:
             balance = InventoryLotBalance(
                 organization_id=getattr(lot, "organization_id", None),
                 lot_id=lot.lot_id,
                 warehouse_id=wh_id,
-                quantity_on_hand=lot.quantity_on_hand if seeded else Decimal("0"),
-                quantity_allocated=lot.quantity_allocated if seeded else Decimal("0"),
-                quantity_available=lot.quantity_available if seeded else Decimal("0"),
+                quantity_on_hand=Decimal("0"),
+                quantity_allocated=Decimal("0"),
+                quantity_available=Decimal("0"),
                 is_active=getattr(lot, "is_active", True),
-                is_quarantined=getattr(lot, "is_quarantined", False),
-                quarantine_reason=getattr(lot, "quarantine_reason", None),
-                qc_status=getattr(lot, "qc_status", None),
+                is_quarantined=False,
+                quarantine_reason=None,
+                qc_status=None,
             )
             balances[wh_id] = balance
         return balance

@@ -43,6 +43,12 @@
 {% if item %}
 <div class="flex items-center gap-3">
     {{ status_badge('ACTIVE' if item.is_active else 'INACTIVE', 'sm') }}
+    {% if item.track_serial_numbers %}
+    <a href="/inventory/serials?item={{ item.item_id }}" class="btn btn-secondary">
+        {{ icon_svg("list-bullet", "h-4 w-4 mr-2") }}
+        View Serials
+    </a>
+    {% endif %}
     <a href="/inventory/items/{{ item.item_id }}/edit" class="btn btn-ghost">
         {{ icon_svg("edit", "h-4 w-4 mr-2") }}
         Edit
@@ -305,6 +311,10 @@
                             </svg>
                             Serial Numbers
                         </span>
+                        <a href="/inventory/serials?item={{ item.item_id }}" class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200 hover:bg-amber-50 dark:bg-slate-900 dark:text-amber-300 dark:ring-amber-800 dark:hover:bg-amber-900/20">
+                            {{ icon_svg("external-link", "h-3.5 w-3.5") }}
+                            View Serials
+                        </a>
                         {% endif %}
                     </div>
                 </div>

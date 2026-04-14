@@ -1221,6 +1221,317 @@ class OperationsInventoryWebService:
     # Lots & Serial Numbers
     # ------------------------------------------------------------------
 
+    def list_serials_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        search: str | None = None,
+        status: str | None = None,
+        warehouse: str | None = None,
+        item: str | None = None,
+        lot: str | None = None,
+        page: int = 1,
+    ) -> HTMLResponse:
+        """Serial numbers list page."""
+        from uuid import UUID as UUID_Type
+
+        from app.models.inventory.inventory_lot import InventoryLot
+        from app.models.inventory.inventory_serial import InventorySerial
+        from app.models.inventory.item import Item
+        from app.models.inventory.warehouse import Warehouse
+
+        context = base_context(request, auth, "Serial Numbers", "serials")
+        org_id = auth.organization_id
+        per_page = 50
+
+        base_filter = InventorySerial.organization_id == org_id
+        total_count = (
+            db.scalar(select(func.count(InventorySerial.serial_id)).where(base_filter))
+            or 0
+        )
+        available_count = (
+            db.scalar(
+                select(func.count(InventorySerial.serial_id)).where(
+                    base_filter,
+                    InventorySerial.status == "AVAILABLE",
+                    InventorySerial.is_active.is_(True),
+                )
+            )
+            or 0
+        )
+        issued_count = (
+            db.scalar(
+                select(func.count(InventorySerial.serial_id)).where(
+                    base_filter,
+                    InventorySerial.status == "ISSUED",
+                )
+            )
+            or 0
+        )
+        inactive_count = (
+            db.scalar(
+                select(func.count(InventorySerial.serial_id)).where(
+                    base_filter,
+                    InventorySerial.is_active.is_(False),
+                )
+            )
+            or 0
+        )
+        tracked_statuses = ["AVAILABLE", "ISSUED", "RESERVED", "DAMAGED", "TRANSFERRED"]
+        status_counts = {
+            status_key: (
+                db.scalar(
+                    select(func.count(InventorySerial.serial_id)).where(
+                        base_filter,
+                        InventorySerial.status == status_key,
+                        InventorySerial.is_active.is_(True),
+                    )
+                )
+                or 0
+            )
+            for status_key in tracked_statuses
+        }
+        blocked_count = (
+            db.scalar(
+                select(func.count(InventorySerial.serial_id)).where(
+                    base_filter,
+                    or_(
+                        InventorySerial.is_active.is_(False),
+                        InventorySerial.status != "AVAILABLE",
+                        InventorySerial.warehouse_id.is_(None),
+                    ),
+                )
+            )
+            or 0
+        )
+
+        serial_ids_stmt = (
+            select(InventorySerial.serial_id)
+            .join(Item, InventorySerial.item_id == Item.item_id)
+            .outerjoin(InventoryLot, InventorySerial.lot_id == InventoryLot.lot_id)
+            .outerjoin(
+                Warehouse, InventorySerial.warehouse_id == Warehouse.warehouse_id
+            )
+            .where(base_filter)
+        )
+
+        normalized_status = (status or "").strip().upper()
+        allowed_statuses = {
+            "AVAILABLE",
+            "ISSUED",
+            "RESERVED",
+            "DAMAGED",
+            "TRANSFERRED",
+        }
+        if normalized_status in allowed_statuses:
+            serial_ids_stmt = serial_ids_stmt.where(
+                InventorySerial.status == normalized_status,
+                InventorySerial.is_active.is_(True),
+            )
+        elif normalized_status == "INACTIVE":
+            serial_ids_stmt = serial_ids_stmt.where(
+                InventorySerial.is_active.is_(False)
+            )
+        elif normalized_status == "USABLE":
+            serial_ids_stmt = serial_ids_stmt.where(
+                InventorySerial.status == "AVAILABLE",
+                InventorySerial.is_active.is_(True),
+                InventorySerial.warehouse_id.is_not(None),
+            )
+        elif normalized_status == "BLOCKED":
+            serial_ids_stmt = serial_ids_stmt.where(
+                or_(
+                    InventorySerial.is_active.is_(False),
+                    InventorySerial.status != "AVAILABLE",
+                    InventorySerial.warehouse_id.is_(None),
+                )
+            )
+
+        if warehouse:
+            try:
+                wh_id = UUID_Type(warehouse)
+                serial_ids_stmt = serial_ids_stmt.where(
+                    InventorySerial.warehouse_id == wh_id
+                )
+            except ValueError:
+                pass
+
+        selected_item = None
+        if item:
+            try:
+                item_id = UUID_Type(item)
+                serial_ids_stmt = serial_ids_stmt.where(
+                    InventorySerial.item_id == item_id
+                )
+                selected_item = db.get(Item, item_id)
+                if selected_item and selected_item.organization_id != org_id:
+                    selected_item = None
+            except ValueError:
+                pass
+
+        selected_lot = None
+        if lot:
+            try:
+                lot_id = UUID_Type(lot)
+                serial_ids_stmt = serial_ids_stmt.where(
+                    InventorySerial.lot_id == lot_id
+                )
+                selected_lot = db.get(InventoryLot, lot_id)
+                if selected_lot and selected_lot.organization_id != org_id:
+                    selected_lot = None
+            except ValueError:
+                pass
+
+        if search:
+            term = f"%{search}%"
+            serial_ids_stmt = serial_ids_stmt.where(
+                or_(
+                    InventorySerial.serial_number.ilike(term),
+                    Item.item_code.ilike(term),
+                    Item.item_name.ilike(term),
+                    InventoryLot.lot_number.ilike(term),
+                )
+            )
+
+        filtered_total = (
+            db.scalar(select(func.count()).select_from(serial_ids_stmt.subquery())) or 0
+        )
+        total_pages = max(1, ceil(filtered_total / per_page))
+        serial_id_rows = list(
+            db.execute(
+                serial_ids_stmt.order_by(
+                    InventorySerial.created_at.desc(),
+                    InventorySerial.serial_number,
+                )
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+            ).all()
+        )
+        serial_ids = [row.serial_id for row in serial_id_rows]
+
+        serial_rows = []
+        if serial_ids:
+            rows = list(
+                db.execute(
+                    select(InventorySerial, Item, InventoryLot, Warehouse)
+                    .join(Item, InventorySerial.item_id == Item.item_id)
+                    .outerjoin(
+                        InventoryLot, InventorySerial.lot_id == InventoryLot.lot_id
+                    )
+                    .outerjoin(
+                        Warehouse,
+                        InventorySerial.warehouse_id == Warehouse.warehouse_id,
+                    )
+                    .where(InventorySerial.serial_id.in_(serial_ids))
+                ).all()
+            )
+            row_by_id = {row.InventorySerial.serial_id: row for row in rows}
+            for serial_id in serial_ids:
+                row = row_by_id.get(serial_id)
+                if not row:
+                    continue
+                serial_rows.append(
+                    {
+                        "serial": row.InventorySerial,
+                        "item": row.Item,
+                        "lot": row.InventoryLot,
+                        "warehouse": row.Warehouse,
+                    }
+                )
+
+        warehouses = list(
+            db.scalars(
+                select(Warehouse)
+                .where(
+                    Warehouse.organization_id == org_id,
+                    Warehouse.is_active.is_(True),
+                )
+                .order_by(Warehouse.warehouse_name)
+            ).all()
+        )
+        items = list(
+            db.scalars(
+                select(Item)
+                .where(
+                    Item.organization_id == org_id,
+                    Item.is_active.is_(True),
+                    Item.track_serial_numbers.is_(True),
+                )
+                .order_by(Item.item_code)
+            ).all()
+        )
+
+        active_filters = build_active_filters(
+            params={
+                "search": search or "",
+                "status": (status or "").lower(),
+                "warehouse": warehouse or "",
+                "item": item or "",
+                "lot": lot or "",
+            },
+            labels={
+                "search": "Search",
+                "status": "Status",
+                "warehouse": "Warehouse",
+                "item": "Item",
+                "lot": "Lot",
+            },
+            options={
+                "status": {
+                    "usable": "Can be used",
+                    "available": "Available",
+                    "issued": "Issued",
+                    "reserved": "Reserved",
+                    "damaged": "Damaged",
+                    "transferred": "Transferred",
+                    "inactive": "Inactive",
+                    "blocked": "Not usable",
+                },
+                "warehouse": {
+                    str(wh.warehouse_id): wh.warehouse_name for wh in warehouses
+                },
+                "item": {
+                    str(
+                        list_item.item_id
+                    ): f"{list_item.item_code} - {list_item.item_name}"
+                    for list_item in items
+                },
+                "lot": {
+                    str(selected_lot.lot_id): selected_lot.lot_number
+                    for selected_lot in [selected_lot]
+                    if selected_lot is not None
+                },
+            },
+        )
+
+        context.update(
+            {
+                "total_count": total_count,
+                "available_count": available_count,
+                "issued_count": issued_count,
+                "inactive_count": inactive_count,
+                "reserved_count": status_counts["RESERVED"],
+                "damaged_count": status_counts["DAMAGED"],
+                "transferred_count": status_counts["TRANSFERRED"],
+                "blocked_count": blocked_count,
+                "serial_rows": serial_rows,
+                "warehouses": warehouses,
+                "items": items,
+                "selected_item": selected_item,
+                "search": search or "",
+                "status": status or "",
+                "warehouse": warehouse or "",
+                "item": item or "",
+                "lot": lot or "",
+                "page": page,
+                "total_pages": total_pages,
+                "filtered_total": filtered_total,
+                "active_filters": active_filters,
+            }
+        )
+        return templates.TemplateResponse(request, "inventory/serials.html", context)
+
     def list_lots_response(
         self,
         request: Request,
@@ -1814,6 +2125,216 @@ class OperationsInventoryWebService:
         context = base_context(request, auth, "Inventory Reports", "reports")
         return templates.TemplateResponse(request, "inventory/reports.html", context)
 
+    def serial_stock_report_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        warehouse: str | None = None,
+        item: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+    ) -> HTMLResponse:
+        """Serial stock by warehouse report."""
+        from uuid import UUID as UUID_Type
+
+        from app.models.inventory.inventory_lot import InventoryLot
+        from app.models.inventory.inventory_serial import InventorySerial
+        from app.models.inventory.item import Item
+        from app.models.inventory.warehouse import Warehouse
+
+        context = base_context(request, auth, "Serial Stock by Warehouse", "reports")
+        org_id = auth.organization_id
+        if org_id is None:
+            raise HTTPException(status_code=400, detail="Organization is required")
+
+        per_page = 50
+        warehouses = list(
+            db.scalars(
+                select(Warehouse)
+                .where(
+                    Warehouse.organization_id == org_id,
+                    Warehouse.is_active.is_(True),
+                )
+                .order_by(Warehouse.warehouse_name)
+            ).all()
+        )
+        items = list(
+            db.scalars(
+                select(Item)
+                .where(
+                    Item.organization_id == org_id,
+                    Item.is_active.is_(True),
+                    Item.track_serial_numbers.is_(True),
+                )
+                .order_by(Item.item_code)
+            ).all()
+        )
+
+        serial_ids_stmt = (
+            select(
+                InventorySerial.serial_id,
+                InventorySerial.item_id,
+                InventorySerial.warehouse_id,
+            )
+            .join(Item, InventorySerial.item_id == Item.item_id)
+            .join(Warehouse, InventorySerial.warehouse_id == Warehouse.warehouse_id)
+            .outerjoin(InventoryLot, InventorySerial.lot_id == InventoryLot.lot_id)
+            .where(
+                InventorySerial.organization_id == org_id,
+                InventorySerial.status == "AVAILABLE",
+                InventorySerial.is_active.is_(True),
+                InventorySerial.warehouse_id.is_not(None),
+            )
+        )
+
+        selected_warehouse = None
+        if warehouse:
+            try:
+                warehouse_id = UUID_Type(warehouse)
+                serial_ids_stmt = serial_ids_stmt.where(
+                    InventorySerial.warehouse_id == warehouse_id
+                )
+                selected_warehouse = db.get(Warehouse, warehouse_id)
+                if selected_warehouse and selected_warehouse.organization_id != org_id:
+                    selected_warehouse = None
+            except ValueError:
+                pass
+
+        selected_item = None
+        if item:
+            try:
+                item_id = UUID_Type(item)
+                serial_ids_stmt = serial_ids_stmt.where(
+                    InventorySerial.item_id == item_id
+                )
+                selected_item = db.get(Item, item_id)
+                if selected_item and selected_item.organization_id != org_id:
+                    selected_item = None
+            except ValueError:
+                pass
+
+        if search:
+            term = f"%{search}%"
+            serial_ids_stmt = serial_ids_stmt.where(
+                or_(
+                    InventorySerial.serial_number.ilike(term),
+                    Item.item_code.ilike(term),
+                    Item.item_name.ilike(term),
+                    Warehouse.warehouse_name.ilike(term),
+                    Warehouse.warehouse_code.ilike(term),
+                    InventoryLot.lot_number.ilike(term),
+                )
+            )
+
+        filtered_subquery = serial_ids_stmt.subquery()
+        total_count = (
+            db.scalar(select(func.count()).select_from(filtered_subquery)) or 0
+        )
+        warehouse_count = (
+            db.scalar(
+                select(func.count(func.distinct(filtered_subquery.c.warehouse_id)))
+            )
+            or 0
+        )
+        item_count = (
+            db.scalar(select(func.count(func.distinct(filtered_subquery.c.item_id))))
+            or 0
+        )
+        total_pages = max(1, ceil(total_count / per_page))
+        serial_id_rows = list(
+            db.execute(
+                serial_ids_stmt.order_by(
+                    Warehouse.warehouse_name,
+                    Item.item_code,
+                    InventorySerial.serial_number,
+                )
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+            ).all()
+        )
+        serial_ids = [row.serial_id for row in serial_id_rows]
+
+        serial_rows = []
+        if serial_ids:
+            rows = list(
+                db.execute(
+                    select(InventorySerial, Item, Warehouse, InventoryLot)
+                    .join(Item, InventorySerial.item_id == Item.item_id)
+                    .join(
+                        Warehouse,
+                        InventorySerial.warehouse_id == Warehouse.warehouse_id,
+                    )
+                    .outerjoin(
+                        InventoryLot, InventorySerial.lot_id == InventoryLot.lot_id
+                    )
+                    .where(InventorySerial.serial_id.in_(serial_ids))
+                ).all()
+            )
+            row_by_id = {row.InventorySerial.serial_id: row for row in rows}
+            for serial_id in serial_ids:
+                row = row_by_id.get(serial_id)
+                if not row:
+                    continue
+                serial_rows.append(
+                    {
+                        "serial": row.InventorySerial,
+                        "item": row.Item,
+                        "warehouse": row.Warehouse,
+                        "lot": row.InventoryLot,
+                    }
+                )
+
+        active_filters = build_active_filters(
+            params={
+                "search": search or "",
+                "warehouse": warehouse or "",
+                "item": item or "",
+            },
+            labels={
+                "search": "Search",
+                "warehouse": "Warehouse",
+                "item": "Item",
+            },
+            options={
+                "warehouse": {
+                    str(wh.warehouse_id): wh.warehouse_name for wh in warehouses
+                },
+                "item": {
+                    str(
+                        list_item.item_id
+                    ): f"{list_item.item_code} - {list_item.item_name}"
+                    for list_item in items
+                },
+            },
+        )
+
+        context.update(
+            {
+                "serial_rows": serial_rows,
+                "warehouses": warehouses,
+                "items": items,
+                "selected_warehouse": selected_warehouse,
+                "selected_item": selected_item,
+                "search": search or "",
+                "warehouse": warehouse or "",
+                "item": item or "",
+                "summary": {
+                    "total_serials": total_count,
+                    "warehouse_count": warehouse_count,
+                    "item_count": item_count,
+                },
+                "page": page,
+                "total_pages": total_pages,
+                "total_count": total_count,
+                "limit": per_page,
+                "active_filters": active_filters,
+            }
+        )
+        return templates.TemplateResponse(
+            request, "inventory/report_serial_stock.html", context
+        )
+
     # ------------------------------------------------------------------
     # Stock Count Detail & Workflow
     # ------------------------------------------------------------------
@@ -2161,6 +2682,151 @@ class OperationsInventoryWebService:
     # ------------------------------------------------------------------
     # Lot Detail & Quarantine
     # ------------------------------------------------------------------
+
+    def serial_detail_response(
+        self,
+        request: Request,
+        serial_id: str,
+        auth: WebAuthContext,
+        db: Session,
+    ) -> HTMLResponse | RedirectResponse:
+        """Serial number detail page."""
+        from uuid import UUID as UUID_Type
+
+        from sqlalchemy.orm import aliased
+
+        from app.models.inventory.inventory_lot import InventoryLot
+        from app.models.inventory.inventory_serial import (
+            InventorySerial,
+            InventorySerialMovement,
+        )
+        from app.models.inventory.inventory_transaction import InventoryTransaction
+        from app.models.inventory.item import Item
+        from app.models.inventory.warehouse import Warehouse
+        from app.models.person import Person
+
+        context = base_context(request, auth, "Serial Detail", "serials")
+
+        try:
+            sid = UUID_Type(serial_id)
+        except ValueError:
+            return RedirectResponse("/inventory/serials", status_code=302)
+
+        row = db.execute(
+            select(InventorySerial, Item, InventoryLot, Warehouse)
+            .join(Item, InventorySerial.item_id == Item.item_id)
+            .outerjoin(InventoryLot, InventorySerial.lot_id == InventoryLot.lot_id)
+            .outerjoin(
+                Warehouse, InventorySerial.warehouse_id == Warehouse.warehouse_id
+            )
+            .where(
+                InventorySerial.serial_id == sid,
+                InventorySerial.organization_id == auth.organization_id,
+            )
+        ).first()
+        if not row:
+            return RedirectResponse("/inventory/serials", status_code=302)
+
+        FromWarehouse = aliased(Warehouse)
+        ToWarehouse = aliased(Warehouse)
+        MovementLot = aliased(InventoryLot)
+        movement_labels = {
+            "RECEIPT": "Received",
+            "RETURN": "Returned",
+            "ISSUE": "Issued",
+            "TRANSFER_OUT": "Transferred out",
+            "TRANSFER_IN": "Transferred in",
+            "ADJUSTMENT": "Adjusted",
+        }
+        movement_rows = []
+        for movement_row in db.execute(
+            select(
+                InventorySerialMovement,
+                InventoryTransaction,
+                FromWarehouse,
+                ToWarehouse,
+                MovementLot,
+                Person,
+            )
+            .outerjoin(
+                InventoryTransaction,
+                InventorySerialMovement.transaction_id
+                == InventoryTransaction.transaction_id,
+            )
+            .outerjoin(
+                FromWarehouse,
+                InventorySerialMovement.from_warehouse_id == FromWarehouse.warehouse_id,
+            )
+            .outerjoin(
+                ToWarehouse,
+                InventorySerialMovement.to_warehouse_id == ToWarehouse.warehouse_id,
+            )
+            .outerjoin(
+                MovementLot, InventorySerialMovement.lot_id == MovementLot.lot_id
+            )
+            .outerjoin(Person, InventorySerialMovement.created_by_user_id == Person.id)
+            .where(
+                InventorySerialMovement.organization_id == auth.organization_id,
+                InventorySerialMovement.serial_id == sid,
+            )
+            .order_by(InventorySerialMovement.created_at.desc())
+        ).all():
+            movement = movement_row.InventorySerialMovement
+            transaction = movement_row.InventoryTransaction
+            actor = movement_row[5]
+            actor_name = None
+            if actor:
+                actor_name = (
+                    actor.display_name
+                    or f"{actor.first_name} {actor.last_name}".strip()
+                    or actor.email
+                )
+            elif movement.created_by_user_id:
+                actor_name = str(movement.created_by_user_id)
+
+            transaction_type = None
+            transaction_reference = None
+            if transaction:
+                transaction_type = (
+                    transaction.transaction_type.value
+                    if hasattr(transaction.transaction_type, "value")
+                    else str(transaction.transaction_type)
+                )
+                transaction_reference = (
+                    transaction.reference
+                    or transaction.source_document_type
+                    or str(transaction.transaction_id)
+                )
+
+            movement_rows.append(
+                {
+                    "movement": movement,
+                    "movement_label": movement_labels.get(
+                        movement.movement_type,
+                        movement.movement_type.replace("_", " ").title(),
+                    ),
+                    "transaction": transaction,
+                    "transaction_type": transaction_type,
+                    "transaction_reference": transaction_reference,
+                    "from_warehouse": movement_row[2],
+                    "to_warehouse": movement_row[3],
+                    "lot": movement_row[4],
+                    "actor_name": actor_name,
+                }
+            )
+
+        context.update(
+            {
+                "serial": row.InventorySerial,
+                "item": row.Item,
+                "lot": row.InventoryLot,
+                "warehouse": row.Warehouse,
+                "movement_rows": movement_rows,
+            }
+        )
+        return templates.TemplateResponse(
+            request, "inventory/serial_detail.html", context
+        )
 
     def lot_detail_response(
         self,

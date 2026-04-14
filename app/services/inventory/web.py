@@ -7,6 +7,7 @@ Provides view-focused data for inventory web routes.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -27,6 +28,8 @@ from app.models.inventory.inventory_transaction import (
     InventoryTransaction,
     TransactionType,
 )
+from app.models.inventory.inventory_serial import InventorySerial
+from app.models.inventory.inventory_lot import InventoryLot
 from app.models.inventory.item import CostingMethod, Item, ItemType
 from app.models.inventory.item_category import ItemCategory
 from app.models.inventory.warehouse import Warehouse
@@ -99,6 +102,80 @@ def _resolve_lot_id_for_item_warehouse(
             InventoryLotBalance.warehouse_id == warehouse_id,
         )
     ).first()
+
+
+def _parse_serial_numbers(serial_numbers_text: str | None) -> list[str]:
+    """Parse pasted serial numbers from newline or comma separated text."""
+    if not serial_numbers_text:
+        return []
+    normalized = serial_numbers_text.replace(",", "\n")
+    return [serial.strip() for serial in normalized.splitlines() if serial.strip()]
+
+
+def _parse_optional_date(value: str | None) -> date | None:
+    """Parse an optional YYYY-MM-DD form date."""
+    normalized = (value or "").strip()
+    if not normalized:
+        return None
+    return date.fromisoformat(normalized)
+
+
+def _clean_optional_text(value: str | None) -> str | None:
+    """Normalize optional form text without turning blanks into report values."""
+    normalized = (value or "").strip()
+    return normalized or None
+
+
+def _clean_serial_prefix(prefix: str) -> str:
+    """Normalize a user-entered prefix into a compact serial-safe token."""
+    cleaned = re.sub(r"[^A-Za-z0-9]+", "-", prefix.strip().upper()).strip("-")
+    return cleaned or "SERIAL"
+
+
+def _generate_receipt_serial_numbers(
+    db: Session,
+    *,
+    organization_id: UUID,
+    item_id: UUID,
+    item_code: str,
+    quantity: Decimal,
+    transaction_date: date,
+    prefix: str | None = None,
+) -> list[str]:
+    """Generate unique receipt serial numbers for an item and transaction date."""
+    from app.models.inventory.inventory_serial import InventorySerial
+
+    if quantity != quantity.to_integral_value():
+        raise ValueError("Auto-generated serial quantities must be whole numbers")
+
+    count = int(quantity)
+    if count <= 0:
+        return []
+
+    prefix_token = _clean_serial_prefix(prefix or item_code)
+    date_token = transaction_date.strftime("%Y%m%d")
+    base = f"{prefix_token}-{date_token}"
+
+    existing_serials = list(
+        db.scalars(
+            select(InventorySerial.serial_number).where(
+                InventorySerial.organization_id == organization_id,
+                InventorySerial.item_id == item_id,
+                InventorySerial.serial_number.like(f"{base}-%"),
+            )
+        ).all()
+    )
+    suffix_pattern = re.compile(rf"^{re.escape(base)}-(\d+)$")
+    max_suffix = 0
+    for serial in existing_serials:
+        match = suffix_pattern.match(str(serial))
+        if match:
+            max_suffix = max(max_suffix, int(match.group(1)))
+
+    return [
+        f"{base}-{suffix:04d}"
+        for suffix in range(max_suffix + 1, max_suffix + count + 1)
+    ]
 
 
 def _get_batch_stock_quantities(
@@ -1722,6 +1799,13 @@ class InventoryWebService:
         notes: str | None,
         lot_number: str | None,
         db: Session,
+        serial_numbers: str | None = None,
+        serial_auto_generate: bool = False,
+        serial_prefix: str | None = None,
+        lot_service_start_date: str | None = None,
+        lot_service_end_date: str | None = None,
+        lot_provider_reference: str | None = None,
+        lot_document_reference: str | None = None,
     ) -> HTMLResponse | RedirectResponse:
         return InventoryTransactionWebService.create_transaction_response(
             request,
@@ -1736,6 +1820,13 @@ class InventoryWebService:
             notes,
             lot_number,
             db,
+            serial_numbers=serial_numbers,
+            serial_auto_generate=serial_auto_generate,
+            serial_prefix=serial_prefix,
+            lot_service_start_date=lot_service_start_date,
+            lot_service_end_date=lot_service_end_date,
+            lot_provider_reference=lot_provider_reference,
+            lot_document_reference=lot_document_reference,
         )
 
     @staticmethod
@@ -1751,6 +1842,7 @@ class InventoryWebService:
         notes: str | None,
         lot_number: str | None,
         db: Session,
+        serial_numbers: str | None = None,
     ) -> RedirectResponse:
         return InventoryTransactionWebService.create_transfer_response(
             request,
@@ -1764,6 +1856,7 @@ class InventoryWebService:
             notes,
             lot_number,
             db,
+            serial_numbers=serial_numbers,
         )
 
     @staticmethod
@@ -1838,6 +1931,8 @@ class InventoryTransactionWebService:
                 "uom": i.base_uom,
                 "last_cost": float(i.last_purchase_cost) if i.last_purchase_cost else 0,
                 "average_cost": float(i.average_cost) if i.average_cost else 0,
+                "track_lots": bool(i.track_lots),
+                "track_serial_numbers": bool(i.track_serial_numbers),
             }
             for i in items
         ]
@@ -1860,9 +1955,41 @@ class InventoryTransactionWebService:
             for w in warehouses
         ]
 
+        available_serials = db.execute(
+            select(
+                InventorySerial.serial_id,
+                InventorySerial.item_id,
+                InventorySerial.serial_number,
+                InventorySerial.warehouse_id,
+                InventorySerial.lot_id,
+                InventoryLot.lot_number,
+            )
+            .outerjoin(InventoryLot, InventoryLot.lot_id == InventorySerial.lot_id)
+            .where(
+                InventorySerial.organization_id == org_id,
+                InventorySerial.status == "AVAILABLE",
+                InventorySerial.is_active.is_(True),
+                InventorySerial.warehouse_id.is_not(None),
+            )
+            .order_by(InventorySerial.serial_number)
+            .limit(2000)
+        ).all()
+        available_serials_list = [
+            {
+                "serial_id": str(row.serial_id),
+                "item_id": str(row.item_id),
+                "serial_number": row.serial_number,
+                "warehouse_id": str(row.warehouse_id),
+                "lot_id": str(row.lot_id) if row.lot_id else None,
+                "lot_number": row.lot_number,
+            }
+            for row in available_serials
+        ]
+
         context = {
             "items_list": items_list,
             "warehouses_list": warehouses_list,
+            "available_serials_list": available_serials_list,
             "transaction_type": transaction_type,
             "today": date.today().strftime("%Y-%m-%d"),
         }
@@ -1918,6 +2045,13 @@ class InventoryTransactionWebService:
         notes: str | None,
         lot_number: str | None,
         db: Session,
+        serial_numbers: str | None = None,
+        serial_auto_generate: bool = False,
+        serial_prefix: str | None = None,
+        lot_service_start_date: str | None = None,
+        lot_service_end_date: str | None = None,
+        lot_provider_reference: str | None = None,
+        lot_document_reference: str | None = None,
     ) -> RedirectResponse:
         """Create a manual inventory transaction."""
         from datetime import datetime
@@ -1941,6 +2075,35 @@ class InventoryTransactionWebService:
             qty = Decimal(quantity)
             cost = Decimal(unit_cost)
             txn_date = datetime.strptime(transaction_date, "%Y-%m-%d")
+            item_uuid = UUID(item_id)
+            warehouse_uuid = UUID(warehouse_id)
+            parsed_serial_numbers = _parse_serial_numbers(serial_numbers)
+            parsed_lot_service_start_date = _parse_optional_date(lot_service_start_date)
+            parsed_lot_service_end_date = _parse_optional_date(lot_service_end_date)
+            parsed_lot_provider_reference = _clean_optional_text(lot_provider_reference)
+            parsed_lot_document_reference = _clean_optional_text(lot_document_reference)
+
+            if serial_auto_generate:
+                if transaction_type != "RECEIPT":
+                    raise ValueError(
+                        "Serial numbers can only be auto-generated on receipts"
+                    )
+                if parsed_serial_numbers:
+                    raise ValueError(
+                        "Use either manual serial numbers or auto-generate serial numbers, not both"
+                    )
+                item = db.get(Item, item_uuid)
+                if not item or item.organization_id != org_id:
+                    raise ValueError("Item not found")
+                parsed_serial_numbers = _generate_receipt_serial_numbers(
+                    db,
+                    organization_id=org_id,
+                    item_id=item_uuid,
+                    item_code=item.item_code,
+                    quantity=qty,
+                    transaction_date=txn_date.date(),
+                    prefix=serial_prefix,
+                )
 
             # Get fiscal period
             fiscal_period = db.scalars(
@@ -1968,8 +2131,8 @@ class InventoryTransactionWebService:
                 transaction_type=txn_type,
                 transaction_date=txn_date,
                 fiscal_period_id=fiscal_period.fiscal_period_id,
-                item_id=UUID(item_id),
-                warehouse_id=UUID(warehouse_id),
+                item_id=item_uuid,
+                warehouse_id=warehouse_uuid,
                 quantity=qty,
                 unit_cost=cost,
                 uom="",  # Will be filled from item
@@ -1978,14 +2141,19 @@ class InventoryTransactionWebService:
                     _resolve_lot_id_for_item_warehouse(
                         db,
                         organization_id=org_id,
-                        item_id=UUID(item_id),
-                        warehouse_id=UUID(warehouse_id),
+                        item_id=item_uuid,
+                        warehouse_id=warehouse_uuid,
                         lot_number=lot_number,
                     )
                     if transaction_type == "ISSUE"
                     else None
                 ),
                 lot_number=lot_number,
+                lot_manufacture_date=parsed_lot_service_start_date,
+                lot_expiry_date=parsed_lot_service_end_date,
+                lot_supplier_lot_number=parsed_lot_provider_reference,
+                lot_certificate_of_analysis=parsed_lot_document_reference,
+                serial_numbers=parsed_serial_numbers,
                 reference=reference,
                 source_document_type="MANUAL",
             )
@@ -2020,6 +2188,7 @@ class InventoryTransactionWebService:
         notes: str | None,
         lot_number: str | None,
         db: Session,
+        serial_numbers: str | None = None,
     ) -> RedirectResponse:
         """Create an inventory transfer."""
         from datetime import datetime
@@ -2078,6 +2247,7 @@ class InventoryTransactionWebService:
                     lot_number=lot_number,
                 ),
                 lot_number=lot_number,
+                serial_numbers=_parse_serial_numbers(serial_numbers),
                 reference=reference,
             )
 

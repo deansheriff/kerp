@@ -1,0 +1,242 @@
+{% extends "inventory/base_inventory.html" %}
+{% from "components/macros.html" import pagination, empty_state, status_badge, compact_filters, filter_custom_select_field, filter_select_field, icon_svg %}
+
+{% block page_title %}Serial Numbers{% endblock %}
+
+{% macro serial_status_pill(serial) -%}
+    {% set effective_status = "INACTIVE" if not serial.is_active else serial.status %}
+    {% if effective_status == "AVAILABLE" %}
+    <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Available</span>
+    {% elif effective_status == "ISSUED" %}
+    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">Issued</span>
+    {% elif effective_status == "RESERVED" %}
+    <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Reserved</span>
+    {% elif effective_status == "DAMAGED" %}
+    <span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">Damaged</span>
+    {% elif effective_status == "TRANSFERRED" %}
+    <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Transferred</span>
+    {% elif effective_status == "INACTIVE" %}
+    <span class="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">Inactive</span>
+    {% else %}
+    {{ status_badge(effective_status) }}
+    {% endif %}
+{%- endmacro %}
+
+{% macro usability_pill(serial, warehouse) -%}
+    {% if serial.is_active and serial.status == "AVAILABLE" and warehouse %}
+    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-800">Can be used</span>
+    {% elif serial.is_active and serial.status == "AVAILABLE" and not warehouse %}
+    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-800">No warehouse</span>
+    {% else %}
+    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">Not usable</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/inventory/items" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Inventory</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Serial Numbers</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 stagger-in">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div class="card p-4">
+            <div class="flex items-center gap-3">
+                <div class="card-icon bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
+                    {{ icon_svg("ticket") }}
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ total_count | default(0) }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Total Serials</p>
+                </div>
+            </div>
+        </div>
+        <div class="card p-4">
+            <div class="flex items-center gap-3">
+                <div class="card-icon bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    {{ icon_svg("check-circle") }}
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ available_count | default(0) }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Available / usable</p>
+                </div>
+            </div>
+        </div>
+        <div class="card p-4">
+            <div class="flex items-center gap-3">
+                <div class="card-icon bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {{ icon_svg("archive") }}
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ issued_count | default(0) }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Issued</p>
+                </div>
+            </div>
+        </div>
+        <div class="card p-4">
+            <div class="flex items-center gap-3">
+                <div class="card-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    {{ icon_svg("clock") }}
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ reserved_count | default(0) }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Reserved</p>
+                </div>
+            </div>
+        </div>
+        <div class="card p-4">
+            <div class="flex items-center gap-3">
+                <div class="card-icon bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                    {{ icon_svg("warning") }}
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ damaged_count | default(0) }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Damaged</p>
+                </div>
+            </div>
+        </div>
+        <div class="card p-4">
+            <div class="flex items-center gap-3">
+                <div class="card-icon bg-zinc-50 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    {{ icon_svg("ban") }}
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ blocked_count | default(0) }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Not usable</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if selected_item %}
+    <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/60 dark:bg-blue-900/20">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Filtered by item</p>
+                <p class="mt-1 text-sm text-blue-900 dark:text-blue-100">
+                    Showing serial numbers for <span class="font-mono">{{ selected_item.item_code }}</span> - {{ selected_item.item_name }}.
+                </p>
+            </div>
+            <a href="/inventory/serials" class="text-sm font-medium text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100">
+                Clear item filter
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    {% call(filter_attrs) compact_filters(
+        base_url="/inventory/serials",
+        active_filters=active_filters | default([]),
+        show_search=true,
+        search=search,
+        search_placeholder="Search serial, item, or lot..."
+    ) %}
+        {{ filter_select_field(
+            "status",
+            "Status",
+            status,
+            [
+                {"value": "usable", "label": "Can be used"},
+                {"value": "available", "label": "Available"},
+                {"value": "issued", "label": "Issued"},
+                {"value": "reserved", "label": "Reserved"},
+                {"value": "damaged", "label": "Damaged"},
+                {"value": "transferred", "label": "Transferred"},
+                {"value": "inactive", "label": "Inactive"},
+                {"value": "blocked", "label": "Not usable"}
+            ],
+            filter_attrs
+        ) }}
+        {% call filter_custom_select_field("item", "Item", filter_attrs) %}
+            {% for filter_item in items | default([]) %}
+            <option value="{{ filter_item.item_id }}" {{ 'selected' if item == filter_item.item_id|string else '' }}>
+                {{ filter_item.item_code }} - {{ filter_item.item_name }}
+            </option>
+            {% endfor %}
+        {% endcall %}
+        {% call filter_custom_select_field("warehouse", "Warehouse", filter_attrs) %}
+            {% for wh in warehouses | default([]) %}
+            <option value="{{ wh.warehouse_id }}" {{ 'selected' if warehouse == wh.warehouse_id|string else '' }}>
+                {{ wh.warehouse_name }}
+            </option>
+            {% endfor %}
+        {% endcall %}
+        {% if lot %}
+        <input type="hidden" name="lot" value="{{ lot }}">
+        {% endif %}
+    {% endcall %}
+
+    <div id="results-container">
+        <div class="card overflow-hidden">
+            {% if serial_rows | default([]) | length > 0 %}
+            <div class="table-container">
+                <table class="table-ledger">
+                    <thead>
+                        <tr>
+                            <th scope="col">Serial Number</th>
+                            <th scope="col">Item</th>
+                            <th scope="col">Lot</th>
+                            <th scope="col">Warehouse</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Usability</th>
+                            <th scope="col">Created</th>
+                            <th scope="col" class="w-12 text-xs font-semibold uppercase tracking-wider"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in serial_rows %}
+                        {% set serial = row.serial %}
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
+                            onclick="window.location='/inventory/serials/{{ serial.serial_id }}'">
+                            <td class="font-medium font-mono text-slate-900 dark:text-white">{{ serial.serial_number }}</td>
+                            <td>
+                                <div class="flex flex-col">
+                                    <span class="text-xs font-mono text-slate-500">{{ row.item.item_code if row.item else '-' }}</span>
+                                    <span>{{ row.item.item_name if row.item else '-' }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if row.lot %}
+                                <a href="/inventory/lots/{{ row.lot.lot_id }}" class="font-mono text-amber-700 hover:text-amber-800 dark:text-amber-300" onclick="event.stopPropagation()">{{ row.lot.lot_number }}</a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>{{ row.warehouse.warehouse_name if row.warehouse else '-' }}</td>
+                            <td>
+                                {{ serial_status_pill(serial) }}
+                            </td>
+                            <td>
+                                {{ usability_pill(serial, row.warehouse) }}
+                            </td>
+                            <td>{{ serial.created_at | format_datetime if serial.created_at else '-' }}</td>
+                            <td>
+                                <a href="/inventory/serials/{{ serial.serial_id }}" class="text-slate-400 hover:text-amber-600 dark:hover:text-amber-400" onclick="event.stopPropagation()">
+                                    {{ icon_svg("chevron-right") }}
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            {{ empty_state(
+                title="No serial numbers tracked yet",
+                description="Serials are created when receiving inventory for items with serial number tracking enabled.",
+                action_url="/inventory/items",
+                action_label="View Items"
+            ) }}
+            {% endif %}
+        </div>
+
+        {% if serial_rows | default([]) | length > 0 %}
+        {{ pagination(page=page, total_pages=total_pages, total_count=filtered_total, limit=50, search=search, filters={"status": status, "warehouse": warehouse, "item": item, "lot": lot}) }}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

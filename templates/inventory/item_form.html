@@ -273,9 +273,9 @@
                 </div>
 
                 <div>
-                    <label class="form-label">Purchase UOM</label>
+                    <label class="form-label">Purchase Unit of Measure</label>
                     <select name="purchase_uom" class="form-select">
-                        <option value="">Use base UOM</option>
+                        <option value="">Use base unit of measure</option>
                         <option value="EACH" {{ 'selected' if item and item.purchase_uom == 'EACH' else '' }}>Each</option>
                         <option value="PCS" {{ 'selected' if item and item.purchase_uom == 'PCS' else '' }}>Pieces</option>
                         <option value="KG" {{ 'selected' if item and item.purchase_uom == 'KG' else '' }}>Kilogram</option>
@@ -290,9 +290,9 @@
                 </div>
 
                 <div>
-                    <label class="form-label">Sales UOM</label>
+                    <label class="form-label">Sales Unit of Measure</label>
                     <select name="sales_uom" class="form-select">
-                        <option value="">Use base UOM</option>
+                        <option value="">Use base unit of measure</option>
                         <option value="EACH" {{ 'selected' if item and item.sales_uom == 'EACH' else '' }}>Each</option>
                         <option value="PCS" {{ 'selected' if item and item.sales_uom == 'PCS' else '' }}>Pieces</option>
                         <option value="KG" {{ 'selected' if item and item.sales_uom == 'KG' else '' }}>Kilogram</option>

@@ -22,6 +22,67 @@ depends_on = None
 
 def upgrade() -> None:
     bind = op.get_bind()
+    # Older staging databases have a few referenced tables that were created
+    # without primary-key constraints. Add the missing constraints only when the
+    # existing id data is safe for foreign keys.
+    op.execute("""
+    DO $$
+    BEGIN
+        IF to_regclass('automation.document_template') IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM pg_constraint
+               WHERE conrelid = 'automation.document_template'::regclass
+                 AND contype = 'p'
+           )
+           AND NOT EXISTS (
+               SELECT template_id
+               FROM automation.document_template
+               GROUP BY template_id
+               HAVING template_id IS NULL OR count(*) > 1
+           )
+        THEN
+            ALTER TABLE automation.document_template
+            ADD CONSTRAINT document_template_pkey PRIMARY KEY (template_id);
+        END IF;
+
+        IF to_regclass('automation.generated_document') IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM pg_constraint
+               WHERE conrelid = 'automation.generated_document'::regclass
+                 AND contype = 'p'
+           )
+           AND NOT EXISTS (
+               SELECT document_id
+               FROM automation.generated_document
+               GROUP BY document_id
+               HAVING document_id IS NULL OR count(*) > 1
+           )
+        THEN
+            ALTER TABLE automation.generated_document
+            ADD CONSTRAINT generated_document_pkey PRIMARY KEY (document_id);
+        END IF;
+
+        IF to_regclass('hr.employee_separation') IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM pg_constraint
+               WHERE conrelid = 'hr.employee_separation'::regclass
+                 AND contype = 'p'
+           )
+           AND NOT EXISTS (
+               SELECT separation_id
+               FROM hr.employee_separation
+               GROUP BY separation_id
+               HAVING separation_id IS NULL OR count(*) > 1
+           )
+        THEN
+            ALTER TABLE hr.employee_separation
+            ADD CONSTRAINT employee_separation_pkey PRIMARY KEY (separation_id);
+        END IF;
+    END $$;
+    """)
 
     # ------------------------------------------------------------------
     # Enum types (idempotent via ensure_enum)

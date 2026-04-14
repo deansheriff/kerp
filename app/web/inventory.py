@@ -646,6 +646,13 @@ def create_receipt_transaction(
     reference: str | None = Form(default=None),
     notes: str | None = Form(default=None),
     lot_number: str | None = Form(default=None),
+    lot_service_start_date: str | None = Form(default=None),
+    lot_service_end_date: str | None = Form(default=None),
+    lot_provider_reference: str | None = Form(default=None),
+    lot_document_reference: str | None = Form(default=None),
+    serial_numbers: str | None = Form(default=None),
+    serial_auto_generate: str | None = Form(default=None),
+    serial_prefix: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
     """Create a manual inventory receipt."""
@@ -662,6 +669,13 @@ def create_receipt_transaction(
         notes,
         lot_number,
         db,
+        serial_numbers=serial_numbers,
+        serial_auto_generate=serial_auto_generate is not None,
+        serial_prefix=serial_prefix,
+        lot_service_start_date=lot_service_start_date,
+        lot_service_end_date=lot_service_end_date,
+        lot_provider_reference=lot_provider_reference,
+        lot_document_reference=lot_document_reference,
     )
 
 
@@ -811,6 +825,7 @@ def create_issue_transaction(
     reference: str | None = Form(default=None),
     notes: str | None = Form(default=None),
     lot_number: str | None = Form(default=None),
+    serial_numbers: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
     """Create a manual inventory issue."""
@@ -827,6 +842,7 @@ def create_issue_transaction(
         notes,
         lot_number,
         db,
+        serial_numbers=serial_numbers,
     )
 
 
@@ -852,6 +868,7 @@ def create_transfer_transaction(
     reference: str | None = Form(default=None),
     notes: str | None = Form(default=None),
     lot_number: str | None = Form(default=None),
+    serial_numbers: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
     """Create an inventory transfer."""
@@ -867,6 +884,7 @@ def create_transfer_transaction(
         notes,
         lot_number,
         db,
+        serial_numbers=serial_numbers,
     )
 
 
@@ -1504,6 +1522,48 @@ async def create_price_list(
 # ============================================================================
 
 
+@router.get("/serials", response_class=HTMLResponse)
+def list_serials(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    search: str | None = None,
+    status: str | None = None,
+    warehouse: str | None = None,
+    item: str | None = None,
+    lot: str | None = None,
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """Serial numbers list page."""
+    return operations_inv_web_service.list_serials_response(
+        request=request,
+        auth=auth,
+        db=db,
+        search=search,
+        status=status,
+        warehouse=warehouse,
+        item=item,
+        lot=lot,
+        page=page,
+    )
+
+
+@router.get("/serials/{serial_id}", response_class=HTMLResponse)
+def serial_detail(
+    request: Request,
+    serial_id: str,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Serial number detail page."""
+    return operations_inv_web_service.serial_detail_response(
+        request=request,
+        serial_id=serial_id,
+        auth=auth,
+        db=db,
+    )
+
+
 @router.get("/lots", response_class=HTMLResponse)
 def list_lots(
     request: Request,
@@ -1595,5 +1655,27 @@ def stock_on_hand_report(
         category=category,
         show_zero=show_zero,
         format=format,
+        page=page,
+    )
+
+
+@router.get("/reports/serial-stock", response_class=HTMLResponse)
+def serial_stock_report(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    warehouse: str | None = None,
+    item: str | None = None,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """Serial stock by warehouse report."""
+    return operations_inv_web_service.serial_stock_report_response(
+        request=request,
+        auth=auth,
+        db=db,
+        warehouse=warehouse,
+        item=item,
+        search=search,
         page=page,
     )

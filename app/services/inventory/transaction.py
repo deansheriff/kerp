@@ -27,6 +27,7 @@ from app.models.inventory.inventory_transaction import (
 from app.models.inventory.item import CostingMethod, Item
 from app.models.inventory.warehouse import Warehouse
 from app.services.common import coerce_uuid
+from app.services.inventory.serial import InventorySerialService
 from app.services.response import ListResponseMixin
 from app.services.settings_cache import settings_cache
 
@@ -49,6 +50,10 @@ class TransactionInput:
     location_id: UUID | None = None
     lot_id: UUID | None = None
     lot_number: str | None = None
+    lot_manufacture_date: date | None = None
+    lot_expiry_date: date | None = None
+    lot_supplier_lot_number: str | None = None
+    lot_certificate_of_analysis: str | None = None
     to_warehouse_id: UUID | None = None
     to_location_id: UUID | None = None
     source_document_type: str | None = None
@@ -56,6 +61,7 @@ class TransactionInput:
     source_document_line_id: UUID | None = None
     reference: str | None = None
     reason_code: str | None = None
+    serial_numbers: list[str] | None = None
 
 
 @dataclass
@@ -96,27 +102,18 @@ class InventoryTransactionService(ListResponseMixin):
                 balances = {}
                 cast(Any, lot)._mock_balances = balances
             balance = balances.get(wh_id)
-            if balance is None and (
-                create_if_missing or lot.warehouse_id in (wh_id, None)
-            ):
-                seeded_from_legacy = lot.warehouse_id in (wh_id, None)
+            if balance is None and create_if_missing:
                 balance = InventoryLotBalance(
                     organization_id=lot.organization_id,
                     lot_id=lot.lot_id,
                     warehouse_id=wh_id,
-                    quantity_on_hand=(
-                        lot.quantity_on_hand if seeded_from_legacy else Decimal("0")
-                    ),
-                    quantity_allocated=(
-                        lot.quantity_allocated if seeded_from_legacy else Decimal("0")
-                    ),
-                    quantity_available=(
-                        lot.quantity_available if seeded_from_legacy else Decimal("0")
-                    ),
+                    quantity_on_hand=Decimal("0"),
+                    quantity_allocated=Decimal("0"),
+                    quantity_available=Decimal("0"),
                     is_active=lot.is_active,
-                    is_quarantined=lot.is_quarantined,
-                    quarantine_reason=getattr(lot, "quarantine_reason", None),
-                    qc_status=getattr(lot, "qc_status", None),
+                    is_quarantined=False,
+                    quarantine_reason=None,
+                    qc_status=None,
                 )
                 balances[wh_id] = balance
             return balance
@@ -371,6 +368,13 @@ class InventoryTransactionService(ListResponseMixin):
         item = db.get(Item, itm_id)
         if not item or item.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Item not found")
+        serial_numbers = InventorySerialService.normalize_serial_numbers(
+            input.serial_numbers
+        )
+        if getattr(item, "track_serial_numbers", False):
+            InventorySerialService.validate_serial_quantity(
+                input.quantity, serial_numbers
+            )
 
         # Validate warehouse
         warehouse = db.get(Warehouse, wh_id)
@@ -440,6 +444,20 @@ class InventoryTransactionService(ListResponseMixin):
             )
 
         db.flush()
+
+        if getattr(item, "track_serial_numbers", False):
+            InventorySerialService.receive_serials(
+                db,
+                organization_id=org_id,
+                item_id=itm_id,
+                warehouse_id=wh_id,
+                serial_numbers=serial_numbers,
+                transaction=transaction,
+                lot_id=transaction.lot_id,
+                location_id=input.location_id,
+                created_by_user_id=user_id,
+                allow_return=input.transaction_type == TransactionType.RETURN,
+            )
 
         # Update weighted average ledger and item average cost
         if item.costing_method == CostingMethod.WEIGHTED_AVERAGE:
@@ -519,6 +537,7 @@ class InventoryTransactionService(ListResponseMixin):
                 raise HTTPException(status_code=404, detail="Inventory lot not found")
             if lot.organization_id is None:
                 lot.organization_id = item.organization_id
+            InventoryTransactionService._apply_receipt_lot_metadata(lot, input)
             balance = InventoryTransactionService._get_lot_balance(
                 db,
                 lot=lot,
@@ -558,6 +577,7 @@ class InventoryTransactionService(ListResponseMixin):
                 )
             ).first()
             if lot:
+                InventoryTransactionService._apply_receipt_lot_metadata(lot, input)
                 balance = InventoryTransactionService._get_lot_balance(
                     db,
                     lot=lot,
@@ -588,6 +608,10 @@ class InventoryTransactionService(ListResponseMixin):
             organization_id=item.organization_id,
             item_id=item.item_id,
             lot_number=lot_number,
+            manufacture_date=input.lot_manufacture_date,
+            expiry_date=input.lot_expiry_date,
+            supplier_lot_number=input.lot_supplier_lot_number,
+            certificate_of_analysis=input.lot_certificate_of_analysis,
             received_date=input.transaction_date.date()
             if hasattr(input.transaction_date, "date")
             else input.transaction_date,
@@ -614,6 +638,18 @@ class InventoryTransactionService(ListResponseMixin):
         transaction.lot_id = lot.lot_id
 
         return lot
+
+    @staticmethod
+    def _apply_receipt_lot_metadata(lot: InventoryLot, input: TransactionInput) -> None:
+        """Keep receipt lot reporting fields current without blanking old values."""
+        if input.lot_manufacture_date:
+            lot.manufacture_date = input.lot_manufacture_date
+        if input.lot_expiry_date:
+            lot.expiry_date = input.lot_expiry_date
+        if input.lot_supplier_lot_number:
+            lot.supplier_lot_number = input.lot_supplier_lot_number
+        if input.lot_certificate_of_analysis:
+            lot.certificate_of_analysis = input.lot_certificate_of_analysis
 
     @staticmethod
     def create_issue(
@@ -645,6 +681,13 @@ class InventoryTransactionService(ListResponseMixin):
         item = db.get(Item, itm_id)
         if not item or item.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Item not found")
+        serial_numbers = InventorySerialService.normalize_serial_numbers(
+            input.serial_numbers
+        )
+        if getattr(item, "track_serial_numbers", False):
+            InventorySerialService.validate_serial_quantity(
+                input.quantity, serial_numbers
+            )
 
         # Validate warehouse
         warehouse = db.get(Warehouse, wh_id)
@@ -780,6 +823,18 @@ class InventoryTransactionService(ListResponseMixin):
 
         db.flush()
 
+        if getattr(item, "track_serial_numbers", False):
+            InventorySerialService.issue_serials(
+                db,
+                organization_id=org_id,
+                item_id=itm_id,
+                warehouse_id=wh_id,
+                serial_numbers=serial_numbers,
+                transaction=transaction,
+                lot_id=lot_id,
+                created_by_user_id=user_id,
+            )
+
         # Weighted average issues consume at current WAC and update ledger quantity.
         if item.costing_method == CostingMethod.WEIGHTED_AVERAGE:
             if not InventoryTransactionService._is_mock_like(db):
@@ -836,8 +891,19 @@ class InventoryTransactionService(ListResponseMixin):
         # Get warehouse-scoped balances ordered by lot received date (oldest first)
         if InventoryTransactionService._is_mock_like(db):
             mock_lots = list(db.scalars(select(InventoryLot)).all())
+            lot_rows: list[tuple[InventoryLotBalance, InventoryLot]] = []
+            for lot in mock_lots:
+                balances = getattr(lot, "_mock_balances", {}) or {}
+                balance = balances.get(wh_id)
+                if (
+                    balance is not None
+                    and (balance.quantity_on_hand or Decimal("0")) > 0
+                    and getattr(balance, "is_active", True)
+                    and not getattr(balance, "is_quarantined", False)
+                ):
+                    lot_rows.append((balance, lot))
             total_available = sum(
-                (lot.quantity_on_hand for lot in mock_lots),
+                (balance.quantity_on_hand or Decimal("0") for balance, _ in lot_rows),
                 Decimal("0"),
             )
 
@@ -852,16 +918,20 @@ class InventoryTransactionService(ListResponseMixin):
             layers_used = []
             first_lot_id = None
 
-            for lot in mock_lots:
+            for bal, lot in lot_rows:
                 if remaining <= 0:
                     break
 
-                consume_qty = min(lot.quantity_on_hand, remaining)
+                consume_qty = min(bal.quantity_on_hand, remaining)
                 layer_cost = consume_qty * lot.unit_cost
-                lot.quantity_on_hand -= consume_qty
-                lot.quantity_available = lot.quantity_on_hand - (
-                    lot.quantity_allocated or Decimal("0")
+                bal.quantity_on_hand -= consume_qty
+                if bal.quantity_allocated > bal.quantity_on_hand:
+                    bal.quantity_allocated = bal.quantity_on_hand
+                bal.quantity_available = bal.quantity_on_hand - (
+                    bal.quantity_allocated or Decimal("0")
                 )
+                bal.is_active = bal.quantity_on_hand > 0 or bal.quantity_allocated > 0
+                InventoryTransactionService._sync_legacy_lot_snapshot(db, lot)
 
                 remaining -= consume_qty
                 total_cost += layer_cost
@@ -964,11 +1034,10 @@ class InventoryTransactionService(ListResponseMixin):
         lot = db.get(InventoryLot, coerce_uuid(lot_id))
         if lot:
             if warehouse_id is None:
-                lot.quantity_on_hand = (lot.quantity_on_hand or Decimal("0")) - quantity
-                lot.quantity_available = lot.quantity_on_hand - (
-                    lot.quantity_allocated or Decimal("0")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Warehouse ID is required for lot consumption",
                 )
-                return
 
             balance = InventoryTransactionService._get_lot_balance(
                 db,
@@ -1209,6 +1278,13 @@ class InventoryTransactionService(ListResponseMixin):
         item = db.get(Item, itm_id)
         if not item or item.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Item not found")
+        serial_numbers = InventorySerialService.normalize_serial_numbers(
+            input.serial_numbers
+        )
+        if getattr(item, "track_serial_numbers", False):
+            InventorySerialService.validate_serial_quantity(
+                input.quantity, serial_numbers
+            )
 
         # Validate warehouses
         from_warehouse = db.get(Warehouse, from_wh_id)
@@ -1361,6 +1437,22 @@ class InventoryTransactionService(ListResponseMixin):
             )
             destination_balance.is_active = True
             InventoryTransactionService._sync_legacy_lot_snapshot(db, lot)
+
+        if getattr(item, "track_serial_numbers", False):
+            InventorySerialService.transfer_serials(
+                db,
+                organization_id=org_id,
+                item_id=itm_id,
+                from_warehouse_id=from_wh_id,
+                to_warehouse_id=to_wh_id,
+                serial_numbers=serial_numbers,
+                issue_transaction=issue_txn,
+                receipt_transaction=receipt_txn,
+                lot_id=input.lot_id,
+                from_location_id=input.location_id,
+                to_location_id=input.to_location_id,
+                created_by_user_id=user_id,
+            )
 
         if auto_commit:
             db.flush()

@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
+from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 from app.models.inventory.inventory_transaction import TransactionType
 from app.models.inventory.item import CostingMethod
 from app.services.inventory.transaction import (
@@ -39,6 +40,7 @@ class MockItem:
         standard_cost: Decimal = None,
         last_purchase_cost: Decimal = None,
         track_lots: bool = False,
+        track_serial_numbers: bool = False,
         category_id: uuid.UUID = None,
         inventory_account_id: uuid.UUID = None,
         cogs_account_id: uuid.UUID = None,
@@ -51,6 +53,7 @@ class MockItem:
         self.standard_cost = standard_cost
         self.last_purchase_cost = last_purchase_cost
         self.track_lots = track_lots
+        self.track_serial_numbers = track_serial_numbers
         self.category_id = category_id or uuid.uuid4()
         self.inventory_account_id = inventory_account_id
         self.cogs_account_id = cogs_account_id
@@ -108,6 +111,18 @@ class MockInventoryLot:
         self.is_active = is_active
         self.is_quarantined = is_quarantined
         self.initial_quantity = initial_quantity or quantity_on_hand
+        balance = InventoryLotBalance(
+            organization_id=self.organization_id,
+            lot_id=self.lot_id,
+            warehouse_id=warehouse_id,
+            quantity_on_hand=quantity_on_hand,
+            quantity_allocated=quantity_allocated,
+            quantity_available=self.quantity_available,
+            is_active=is_active,
+            is_quarantined=is_quarantined,
+        )
+        self._mock_balances = {warehouse_id: balance}
+        self._mock_default_balance = balance
 
 
 class MockInventoryTransaction:
@@ -159,6 +174,11 @@ def create_transaction_input(
         currency_code=kwargs.get("currency_code", "USD"),
         location_id=kwargs.get("location_id"),
         lot_id=kwargs.get("lot_id"),
+        lot_number=kwargs.get("lot_number"),
+        lot_manufacture_date=kwargs.get("lot_manufacture_date"),
+        lot_expiry_date=kwargs.get("lot_expiry_date"),
+        lot_supplier_lot_number=kwargs.get("lot_supplier_lot_number"),
+        lot_certificate_of_analysis=kwargs.get("lot_certificate_of_analysis"),
         to_warehouse_id=kwargs.get("to_warehouse_id"),
         to_location_id=kwargs.get("to_location_id"),
         source_document_type=kwargs.get("source_document_type"),
@@ -166,6 +186,7 @@ def create_transaction_input(
         source_document_line_id=kwargs.get("source_document_line_id"),
         reference=kwargs.get("reference"),
         reason_code=kwargs.get("reason_code"),
+        serial_numbers=kwargs.get("serial_numbers"),
     )
 
 
@@ -409,6 +430,49 @@ class TestCreateReceipt:
 
         mock_db.add.assert_called_once()
         mock_db.flush.assert_called()
+
+    def test_create_receipt_lot_keeps_isp_reporting_metadata(self):
+        """Lot-tracked receipts should persist service/reporting metadata."""
+        mock_db = MagicMock()
+        org_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        wh_id = uuid.uuid4()
+        mock_db.scalars.return_value.first.return_value = None
+
+        mock_item = MockItem(
+            item_id=item_id,
+            organization_id=org_id,
+            costing_method=CostingMethod.WEIGHTED_AVERAGE,
+            track_lots=True,
+        )
+        mock_transaction = MagicMock()
+
+        input_data = create_transaction_input(
+            transaction_type=TransactionType.RECEIPT,
+            item_id=item_id,
+            warehouse_id=wh_id,
+            quantity=Decimal("3"),
+            unit_cost=Decimal("25.00"),
+            transaction_date=datetime(2026, 4, 14, tzinfo=UTC),
+            lot_number="CIRCUIT-APR-001",
+            lot_manufacture_date=date(2026, 4, 1),
+            lot_expiry_date=date(2027, 3, 31),
+            lot_supplier_lot_number="CIRCUIT-12345",
+            lot_certificate_of_analysis="SLA-987",
+        )
+
+        lot = InventoryTransactionService._create_or_update_lot_for_receipt(
+            mock_db,
+            mock_item,
+            mock_transaction,
+            input_data,
+        )
+
+        assert lot.lot_number == "CIRCUIT-APR-001"
+        assert lot.manufacture_date == date(2026, 4, 1)
+        assert lot.expiry_date == date(2027, 3, 31)
+        assert lot.supplier_lot_number == "CIRCUIT-12345"
+        assert lot.certificate_of_analysis == "SLA-987"
 
     def test_create_receipt_item_not_found(self):
         """Test receipt fails when item not found."""
@@ -819,6 +883,7 @@ class TestCreateIssue:
         mock_lot = MockInventoryLot(
             lot_id=lot_id,
             item_id=item_id,
+            warehouse_id=wh_id,
             is_quarantined=True,  # Quarantined
         )
 
@@ -892,6 +957,7 @@ class TestCreateIssue:
         mock_lot = MockInventoryLot(
             lot_id=lot_id,
             item_id=item_id,
+            warehouse_id=wh_id,
             quantity_available=Decimal("10"),  # Only 10 available in lot
         )
 
@@ -1091,10 +1157,12 @@ class TestConsumeFifo:
         """Test FIFO consumption from single lot."""
         mock_db = MagicMock()
         item_id = uuid.uuid4()
+        warehouse_id = uuid.uuid4()
 
         mock_lot = MockInventoryLot(
             lot_id=uuid.uuid4(),
             item_id=item_id,
+            warehouse_id=warehouse_id,
             quantity_on_hand=Decimal("100"),
             quantity_allocated=Decimal("0"),
             unit_cost=Decimal("10.00"),
@@ -1105,7 +1173,7 @@ class TestConsumeFifo:
         result = InventoryTransactionService._consume_fifo(
             db=mock_db,
             item_id=item_id,
-            warehouse_id=uuid.uuid4(),
+            warehouse_id=warehouse_id,
             quantity=Decimal("50"),
         )
 
@@ -1118,10 +1186,12 @@ class TestConsumeFifo:
         """Test FIFO consumption from multiple lots."""
         mock_db = MagicMock()
         item_id = uuid.uuid4()
+        warehouse_id = uuid.uuid4()
 
         lot1 = MockInventoryLot(
             lot_id=uuid.uuid4(),
             item_id=item_id,
+            warehouse_id=warehouse_id,
             quantity_on_hand=Decimal("30"),
             quantity_allocated=Decimal("0"),
             unit_cost=Decimal("10.00"),
@@ -1129,6 +1199,7 @@ class TestConsumeFifo:
         lot2 = MockInventoryLot(
             lot_id=uuid.uuid4(),
             item_id=item_id,
+            warehouse_id=warehouse_id,
             quantity_on_hand=Decimal("50"),
             quantity_allocated=Decimal("0"),
             unit_cost=Decimal("12.00"),
@@ -1142,7 +1213,7 @@ class TestConsumeFifo:
         result = InventoryTransactionService._consume_fifo(
             db=mock_db,
             item_id=item_id,
-            warehouse_id=uuid.uuid4(),
+            warehouse_id=warehouse_id,
             quantity=Decimal("50"),  # 30 from lot1 + 20 from lot2
         )
 
@@ -1157,10 +1228,12 @@ class TestConsumeFifo:
         """Test FIFO consumption fails with insufficient inventory."""
         mock_db = MagicMock()
         item_id = uuid.uuid4()
+        warehouse_id = uuid.uuid4()
 
         mock_lot = MockInventoryLot(
             lot_id=uuid.uuid4(),
             item_id=item_id,
+            warehouse_id=warehouse_id,
             quantity_on_hand=Decimal("30"),
             quantity_allocated=Decimal("0"),
             unit_cost=Decimal("10.00"),
@@ -1172,7 +1245,7 @@ class TestConsumeFifo:
             InventoryTransactionService._consume_fifo(
                 db=mock_db,
                 item_id=item_id,
-                warehouse_id=uuid.uuid4(),
+                warehouse_id=warehouse_id,
                 quantity=Decimal("50"),  # More than available
             )
 
@@ -1217,6 +1290,7 @@ class TestConsumeFromLot:
 
         mock_lot = MockInventoryLot(
             lot_id=lot_id,
+            warehouse_id=uuid.uuid4(),
             quantity_on_hand=Decimal("100"),
             quantity_allocated=Decimal("10"),
         )
@@ -1227,6 +1301,7 @@ class TestConsumeFromLot:
             db=mock_db,
             lot_id=lot_id,
             quantity=Decimal("30"),
+            warehouse_id=mock_lot.warehouse_id,
         )
 
         assert mock_lot.quantity_on_hand == Decimal("70")
@@ -1902,3 +1977,148 @@ class TestList:
 
         assert len(result) == 1
         mock_db.scalars.assert_called()
+
+
+class TestSerialTrackedTransactions:
+    """Tests for serial tracking hooks in transaction posting."""
+
+    def test_serial_tracked_receipt_requires_one_serial_per_unit(self):
+        mock_db = MagicMock()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        wh_id = uuid.uuid4()
+        mock_item = MockItem(
+            item_id=item_id,
+            organization_id=org_id,
+            track_serial_numbers=True,
+        )
+        mock_warehouse = MockWarehouse(warehouse_id=wh_id, organization_id=org_id)
+
+        def mock_get(model_class, _id):
+            from app.models.inventory.item import Item
+            from app.models.inventory.warehouse import Warehouse
+
+            if model_class == Item:
+                return mock_item
+            if model_class == Warehouse:
+                return mock_warehouse
+            return None
+
+        mock_db.get.side_effect = mock_get
+        input_data = create_transaction_input(
+            transaction_type=TransactionType.RECEIPT,
+            item_id=item_id,
+            warehouse_id=wh_id,
+            quantity=Decimal("2"),
+            serial_numbers=["SN-001"],
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            InventoryTransactionService.create_receipt(
+                mock_db, org_id, input_data, user_id
+            )
+
+        assert exc_info.value.status_code == 400
+        assert "exactly 2 serial" in exc_info.value.detail
+
+    def test_serial_tracked_receipt_registers_serials(self):
+        mock_db = MagicMock()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        wh_id = uuid.uuid4()
+        mock_item = MockItem(
+            item_id=item_id,
+            organization_id=org_id,
+            track_serial_numbers=True,
+        )
+        mock_warehouse = MockWarehouse(warehouse_id=wh_id, organization_id=org_id)
+
+        def mock_get(model_class, _id):
+            from app.models.inventory.item import Item
+            from app.models.inventory.warehouse import Warehouse
+
+            if model_class == Item:
+                return mock_item
+            if model_class == Warehouse:
+                return mock_warehouse
+            return None
+
+        mock_db.get.side_effect = mock_get
+        input_data = create_transaction_input(
+            transaction_type=TransactionType.RECEIPT,
+            item_id=item_id,
+            warehouse_id=wh_id,
+            quantity=Decimal("2"),
+            serial_numbers=["SN-001", "SN-002"],
+        )
+
+        with (
+            patch.object(
+                InventoryTransactionService,
+                "get_current_balance",
+                return_value=Decimal("0"),
+            ),
+            patch.object(
+                InventoryTransactionService,
+                "calculate_weighted_average_cost",
+                return_value=Decimal("10.00"),
+            ),
+            patch(
+                "app.services.inventory.transaction.InventorySerialService.receive_serials"
+            ) as mock_receive,
+        ):
+            InventoryTransactionService.create_receipt(
+                mock_db, org_id, input_data, user_id
+            )
+
+        assert mock_receive.call_args.kwargs["serial_numbers"] == ["SN-001", "SN-002"]
+
+    def test_serial_tracked_issue_marks_serials_issued(self):
+        mock_db = MagicMock()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        wh_id = uuid.uuid4()
+        mock_item = MockItem(
+            item_id=item_id,
+            organization_id=org_id,
+            track_serial_numbers=True,
+        )
+        mock_warehouse = MockWarehouse(warehouse_id=wh_id, organization_id=org_id)
+
+        def mock_get(model_class, _id):
+            from app.models.inventory.item import Item
+            from app.models.inventory.warehouse import Warehouse
+
+            if model_class == Item:
+                return mock_item
+            if model_class == Warehouse:
+                return mock_warehouse
+            return None
+
+        mock_db.get.side_effect = mock_get
+        input_data = create_transaction_input(
+            transaction_type=TransactionType.ISSUE,
+            item_id=item_id,
+            warehouse_id=wh_id,
+            quantity=Decimal("1"),
+            serial_numbers=["SN-001"],
+        )
+
+        with (
+            patch.object(
+                InventoryTransactionService,
+                "get_current_balance",
+                return_value=Decimal("10"),
+            ),
+            patch(
+                "app.services.inventory.transaction.InventorySerialService.issue_serials"
+            ) as mock_issue,
+        ):
+            InventoryTransactionService.create_issue(
+                mock_db, org_id, input_data, user_id
+            )
+
+        assert mock_issue.call_args.kwargs["serial_numbers"] == ["SN-001"]

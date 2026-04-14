@@ -18,6 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.models.inventory.inventory_lot_balance import InventoryLotBalance
 from app.models.inventory.inventory_transaction import TransactionType
 
 # ============ Mock Enums ============
@@ -323,6 +324,20 @@ class MockInventoryLot:
         self.qc_status = qc_status
         self.created_at = created_at or datetime.now(UTC)
         self.updated_at = updated_at
+        balance = InventoryLotBalance(
+            organization_id=self.organization_id,
+            lot_id=self.lot_id,
+            warehouse_id=warehouse_id,
+            quantity_on_hand=quantity_on_hand,
+            quantity_allocated=quantity_allocated,
+            quantity_available=self.quantity_available,
+            is_active=is_active,
+            is_quarantined=is_quarantined,
+            quarantine_reason=quarantine_reason,
+            qc_status=qc_status,
+        )
+        self._mock_balances = {warehouse_id: balance}
+        self._mock_default_balance = balance
 
 
 class MockInventoryValuation:

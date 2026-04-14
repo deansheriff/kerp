@@ -430,6 +430,7 @@ class InventoryReturnWebService:
             or settings.default_presentation_currency_code,
             lot_id=existing_lot.lot_id if existing_lot else None,
             lot_number=normalized_lot_number,
+            serial_numbers=parsed_serial_numbers or None,
             source_document_type="INVENTORY_RETURN",
             source_document_id=inventory_return.return_id,
             reference=inventory_return.return_number,
