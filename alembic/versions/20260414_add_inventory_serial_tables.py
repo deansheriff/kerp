@@ -180,7 +180,9 @@ def upgrade() -> None:
                 nullable=True,
             ),
             sa.Column("reason", sa.String(length=100), nullable=True),
-            sa.Column("created_by_user_id", postgresql.UUID(as_uuid=True), nullable=True),
+            sa.Column(
+                "created_by_user_id", postgresql.UUID(as_uuid=True), nullable=True
+            ),
             sa.Column(
                 "created_at",
                 sa.DateTime(timezone=True),
