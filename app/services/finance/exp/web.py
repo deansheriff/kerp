@@ -158,7 +158,25 @@ class ExpenseWebService:
         """Get context for expense form (new/edit)."""
         org_id = coerce_uuid(organization_id)
 
-        # Get expense accounts (EXPENSES category)
+        # Get expense accounts (EXPENSES category), excluding system/automated
+        # accounts that should not appear on manual expense entries.
+        _system_expense_codes = {
+            "6000",  # Staff Salaries & Wage (payroll)
+            "6031",  # Exchange gain or Loss (accounting)
+            "6034",  # Reconciliation Discrepancies (banking)
+            "6035",  # Undeposited Funds (banking)
+            "6036",  # Unearned Revenue (revenue deferral)
+            "6039",  # Pension Expense (payroll)
+            "6040",  # ITF (payroll statutory)
+            "6041",  # NHF (payroll statutory)
+            "6062",  # Bad Debt (accounting write-off)
+            "6091",  # Depreciation (automated)
+            "6092",  # Tax Audit Expense (accounting)
+            "6094",  # Discount (sales)
+            "6095",  # Discounts given - COS (sales)
+            "6100",  # VAT Paid (tax)
+            "6101",  # Payroll Rounding Expense (payroll)
+        }
         expense_accounts = db.scalars(
             select(Account)
             .join(AccountCategory, Account.category_id == AccountCategory.category_id)
@@ -166,6 +184,7 @@ class ExpenseWebService:
                 Account.organization_id == org_id,
                 Account.is_active.is_(True),
                 AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
+                Account.account_code.notin_(_system_expense_codes),
             )
             .order_by(Account.account_code)
         ).all()

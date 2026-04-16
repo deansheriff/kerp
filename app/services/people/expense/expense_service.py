@@ -526,7 +526,8 @@ class ExpenseService:
                     category_id=item_data["category_id"],
                     description=item_data["description"],
                     claimed_amount=item_data["claimed_amount"],
-                    expense_account_id=item_data.get("expense_account_id"),
+                    expense_account_id=item_data.get("expense_account_id")
+                    or category.expense_account_id,
                     cost_center_id=item_data.get("cost_center_id"),
                     receipt_url=item_data.get("receipt_url"),
                     receipt_number=item_data.get("receipt_number"),
@@ -586,7 +587,8 @@ class ExpenseService:
             category_id=item_data["category_id"],
             description=item_data["description"],
             claimed_amount=item_data["claimed_amount"],
-            expense_account_id=item_data.get("expense_account_id"),
+            expense_account_id=item_data.get("expense_account_id")
+            or category.expense_account_id,
             cost_center_id=item_data.get("cost_center_id"),
             receipt_url=item_data.get("receipt_url"),
             receipt_number=item_data.get("receipt_number"),

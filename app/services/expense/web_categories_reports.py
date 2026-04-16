@@ -33,6 +33,29 @@ from app.web.deps import base_context
 
 
 class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
+    # Accounts that should never appear in expense category dropdowns.
+    # These are system/automated accounts (payroll, depreciation, tax,
+    # reconciliation, etc.) that are not valid for manual expense claims.
+    _SYSTEM_EXPENSE_CODES: frozenset[str] = frozenset(
+        {
+            "6000",  # Staff Salaries & Wage
+            "6031",  # Exchange gain or Loss
+            "6034",  # Reconciliation Discrepancies
+            "6035",  # Undeposited Funds
+            "6036",  # Unearned Revenue
+            "6039",  # Pension Expense
+            "6040",  # ITF
+            "6041",  # NHF
+            "6062",  # Bad Debt
+            "6091",  # Depreciation
+            "6092",  # Tax Audit Expense
+            "6094",  # Discount
+            "6095",  # Discounts given - COS
+            "6100",  # VAT Paid
+            "6101",  # Payroll Rounding Expense
+        }
+    )
+
     @staticmethod
     def _safe_iso_date(value: str | None) -> date_type | None:
         if not value:
@@ -102,6 +125,9 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
                 AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
                 Account.is_active.is_(True),
                 AccountCategory.is_active.is_(True),
+                Account.account_code.notin_(
+                    ExpenseCategoriesReportsWebMixin._SYSTEM_EXPENSE_CODES
+                ),
             )
             .order_by(Account.account_code)
         ).all()
@@ -254,6 +280,9 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
                 AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
                 Account.is_active.is_(True),
                 AccountCategory.is_active.is_(True),
+                Account.account_code.notin_(
+                    ExpenseCategoriesReportsWebMixin._SYSTEM_EXPENSE_CODES
+                ),
             )
             .order_by(Account.account_code)
         ).all()
