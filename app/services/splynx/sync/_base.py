@@ -75,9 +75,29 @@ class BaseSyncMixin:
 
     @property
     def sales_tax_code(self) -> TaxCode | None:
-        """Lazy-resolve the org's active VAT sales tax code."""
+        """Lazy-resolve the org's active VAT sales tax code.
+
+        Returns a detached-safe copy so that ``db.expunge_all()``
+        (called every 500 records during batch sync) does not
+        invalidate the cached reference.
+        """
         if not self._sales_tax_code_resolved:
-            self._sales_tax_code = self._resolve_sales_tax()
+            live = self._resolve_sales_tax()
+            if live is not None:
+                # Snapshot scalar attributes into a plain object so the
+                # cached reference survives session expunge/rollback.
+                from types import SimpleNamespace
+
+                self._sales_tax_code = SimpleNamespace(  # type: ignore[assignment]
+                    tax_code_id=live.tax_code_id,
+                    tax_code=live.tax_code,
+                    tax_name=live.tax_name,
+                    tax_rate=live.tax_rate,
+                    is_inclusive=live.is_inclusive,
+                    is_compound=live.is_compound,
+                    tax_collected_account_id=live.tax_collected_account_id,
+                    tax_paid_account_id=live.tax_paid_account_id,
+                )
             self._sales_tax_code_resolved = True
         return self._sales_tax_code
 

@@ -195,6 +195,8 @@ class UniqueDateAmountStrategy(MatchStrategy):
             line_index.setdefault(key, []).append(line)
 
         matched_payment_ids = ctx.tracker(self.provider.provider_key)
+
+        # Pass 1: exact date + amount (original greedy pairing)
         for key, indexed_payments in payment_index.items():
             available_lines = [
                 line
@@ -239,6 +241,74 @@ class UniqueDateAmountStrategy(MatchStrategy):
                         exc,
                     )
                     ctx.result.errors.append(f"Line {line.line_number}: {exc}")
+
+        # Pass 2: date-tolerant amount match.
+        # Splynx operators often record payments 1-7 days after the bank
+        # posts them.  For each still-unmatched bank line, find the
+        # closest-date payment with the same amount.
+
+        buffer_days = ctx.config.date_buffer_days if ctx.config else 7
+        amount_index: dict[int, list[Any]] = {}
+        for payment in payments:
+            if payment.payment_id in matched_payment_ids or not payment.correlation_id:
+                continue
+            amt_key = int(Decimal(payment.amount) * 100)
+            amount_index.setdefault(amt_key, []).append(payment)
+
+        for line in ctx.still_unmatched_lines():
+            amt_key = int(Decimal(line.amount) * 100)
+            candidates = amount_index.get(amt_key)
+            if not candidates:
+                continue
+            nearby = [
+                p
+                for p in candidates
+                if p.payment_id not in matched_payment_ids
+                and abs((p.payment_date - line.transaction_date).days) <= buffer_days
+            ]
+            if not nearby:
+                continue
+            nearby.sort(
+                key=lambda p: abs((p.payment_date - line.transaction_date).days)
+            )
+            # Skip if the two closest are equidistant (ambiguous)
+            if len(nearby) > 1 and abs(
+                (nearby[0].payment_date - line.transaction_date).days
+            ) == abs((nearby[1].payment_date - line.transaction_date).days):
+                continue
+            best = nearby[0]
+            try:
+                journal_line = service._find_journal_line(
+                    ctx.db,
+                    ctx.organization_id,
+                    best.correlation_id,
+                    ctx.bank_account.gl_account_id,
+                    extra_gl_account_ids=ctx.extra_gl_account_ids,
+                )
+                if not journal_line:
+                    continue
+                days_off = abs((best.payment_date - line.transaction_date).days)
+                _perform_match(
+                    service,
+                    ctx,
+                    line,
+                    journal_line,
+                    source_type="CUSTOMER_PAYMENT",
+                    source_id=best.payment_id,
+                    confidence=70,
+                    explanation=(
+                        f"Splynx payment {best.splynx_id} "
+                        f"(amount match, {days_off}d date offset)"
+                    ),
+                )
+                matched_payment_ids.add(best.payment_id)
+            except Exception as exc:
+                service.logger.exception(
+                    "Error matching line %s via date-tolerant amount: %s",
+                    line.line_id,
+                    exc,
+                )
+                ctx.result.errors.append(f"Line {line.line_number}: {exc}")
 
 
 @dataclass(frozen=True)
