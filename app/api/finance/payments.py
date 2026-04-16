@@ -188,6 +188,22 @@ class ExpensePaymentResponse(BaseModel):
     recipient_account_number: str | None = None
 
 
+class ResetExpensePaymentIntentRequest(BaseModel):
+    """Request to reset a failed/abandoned/expired expense payment intent."""
+
+    reason: str | None = Field(default=None, max_length=500)
+    force: bool = False
+
+
+class ResetExpensePaymentIntentResponse(BaseModel):
+    """Response when an expense payment intent is reset."""
+
+    expense_claim_id: UUID
+    intent_id: UUID
+    status: str
+    message: str
+
+
 class InitiateTransferResponse(BaseModel):
     """Response from transfer initiation."""
 
@@ -532,6 +548,48 @@ def initialize_expense_payment(
         recipient_account_name=intent.recipient_account_name,
         recipient_bank_code=intent.recipient_bank_code,
         recipient_account_number=intent.recipient_account_number,
+    )
+
+
+@router.post(
+    "/expense-claims/{expense_claim_id}/reset-payment-intent",
+    response_model=ResetExpensePaymentIntentResponse,
+)
+def reset_expense_payment_intent(
+    expense_claim_id: UUID,
+    request_data: ResetExpensePaymentIntentRequest,
+    organization_id: UUID = Depends(require_organization_id),
+    db: Session = Depends(get_db),
+    auth: dict = Depends(require_expense_reimburse_access),
+):
+    """
+    Reset a non-completed expense payment intent so reimbursement can be retried.
+    """
+    svc = PaymentService(db, organization_id)
+    try:
+        intent = svc.reset_expense_payment_intent(
+            expense_claim_id=expense_claim_id,
+            reason=request_data.reason,
+            force=request_data.force,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            f"Unexpected error resetting expense payment intent for claim {expense_claim_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not reset expense payment intent. Please try again.",
+        )
+
+    return ResetExpensePaymentIntentResponse(
+        expense_claim_id=expense_claim_id,
+        intent_id=intent.intent_id,
+        status=intent.status.value,
+        message="Payment intent reset. Re-run reimbursement to create a fresh transfer.",
     )
 
 

@@ -935,10 +935,16 @@ class ExpenseClaimMixin(ExpenseServiceBase):
     ) -> None:
         from app.services.expense.limit_service import ExpenseLimitService
 
+        claim_amount = (
+            claim.net_payable_amount
+            or claim.total_approved_amount
+            or claim.total_claimed_amount
+            or Decimal("0")
+        )
         ExpenseLimitService(self.db, self.ctx).check_approver_weekly_budget(
             org_id,
             approver_id,
-            claim.total_approved_amount or claim.total_claimed_amount or Decimal("0"),
+            claim_amount,
             approval_at=approval_at,
         )
 

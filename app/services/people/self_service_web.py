@@ -26,9 +26,6 @@ from starlette.datastructures import UploadFile
 from app.models.people.attendance import Attendance, AttendanceStatus
 from app.models.people.exp import (
     ExpenseClaim,
-    ExpenseClaimAction,
-    ExpenseClaimActionStatus,
-    ExpenseClaimActionType,
     ExpenseClaimStatus,
 )
 from app.models.people.hr.employee import Employee, EmployeeStatus
@@ -2397,7 +2394,7 @@ class SelfServiceWebService:
             budget_info = limit_svc._get_approver_weekly_budget(org_id, approver)
             if budget_info is not None:
                 budget_amount, limit_id = budget_info
-                now = datetime.now(UTC)
+                now = datetime.now(UTC).date()
                 latest_reset = limit_svc.get_latest_weekly_reset(
                     org_id,
                     approver_id=approver_employee_id,
@@ -2407,32 +2404,21 @@ class SelfServiceWebService:
                 usage_query = (
                     select(
                         func.coalesce(
-                            func.sum(ExpenseClaim.total_approved_amount), Decimal("0")
+                            func.sum(ExpenseClaim.net_payable_amount), Decimal("0")
                         )
                     )
                     .select_from(ExpenseClaim)
-                    .join(
-                        ExpenseClaimAction,
-                        and_(
-                            ExpenseClaimAction.claim_id == ExpenseClaim.claim_id,
-                            ExpenseClaimAction.action_type
-                            == ExpenseClaimActionType.APPROVE,
-                            ExpenseClaimAction.status
-                            == ExpenseClaimActionStatus.COMPLETED,
-                        ),
-                    )
                     .where(
                         ExpenseClaim.organization_id == org_id,
-                        ExpenseClaim.status.in_(
-                            [ExpenseClaimStatus.APPROVED, ExpenseClaimStatus.PAID]
-                        ),
-                        ExpenseClaimAction.created_at <= now,
+                        ExpenseClaim.status == ExpenseClaimStatus.PAID,
+                        ExpenseClaim.paid_on.isnot(None),
+                        ExpenseClaim.paid_on <= now,
                         ExpenseClaim.approver_id == approver_employee_id,
                     )
                 )
                 if latest_reset is not None:
                     usage_query = usage_query.where(
-                        ExpenseClaimAction.created_at >= latest_reset.reset_at
+                        ExpenseClaim.paid_on >= latest_reset.reset_at.date()
                     )
 
                 used_amount = db.scalar(usage_query) or Decimal("0")

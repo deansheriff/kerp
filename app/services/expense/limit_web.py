@@ -1099,7 +1099,7 @@ class ExpenseLimitWebService:
             select(
                 ExpenseClaim.approver_id.label("approver_id"),
                 func.coalesce(
-                    func.sum(ExpenseClaim.total_approved_amount),
+                    func.sum(ExpenseClaim.net_payable_amount),
                     Decimal("0"),
                 ).label("paid_amount"),
             )
@@ -1397,7 +1397,7 @@ class ExpenseLimitWebService:
             as_of=now,
         )
         usage_query = select(
-            func.coalesce(func.sum(ExpenseClaim.total_approved_amount), Decimal("0"))
+            func.coalesce(func.sum(ExpenseClaim.net_payable_amount), Decimal("0"))
         ).where(
             ExpenseClaim.organization_id == org_id,
             ExpenseClaim.status == ExpenseClaimStatus.PAID,

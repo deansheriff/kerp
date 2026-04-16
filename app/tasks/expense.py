@@ -11,6 +11,7 @@ Handles:
 import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 try:
     from datetime import UTC  # type: ignore
@@ -33,6 +34,8 @@ from app.models.people.hr.employee import Employee, EmployeeStatus
 from app.services.notification import NotificationService
 
 logger = logging.getLogger(__name__)
+
+AFRICA_LAGOS_TZ = ZoneInfo("Africa/Lagos")
 
 
 @shared_task
@@ -288,6 +291,100 @@ def process_expense_approval_reminders() -> dict:
     )
     logger.info("Approval reminders complete: %d sent", total_sent)
 
+    return results
+
+
+@shared_task
+def reset_weekly_approver_budgets() -> dict:
+    """Reset weekly approver budgets every Monday at 07:00 Africa/Lagos."""
+
+    from app.services.expense.limit_service import ExpenseLimitService
+
+    logger.info("Running scheduled weekly approver budget reset")
+
+    results: dict[str, Any] = {
+        "organizations_processed": 0,
+        "employees_evaluated": 0,
+        "resets_created": 0,
+        "already_reset": 0,
+        "errors": [],
+    }
+
+    with SessionLocal() as db:
+        now_lagos = datetime.now(AFRICA_LAGOS_TZ)
+        current_week_start = (now_lagos - timedelta(days=now_lagos.weekday())).date()
+        current_week_end = current_week_start + timedelta(days=6)
+        previous_week_start = current_week_start - timedelta(days=7)
+        previous_week_end = current_week_end - timedelta(days=7)
+        week_window_start = datetime.combine(
+            current_week_start, datetime.min.time(), tzinfo=AFRICA_LAGOS_TZ
+        )
+
+        orgs = db.scalars(
+            select(Organization).where(Organization.is_active == True)
+        ).all()
+
+        for org in orgs:
+            try:
+                employees = db.scalars(
+                    select(Employee).where(
+                        Employee.organization_id == org.organization_id,
+                        Employee.status == EmployeeStatus.ACTIVE,
+                    )
+                ).all()
+                limit_service = ExpenseLimitService(db)
+
+                for employee in employees:
+                    results["employees_evaluated"] += 1
+                    budget_info = limit_service._get_approver_weekly_budget(
+                        org.organization_id, employee
+                    )
+                    if budget_info is None:
+                        continue
+
+                    _, approver_limit_id = budget_info
+                    already_reset = limit_service.get_latest_weekly_reset(
+                        org.organization_id,
+                        employee.employee_id,
+                        approver_limit_id,
+                        from_datetime=week_window_start,
+                    )
+                    if already_reset is not None:
+                        results["already_reset"] += 1
+                        continue
+
+                    limit_service.create_weekly_budget_reset(
+                        org.organization_id,
+                        approver_id=employee.employee_id,
+                        reviewed_by_id=employee.person_id,
+                        reset_reason="Scheduled weekly budget reset",
+                        reviewed_from=previous_week_start,
+                        reviewed_to=previous_week_end,
+                    )
+                    results["resets_created"] += 1
+
+                db.commit()
+                results["organizations_processed"] += 1
+
+            except Exception as e:
+                db.rollback()
+                logger.error(
+                    "Failed to process automatic budget reset for org %s: %s",
+                    org.organization_id,
+                    e,
+                )
+                results["errors"].append(
+                    {
+                        "organization_id": str(org.organization_id),
+                        "error": str(e),
+                    }
+                )
+
+    logger.info(
+        "Weekly approver budget reset complete: %d orgs, %d resets",
+        results["organizations_processed"],
+        results["resets_created"],
+    )
     return results
 
 

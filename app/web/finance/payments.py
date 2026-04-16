@@ -4,11 +4,15 @@ Payment Web Routes.
 HTML pages for payment flow.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+import logging
+from urllib.parse import quote_plus
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.services.common import coerce_uuid
+from app.services.finance.payments import PaymentService
 from app.services.finance.payments.web import payment_web_service
 from app.services.finance.platform.authorization import AuthorizationService
 from app.templates import templates
@@ -22,6 +26,7 @@ from app.web.deps import (
 )
 
 router = APIRouter(prefix="/payments", tags=["payments-web"])
+logger = logging.getLogger(__name__)
 
 
 def _require_expense_reimburse(
@@ -119,11 +124,51 @@ def reimburse_expense_page(
     context = base_context(request, auth, page_title, "expense", db=db)
     context.update(result.get("context", {}))
     context["error"] = request.query_params.get("error")
+    context["success"] = request.query_params.get("success")
 
     return templates.TemplateResponse(
         request,
         "finance/payments/reimburse_expense.html",
         context,
+    )
+
+
+@router.post("/reimburse/{expense_claim_id}/reset-intent")
+def reimburse_expense_reset_intent(
+    expense_claim_id: str,
+    reason: str | None = Form(None),
+    force: bool = Form(False),
+    auth: WebAuthContext = Depends(_require_expense_reimburse),
+    db: Session = Depends(get_db),
+):
+    """
+    Reset the latest failed/abandoned/expired reimbursement intent for retry.
+    """
+    claim_id = coerce_uuid(expense_claim_id)
+    svc = PaymentService(db, coerce_uuid(auth.organization_id))
+    try:
+        svc.reset_expense_payment_intent(
+            expense_claim_id=claim_id,
+            reason=(reason or None),
+            force=force,
+        )
+    except HTTPException as exc:
+        return RedirectResponse(
+            f"/finance/payments/reimburse/{expense_claim_id}?error={quote_plus(str(exc.detail))}",
+            status_code=303,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to reset expense reimbursement intent %s", expense_claim_id
+        )
+        return RedirectResponse(
+            f"/finance/payments/reimburse/{expense_claim_id}?error=Failed+to+reset+payment+intent",
+            status_code=303,
+        )
+
+    return RedirectResponse(
+        f"/finance/payments/reimburse/{expense_claim_id}?success=Payment+intent+reset+for+retry",
+        status_code=303,
     )
 
 

@@ -131,7 +131,7 @@ def get_celery_config() -> dict:
 
     broker = broker or _env_value("REDIS_URL") or "redis://localhost:6379/0"
     backend = backend or _env_value("REDIS_URL") or "redis://localhost:6379/1"
-    timezone = timezone or "UTC"
+    timezone = timezone or "Africa/Lagos"
     config: dict[str, str | int] = {
         "broker_url": broker,
         "result_backend": backend,
@@ -228,6 +228,14 @@ def _builtin_beat_schedule() -> dict[str, dict]:
         "expense-approval-reminders": {
             "task": "app.tasks.expense.process_expense_approval_reminders",
             "schedule": crontab(hour=8, minute=15),  # Daily at 8:15 AM
+        },
+        "expense-weekly-budget-reset": {
+            "task": "app.tasks.expense.reset_weekly_approver_budgets",
+            "schedule": crontab(
+                hour=7,
+                minute=0,
+                day_of_week=1,
+            ),  # Monday 7:00 AM (Africa/Lagos timezone)
         },
         "expense-stuck-transfers": {
             "task": "app.tasks.expense.poll_stuck_expense_transfers",

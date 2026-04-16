@@ -153,12 +153,31 @@ class PaymentWebService:
         # Check for existing active payment intent to prevent duplicate payments
         active_statuses = [PaymentIntentStatus.PENDING, PaymentIntentStatus.PROCESSING]
         active_intent = db.scalar(
-            select(PaymentIntent).where(
+            select(PaymentIntent)
+            .where(
                 PaymentIntent.source_type == "EXPENSE_CLAIM",
                 PaymentIntent.source_id == expense_claim.claim_id,
                 PaymentIntent.status.in_(active_statuses),
             )
+            .order_by(PaymentIntent.created_at.desc())
+            .limit(1)
         )
+
+        latest_intent = db.scalar(
+            select(PaymentIntent)
+            .where(
+                PaymentIntent.source_type == "EXPENSE_CLAIM",
+                PaymentIntent.source_id == expense_claim.claim_id,
+            )
+            .order_by(PaymentIntent.created_at.desc())
+            .limit(1)
+        )
+
+        resettable_statuses = {
+            PaymentIntentStatus.FAILED,
+            PaymentIntentStatus.ABANDONED,
+            PaymentIntentStatus.EXPIRED,
+        }
 
         can_reimburse = (
             expense_claim.status == ExpenseClaimStatus.APPROVED
@@ -183,6 +202,16 @@ class PaymentWebService:
             and not active_intent.transfer_code
         )
 
+        can_reset_intent = (
+            latest_intent is not None and latest_intent.status in resettable_statuses
+        )
+        latest_intent_status = latest_intent.status.value if latest_intent else None
+        latest_intent_error = None
+        if latest_intent and isinstance(latest_intent.gateway_response, dict):
+            raw_error = latest_intent.gateway_response.get("error")
+            if raw_error:
+                latest_intent_error = str(raw_error)
+
         return {
             "context": {
                 "page_title": f"Reimburse {expense_claim.claim_number}",
@@ -203,6 +232,12 @@ class PaymentWebService:
                 if active_intent
                 else None,
                 "can_retry_transfer": can_retry_transfer,
+                "can_reset_intent": can_reset_intent,
+                "latest_intent_status": latest_intent_status,
+                "latest_intent_error": latest_intent_error,
+                "latest_intent_id": str(latest_intent.intent_id)
+                if latest_intent
+                else None,
             }
         }
 
