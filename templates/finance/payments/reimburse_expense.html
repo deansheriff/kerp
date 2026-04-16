@@ -25,6 +25,13 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Transfer funds via Paystack</p>
         </div>
 
+        {% if error %}
+        <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-900/20">
+            <p class="text-sm font-medium text-rose-700 dark:text-rose-300">Payment could not be initiated</p>
+            <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ error }}</p>
+        </div>
+        {% endif %}
+
         <!-- Expense Claim Summary -->
         <div class="mb-6 space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
             <div class="flex items-center justify-between">
@@ -232,9 +239,7 @@ async function retryTransfer(intentId) {
         }
     } catch (error) {
         console.error('Retry transfer error:', error);
-        window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Transfer failed: ' + error.message, type: 'error' } }));
-        btn.disabled = false;
-        btnText.textContent = 'Retry Transfer';
+        window.location.href = '/finance/payments/reimburse/{{ expense_claim.claim_id }}?error=' + encodeURIComponent(error.message || 'Transfer failed');
     }
 }
 </script>
@@ -425,9 +430,7 @@ async function initiateTransfer() {
 
     } catch (error) {
         console.error('Transfer error:', error);
-        window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Transfer failed: ' + error.message, type: 'error' } }));
-        btn.disabled = false;
-        btnText.textContent = 'Initiate Transfer';
+        window.location.href = '/finance/payments/reimburse/{{ expense_claim.claim_id }}?error=' + encodeURIComponent(error.message || 'Transfer failed');
     }
 }
 

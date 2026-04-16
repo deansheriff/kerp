@@ -74,6 +74,19 @@ if TYPE_CHECKING:
 __all__ = ["EmployeeService"]
 
 
+def _employee_search_predicate(search_term: str):
+    """Build the shared employee search predicate."""
+    full_name = func.trim(Person.first_name + " " + Person.last_name)
+    return or_(
+        Employee.employee_code.ilike(search_term),
+        Person.first_name.ilike(search_term),
+        Person.last_name.ilike(search_term),
+        Person.display_name.ilike(search_term),
+        full_name.ilike(search_term),
+        Person.email.ilike(search_term),
+    )
+
+
 class EmployeeService:
     """Service for employee business logic.
 
@@ -263,14 +276,7 @@ class EmployeeService:
             if not joined_person:
                 stmt = stmt.join(Person, Employee.person_id == Person.id)
                 joined_person = True
-            stmt = stmt.where(
-                or_(
-                    Employee.employee_code.ilike(search_term),
-                    Person.first_name.ilike(search_term),
-                    Person.last_name.ilike(search_term),
-                    Person.email.ilike(search_term),
-                )
-            )
+            stmt = stmt.where(_employee_search_predicate(search_term))
 
         if filters.date_of_joining_from:
             stmt = stmt.where(Employee.date_of_joining >= filters.date_of_joining_from)
@@ -433,12 +439,7 @@ class EmployeeService:
             .where(
                 Employee.organization_id == self.organization_id,
                 Employee.is_deleted == False,
-                or_(
-                    Employee.employee_code.ilike(search_term),
-                    Person.first_name.ilike(search_term),
-                    Person.last_name.ilike(search_term),
-                    Person.email.ilike(search_term),
-                ),
+                _employee_search_predicate(search_term),
             )
             .order_by(Person.first_name.asc())
             .limit(limit)

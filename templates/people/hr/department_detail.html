@@ -1,6 +1,6 @@
 {% extends "people/base_people.html" %}
 
-{% from "components/macros.html" import empty_state, icon_svg, pagination %}
+{% from "components/macros.html" import empty_state, icon_svg, pagination, status_badge %}
 {% block page_title %}Department: {{ department.department_name }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -88,6 +88,89 @@
         <div class="p-5 border-b border-slate-100 dark:border-slate-800">
             <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Employees</h3>
             <p class="text-sm text-slate-500 dark:text-slate-400">Designation, employment type, and shift assignment for this department.</p>
+        </div>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Employee</th>
+                        <th scope="col">Code</th>
+                        <th scope="col">Designation</th>
+                        <th scope="col">Employment Type</th>
+                        <th scope="col">Joined</th>
+                        <th scope="col" class="text-center">Status</th>
+                        <th scope="col" class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees %}
+                    <tr class="group">
+                        <td>
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                                    {{ emp.full_name[:2] | upper if emp.full_name else 'NA' }}
+                                </div>
+                                <div class="min-w-0">
+                                    <a href="/people/hr/employees/{{ emp.employee_id }}"
+                                       class="block truncate font-medium text-slate-900 transition-colors hover:text-teal-600 dark:text-white dark:hover:text-teal-400">
+                                        {{ emp.full_name }}
+                                    </a>
+                                    <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                                        {{ emp.person.email if emp.person and emp.person.email else 'No work email' }}
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="font-mono text-sm text-slate-700 dark:text-slate-300">{{ emp.employee_code }}</span>
+                        </td>
+                        <td>
+                            {% if emp.designation %}
+                            <span class="text-sm text-slate-700 dark:text-slate-300">{{ emp.designation.designation_name }}</span>
+                            {% else %}
+                            <span class="text-sm text-slate-400 dark:text-slate-500">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if emp.employment_type %}
+                            <span class="text-sm text-slate-700 dark:text-slate-300">{{ emp.employment_type.type_name }}</span>
+                            {% else %}
+                            <span class="text-sm text-slate-400 dark:text-slate-500">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if emp.date_of_joining %}
+                            <span class="text-sm text-slate-600 dark:text-slate-300">{{ emp.date_of_joining | format_date }}</span>
+                            {% else %}
+                            <span class="text-sm text-slate-400 dark:text-slate-500">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {{ status_badge(emp.status.value if emp.status else 'UNKNOWN', 'sm') }}
+                        </td>
+                        <td class="text-right">
+                            <a href="/people/hr/employees/{{ emp.employee_id }}"
+                               class="text-slate-400 transition-colors hover:text-teal-600 dark:hover:text-teal-400"
+                               aria-label="View {{ emp.full_name }}" title="View employee">
+                                {{ icon_svg("eye", "h-4 w-4 inline") }}
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7">
+                            {{ empty_state(
+                                "No employees in this department",
+                                "Assign employees to this department to see them here.",
+                                icon="user",
+                                cta_text="View Employees",
+                                cta_href="/people/hr/employees"
+                            ) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {{ pagination(
             page=page | default(1),

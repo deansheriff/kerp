@@ -118,6 +118,7 @@ def reimburse_expense_page(
     page_title = result.get("context", {}).get("page_title", "Reimburse Expense")
     context = base_context(request, auth, page_title, "expense", db=db)
     context.update(result.get("context", {}))
+    context["error"] = request.query_params.get("error")
 
     return templates.TemplateResponse(
         request,

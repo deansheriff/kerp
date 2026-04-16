@@ -23,6 +23,7 @@ from app.services.finance.payments import (
     PaystackError,
     WebhookService,
 )
+from app.services.expense.limit_service import ExpenseLimitServiceError
 from app.services.finance.platform.authorization import AuthorizationService
 from app.services.settings_spec import resolve_value
 
@@ -585,6 +586,8 @@ def initiate_transfer(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except ExpenseLimitServiceError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except PaystackError as e:
         logger.error(f"Transfer initiation failed: {e}")
         raise HTTPException(status_code=502, detail=f"Transfer failed: {e.message}")

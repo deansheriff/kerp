@@ -78,6 +78,7 @@ from app.services.expense.expense_service import (
     ApproverAuthorityError,
     ExpenseClaimStatusError,
 )
+from app.services.expense.limit_service import ExpenseLimitServiceError
 from app.services.finance.platform.idempotency import IdempotencyService
 
 router = APIRouter(
@@ -525,6 +526,17 @@ def approve_claim(
         )
         return response
     except ApproverAuthorityError as exc:
+        detail = str(exc)
+        IdempotencyService.update_response(
+            db=db,
+            organization_id=organization_id,
+            idempotency_key=idempotency_key,
+            endpoint=request.url.path,
+            response_status=403,
+            response_body={"detail": detail},
+        )
+        raise HTTPException(status_code=403, detail=detail)
+    except ExpenseLimitServiceError as exc:
         detail = str(exc)
         IdempotencyService.update_response(
             db=db,

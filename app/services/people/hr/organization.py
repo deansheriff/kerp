@@ -508,6 +508,7 @@ class OrganizationService:
             select(Employee.status, func.count(Employee.employee_id))
             .where(
                 Employee.department_id == department_id,
+                Employee.organization_id == self.organization_id,
                 Employee.is_deleted == False,
             )
             .group_by(Employee.status)

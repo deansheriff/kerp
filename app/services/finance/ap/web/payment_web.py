@@ -1041,6 +1041,83 @@ class PaymentWebService:
             request, "finance/ap/payment_batches.html", context
         )
 
+    def _payment_batch_form_context(
+        self,
+        db: Session,
+        org_id: UUID,
+        *,
+        search: str | None = None,
+        supplier_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Build shared context for the payment batch form (new + error re-render)."""
+        bank_accounts = bank_account_service.list(
+            db=db,
+            organization_id=org_id,
+            status=BankAccountStatus.active,
+            limit=200,
+        )
+
+        # Only payable invoices: POSTED or PARTIALLY_PAID with outstanding balance
+        stmt = (
+            select(SupplierInvoice, Supplier)
+            .join(Supplier, SupplierInvoice.supplier_id == Supplier.supplier_id)
+            .where(
+                SupplierInvoice.organization_id == org_id,
+                SupplierInvoice.status.in_(
+                    [
+                        SupplierInvoiceStatus.POSTED,
+                        SupplierInvoiceStatus.PARTIALLY_PAID,
+                    ]
+                ),
+                (SupplierInvoice.total_amount - SupplierInvoice.amount_paid)
+                > Decimal("0"),
+            )
+        )
+        if supplier_id:
+            stmt = stmt.where(SupplierInvoice.supplier_id == coerce_uuid(supplier_id))
+        if search:
+            pattern = f"%{search}%"
+            stmt = stmt.where(
+                SupplierInvoice.invoice_number.ilike(pattern)
+                | Supplier.trading_name.ilike(pattern)
+                | Supplier.legal_name.ilike(pattern)
+            )
+        stmt = stmt.order_by(SupplierInvoice.due_date.asc()).limit(200)
+        rows = db.execute(stmt).all()
+
+        invoices_view = [
+            {
+                "invoice_id": inv.invoice_id,
+                "invoice_number": inv.invoice_number,
+                "supplier_name": sup.trading_name or sup.legal_name,
+                "due_date": inv.due_date,
+                "amount": inv.balance_due,
+                "currency_code": inv.currency_code,
+                "status": inv.status.value if inv.status else "",
+            }
+            for inv, sup in rows
+        ]
+
+        # Suppliers for filter dropdown
+        suppliers = list(
+            db.scalars(
+                select(Supplier)
+                .where(Supplier.organization_id == org_id)
+                .order_by(Supplier.trading_name)
+                .limit(500)
+            ).all()
+        )
+
+        return {
+            "bank_accounts": bank_accounts,
+            "suppliers": suppliers,
+            "invoices": invoices_view,
+            "search": search or "",
+            "selected_supplier_id": supplier_id or "",
+            "payment_methods": [method.value for method in APPaymentMethod],
+            "form_data": {},
+        }
+
     def payment_batch_new_form_response(
         self,
         request: Request,
@@ -1054,53 +1131,95 @@ class PaymentWebService:
         org_id = auth.organization_id
         if org_id is None:
             raise HTTPException(status_code=401, detail="Authentication required")
-        bank_accounts = bank_account_service.list(
-            db=db,
-            organization_id=org_id,
-            status=BankAccountStatus.active,
-            limit=200,
-        )
-        stmt = (
-            select(SupplierInvoice, Supplier)
-            .join(Supplier, SupplierInvoice.supplier_id == Supplier.supplier_id)
-            .where(SupplierInvoice.organization_id == org_id)
-        )
-        if supplier_id:
-            stmt = stmt.where(SupplierInvoice.supplier_id == supplier_id)
-        if search:
-            stmt = stmt.where(
-                SupplierInvoice.invoice_number.ilike(f"%{search}%")
-                | Supplier.trading_name.ilike(f"%{search}%")
-                | Supplier.legal_name.ilike(f"%{search}%")
-            )
-        stmt = stmt.order_by(SupplierInvoice.invoice_date.desc()).limit(50)
-        invoices = db.execute(stmt)
-        invoices = invoices.all()
-        invoices_view = [
-            {
-                "invoice_id": invoice.invoice_id,
-                "invoice_number": invoice.invoice_number,
-                "supplier_name": supplier.trading_name or supplier.legal_name,
-                "due_date": invoice.due_date,
-                "amount": invoice.total_amount,
-                "currency_code": invoice.currency_code,
-            }
-            for invoice, supplier in invoices
-        ]
 
         context = base_context(request, auth, "New Payment Batch", "ap")
         context.update(
-            {
-                "bank_accounts": bank_accounts,
-                "invoices": invoices_view,
-                "payment_methods": [method.value for method in APPaymentMethod],
-                "form_data": {},
-            }
+            self._payment_batch_form_context(
+                db, org_id, search=search, supplier_id=supplier_id
+            )
         )
-        context.update(get_currency_context(db, str(auth.organization_id)))
+        context.update(get_currency_context(db, str(org_id)))
         return templates.TemplateResponse(
             request, "finance/ap/payment_batch_form.html", context
         )
+
+    async def create_payment_batch_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+    ) -> HTMLResponse | RedirectResponse:
+        """Handle payment batch form submission."""
+        form_data = await request.form()
+        data = dict(form_data)
+        invoice_ids = form_data.getlist("invoice_ids")
+
+        try:
+            batch_date = parse_date((data.get("batch_date") or "").strip())
+            bank_account_id = (data.get("bank_account_id") or "").strip()
+            payment_method = (data.get("payment_method") or "BANK_TRANSFER").strip()
+            currency_code = (data.get("currency_code") or "").strip().upper() or None
+
+            if batch_date is None:
+                raise ValueError("Batch date is required")
+            if not bank_account_id:
+                raise ValueError("Bank account is required")
+            if not invoice_ids:
+                raise ValueError("Select at least one invoice")
+            if auth.person_id is None:
+                raise ValueError("Authenticated person is required")
+
+            # Parse per-invoice amounts and WHT from form fields
+            invoice_amounts: dict[UUID, Decimal] = {}
+            invoice_wht_amounts: dict[UUID, Decimal] = {}
+            for inv_id_str in invoice_ids:
+                inv_uuid = coerce_uuid(inv_id_str)
+                amt_str = (data.get(f"amount_{inv_id_str}") or "").strip()
+                if amt_str:
+                    invoice_amounts[inv_uuid] = Decimal(amt_str)
+                wht_str = (data.get(f"wht_{inv_id_str}") or "").strip()
+                if wht_str:
+                    wht_val = Decimal(wht_str)
+                    if wht_val > Decimal("0"):
+                        invoice_wht_amounts[inv_uuid] = wht_val
+
+            batch = payment_batch_service.create_batch_from_invoice_ids(
+                db=db,
+                organization_id=auth.organization_id,
+                batch_date=batch_date,
+                payment_method=payment_method,
+                bank_account_id=coerce_uuid(bank_account_id),
+                invoice_ids=[coerce_uuid(iid) for iid in invoice_ids],
+                created_by_user_id=coerce_uuid(auth.person_id),
+                currency_code=currency_code,
+                invoice_amounts=invoice_amounts or None,
+                invoice_wht_amounts=invoice_wht_amounts or None,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=(
+                    "/finance/ap/payment-batches"
+                    f"?success=Batch+{batch.batch_number}+created+successfully"
+                ),
+                status_code=303,
+            )
+        except Exception as e:
+            logger.exception("create_payment_batch_response failed")
+            org_id = auth.organization_id
+            context = base_context(request, auth, "New Payment Batch", "ap")
+            if org_id:
+                context.update(self._payment_batch_form_context(db, org_id))
+                context.update(get_currency_context(db, str(org_id)))
+            data["invoice_ids"] = invoice_ids
+            context["form_data"] = data
+            # HTTPException stores the message in .detail, not __str__
+            if isinstance(e, HTTPException):
+                context["error"] = e.detail
+            else:
+                context["error"] = str(e)
+            return templates.TemplateResponse(
+                request, "finance/ap/payment_batch_form.html", context
+            )
 
     async def upload_payment_attachment_response(
         self,
