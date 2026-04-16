@@ -76,12 +76,19 @@ __all__ = ["EmployeeService"]
 
 def _employee_search_predicate(search_term: str):
     """Build the shared employee search predicate."""
-    full_name = func.trim(Person.first_name + " " + Person.last_name)
+    full_name = func.trim(
+        func.concat(
+            func.coalesce(Person.first_name, ""),
+            " ",
+            func.coalesce(Person.last_name, ""),
+        )
+    )
+    display_or_full_name = func.coalesce(Person.display_name, full_name)
     return or_(
         Employee.employee_code.ilike(search_term),
         Person.first_name.ilike(search_term),
         Person.last_name.ilike(search_term),
-        Person.display_name.ilike(search_term),
+        display_or_full_name.ilike(search_term),
         full_name.ilike(search_term),
         Person.email.ilike(search_term),
     )
