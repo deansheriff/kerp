@@ -1,0 +1,56 @@
+{% extends "fixed_assets/base_fixed_assets.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}Create Depreciation Run{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/fixed-assets/depreciation" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Depreciation</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Create Run</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block back_fallback %}/fixed-assets/depreciation{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="card p-6">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Create Depreciation Run</h2>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Select a fiscal period and optional posting date before posting depreciation.</p>
+
+        <form method="post" action="/fixed-assets/depreciation/run" class="mt-6 grid gap-4 md:grid-cols-2">
+            {{ request.state.csrf_form | safe }}
+
+            <div>
+                <label for="fiscal_period_id" class="form-label text-xs">Fiscal Period</label>
+                <select id="fiscal_period_id" name="fiscal_period_id" required class="form-select w-full">
+                    <option value="">Select period</option>
+                    {% for fp in fiscal_periods %}
+                    <option value="{{ fp.fiscal_period_id }}" {{ 'selected' if fp.fiscal_period_id == period else '' }}>
+                        {{ fp.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="posting_date" class="form-label text-xs">Posting Date (optional)</label>
+                <input id="posting_date" type="date" name="posting_date" class="form-input w-full">
+            </div>
+
+            <div class="md:col-span-2">
+                <div class="flex items-center gap-2">
+                    <button type="submit" class="btn btn-primary inline-flex items-center">
+                        {{ icon_svg("calculator", "h-4 w-4 mr-1.5") }}
+                        Run Depreciation
+                    </button>
+                    <a href="/fixed-assets/depreciation" class="btn btn-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

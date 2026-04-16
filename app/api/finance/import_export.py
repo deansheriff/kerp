@@ -23,7 +23,6 @@ from app.services.auth_dependencies import (
 )
 from app.services.finance.import_export import (
     AccountImporter,
-    AssetImporter,
     BankAccountImporter,
     CustomerImporter,
     CustomerPaymentImporter,
@@ -56,7 +55,6 @@ class EntityType(str, Enum):
     CUSTOMERS = "customers"
     SUPPLIERS = "suppliers"
     ITEMS = "items"
-    ASSETS = "assets"
     BANK_ACCOUNTS = "bank_accounts"
     INVOICES = "invoices"
     EXPENSES = "expenses"
@@ -215,25 +213,12 @@ async def get_supported_types(
                 "import_order": 4,
             },
             {
-                "type": "assets",
-                "name": "Fixed Assets",
-                "description": "Import fixed assets",
-                "required_columns": ["Asset Name"],
-                "optional_columns": [
-                    "Asset Number",
-                    "Acquisition Date",
-                    "Cost",
-                    "Category",
-                ],
-                "import_order": 5,
-            },
-            {
                 "type": "bank_accounts",
                 "name": "Bank Accounts",
                 "description": "Import bank accounts",
                 "required_columns": ["Bank Name", "Account Number"],
                 "optional_columns": ["Account Type", "Currency", "IBAN", "Branch"],
-                "import_order": 6,
+            "import_order": 5,
             },
             {
                 "type": "invoices",
@@ -246,7 +231,7 @@ async def get_supported_types(
                     "Due Date",
                     "Status",
                 ],
-                "import_order": 7,
+            "import_order": 6,
                 "prerequisites": ["customers"],
             },
             {
@@ -260,7 +245,7 @@ async def get_supported_types(
                     "Category",
                     "Payment Method",
                 ],
-                "import_order": 8,
+            "import_order": 7,
                 "prerequisites": ["accounts"],
             },
             {
@@ -269,7 +254,7 @@ async def get_supported_types(
                 "description": "Import customer payment receipts",
                 "required_columns": ["Customer Name", "Amount"],
                 "optional_columns": ["Payment Date", "Reference", "Payment Method"],
-                "import_order": 9,
+            "import_order": 8,
                 "prerequisites": ["customers"],
             },
             {
@@ -278,7 +263,7 @@ async def get_supported_types(
                 "description": "Import supplier/vendor payments",
                 "required_columns": ["Vendor Name", "Amount"],
                 "optional_columns": ["Payment Date", "Reference", "Payment Method"],
-                "import_order": 10,
+            "import_order": 9,
                 "prerequisites": ["suppliers"],
             },
         ],
@@ -287,7 +272,6 @@ async def get_supported_types(
             "customers",
             "suppliers",
             "items",
-            "assets",
             "bank_accounts",
             "invoices",
             "expenses",
@@ -382,7 +366,7 @@ async def import_data(
     Import data from a CSV file.
 
     Supports various entity types including accounts, customers, suppliers,
-    items, assets, bank accounts, invoices, expenses, and payments.
+    items, bank accounts, invoices, expenses, and payments.
     """
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(
@@ -460,16 +444,6 @@ def _get_importer(entity_type: EntityType, db: Session, config: ImportConfig):
             raise ValueError("No inventory account found. Import accounts first.")
         return ItemImporter(
             db, config, inv_account, inv_account, inv_account, inv_account
-        )
-
-    elif entity_type == EntityType.ASSETS:
-        asset_account = find_account_by_subledger_type(db, org_id, "ASSET")
-        if not asset_account:
-            asset_account = find_account_by_name_pattern(db, org_id, "fixed asset")
-        if not asset_account:
-            raise ValueError("No fixed asset account found. Import accounts first.")
-        return AssetImporter(
-            db, config, asset_account, asset_account, asset_account, asset_account
         )
 
     elif entity_type == EntityType.BANK_ACCOUNTS:

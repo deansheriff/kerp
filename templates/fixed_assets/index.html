@@ -1,59 +1,142 @@
-{% extends "inventory/base_inventory.html" %}
+{% extends "fixed_assets/base_fixed_assets.html" %}
 {% from "components/macros.html" import icon_svg %}
 
-{% block page_title %}Fixed Assets{% endblock %}
+{% block page_title %}Asset Management{% endblock %}
 
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
-        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Fixed Assets</span></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Asset Management</span></li>
     </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6 page-enter">
-    <div class="card p-6">
-        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Fixed Assets</h2>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose an asset category to continue.</p>
+{% set kpi = kpi | default({}) %}
+{% set by_state = kpi.get("by_state", []) %}
+{% set maintenance_due = kpi.get("maintenance_due", 0) %}
+{% set depreciation_due = kpi.get("depreciation_due", 0) %}
+{% set location_mismatch_count = kpi.get("location_mismatch_count", 0) %}
+{% set discrepancy_count = kpi.get("discrepancy_count", 0) %}
+
+<div class="space-y-8 page-enter">
+        <div class="card p-6">
+        <div class="mb-3 flex items-start justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Asset Management</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Operational KPI overview and module shortcuts.</p>
+            </div>
+            <a href="/fixed-assets/assets/new" class="btn btn-primary btn-sm">
+                {{ icon_svg("plus", "h-4 w-4 mr-2") }}
+                New Asset
+            </a>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <a href="/fixed-assets/reports?section=state" class="card p-5 border-emerald-200/70 bg-emerald-50/30 transition hover:border-emerald-300 dark:border-emerald-900/50 dark:bg-emerald-900/20">
+                <div class="flex items-start gap-3">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        {{ icon_svg("plus", "h-5 w-5") }}
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900 dark:text-white">Assets</h3>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Create and maintain all fixed asset master records.</p>
+                    </div>
+                </div>
+            </a>
+
+            <a href="/fixed-assets/import" class="card p-5 border-violet-200/70 bg-violet-50/30 transition hover:border-violet-300 dark:border-violet-900/50 dark:bg-violet-900/20">
+                <div class="flex items-start gap-3">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                        {{ icon_svg("cloud-upload", "h-5 w-5") }}
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900 dark:text-white">Import</h3>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Import fixed asset records and upload schedule data.</p>
+                    </div>
+                </div>
+            </a>
+
+            <a href="/fixed-assets/depreciation" class="card p-5 border-amber-200/70 bg-amber-50/30 transition hover:border-amber-300 dark:border-amber-900/50 dark:bg-amber-900/20">
+                <div class="flex items-start gap-3">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                        {{ icon_svg("calculator", "h-5 w-5") }}
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900 dark:text-white">Depreciation</h3>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Run, post, and review depreciation activity.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <a href="/fixed-assets/assets" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
-            <div class="flex items-start gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
-                    {{ icon_svg("building", "h-5 w-5") }}
-                </div>
+    <div class="grid gap-6 xl:grid-cols-3">
+        <div class="card p-6 xl:col-span-2">
+            <div class="mb-4 flex items-start justify-between gap-3">
                 <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Assets</h3>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage asset records, values, and lifecycle status.</p>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">By State</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Asset counts by lifecycle status.</p>
                 </div>
+                <a href="/fixed-assets/reports?section=state" class="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">Open report</a>
             </div>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {% for item in by_state %}
+                    <a href="/fixed-assets/reports?section=state" class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 transition hover:bg-white dark:border-slate-700 dark:bg-slate-800/50">
+                        <p class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ item.label }}</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ item.count | default(0) }}</p>
+                    </a>
+                {% else %}
+                    <p class="text-sm text-slate-500 dark:text-slate-400">No assets available.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <a href="/fixed-assets/reports?section=maintenance_due" class="card block p-5 transition hover:border-amber-200 hover:bg-amber-50/50 dark:hover:bg-amber-900/20">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Maintenance Due</p>
+                        <p class="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{{ maintenance_due }}</p>
+                    </div>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
+                        {{ icon_svg("cog", "h-5 w-5") }}
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Open requests with overdue due dates.</p>
+            </a>
+
+            <a href="/fixed-assets/reports?section=depreciation_due" class="card block p-5 transition hover:border-emerald-200 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Depreciation Due</p>
+                        <p class="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{{ depreciation_due }}</p>
+                    </div>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        {{ icon_svg("calculator", "h-5 w-5") }}
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Active assets with an unapplied depreciation run.</p>
+            </a>
+        </div>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-2">
+        <a href="/fixed-assets/reports?section=location_mismatches" class="card p-5 transition hover:border-rose-200 hover:bg-rose-50/50 dark:hover:bg-rose-900/20">
+            <div class="mb-3">
+                <p class="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">Location Mismatch</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{{ location_mismatch_count }}</p>
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Open audit discrepancy lines that include location mismatch or mixed mismatch conditions.</p>
         </a>
 
-        <a href="/fixed-assets/categories" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
-            <div class="flex items-start gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
-                    {{ icon_svg("collection", "h-5 w-5") }}
-                </div>
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Categories</h3>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Define asset classes and depreciation defaults.</p>
-                </div>
+        <a href="/fixed-assets/reports?section=discrepancies" class="card p-5 transition hover:border-sky-200 hover:bg-sky-50/50 dark:hover:bg-sky-900/20">
+            <div class="mb-3">
+                <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Open Discrepancies</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{{ discrepancy_count }}</p>
             </div>
-        </a>
-
-        <a href="/fixed-assets/depreciation" class="card p-5 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20">
-            <div class="flex items-start gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                    {{ icon_svg("calculator", "h-5 w-5") }}
-                </div>
-                <div>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Depreciation</h3>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review schedules and run depreciation calculations.</p>
-                </div>
-            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Outstanding open discrepancies detected from audit and physical checks.</p>
         </a>
     </div>
 </div>

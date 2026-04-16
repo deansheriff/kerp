@@ -14,6 +14,18 @@ from app.models.fixed_assets.depreciation_run import (
     DepreciationRunStatus,
 )
 from app.models.fixed_assets.depreciation_schedule import DepreciationSchedule
+from app.models.fixed_assets.maintenance_request import (
+    MaintenancePriority,
+    MaintenanceRequest,
+    MaintenanceRequestStatus,
+    MaintenanceStatusLog,
+)
+from app.models.fixed_assets.maintenance_work_order import (
+    MaintenanceWorkOrder,
+    MaintenanceWorkOrderPart,
+    MaintenanceWorkOrderPartStatus,
+    MaintenanceWorkOrderStatus,
+)
 
 __all__ = [
     "AssetCategory",
@@ -28,4 +40,12 @@ __all__ = [
     "AssetImpairment",
     "AssetDisposal",
     "DisposalType",
+    "MaintenanceRequest",
+    "MaintenanceRequestStatus",
+    "MaintenancePriority",
+    "MaintenanceStatusLog",
+    "MaintenanceWorkOrder",
+    "MaintenanceWorkOrderStatus",
+    "MaintenanceWorkOrderPart",
+    "MaintenanceWorkOrderPartStatus",
 ]

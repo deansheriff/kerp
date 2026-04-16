@@ -1,4 +1,4 @@
-{% extends "inventory/base_inventory.html" %}
+{% extends "fixed_assets/base_fixed_assets.html" %}
 {% from "components/macros.html" import icon_svg %}
 
 {% block page_title %}New Asset{% endblock %}
@@ -31,7 +31,7 @@
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
         <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
-        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/fixed-assets/assets" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Fixed Assets</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/fixed-assets/assets" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Asset Management</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">New</span></li>
     </ol>
 </nav>
@@ -106,6 +106,21 @@
                         </option>
                         {% endfor %}
                     </select>
+                </div>
+
+                <div>
+                    <label class="form-label">
+                        Depreciation Schedule
+                    </label>
+                    <select name="depreciation_schedule_id" class="form-select">
+                        <option value="">Use category default</option>
+                        {% for schedule in depreciation_schedules %}
+                        <option value="{{ schedule.schedule_id }}" {{ 'selected' if selected_depreciation_schedule_id == schedule.schedule_id else '' }}>
+                            {{ schedule.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p class="form-hint">Optional. If set, future depreciation for this asset will start from this schedule.</p>
                 </div>
 
                 <div class="sm:col-span-2">

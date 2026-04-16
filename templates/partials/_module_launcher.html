@@ -14,11 +14,15 @@
     "projects",
     "coach",
     "expense",
+    "fixed_assets",
   ] %}
 {% endif %}
 {% set launcher_modules = [] %}
 {% set launcher_modules = launcher_modules + [{"key": "home", "label": "Home", "href": "/", "icon": "/static/favicon.svg"}] %}
 
+{% if "fixed_assets" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "fixed_assets", "label": "Asset Management", "href": "/fixed-assets", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-emerald-500"}] %}
+{% endif %}
 {% if "finance" in modules %}
   {% set launcher_modules = launcher_modules + [{"key": "finance", "label": "Finance", "href": "/finance/dashboard", "icon": "/static/img/illustrations/module-finance.png", "accent": "bg-teal-500"}] %}
 {% endif %}
@@ -34,8 +38,14 @@
 {% if "inventory" in modules %}
   {% set launcher_modules = launcher_modules + [{"key": "inventory", "label": "Inventory", "href": "/inventory", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
 {% endif %}
-{% if "fleet" in modules or "support" in modules or "projects" in modules %}
-  {% set launcher_modules = launcher_modules + [{"key": "operations", "label": "Operations", "href": "/operations/dashboard", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
+{% if "fleet" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "fleet", "label": "Fleet", "href": "/fleet", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-amber-500"}] %}
+{% endif %}
+{% if "support" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "support", "label": "Support", "href": "/support/tickets", "icon": "/static/img/illustrations/module-support.png", "accent": "bg-amber-500"}] %}
+{% endif %}
+{% if "projects" in modules %}
+  {% set launcher_modules = launcher_modules + [{"key": "projects", "label": "Projects", "href": "/projects", "icon": "/static/img/illustrations/module-projects.png", "accent": "bg-amber-500"}] %}
 {% endif %}
 {% if "procurement" in modules %}
   {% set launcher_modules = launcher_modules + [{"key": "procurement", "label": "Procurement", "href": "/procurement", "icon": "/static/img/illustrations/module-procurement.png", "accent": "bg-blue-500"}] %}

@@ -1,4 +1,4 @@
-{% extends "inventory/base_inventory.html" %}
+{% extends "fixed_assets/base_fixed_assets.html" %}
 {% from "components/macros.html" import empty_state, status_badge, icon_svg %}
 
 {% block page_title %}Depreciation Schedule{% endblock %}
@@ -13,10 +13,10 @@
 {% endblock %}
 
 {% block header_actions %}
-<button class="btn btn-primary">
-    {{ icon_svg("calculator", "h-4 w-4") }}
-    Run Depreciation
-</button>
+<a href="/fixed-assets/depreciation/runs/new" class="btn btn-primary inline-flex items-center">
+    {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
+    New Depreciation Run
+</a>
 {% endblock %}
 
 {% block content %}

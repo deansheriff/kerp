@@ -27,6 +27,7 @@ from app.models.fixed_assets.asset import Asset, AssetStatus
 from app.models.fixed_assets.asset_disposal import AssetDisposal, DisposalType
 from app.services.audit_dispatcher import fire_audit_event
 from app.services.common import coerce_uuid
+from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -215,10 +216,24 @@ class AssetDisposalService(ListResponseMixin):
         disposal.approved_at = datetime.now(UTC)
 
         # Update asset status
+        previous_status = asset.status
         asset.status = AssetStatus.DISPOSED
         asset.disposal_date = disposal.disposal_date
         asset.disposal_proceeds = disposal.net_proceeds
         asset.disposal_gain_loss = disposal.gain_loss_on_disposal
+        record_asset_lifecycle_event(
+            db,
+            org_id=org_id,
+            asset_id=asset.asset_id,
+            event_category="STATE",
+            event_type="STATE_CHANGED",
+            source_type="asset_disposal",
+            source_record_id=disposal.disposal_id,
+            actor_user_id=user_id,
+            previous_status=previous_status.value,
+            new_status=asset.status.value,
+            notes="Asset marked disposed after disposal approval",
+        )
 
         try:
             from app.services.finance.automation.event_dispatcher import (

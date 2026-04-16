@@ -25,6 +25,16 @@ class AssignmentStatus(str, enum.Enum):
     LOST = "LOST"
 
 
+class AssignmentMovementType(str, enum.Enum):
+    """Movement event types for assignment lifecycle."""
+
+    ASSIGNED = "ASSIGNED"
+    TRANSFERRED = "TRANSFERRED"
+    REASSIGNED = "REASSIGNED"
+    RETURNED = "RETURNED"
+    LOCATION_TRANSFERRED = "LOCATION_TRANSFERRED"
+
+
 class AssetCondition(str, enum.Enum):
     """Condition of asset at issue/return."""
 
@@ -103,4 +113,82 @@ class AssetAssignment(Base, AuditMixin, ERPNextSyncMixin):
     previous_assignment: Mapped[AssetAssignment | None] = relationship(
         "AssetAssignment",
         remote_side="AssetAssignment.assignment_id",
+    )
+
+
+class AssetAssignmentMovement(Base, AuditMixin, ERPNextSyncMixin):
+    """Asset assignment/ownership/location movement log."""
+
+    __tablename__ = "asset_assignment_movement"
+    __table_args__ = (
+        Index("idx_asset_assignment_movement_asset", "organization_id", "asset_id"),
+        Index(
+            "idx_asset_assignment_movement_employee",
+            "organization_id",
+            "to_employee_id",
+        ),
+        Index("idx_asset_assignment_movement_type", "organization_id", "movement_type"),
+        {"schema": "hr"},
+    )
+
+    movement_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("core_org.organization.organization_id"),
+        nullable=False,
+        index=True,
+    )
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("fa.asset.asset_id"),
+        nullable=False,
+        index=True,
+    )
+    assignment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("hr.asset_assignment.assignment_id"),
+        nullable=True,
+    )
+    movement_type: Mapped[AssignmentMovementType] = mapped_column(
+        Enum(AssignmentMovementType, name="asset_assignment_movement_type"),
+        nullable=False,
+    )
+    from_employee_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("hr.employee.employee_id"),
+        nullable=True,
+    )
+    to_employee_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("hr.employee.employee_id"),
+        nullable=True,
+    )
+    from_location_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("core_org.location.location_id"),
+        nullable=True,
+    )
+    to_location_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("core_org.location.location_id"),
+        nullable=True,
+    )
+    moved_on: Mapped[date] = mapped_column(Date, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    moved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        nullable=True,
+        onupdate=func.now(),
     )

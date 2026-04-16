@@ -18,6 +18,7 @@ from app.services.fixed_assets.depreciation import (
     DepreciationService,
     depreciation_service,
 )
+from app.services.fixed_assets.import_export import AssetCategoryImporter, AssetImporter
 from app.services.fixed_assets.disposal import (
     AssetDisposalService,
     DisposalInput,
@@ -38,6 +39,8 @@ __all__ = [
     "AssetService",
     "AssetInput",
     "asset_service",
+    "AssetCategoryImporter",
+    "AssetImporter",
     # Category
     "AssetCategoryService",
     "AssetCategoryInput",

@@ -1,0 +1,290 @@
+{% extends "fixed_assets/base_fixed_assets.html" %}
+{% from "components/macros.html" import icon_svg, empty_state, status_badge %}
+
+{% block page_title %}Asset Management Reports{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/fixed-assets" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Asset Management</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Reports</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+{% set kpi = kpi | default({}) %}
+{% set section = section | default("overview") %}
+{% set by_state = kpi.get("by_state", []) %}
+{% set maintenance_due = kpi.get("maintenance_due", 0) %}
+{% set depreciation_due = kpi.get("depreciation_due", 0) %}
+{% set location_mismatch_count = kpi.get("location_mismatch_count", 0) %}
+{% set discrepancy_count = kpi.get("discrepancy_count", 0) %}
+{% set discrepancy_status = discrepancy_status | default("OPEN") %}
+
+<div class="space-y-8 stagger-in">
+    <div class="card p-4">
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="/fixed-assets/reports?section=overview"
+               class="rounded-full border px-3 py-1.5 text-sm {% if section == 'overview' %}border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-300{% else %}border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800{% endif %}">
+                Overview
+            </a>
+            <a href="/fixed-assets/reports?section=state"
+               class="rounded-full border px-3 py-1.5 text-sm {% if section == 'state' %}border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-300{% else %}border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800{% endif %}">
+                By State
+            </a>
+            <a href="/fixed-assets/reports?section=maintenance_due"
+               class="rounded-full border px-3 py-1.5 text-sm {% if section == 'maintenance_due' %}border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-300{% else %}border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800{% endif %}">
+                Maintenance Due
+            </a>
+            <a href="/fixed-assets/reports?section=depreciation_due"
+               class="rounded-full border px-3 py-1.5 text-sm {% if section == 'depreciation_due' %}border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-300{% else %}border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800{% endif %}">
+                Depreciation Due
+            </a>
+            <a href="/fixed-assets/reports?section=location_mismatches"
+               class="rounded-full border px-3 py-1.5 text-sm {% if section == 'location_mismatches' %}border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-300{% else %}border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800{% endif %}">
+                Location Mismatch
+            </a>
+            <a href="/fixed-assets/reports?section=discrepancies&discrepancy_status={{ discrepancy_status }}"
+               class="rounded-full border px-3 py-1.5 text-sm {% if section == 'discrepancies' %}border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-300{% else %}border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800{% endif %}">
+                Discrepancies
+            </a>
+        </div>
+    </div>
+
+    {% if section == "overview" %}
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <a href="/fixed-assets/reports?section=state" class="card p-5 border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/20 transition hover:bg-emerald-50/40">
+            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">State Records</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ by_state | length }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Assets grouped by lifecycle state.</p>
+        </a>
+
+        <a href="/fixed-assets/reports?section=maintenance_due" class="card p-5 border-amber-200 dark:border-amber-900/50 bg-amber-50/20 transition hover:bg-amber-50/40">
+            <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Maintenance Due</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ maintenance_due }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Overdue maintenance requests.</p>
+        </a>
+
+        <a href="/fixed-assets/reports?section=depreciation_due" class="card p-5 border-violet-200 dark:border-violet-900/50 bg-violet-50/20 transition hover:bg-violet-50/40">
+            <p class="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">Depreciation Due</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ depreciation_due }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Assets eligible for run posting.</p>
+        </a>
+
+        <a href="/fixed-assets/reports?section=location_mismatches" class="card p-5 border-rose-200 dark:border-rose-900/50 bg-rose-50/20 transition hover:bg-rose-50/40">
+            <p class="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">Location Mismatch</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ location_mismatch_count }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Open location/ownership mismatch lines.</p>
+        </a>
+
+            <a href="/fixed-assets/reports?section=discrepancies&discrepancy_status={{ discrepancy_status }}" class="card p-5 border-sky-200 dark:border-sky-900/50 bg-sky-50/20 transition hover:bg-sky-50/40">
+            <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Discrepancies</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ discrepancy_count }}</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">All discrepancy lines in selected state.</p>
+        </a>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-2">
+        <div class="card p-5">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">By State</h3>
+            <div class="mt-4 space-y-2">
+                {% for item in by_state %}
+                    <a href="/fixed-assets/assets?status={{ item.status }}" class="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3 transition hover:bg-white dark:border-slate-700 dark:bg-slate-800/50">
+                        <span class="text-sm text-slate-700 dark:text-slate-200">{{ item.label }}</span>
+                        <span class="font-semibold text-slate-900 dark:text-white">{{ item.count }}</span>
+                    </a>
+                {% else %}
+                    {{ empty_state("No assets found", "There are no assets yet to report by state.", "document") }}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {% elif section == "state" %}
+    <div class="card p-5">
+        <h3 class="text-base font-semibold text-slate-900 dark:text-white">Asset State Breakdown</h3>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {% for item in by_state %}
+                <a href="/fixed-assets/assets?status={{ item.status }}" class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 transition hover:bg-white dark:border-slate-700 dark:bg-slate-800/50">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ item.label }}</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ item.count }}</p>
+                </a>
+            {% else %}
+                {{ empty_state("No assets by state", "No assets match the selected filters.", "document") }}
+            {% endfor %}
+        </div>
+    </div>
+
+    {% elif section == "maintenance_due" %}
+    <div class="card p-5">
+        <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Overdue Maintenance Requests</h3>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ maintenance_due_items | length }} shown ({{ maintenance_due }} total)</span>
+        </div>
+        {% if maintenance_due_items %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-collapse text-sm">
+                <thead>
+                    <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Asset</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Request</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Due Date</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in maintenance_due_items %}
+                        <tr class="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                            <td class="py-3">
+                                <a href="/fixed-assets/assets/{{ item.asset_id }}"
+                                   class="text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-100">
+                                    {{ item.asset_number }} - {{ item.asset_name }}
+                                </a>
+                            </td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.title }}</td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.due_date }}</td>
+                            <td class="py-3">{{ status_badge(item.status) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {{ empty_state("No maintenance due", "No overdue maintenance items currently meet the selected criteria.", "document") }}
+        {% endif %}
+    </div>
+
+    {% elif section == "depreciation_due" %}
+    <div class="card p-5">
+        <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Assets Due for Depreciation Posting</h3>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ depreciation_due_items | length }} shown ({{ depreciation_due }} total)</span>
+        </div>
+        {% if depreciation_due_items %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-collapse text-sm">
+                <thead>
+                    <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Asset</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Net Book Value</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Residual Value</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Remaining Life</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in depreciation_due_items %}
+                        <tr class="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                            <td class="py-3">
+                                <a href="/fixed-assets/assets/{{ item.asset_id }}"
+                                   class="text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-100">
+                                    {{ item.asset_number }} - {{ item.asset_name }}
+                                </a>
+                            </td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.net_book_value }}</td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.residual_value }}</td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.remaining_life_months }} month{{ "s" if item.remaining_life_months != 1 else "" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {{ empty_state("No items due", "No assets currently meet the depreciation criteria.", "document") }}
+        {% endif %}
+    </div>
+
+    {% elif section == "location_mismatches" %}
+    <div class="card p-5">
+        <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Location/Ownership Mismatches</h3>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ location_mismatch_items | length }} shown ({{ location_mismatch_count }} total)</span>
+        </div>
+        {% if location_mismatch_items %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-collapse text-sm">
+                <thead>
+                    <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Asset</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Mismatch Type</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Detected</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in location_mismatch_items %}
+                        <tr class="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                            <td class="py-3">
+                                <a href="/fixed-assets/assets/{{ item.asset_id }}"
+                                   class="text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-100">
+                                    {{ item.asset_number }} - {{ item.asset_name }}
+                                </a>
+                            </td>
+                            <td class="py-3">
+                                <span class="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                                    {{ item.discrepancy_type }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.detected_at }}</td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.notes or "-" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {{ empty_state("No location mismatches", "All checked assets are aligned to expected locations/ownership for the selected status.", "document") }}
+        {% endif %}
+    </div>
+
+    {% elif section == "discrepancies" %}
+    <div class="card p-5">
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Discrepancies</h3>
+            {% for option in ["OPEN", "RESOLVED", "CLOSED"] %}
+                <a href="/fixed-assets/reports?section=discrepancies&discrepancy_status={{ option }}"
+                   class="rounded-full border px-2.5 py-1 text-xs {% if discrepancy_status == option %}border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300{% else %}border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800{% endif %}">
+                    {{ option }}
+                </a>
+            {% endfor %}
+            <span class="ml-auto text-sm text-slate-500 dark:text-slate-400">{{ discrepancy_items | length }} shown ({{ discrepancy_count }} total)</span>
+        </div>
+        {% if discrepancy_items %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full border-collapse text-sm">
+                <thead>
+                    <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Asset</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Type</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Status</th>
+                        <th class="border-b border-slate-200 py-2 dark:border-slate-700">Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in discrepancy_items %}
+                        <tr class="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                            <td class="py-3">
+                                <a href="/fixed-assets/assets/{{ item.asset_id }}"
+                                   class="text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-100">
+                                    {{ item.asset_number }} - {{ item.asset_name }}
+                                </a>
+                            </td>
+                            <td class="py-3">
+                                <span class="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                                    {{ item.discrepancy_type }}
+                                </span>
+                            </td>
+                            <td class="py-3">{{ status_badge(item.status) }}</td>
+                            <td class="py-3 text-slate-700 dark:text-slate-200">{{ item.detected_at }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {{ empty_state("No discrepancies", "No discrepancies found for this status.", "document") }}
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

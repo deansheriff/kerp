@@ -13,7 +13,8 @@ from uuid import UUID
 
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.datastructures import UploadFile
 
@@ -22,10 +23,17 @@ from app.models.finance.core_config.numbering_sequence import (
     SequenceType,
 )
 from app.models.finance.gl.account import Account
-from app.models.finance.gl.fiscal_period import FiscalPeriod
+from app.models.finance.gl.fiscal_period import FiscalPeriod, PeriodStatus
 from app.models.fixed_assets.asset import Asset, AssetStatus
 from app.models.fixed_assets.asset_category import AssetCategory, DepreciationMethod
+from app.models.fixed_assets.maintenance_request import (
+    MaintenanceRequest,
+    MaintenanceRequestStatus,
+)
 from app.models.fixed_assets.depreciation_run import DepreciationRun
+from app.models.fixed_assets.depreciation_schedule import DepreciationSchedule
+from app.models.fixed_assets.depreciation_run import DepreciationRunStatus
+from app.models.people.assets.audit import AssetAuditDiscrepancy
 from app.services.common import coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.finance.platform.currency_context import get_currency_context
@@ -101,6 +109,474 @@ class FixedAssetWebService:
         )
 
     @staticmethod
+    def dashboard_context(
+        db: Session,
+        organization_id: str,
+    ) -> dict:
+        org_id = coerce_uuid(organization_id)
+        today = date.today()
+        context: dict = {
+            "kpi": {
+                "by_state": [],
+                "maintenance_due": 0,
+                "depreciation_due": 0,
+                "location_mismatch_count": 0,
+                "discrepancy_count": 0,
+            }
+        }
+
+        try:
+            asset_rows = list(
+                db.execute(
+                    select(Asset.status, func.count(Asset.asset_id))
+                    .where(Asset.organization_id == org_id)
+                    .group_by(Asset.status)
+                )
+            )
+            state_counts = {
+                str(status.value): int(count)
+                for status, count in asset_rows
+                if status is not None
+            }
+            context["kpi"]["by_state"] = [
+                {
+                    "status": status.value,
+                    "label": status.value.replace("_", " ").title(),
+                    "count": state_counts.get(status.value, 0),
+                }
+                for status in AssetStatus
+            ]
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load asset state KPIs: %s", exc)
+            context["kpi"]["by_state"] = []
+
+        maintenance_open_statuses = [
+            MaintenanceRequestStatus.OPEN,
+            MaintenanceRequestStatus.ASSIGNED,
+            MaintenanceRequestStatus.IN_PROGRESS,
+            MaintenanceRequestStatus.WAITING_FOR_PARTS,
+        ]
+        try:
+            context["kpi"]["maintenance_due"] = (
+                db.scalar(
+                    select(func.count(MaintenanceRequest.maintenance_request_id))
+                    .where(
+                        and_(
+                            MaintenanceRequest.organization_id == org_id,
+                            MaintenanceRequest.status.in_(maintenance_open_statuses),
+                            MaintenanceRequest.due_date.is_not(None),
+                            MaintenanceRequest.due_date <= today,
+                        )
+                    )
+                )
+                or 0
+            )
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load maintenance due KPI: %s", exc)
+            context["kpi"]["maintenance_due"] = 0
+
+        try:
+            eligible_depreciation_assets = (
+                db.scalar(
+                    select(func.count(Asset.asset_id))
+                    .where(
+                        and_(
+                            Asset.organization_id == org_id,
+                            Asset.status == AssetStatus.ACTIVE,
+                            Asset.net_book_value > Asset.residual_value,
+                            Asset.remaining_life_months > 0,
+                            Asset.depreciation_start_date.is_not(None),
+                            Asset.depreciation_start_date <= today,
+                        )
+                    )
+                )
+                or 0
+            )
+
+            current_period_id = db.scalar(
+                select(FiscalPeriod.fiscal_period_id)
+                .where(
+                    and_(
+                        FiscalPeriod.organization_id == org_id,
+                        FiscalPeriod.status.in_(
+                            [PeriodStatus.OPEN, PeriodStatus.REOPENED]
+                        ),
+                    )
+                )
+                .order_by(FiscalPeriod.end_date.desc())
+                .limit(1)
+            )
+
+            has_posted_run = False
+            if current_period_id:
+                has_posted_run = bool(
+                    db.scalar(
+                        select(func.count(DepreciationRun.run_id))
+                        .where(
+                            and_(
+                                DepreciationRun.organization_id == org_id,
+                                DepreciationRun.fiscal_period_id == current_period_id,
+                                DepreciationRun.status == DepreciationRunStatus.POSTED,
+                            )
+                        )
+                    )
+                    or 0
+                )
+
+            context["kpi"]["depreciation_due"] = (
+                0 if has_posted_run else eligible_depreciation_assets
+            )
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load depreciation due KPI: %s", exc)
+            context["kpi"]["depreciation_due"] = 0
+
+        try:
+            context["kpi"]["location_mismatch_count"] = (
+                db.scalar(
+                    select(func.count(AssetAuditDiscrepancy.discrepancy_id))
+                    .where(
+                        and_(
+                            AssetAuditDiscrepancy.organization_id == org_id,
+                            AssetAuditDiscrepancy.status == "OPEN",
+                            AssetAuditDiscrepancy.discrepancy_type.in_(
+                                ["LOCATION", "MULTI"]
+                            ),
+                        )
+                    )
+                )
+                or 0
+            )
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load location mismatch KPI: %s", exc)
+            context["kpi"]["location_mismatch_count"] = 0
+
+        try:
+            context["kpi"]["discrepancy_count"] = (
+                db.scalar(
+                    select(func.count(AssetAuditDiscrepancy.discrepancy_id)).where(
+                        and_(
+                            AssetAuditDiscrepancy.organization_id == org_id,
+                            AssetAuditDiscrepancy.status == "OPEN",
+                        )
+                    )
+                )
+                or 0
+            )
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load discrepancy KPI: %s", exc)
+            context["kpi"]["discrepancy_count"] = 0
+
+        return context
+
+    @staticmethod
+    def reporting_context(
+        db: Session,
+        organization_id: str,
+        section: str = "overview",
+        discrepancy_status: str = "OPEN",
+    ) -> dict:
+        """Build context for fixed-asset KPI reporting pages."""
+        org_id = coerce_uuid(organization_id)
+        today = date.today()
+        requested = (section or "overview").strip().lower()
+
+        valid_sections = {
+            "overview",
+            "state",
+            "maintenance_due",
+            "depreciation_due",
+            "location_mismatches",
+            "discrepancies",
+        }
+        if requested not in valid_sections:
+            requested = "overview"
+
+        normalized_discrepancy_status = (discrepancy_status or "OPEN").strip().upper()
+        row_limit = 25
+
+        data: dict = {
+            "section": requested,
+            "discrepancy_status": normalized_discrepancy_status,
+            "kpi": {
+                "by_state": [],
+                "maintenance_due": 0,
+                "depreciation_due": 0,
+                "location_mismatch_count": 0,
+                "discrepancy_count": 0,
+            },
+            "maintenance_due_items": [],
+            "depreciation_due_items": [],
+            "location_mismatch_items": [],
+            "discrepancy_items": [],
+        }
+
+        dashboard_data = FixedAssetWebService.dashboard_context(
+            db,
+            organization_id,
+        )
+        data["kpi"].update(dashboard_data["kpi"])
+
+        maintenance_open_statuses = [
+            MaintenanceRequestStatus.OPEN,
+            MaintenanceRequestStatus.ASSIGNED,
+            MaintenanceRequestStatus.IN_PROGRESS,
+            MaintenanceRequestStatus.WAITING_FOR_PARTS,
+        ]
+        try:
+            data["kpi"]["maintenance_due"] = (
+                db.scalar(
+                    select(func.count(MaintenanceRequest.maintenance_request_id))
+                    .where(
+                        and_(
+                            MaintenanceRequest.organization_id == org_id,
+                            MaintenanceRequest.status.in_(maintenance_open_statuses),
+                            MaintenanceRequest.due_date.is_not(None),
+                            MaintenanceRequest.due_date <= today,
+                        )
+                    )
+                )
+                or 0
+            )
+
+            maintenance_rows = db.execute(
+                select(
+                    MaintenanceRequest.maintenance_request_id,
+                    Asset.asset_id,
+                    Asset.asset_number,
+                    Asset.asset_name,
+                    MaintenanceRequest.title,
+                    MaintenanceRequest.due_date,
+                    MaintenanceRequest.status,
+                )
+                .join(Asset, Asset.asset_id == MaintenanceRequest.asset_id)
+                .where(
+                    and_(
+                        MaintenanceRequest.organization_id == org_id,
+                        MaintenanceRequest.status.in_(maintenance_open_statuses),
+                        MaintenanceRequest.due_date.is_not(None),
+                        MaintenanceRequest.due_date <= today,
+                    )
+                )
+                .order_by(MaintenanceRequest.due_date.asc(), MaintenanceRequest.title.asc())
+                .limit(row_limit)
+            ).all()
+
+            data["maintenance_due_items"] = [
+                {
+                    "asset_id": str(row.asset_id),
+                    "maintenance_request_id": str(row.maintenance_request_id),
+                    "asset_number": row.asset_number,
+                    "asset_name": row.asset_name,
+                    "title": row.title,
+                    "due_date": _format_date(row.due_date),
+                    "status": str(row.status),
+                }
+                for row in maintenance_rows
+            ]
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load maintenance due report rows: %s", exc)
+            data["maintenance_due_items"] = []
+            data["kpi"]["maintenance_due"] = 0
+
+        try:
+            eligible_query = (
+                select(
+                    Asset.asset_id,
+                    Asset.asset_number,
+                    Asset.asset_name,
+                    Asset.net_book_value,
+                    Asset.residual_value,
+                    Asset.remaining_life_months,
+                    Asset.status,
+                )
+                .where(
+                    and_(
+                        Asset.organization_id == org_id,
+                        Asset.status == AssetStatus.ACTIVE,
+                        Asset.net_book_value > Asset.residual_value,
+                        Asset.remaining_life_months > 0,
+                        Asset.depreciation_start_date.is_not(None),
+                        Asset.depreciation_start_date <= today,
+                    )
+                )
+            )
+
+            current_period_id = db.scalar(
+                select(FiscalPeriod.fiscal_period_id)
+                .where(
+                    and_(
+                        FiscalPeriod.organization_id == org_id,
+                        FiscalPeriod.status.in_(
+                            [PeriodStatus.OPEN, PeriodStatus.REOPENED]
+                        ),
+                    )
+                )
+                .order_by(FiscalPeriod.end_date.desc())
+                .limit(1)
+            )
+
+            if current_period_id:
+                posted_asset_ids = db.execute(
+                    select(DepreciationSchedule.asset_id)
+                    .join(
+                        DepreciationRun,
+                        DepreciationRun.run_id == DepreciationSchedule.run_id,
+                    )
+                    .where(
+                        and_(
+                            DepreciationRun.organization_id == org_id,
+                            DepreciationRun.fiscal_period_id == current_period_id,
+                            DepreciationRun.status == DepreciationRunStatus.POSTED,
+                        )
+                    )
+                ).all()
+                if posted_asset_ids:
+                    eligible_query = eligible_query.where(
+                        Asset.asset_id.not_in(
+                            [row[0] for row in posted_asset_ids]
+                        )
+                    )
+
+            data["kpi"]["depreciation_due"] = (
+                db.scalar(select(func.count()).select_from(eligible_query.subquery()))
+                or 0
+            )
+
+            depreciation_rows = db.execute(
+                eligible_query.order_by(Asset.asset_name.asc()).limit(row_limit)
+            ).all()
+
+            data["depreciation_due_items"] = [
+                {
+                    "asset_id": str(row.asset_id),
+                    "asset_number": row.asset_number,
+                    "asset_name": row.asset_name,
+                    "net_book_value": _format_currency(row.net_book_value),
+                    "residual_value": _format_currency(row.residual_value),
+                    "remaining_life_months": int(row.remaining_life_months or 0),
+                    "status": str(row.status),
+                }
+                for row in depreciation_rows
+            ]
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load depreciation due report rows: %s", exc)
+            data["depreciation_due_items"] = []
+            data["kpi"]["depreciation_due"] = 0
+
+        mismatch_types = ["LOCATION", "MULTI", "OWNERSHIP"]
+        try:
+            data["kpi"]["location_mismatch_count"] = (
+                db.scalar(
+                    select(func.count(AssetAuditDiscrepancy.discrepancy_id)).where(
+                        and_(
+                            AssetAuditDiscrepancy.organization_id == org_id,
+                            AssetAuditDiscrepancy.status == normalized_discrepancy_status,
+                            AssetAuditDiscrepancy.discrepancy_type.in_(mismatch_types),
+                        )
+                    )
+                )
+                or 0
+            )
+            mismatch_rows = db.execute(
+                select(
+                    Asset.asset_id,
+                    Asset.asset_number,
+                    Asset.asset_name,
+                    AssetAuditDiscrepancy.discrepancy_id,
+                    AssetAuditDiscrepancy.discrepancy_type,
+                    AssetAuditDiscrepancy.status,
+                    AssetAuditDiscrepancy.detected_at,
+                    AssetAuditDiscrepancy.notes,
+                )
+                .join(Asset, Asset.asset_id == AssetAuditDiscrepancy.asset_id)
+                .where(
+                    and_(
+                        AssetAuditDiscrepancy.organization_id == org_id,
+                        AssetAuditDiscrepancy.status == normalized_discrepancy_status,
+                        AssetAuditDiscrepancy.discrepancy_type.in_(mismatch_types),
+                    )
+                )
+                .order_by(AssetAuditDiscrepancy.detected_at.desc())
+                .limit(row_limit)
+            ).all()
+
+            data["location_mismatch_items"] = [
+                {
+                    "asset_id": str(row.asset_id),
+                    "asset_number": row.asset_number,
+                    "asset_name": row.asset_name,
+                    "discrepancy_id": str(row.discrepancy_id),
+                    "discrepancy_type": row.discrepancy_type,
+                    "status": row.status,
+                    "detected_at": _format_date(row.detected_at),
+                    "notes": row.notes,
+                }
+                for row in mismatch_rows
+            ]
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load location mismatch report rows: %s", exc)
+            data["location_mismatch_items"] = []
+            data["kpi"]["location_mismatch_count"] = 0
+
+        try:
+            data["kpi"]["discrepancy_count"] = (
+                db.scalar(
+                    select(func.count(AssetAuditDiscrepancy.discrepancy_id)).where(
+                        and_(
+                            AssetAuditDiscrepancy.organization_id == org_id,
+                            AssetAuditDiscrepancy.status == normalized_discrepancy_status,
+                        )
+                    )
+                )
+                or 0
+            )
+            discrepancy_rows = db.execute(
+                select(
+                    Asset.asset_id,
+                    Asset.asset_number,
+                    Asset.asset_name,
+                    AssetAuditDiscrepancy.discrepancy_id,
+                    AssetAuditDiscrepancy.discrepancy_type,
+                    AssetAuditDiscrepancy.status,
+                    AssetAuditDiscrepancy.detected_at,
+                    AssetAuditDiscrepancy.notes,
+                )
+                .join(Asset, Asset.asset_id == AssetAuditDiscrepancy.asset_id)
+                .where(
+                    and_(
+                        AssetAuditDiscrepancy.organization_id == org_id,
+                        AssetAuditDiscrepancy.status == normalized_discrepancy_status,
+                    )
+                )
+                .order_by(AssetAuditDiscrepancy.detected_at.desc())
+                .limit(row_limit)
+            ).all()
+
+            data["discrepancy_items"] = [
+                {
+                    "asset_id": str(row.asset_id),
+                    "asset_number": row.asset_number,
+                    "asset_name": row.asset_name,
+                    "discrepancy_id": str(row.discrepancy_id),
+                    "discrepancy_type": row.discrepancy_type,
+                    "status": row.status,
+                    "detected_at": _format_date(row.detected_at),
+                    "notes": row.notes,
+                }
+                for row in discrepancy_rows
+            ]
+        except SQLAlchemyError as exc:
+            logger.warning("Unable to load discrepancy report rows: %s", exc)
+            data["discrepancy_items"] = []
+            data["kpi"]["discrepancy_count"] = 0
+
+        # Provide state distribution for overview and state-section cards.
+        data["kpi"]["by_state"] = dashboard_data.get("kpi", {}).get(
+            "by_state", []
+        )
+        return data
+
+    @staticmethod
     def asset_form_context(
         db: Session,
         organization_id: str,
@@ -144,9 +620,38 @@ class FixedAssetWebService:
             for s in suppliers
         ]
 
+        depreciation_schedule_rows = db.execute(
+            select(
+                DepreciationSchedule.schedule_id,
+                DepreciationRun.run_number,
+                FiscalPeriod.period_name,
+                FiscalPeriod.start_date,
+                FiscalPeriod.end_date,
+            )
+            .join(DepreciationRun, DepreciationSchedule.run_id == DepreciationRun.run_id)
+            .join(
+                FiscalPeriod,
+                DepreciationRun.fiscal_period_id == FiscalPeriod.fiscal_period_id,
+            )
+            .where(DepreciationRun.organization_id == org_id)
+            .order_by(DepreciationRun.created_at.desc(), DepreciationSchedule.created_at.desc())
+        ).all()
+        depreciation_schedules = []
+        for schedule_id, run_number, period_name, start_date, end_date in (
+            depreciation_schedule_rows
+        ):
+            depreciation_schedules.append(
+                {
+                    "schedule_id": str(schedule_id),
+                    "label": f"Run {run_number} - {period_name} ({_format_date(start_date)} - {_format_date(end_date)})",
+                    "run_number": run_number,
+                }
+            )
+
         context = {
             "categories": categories,
             "suppliers_list": suppliers_list,
+            "depreciation_schedules": depreciation_schedules,
             "today": _format_date(date.today()),
             "asset_number_preview": FixedAssetWebService._sequence_preview(sequence),
         }
@@ -244,7 +749,7 @@ class FixedAssetWebService:
         auth: WebAuthContext,
         db: Session,
     ) -> HTMLResponse:
-        context = base_context(request, auth, "New Asset", "fa")
+        context = base_context(request, auth, "New Asset", "fixed_assets")
         context.update(self.asset_form_context(db, str(auth.organization_id)))
         return templates.TemplateResponse(
             request, "fixed_assets/asset_form.html", context
@@ -260,6 +765,7 @@ class FixedAssetWebService:
         acquisition_cost: str,
         currency_code: str | None,
         description: str | None,
+        depreciation_schedule_id: str | None,
         db: Session,
     ) -> HTMLResponse | RedirectResponse:
         try:
@@ -284,6 +790,11 @@ class FixedAssetWebService:
                 acquisition_cost=Decimal(acquisition_cost),
                 currency_code=resolved_currency,
                 description=description,
+                depreciation_schedule_id=(
+                    UUID(depreciation_schedule_id)
+                    if depreciation_schedule_id
+                    else None
+                ),
             )
 
             asset_service.create_asset(
@@ -298,9 +809,12 @@ class FixedAssetWebService:
             )
 
         except Exception as e:
-            context = base_context(request, auth, "New Asset", "fa")
+            context = base_context(request, auth, "New Asset", "fixed_assets")
             context.update(self.asset_form_context(db, str(auth.organization_id)))
             context["error"] = str(e)
+            context["selected_depreciation_schedule_id"] = (
+                depreciation_schedule_id
+            )
             return templates.TemplateResponse(
                 request, "fixed_assets/asset_form.html", context
             )
@@ -398,7 +912,7 @@ class FixedAssetWebService:
         page: int,
         db: Session,
     ) -> HTMLResponse:
-        context = base_context(request, auth, "Asset Categories", "fa")
+        context = base_context(request, auth, "Asset Categories", "fixed_assets")
         context.update(
             self.list_categories_context(
                 db,
@@ -418,7 +932,7 @@ class FixedAssetWebService:
         db: Session,
         error: str | None = None,
     ) -> HTMLResponse:
-        context = base_context(request, auth, "New Asset Category", "fa")
+        context = base_context(request, auth, "New Asset Category", "fixed_assets")
         context.update(self.category_form_context(db, str(auth.organization_id)))
         context["error"] = error
         return templates.TemplateResponse(
@@ -506,7 +1020,7 @@ class FixedAssetWebService:
         if not category or category.organization_id != auth.organization_id:
             return RedirectResponse(url="/fixed-assets/categories", status_code=302)
 
-        context = base_context(request, auth, "Edit Asset Category", "fa")
+        context = base_context(request, auth, "Edit Asset Category", "fixed_assets")
         context.update(
             self.category_form_context(
                 db, str(auth.organization_id), category_id=category_id
@@ -660,17 +1174,69 @@ class FixedAssetWebService:
                 }
             )
 
+        fiscal_period_rows = db.execute(
+            select(FiscalPeriod.fiscal_period_id, FiscalPeriod.period_name, FiscalPeriod.start_date, FiscalPeriod.end_date)
+            .where(FiscalPeriod.organization_id == org_id)
+            .order_by(FiscalPeriod.start_date.desc())
+        ).all()
+        fiscal_periods = [
+            {
+                "fiscal_period_id": str(period_id),
+                "label": (
+                    f"{period_name} ({_format_date(start_date)} - {_format_date(end_date)})"
+                ),
+                "period_name": period_name,
+            }
+            for period_id, period_name, start_date, end_date in fiscal_period_rows
+        ]
+
         total_pages = max(1, (total_count + limit - 1) // limit)
 
         return {
             "depreciation_runs": runs_view,
             "asset_id": asset_id,
+            "fiscal_periods": fiscal_periods,
             "period": period,
             "page": page,
             "limit": limit,
             "offset": offset,
             "total_count": total_count,
             "total_pages": total_pages,
+        }
+
+    def depreciation_run_form_context(
+        self,
+        db: Session,
+        organization_id: str,
+        period: str | None = None,
+    ) -> dict:
+        """Context for the dedicated depreciation run creation page."""
+        org_id = coerce_uuid(organization_id)
+
+        fiscal_period_rows = db.execute(
+            select(
+                FiscalPeriod.fiscal_period_id,
+                FiscalPeriod.period_name,
+                FiscalPeriod.start_date,
+                FiscalPeriod.end_date,
+            )
+            .where(FiscalPeriod.organization_id == org_id)
+            .order_by(FiscalPeriod.start_date.desc())
+        ).all()
+        fiscal_periods = [
+            {
+                "fiscal_period_id": str(row_id),
+                "label": (
+                    f"{period_name} ({_format_date(start_date)} - {_format_date(end_date)})"
+                ),
+                "period_name": period_name,
+            }
+            for row_id, period_name, start_date, end_date in fiscal_period_rows
+        ]
+
+        return {
+            "fiscal_periods": fiscal_periods,
+            "period": period,
         }
 
     def asset_detail_response(
@@ -696,7 +1262,7 @@ class FixedAssetWebService:
             db.get(AssetCategory, asset.category_id) if asset.category_id else None
         )
 
-        context = base_context(request, auth, "Asset Details", "fa")
+        context = base_context(request, auth, "Asset Details", "fixed_assets")
         context.update(
             {
                 "asset": {
@@ -754,9 +1320,14 @@ class FixedAssetWebService:
                 status_code=303,
             )
 
-        context = base_context(request, auth, "Edit Asset", "fa")
+        context = base_context(request, auth, "Edit Asset", "fixed_assets")
         context.update(self.asset_form_context(db, str(auth.organization_id)))
         context["asset"] = asset
+        context["selected_depreciation_schedule_id"] = (
+            str(asset.current_depreciation_schedule_id)
+            if asset.current_depreciation_schedule_id
+            else None
+        )
         return templates.TemplateResponse(
             request, "fixed_assets/asset_form.html", context
         )
@@ -937,6 +1508,7 @@ class FixedAssetWebService:
         try:
             form_data = await request.form()
             fiscal_period_id = _safe_form_text(form_data.get("fiscal_period_id"))
+            posting_date_text = _safe_form_text(form_data.get("posting_date"))
             org_id = auth.organization_id
             user_id = auth.user_id
             if org_id is None:
@@ -945,6 +1517,11 @@ class FixedAssetWebService:
                 raise HTTPException(status_code=401, detail="Authentication required")
             if not fiscal_period_id:
                 raise ValueError("Fiscal period is required")
+            posting_date = (
+                datetime.strptime(posting_date_text, "%Y-%m-%d").date()
+                if posting_date_text
+                else None
+            )
 
             from app.services.fixed_assets.depreciation import DepreciationService
 
@@ -955,9 +1532,16 @@ class FixedAssetWebService:
                 user_id,
             )
             DepreciationService.calculate_run(db, org_id, run.run_id)
+            DepreciationService.post_run(
+                db,
+                org_id,
+                run.run_id,
+                posted_by_user_id=user_id,
+                posting_date=posting_date,
+            )
 
             return RedirectResponse(
-                url="/fixed-assets/depreciation?success=Depreciation+run+completed",
+                url="/fixed-assets/depreciation?success=Depreciation+run+posted",
                 status_code=303,
             )
         except Exception as e:

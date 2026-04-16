@@ -21,8 +21,18 @@ All People models:
 
 # People Assets
 from app.models.people.assets import (
+    AssetAuditAdjustment,
+    AssetAuditAdjustmentType,
+    AssetAuditDiscrepancy,
+    AssetAuditLine,
+    AssetAuditLineStatus,
+    AssetLifecycleEvent,
+    AssetAuditPlan,
+    AssetAuditPlanStatus,
     AssetAssignment,
     AssetCondition,
+    AssetTrackingEvent,
+    AssetTrackingMethod,
     AssignmentStatus,
 )
 
@@ -226,6 +236,16 @@ __all__ = [
     "AssetAssignment",
     "AssignmentStatus",
     "AssetCondition",
+    "AssetTrackingEvent",
+    "AssetTrackingMethod",
+    "AssetAuditPlan",
+    "AssetAuditPlanStatus",
+    "AssetAuditLine",
+    "AssetAuditLineStatus",
+    "AssetAuditAdjustment",
+    "AssetAuditAdjustmentType",
+    "AssetAuditDiscrepancy",
+    "AssetLifecycleEvent",
     # Expenses
     "ExpenseCategory",
     "ExpenseClaim",

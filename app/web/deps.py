@@ -368,13 +368,6 @@ def landing_content() -> dict:
                     "cta_href": "/finance/ap/suppliers",
                 },
                 {
-                    "key": "fa",
-                    "title": "Fixed Assets",
-                    "description": "Asset register and depreciation schedules.",
-                    "cta_label": "View assets",
-                    "cta_href": "/fixed-assets/assets",
-                },
-                {
                     "key": "banking",
                     "title": "Banking",
                     "description": "Bank accounts, reconciliation, and cash flow management.",
@@ -769,6 +762,7 @@ def base_context(
         )
 
         help_module_map = {
+            "fixed_assets": "fixed_assets",
             "dashboard": "settings"
             if request.url.path.startswith("/operations")
             else "",
@@ -820,6 +814,8 @@ def base_context(
                 contextual_module = "settings"
             elif path.startswith("/coach"):
                 contextual_module = "coach"
+            elif path.startswith("/fixed-assets"):
+                contextual_module = "fixed_assets"
 
         # Deep route-to-article mapping for contextual help
         route_article_map = {
@@ -1006,6 +1002,14 @@ class WebAuthContext:
         scopes_set = set(self.scopes)
         roles_set = {r.strip().lower() for r in self.roles if r and r.strip()}
 
+        has_fixed_assets_scope = any(
+            scope == "fa"
+            or scope == "fixed_assets"
+            or scope.startswith("fa:")
+            or scope.startswith("fixed_assets:")
+            for scope in scopes_set
+        )
+
         if self.is_admin or "finance:access" in scopes_set:
             modules.append("finance")
         # HR/People: allow either scope-based access or named HR roles.
@@ -1032,6 +1036,8 @@ class WebAuthContext:
             modules.append("settings")
         if self.is_admin or "expense:access" in scopes_set:
             modules.append("expense")
+        if self.is_admin or has_fixed_assets_scope:
+            modules.append("fixed_assets")
         if self.is_admin or "discipline:access" in scopes_set:
             modules.append("discipline")
         if self.is_admin or scopes_set.intersection(
@@ -1049,14 +1055,21 @@ class WebAuthContext:
         if "self:access" in scopes_set:
             modules.append("self_service")
 
-        # Filter by deployment-level enabled modules
-        # "discipline" maps to "people", "settings" is always on
-        _module_map = {"discipline": "people", "self_service": "people"}
+        # Filter by deployment-level enabled modules.
+        # "discipline" maps to "people", and "settings" is always on.
+        _module_map = {
+            "discipline": "people",
+            "self_service": "people",
+        }
         _always_on = {"settings"}
+
+        def _is_module_enabled(module_name: str) -> bool:
+            return is_module_enabled(_module_map.get(module_name, module_name))
+
         return [
             m
             for m in modules
-            if m in _always_on or is_module_enabled(_module_map.get(m, m))
+            if m in _always_on or _is_module_enabled(m)
         ]
 
     def has_module_access(self, module: str) -> bool:
@@ -1077,6 +1090,8 @@ class WebAuthContext:
             "coach": "coach",
             "public_sector": "public_sector",
             "public-sector": "public_sector",
+            "fixed_assets": "fixed_assets",
+            "fa": "fixed_assets",
             "self": "self_service",
             "self-service": "self_service",
             "self_service": "self_service",
@@ -1086,19 +1101,41 @@ class WebAuthContext:
 
     def has_permission(self, permission: str) -> bool:
         """Check if user has a specific permission."""
-        return self.is_admin or permission in self.scopes
+        if self.is_admin:
+            return True
+
+        requested = (permission or "").strip()
+        if not requested:
+            return False
+
+        scopes_set = {scope.strip() for scope in self.scopes}
+
+        for scope in scopes_set:
+            if scope == requested:
+                return True
+
+            if requested.endswith(":*"):
+                requested_root = requested[:-2]
+                if scope == requested_root or scope.startswith(f"{requested_root}:"):
+                    return True
+            elif scope.endswith(":*"):
+                scope_root = scope[:-2]
+                if requested == scope_root or requested.startswith(f"{scope_root}:"):
+                    return True
+
+        return False
 
     def has_any_permission(self, permissions: list[str]) -> bool:
         """Check if user has any of the specified permissions."""
         if self.is_admin:
             return True
-        return bool(set(permissions) & set(self.scopes))
+        return any(self.has_permission(permission) for permission in permissions)
 
     def has_all_permissions(self, permissions: list[str]) -> bool:
         """Check if user has all specified permissions."""
         if self.is_admin:
             return True
-        return set(permissions).issubset(set(self.scopes))
+        return all(self.has_permission(permission) for permission in permissions)
 
     @property
     def default_module(self) -> str | None:
@@ -1140,6 +1177,8 @@ class WebAuthContext:
                 return "/coach/"
             if module == "self_service":
                 return "/people/self/attendance"
+            if module == "fixed_assets":
+                return "/fixed-assets"
             return f"/{module}/dashboard"
         # Multiple modules - go to module selector
         return "/"
@@ -1632,6 +1671,21 @@ def require_finance_admin(
         raise HTTPException(
             status_code=403,
             detail="Finance admin access required",
+        )
+    return auth
+
+
+def require_fixed_assets_access(
+    auth: WebAuthContext = Depends(require_web_auth),
+) -> WebAuthContext:
+    """
+    Require access to the Fixed Assets module.
+
+    """
+    if not auth.has_any_permission(["fa:*", "fixed_assets:*"]):
+        raise HTTPException(
+            status_code=403,
+            detail="Permission 'fa:*' required",
         )
     return auth
 

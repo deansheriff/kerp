@@ -4,26 +4,222 @@ FA (Fixed Assets) Web Routes.
 HTML template routes for Assets and Depreciation.
 """
 
-from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
+from app.services.finance.import_export.web import import_web_service
 from app.services.fixed_assets.web import fa_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_finance_access
+from app.web.deps import (
+    WebAuthContext,
+    base_context,
+    get_db,
+    require_fixed_assets_access,
+)
 
 router = APIRouter(prefix="/fixed-assets", tags=["fa-web"])
+
+
+def _build_target_fields(
+    columns: dict[str, list[str]],
+) -> list[dict[str, str | bool]]:
+    """Build target_fields list from column requirements for the wizard."""
+    fields: list[dict[str, str | bool]] = []
+    for col in columns.get("required", []):
+        fields.append({"source_field": col, "target_field": col, "required": True})
+    for col in columns.get("optional", []):
+        fields.append({"source_field": col, "target_field": col, "required": False})
+    return fields
 
 
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 def fa_landing(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+    db: Session = Depends(get_db),
 ):
-    """Fixed assets landing page."""
-    context = base_context(request, auth, "Fixed Assets", "fa")
+    """Asset management landing dashboard."""
+    context = base_context(request, auth, "Asset Management", "fixed_assets")
+    context.update(fa_web_service.dashboard_context(db, str(auth.organization_id)))
     return templates.TemplateResponse(request, "fixed_assets/index.html", context)
+
+
+@router.get("/reports", response_class=HTMLResponse)
+def fa_reports(
+    request: Request,
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+    db: Session = Depends(get_db),
+    section: str = Query(default="overview"),
+    discrepancy_status: str = Query(default="OPEN"),
+):
+    """Asset management reporting dashboard."""
+    context = base_context(request, auth, "Asset Management Reports", "reports", db=db)
+    context.update(
+        fa_web_service.reporting_context(
+            db,
+            str(auth.organization_id),
+            section=section,
+            discrepancy_status=discrepancy_status,
+        )
+    )
+    return templates.TemplateResponse(
+        request, "fixed_assets/reports.html", context
+    )
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+def fa_dashboard(
+    request: Request,
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+    db: Session = Depends(get_db),
+):
+    """Asset management dashboard route."""
+    return fa_landing(request, auth, db)
+
+
+@router.get("/import", response_class=HTMLResponse)
+def fa_import_dashboard(
+    request: Request,
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+):
+    """Asset management import dashboard."""
+    context = base_context(request, auth, "Import Asset Management", "fixed_assets")
+    context["entity_types"] = [
+        {
+            "id": "assets",
+            "name": "Assets",
+                "description": "Import asset records and depreciation schedule data",
+            "order": 1,
+        }
+    ]
+    return templates.TemplateResponse(
+        request, "fixed_assets/import_export/dashboard.html", context
+    )
+
+
+@router.get("/import/{entity_type}", response_class=HTMLResponse)
+def fa_import_form(
+    request: Request,
+    entity_type: str,
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+):
+    """Asset management import form for supported entity types."""
+    if entity_type != "assets":
+        raise HTTPException(
+            status_code=404, detail=f"Unsupported import entity: {entity_type}"
+        )
+
+    from app.services.finance.import_export.base import build_alias_map
+
+    columns = {
+        "assets": {
+            "required": ["Asset Name"],
+            "optional": [
+                "Asset Number",
+                "Acquisition Date",
+                "Acquisition Cost",
+                "Category",
+                "Useful Life",
+            ],
+        }
+    }
+
+    context = base_context(
+        request, auth, "Import Asset Management", "fixed_assets"
+    )
+    context["entity_type"] = entity_type
+    context["entity_name"] = "Asset Management"
+    context["columns"] = columns[entity_type]
+    context["preview_url"] = f"/fixed-assets/import/{entity_type}/preview"
+    context["import_url"] = f"/fixed-assets/import/{entity_type}"
+    context["cancel_url"] = "/fixed-assets/import"
+    context["alias_map"] = build_alias_map()
+    context["target_fields"] = _build_target_fields(columns[entity_type])
+    context["accent_color"] = "emerald"
+
+    return templates.TemplateResponse(
+        request, "fixed_assets/import_export/import_form.html", context
+    )
+
+
+@router.post("/import/{entity_type}/preview", response_class=JSONResponse)
+async def fa_import_preview(
+    request: Request,
+    entity_type: str,
+    file: UploadFile = File(...),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+    db: Session = Depends(get_db),
+):
+    """Preview fixed assets import with validation and column mapping."""
+    try:
+        result = await import_web_service.preview_import(
+            db=db,
+            organization_id=auth.organization_id,
+            user_id=auth.person_id,
+            entity_type=entity_type,
+            file=file,
+        )
+        return JSONResponse(content=result)
+    except ValueError as exc:
+        return JSONResponse(content={"detail": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse(
+            content={"detail": f"Preview failed: {str(exc)}"}, status_code=500
+        )
+
+
+@router.post("/import/{entity_type}", response_class=JSONResponse)
+async def fa_execute_import(
+    request: Request,
+    entity_type: str,
+    file: UploadFile = File(...),
+    skip_duplicates: str | None = Form(default=None),
+    dry_run: str | None = Form(default=None),
+    column_mapping: str | None = Form(default=None),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+    db: Session = Depends(get_db),
+):
+    """Execute fixed assets import operation (web route)."""
+    import json
+
+    try:
+        skip_dups = skip_duplicates is not None and skip_duplicates.lower() in (
+            "true",
+            "1",
+            "on",
+            "",
+        )
+        is_dry_run = dry_run is not None and dry_run.lower() in ("true", "1", "on", "")
+        mapping = json.loads(column_mapping) if column_mapping else None
+
+        result = await import_web_service.execute_import(
+            db=db,
+            organization_id=auth.organization_id,
+            user_id=auth.person_id,
+            entity_type=entity_type,
+            file=file,
+            skip_duplicates=skip_dups,
+            dry_run=is_dry_run,
+            column_mapping=mapping,
+        )
+        return JSONResponse(content=result)
+    except ValueError as exc:
+        return JSONResponse(content={"detail": str(exc)}, status_code=400)
+    except Exception as exc:
+        return JSONResponse(
+            content={"detail": f"Import failed: {str(exc)}"}, status_code=500
+        )
 
 
 # =============================================================================
@@ -34,7 +230,7 @@ def fa_landing(
 @router.get("/assets", response_class=HTMLResponse)
 def list_assets(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
@@ -42,7 +238,7 @@ def list_assets(
     db: Session = Depends(get_db),
 ):
     """Assets list page."""
-    context = base_context(request, auth, "Fixed Assets", "fa")
+    context = base_context(request, auth, "Asset Management", "fixed_assets")
     context.update(
         fa_web_service.list_assets_context(
             db,
@@ -59,7 +255,7 @@ def list_assets(
 @router.get("/assets/new", response_class=HTMLResponse)
 def new_asset_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """New asset form page."""
@@ -69,13 +265,14 @@ def new_asset_form(
 @router.post("/assets/new")
 def create_asset(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     asset_name: str = Form(...),
     category_id: str = Form(...),
     acquisition_date: str = Form(...),
     acquisition_cost: str = Form(...),
     currency_code: str | None = Form(default=None),
     description: str | None = Form(default=None),
+    depreciation_schedule_id: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
     """Create a new fixed asset."""
@@ -88,6 +285,7 @@ def create_asset(
         acquisition_cost,
         currency_code,
         description,
+        depreciation_schedule_id,
         db,
     )
 
@@ -98,7 +296,7 @@ async def export_all_assets(
     search: str = "",
     status: str = "",
     category: str = "",
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Export all assets matching filters to CSV."""
@@ -113,7 +311,7 @@ async def export_all_assets(
 def view_asset(
     request: Request,
     asset_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Asset detail page."""
@@ -124,7 +322,7 @@ def view_asset(
 def edit_asset_form(
     request: Request,
     asset_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Edit asset form page."""
@@ -135,7 +333,7 @@ def edit_asset_form(
 async def update_asset(
     request: Request,
     asset_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Update an existing fixed asset."""
@@ -146,7 +344,7 @@ async def update_asset(
 async def dispose_asset(
     request: Request,
     asset_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Dispose a fixed asset."""
@@ -157,7 +355,7 @@ async def dispose_asset(
 async def revalue_asset(
     request: Request,
     asset_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Revalue a fixed asset."""
@@ -168,7 +366,7 @@ async def revalue_asset(
 async def impair_asset(
     request: Request,
     asset_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Record impairment for a fixed asset."""
@@ -183,7 +381,7 @@ async def impair_asset(
 @router.post("/assets/bulk-delete")
 async def bulk_delete_assets(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Bulk delete assets (only DRAFT status)."""
@@ -199,7 +397,7 @@ async def bulk_delete_assets(
 @router.post("/assets/bulk-export")
 async def bulk_export_assets(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Export selected assets to CSV."""
@@ -220,7 +418,7 @@ async def bulk_export_assets(
 @router.get("/categories", response_class=HTMLResponse)
 def list_categories(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     is_active: str | None = None,
     page: int = Query(default=1, ge=1),
     db: Session = Depends(get_db),
@@ -244,7 +442,7 @@ def list_categories(
 @router.get("/categories/new", response_class=HTMLResponse)
 def new_category_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """New asset category form page."""
@@ -254,7 +452,7 @@ def new_category_form(
 @router.post("/categories/new", response_class=HTMLResponse)
 async def create_category(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Create a new asset category."""
@@ -265,7 +463,7 @@ async def create_category(
 def edit_category_form(
     request: Request,
     category_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Edit asset category form page."""
@@ -276,7 +474,7 @@ def edit_category_form(
 async def update_category(
     request: Request,
     category_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Update an existing asset category."""
@@ -286,7 +484,7 @@ async def update_category(
 @router.post("/categories/{category_id}/toggle", response_class=HTMLResponse)
 def toggle_category(
     category_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Toggle asset category active/inactive status."""
@@ -301,13 +499,13 @@ def toggle_category(
 @router.get("/depreciation", response_class=HTMLResponse)
 def depreciation_schedule(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     asset_id: str | None = None,
     period: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Depreciation schedule page."""
-    context = base_context(request, auth, "Depreciation Schedule", "fa")
+    context = base_context(request, auth, "Depreciation Schedule", "fixed_assets")
     context.update(
         fa_web_service.depreciation_context(
             db,
@@ -324,8 +522,29 @@ def depreciation_schedule(
 @router.post("/depreciation/run")
 async def run_depreciation(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
     """Run depreciation for a period."""
     return await fa_web_service.run_depreciation_response(request, auth, db)
+
+
+@router.get("/depreciation/runs/new", response_class=HTMLResponse)
+def new_depreciation_run(
+    request: Request,
+    auth: WebAuthContext = Depends(require_fixed_assets_access),
+    period: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Depreciation run creation page."""
+    context = base_context(request, auth, "Create Depreciation Run", "fixed_assets")
+    context.update(
+        fa_web_service.depreciation_run_form_context(
+            db,
+            str(auth.organization_id),
+            period=period,
+        )
+    )
+    return templates.TemplateResponse(
+        request, "fixed_assets/depreciation_run_form.html", context
+    )

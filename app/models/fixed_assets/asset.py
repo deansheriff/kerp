@@ -47,6 +47,7 @@ class Asset(Base, ERPNextSyncMixin):
         UniqueConstraint("organization_id", "asset_number", name="uq_asset"),
         Index("idx_asset_category", "category_id"),
         Index("idx_asset_location", "location_id"),
+        Index("idx_asset_depreciation_schedule", "current_depreciation_schedule_id"),
         {"schema": "fa"},
     )
 
@@ -147,6 +148,12 @@ class Asset(Base, ERPNextSyncMixin):
         Enum(AssetStatus, name="asset_status"),
         nullable=False,
         default=AssetStatus.DRAFT,
+    )
+
+    current_depreciation_schedule_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("fa.depreciation_schedule.schedule_id"),
+        nullable=True,
     )
 
     # CGU assignment for impairment testing

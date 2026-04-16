@@ -28,6 +28,7 @@ from app.services.fixed_assets import (
     asset_service,
     depreciation_service,
 )
+from app.api.fixed_assets import import_export as import_export_router
 
 router = APIRouter(
     prefix="/fixed-assets",
@@ -70,6 +71,7 @@ class AssetCreate(BaseModel):
     location_id: UUID | None = None
     cost_center_id: UUID | None = None
     description: str | None = None
+    depreciation_schedule_id: UUID | None = None
 
 
 class AssetRead(BaseModel):
@@ -111,6 +113,26 @@ class DepreciationRunRead(BaseModel):
     total_depreciation: Decimal
     assets_processed: int
     status: str
+
+
+class DepreciationScheduleRead(BaseModel):
+    """Depreciation schedule response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    schedule_id: UUID
+    run_id: UUID
+    asset_id: UUID
+    cost_basis: Decimal
+    accumulated_depreciation_opening: Decimal
+    net_book_value_opening: Decimal
+    depreciation_amount: Decimal
+    accumulated_depreciation_closing: Decimal
+    net_book_value_closing: Decimal
+    remaining_life_months_opening: int
+    remaining_life_months_closing: int
+    expense_account_id: UUID
+    accumulated_depreciation_account_id: UUID
 
 
 class DisposalCreate(BaseModel):
@@ -173,6 +195,7 @@ def create_asset(
         useful_life_months=payload.useful_life_months,
         residual_value=payload.residual_value,
         depreciation_method=payload.depreciation_method,
+        depreciation_schedule_id=payload.depreciation_schedule_id,
         location_id=payload.location_id,
         cost_center_id=payload.cost_center_id,
         description=payload.description,
@@ -327,6 +350,24 @@ def list_depreciation_runs(
     )
 
 
+@router.post(
+    "/depreciation/runs/{run_id}/calculate",
+    response_model=DepreciationRunRead,
+)
+def calculate_depreciation_run(
+    run_id: UUID,
+    organization_id: UUID = Depends(require_organization_id),
+    auth: dict = Depends(require_tenant_permission("fa:depreciation:run")),
+    db: Session = Depends(get_db),
+):
+    """Calculate depreciation for an existing run."""
+    return depreciation_service.calculate_run(
+        db=db,
+        organization_id=organization_id,
+        run_id=run_id,
+    )
+
+
 @router.post("/depreciation/runs/{run_id}/post", response_model=PostingResultSchema)
 def post_depreciation(
     run_id: UUID,
@@ -337,7 +378,7 @@ def post_depreciation(
     db: Session = Depends(get_db),
 ):
     """Post depreciation run to GL."""
-    result = FAPostingAdapter.post_depreciation_run(
+    run = depreciation_service.post_run(
         db=db,
         organization_id=organization_id,
         run_id=run_id,
@@ -345,10 +386,34 @@ def post_depreciation(
         posted_by_user_id=posted_by_user_id,
     )
     return PostingResultSchema(
-        success=result.success,
-        journal_entry_id=result.journal_entry_id,
+        success=True,
+        journal_entry_id=run.journal_entry_id,
         entry_number=None,
-        message=result.message,
+        message="Depreciation run posted successfully",
+    )
+
+
+@router.get(
+    "/depreciation/runs/{run_id}/schedules",
+    response_model=ListResponse[DepreciationScheduleRead],
+)
+def list_depreciation_schedules(
+    run_id: UUID,
+    organization_id: UUID = Depends(require_organization_id),
+    auth: dict = Depends(require_tenant_permission("fa:depreciation:read")),
+    db: Session = Depends(get_db),
+):
+    """List depreciation schedules for a specific run."""
+    schedules = depreciation_service.get_run_schedules(
+        db=db,
+        organization_id=organization_id,
+        run_id=run_id,
+    )
+    return ListResponse(
+        items=schedules,
+        count=len(schedules),
+        limit=len(schedules),
+        offset=0,
     )
 
 
@@ -422,3 +487,6 @@ def post_disposal(
         entry_number=None,
         message=result.message,
     )
+
+
+router.include_router(import_export_router.router)

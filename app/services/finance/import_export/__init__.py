@@ -26,7 +26,10 @@ Import order recommendation:
 """
 
 from .accounts import AccountCategoryImporter, AccountImporter
-from .assets import AssetCategoryImporter, AssetImporter
+from .assets import (
+    AssetCategoryImporter,
+    AssetImporter,
+)
 from .banking import BankAccountImporter
 from .base import (
     # Column alias utilities

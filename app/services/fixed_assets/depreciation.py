@@ -30,6 +30,7 @@ from app.models.fixed_assets.depreciation_run import (
 )
 from app.models.fixed_assets.depreciation_schedule import DepreciationSchedule
 from app.services.common import coerce_uuid
+from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -489,15 +490,36 @@ class DepreciationService(ListResponseMixin):
             for schedule in schedules:
                 asset = db.get(Asset, schedule.asset_id)
                 if asset:
+                    previous_status = asset.status
                     asset.accumulated_depreciation = (
                         schedule.accumulated_depreciation_closing
                     )
                     asset.net_book_value = schedule.net_book_value_closing
                     asset.remaining_life_months = schedule.remaining_life_months_closing
+                    asset.current_depreciation_schedule_id = schedule.schedule_id
 
                     # Check if fully depreciated
-                    if asset.net_book_value <= asset.residual_value:
+                    if (
+                        asset.net_book_value <= asset.residual_value
+                        and previous_status != AssetStatus.FULLY_DEPRECIATED
+                    ):
                         asset.status = AssetStatus.FULLY_DEPRECIATED
+                        record_asset_lifecycle_event(
+                            db,
+                            org_id=org_id,
+                            asset_id=asset.asset_id,
+                            event_category="STATE",
+                            event_type="STATE_CHANGED",
+                            source_type="depreciation_run",
+                            source_record_id=run.run_id,
+                            previous_status=previous_status.value,
+                            new_status=asset.status.value,
+                            notes="Depreciation posting updated asset state",
+                            event_payload={
+                                "run_id": str(run.run_id),
+                                "schedule_id": str(schedule.schedule_id),
+                            },
+                        )
 
             run.status = DepreciationRunStatus.POSTED
             run.posted_at = datetime.now(UTC)

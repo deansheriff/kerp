@@ -21,8 +21,11 @@ from sqlalchemy.orm import Session
 from app.models.finance.core_config.numbering_sequence import SequenceType
 from app.models.fixed_assets.asset import Asset, AssetStatus
 from app.models.fixed_assets.asset_category import AssetCategory, DepreciationMethod
+from app.models.fixed_assets.depreciation_run import DepreciationRun
+from app.models.fixed_assets.depreciation_schedule import DepreciationSchedule
 from app.services.common import coerce_uuid
 from app.services.finance.platform.sequence import SequenceService
+from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -77,6 +80,7 @@ class AssetInput:
     manufacturer: str | None = None
     model: str | None = None
     warranty_expiry_date: date | None = None
+    depreciation_schedule_id: UUID | None = None
     insured_value: Decimal | None = None
     insurance_policy_number: str | None = None
     cash_generating_unit_id: UUID | None = None
@@ -317,6 +321,25 @@ class AssetService(ListResponseMixin):
         exchange_rate = input.exchange_rate or Decimal("1.0")
         functional_cost = input.acquisition_cost * exchange_rate
 
+        schedule_id = (
+            coerce_uuid(input.depreciation_schedule_id)
+            if input.depreciation_schedule_id
+            else None
+        )
+        if schedule_id is not None:
+            schedule = db.get(DepreciationSchedule, schedule_id)
+            if not schedule:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Depreciation schedule not found",
+                )
+            depreciation_run = db.get(DepreciationRun, schedule.run_id)
+            if not depreciation_run or depreciation_run.organization_id != org_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Depreciation schedule does not belong to organization",
+                )
+
         # Use category defaults if not specified
         depreciation_method = (
             input.depreciation_method or category.depreciation_method.value
@@ -353,6 +376,7 @@ class AssetService(ListResponseMixin):
             useful_life_months=useful_life,
             remaining_life_months=useful_life,
             residual_value=residual_value,
+            current_depreciation_schedule_id=schedule_id,
             accumulated_depreciation=Decimal("0"),
             net_book_value=net_book_value,
             impairment_loss=Decimal("0"),
@@ -373,6 +397,47 @@ class AssetService(ListResponseMixin):
         db.add(asset)
         db.flush()
         db.refresh(asset)
+        record_asset_lifecycle_event(
+            db,
+            org_id=org_id,
+            asset_id=asset.asset_id,
+            event_category="STATE",
+            event_type="STATE_CHANGED",
+            source_type="asset",
+            source_record_id=asset.asset_id,
+            actor_user_id=user_id,
+            new_status=AssetStatus.DRAFT.value,
+            notes="Asset created in draft state",
+            event_payload={"creation_method": "AssetService.create_asset"},
+        )
+        if asset.location_id:
+            record_asset_lifecycle_event(
+                db,
+                org_id=org_id,
+                asset_id=asset.asset_id,
+                event_category="LOCATION",
+                event_type="LOCATION_CHANGED",
+                source_type="asset",
+                source_record_id=asset.asset_id,
+                actor_user_id=user_id,
+                previous_location_id=None,
+                new_location_id=asset.location_id,
+                notes="Initial location set on asset creation",
+            )
+        if asset.custodian_employee_id:
+            record_asset_lifecycle_event(
+                db,
+                org_id=org_id,
+                asset_id=asset.asset_id,
+                event_category="OWNERSHIP",
+                event_type="OWNERSHIP_CHANGED",
+                source_type="asset",
+                source_record_id=asset.asset_id,
+                actor_user_id=user_id,
+                previous_owner_employee_id=None,
+                new_owner_employee_id=asset.custodian_employee_id,
+                notes="Initial custodian set on asset creation",
+            )
 
         return asset
 
@@ -404,15 +469,31 @@ class AssetService(ListResponseMixin):
         if not asset or asset.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Asset not found")
 
+        previous_location_id = asset.location_id
+        previous_owner_id = asset.custodian_employee_id
+
         if asset.status != AssetStatus.DRAFT:
             raise HTTPException(
                 status_code=400,
                 detail=f"Cannot activate asset with status '{asset.status.value}'",
             )
 
+        previous_status = asset.status
         asset.status = AssetStatus.ACTIVE
         asset.in_service_date = in_service_date or asset.acquisition_date
         asset.depreciation_start_date = depreciation_start_date or asset.in_service_date
+        record_asset_lifecycle_event(
+            db,
+            org_id=org_id,
+            asset_id=asset.asset_id,
+            event_category="STATE",
+            event_type="STATE_CHANGED",
+            source_type="asset",
+            source_record_id=asset.asset_id,
+            previous_status=previous_status.value,
+            new_status=asset.status.value,
+            notes="Asset activated",
+        )
 
         db.flush()
         db.refresh(asset)
@@ -448,10 +529,13 @@ class AssetService(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Asset not found")
 
         # Fields that can be updated after activation
+        previous_location_id = asset.location_id
+        previous_owner_id = asset.custodian_employee_id
         always_updatable = {
             "description",
             "location_id",
             "cost_center_id",
+            "custodian_employee_id",
             "custodian_user_id",
             "serial_number",
             "barcode",
@@ -476,7 +560,10 @@ class AssetService(ListResponseMixin):
 
         for key, value in updates.items():
             if key in always_updatable:
-                setattr(asset, key, value)
+                if key == "custodian_user_id":
+                    asset.custodian_employee_id = value
+                else:
+                    setattr(asset, key, value)
             elif key in draft_only:
                 if asset.status != AssetStatus.DRAFT:
                     raise HTTPException(
@@ -484,6 +571,32 @@ class AssetService(ListResponseMixin):
                         detail=ASSET_STATUS_UPDATE_ERROR.format(key=key),
                     )
                 setattr(asset, key, value)
+        if previous_location_id != asset.location_id:
+            record_asset_lifecycle_event(
+                db,
+                org_id=org_id,
+                asset_id=asset.asset_id,
+                event_category="LOCATION",
+                event_type="LOCATION_CHANGED",
+                source_type="asset",
+                source_record_id=asset.asset_id,
+                previous_location_id=previous_location_id,
+                new_location_id=asset.location_id,
+                notes="Asset location updated",
+            )
+        if previous_owner_id != asset.custodian_employee_id:
+            record_asset_lifecycle_event(
+                db,
+                org_id=org_id,
+                asset_id=asset.asset_id,
+                event_category="OWNERSHIP",
+                event_type="OWNERSHIP_CHANGED",
+                source_type="asset",
+                source_record_id=asset.asset_id,
+                previous_owner_employee_id=previous_owner_id,
+                new_owner_employee_id=asset.custodian_employee_id,
+                notes="Asset custodian updated",
+            )
 
         db.flush()
         db.refresh(asset)
@@ -510,8 +623,21 @@ class AssetService(ListResponseMixin):
                 detail="Only ACTIVE assets can be marked fully depreciated",
             )
 
+        previous_status = asset.status
         asset.status = AssetStatus.FULLY_DEPRECIATED
         asset.remaining_life_months = 0
+        record_asset_lifecycle_event(
+            db,
+            org_id=org_id,
+            asset_id=asset.asset_id,
+            event_category="STATE",
+            event_type="STATE_CHANGED",
+            source_type="asset",
+            source_record_id=asset.asset_id,
+            previous_status=previous_status.value,
+            new_status=asset.status.value,
+            notes="Asset marked fully depreciated",
+        )
 
         db.flush()
         db.refresh(asset)

@@ -74,19 +74,11 @@ def import_dashboard(
             "prereqs": ["accounts"],
         },
         {
-            "id": "assets",
-            "name": "Fixed Assets",
-            "description": "Import fixed assets and depreciation schedules",
-            "icon": "building-office",
-            "order": 5,
-            "prereqs": ["accounts"],
-        },
-        {
             "id": "bank_accounts",
             "name": "Bank Accounts",
             "description": "Import bank account details",
             "icon": "building-library",
-            "order": 6,
+            "order": 5,
             "prereqs": ["accounts"],
         },
         {
@@ -94,7 +86,7 @@ def import_dashboard(
             "name": "Customer Invoices",
             "description": "Import sales invoices and credit notes",
             "icon": "document-text",
-            "order": 7,
+            "order": 6,
             "prereqs": ["customers"],
         },
         {
@@ -102,7 +94,7 @@ def import_dashboard(
             "name": "Expenses",
             "description": "Import expense entries",
             "icon": "receipt-percent",
-            "order": 8,
+            "order": 7,
             "prereqs": ["accounts"],
         },
         {
@@ -110,7 +102,7 @@ def import_dashboard(
             "name": "Customer Payments",
             "description": "Import payment receipts from customers",
             "icon": "banknotes",
-            "order": 9,
+            "order": 8,
             "prereqs": ["customers"],
         },
         {
@@ -118,7 +110,7 @@ def import_dashboard(
             "name": "Supplier Payments",
             "description": "Import payments to vendors",
             "icon": "credit-card",
-            "order": 10,
+            "order": 9,
             "prereqs": ["suppliers"],
         },
     ]
@@ -143,7 +135,6 @@ def import_form(
         "customers": "Customers",
         "suppliers": "Suppliers/Vendors",
         "items": "Inventory Items",
-        "assets": "Fixed Assets",
         "bank_accounts": "Bank Accounts",
         "invoices": "Customer Invoices",
         "expenses": "Expenses",
@@ -192,16 +183,6 @@ def import_form(
                 "Unit Price",
                 "Selling Price",
                 "Category",
-            ],
-        },
-        "assets": {
-            "required": ["Asset Name"],
-            "optional": [
-                "Asset Number",
-                "Acquisition Date",
-                "Acquisition Cost",
-                "Category",
-                "Useful Life",
             ],
         },
         "bank_accounts": {
