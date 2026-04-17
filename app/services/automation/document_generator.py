@@ -356,18 +356,18 @@ class DocumentGeneratorService:
             TemplateNotFoundError: If template not found
             PDFGenerationError: If PDF generation fails
         """
-        try:
-            from weasyprint import HTML
-        except ImportError:
-            logger.error("WeasyPrint not installed. Run: pip install weasyprint")
-            raise PDFGenerationError("WeasyPrint is required for PDF generation")
-
         # Get template
         template = self.get_template(organization_id, template_type, template_name)
         if not template:
             raise TemplateNotFoundError(
                 f"No template found for type {template_type.value}"
             )
+
+        try:
+            from weasyprint import HTML
+        except ImportError:
+            logger.error("WeasyPrint not installed. Run: pip install weasyprint")
+            raise PDFGenerationError("WeasyPrint is required for PDF generation")
 
         # Render HTML
         if use_base_template:

@@ -211,10 +211,8 @@ class TestDocumentGeneratorService:
         assert "api_secret_key" not in snapshot
         assert "password" not in snapshot
 
-    @patch("weasyprint.HTML")
     def test_generate_pdf(
         self,
-        mock_html_class: MagicMock,
         db: Session,
         organization: Organization,
         offer_letter_template: DocumentTemplate,
@@ -224,7 +222,7 @@ class TestDocumentGeneratorService:
         # Mock WeasyPrint
         mock_html_instance = MagicMock()
         mock_html_instance.write_pdf.return_value = b"%PDF-1.4 fake pdf content"
-        mock_html_class.return_value = mock_html_instance
+        mock_html_class = MagicMock(return_value=mock_html_instance)
 
         service = DocumentGeneratorService(db)
 
@@ -241,18 +239,19 @@ class TestDocumentGeneratorService:
 
         entity_id = uuid.uuid4()
 
-        pdf_bytes, doc_record = service.generate_pdf(
-            organization_id=organization.organization_id,
-            template_type=TemplateType.OFFER_LETTER,
-            context=context,
-            entity_type="JOB_OFFER",
-            entity_id=entity_id,
-            document_number="OFFER-2024-0001",
-            document_title="Offer Letter for John Doe",
-            created_by=user_id,
-            save_record=True,
-            use_base_template=False,  # Skip base template for simpler test
-        )
+        with patch.dict("sys.modules", {"weasyprint": MagicMock(HTML=mock_html_class)}):
+            pdf_bytes, doc_record = service.generate_pdf(
+                organization_id=organization.organization_id,
+                template_type=TemplateType.OFFER_LETTER,
+                context=context,
+                entity_type="JOB_OFFER",
+                entity_id=entity_id,
+                document_number="OFFER-2024-0001",
+                document_title="Offer Letter for John Doe",
+                created_by=user_id,
+                save_record=True,
+                use_base_template=False,  # Skip base template for simpler test
+            )
 
         # Check PDF bytes returned
         assert pdf_bytes == b"%PDF-1.4 fake pdf content"

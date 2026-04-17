@@ -130,6 +130,8 @@ class TestAssetService:
 
         # Mock category lookup
         mock_db.get.return_value = mock_category
+        # Mock uniqueness check for generated asset number
+        mock_db.scalars.return_value.first.return_value = None
 
         input_data = AssetInput(
             asset_name="Office Computer",
