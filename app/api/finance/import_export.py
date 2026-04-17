@@ -218,7 +218,7 @@ async def get_supported_types(
                 "description": "Import bank accounts",
                 "required_columns": ["Bank Name", "Account Number"],
                 "optional_columns": ["Account Type", "Currency", "IBAN", "Branch"],
-            "import_order": 5,
+                "import_order": 5,
             },
             {
                 "type": "invoices",
@@ -231,7 +231,7 @@ async def get_supported_types(
                     "Due Date",
                     "Status",
                 ],
-            "import_order": 6,
+                "import_order": 6,
                 "prerequisites": ["customers"],
             },
             {
@@ -245,7 +245,7 @@ async def get_supported_types(
                     "Category",
                     "Payment Method",
                 ],
-            "import_order": 7,
+                "import_order": 7,
                 "prerequisites": ["accounts"],
             },
             {
@@ -254,7 +254,7 @@ async def get_supported_types(
                 "description": "Import customer payment receipts",
                 "required_columns": ["Customer Name", "Amount"],
                 "optional_columns": ["Payment Date", "Reference", "Payment Method"],
-            "import_order": 8,
+                "import_order": 8,
                 "prerequisites": ["customers"],
             },
             {
@@ -263,7 +263,7 @@ async def get_supported_types(
                 "description": "Import supplier/vendor payments",
                 "required_columns": ["Vendor Name", "Amount"],
                 "optional_columns": ["Payment Date", "Reference", "Payment Method"],
-            "import_order": 9,
+                "import_order": 9,
                 "prerequisites": ["suppliers"],
             },
         ],

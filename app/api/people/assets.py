@@ -293,7 +293,10 @@ def start_asset_audit_plan(
     return AssetAuditPlanRead.model_validate(plan)
 
 
-@router.get("/audit/plans/{audit_plan_id}/lines", response_model=ListResponse[AssetAuditLineRead])
+@router.get(
+    "/audit/plans/{audit_plan_id}/lines",
+    response_model=ListResponse[AssetAuditLineRead],
+)
 def list_asset_audit_lines(
     audit_plan_id: UUID,
     organization_id: UUID = Depends(require_organization_id),
@@ -613,7 +616,9 @@ def calculate_depreciation_run(
     return AssetDepreciationRunRead.model_validate(run)
 
 
-@router.post("/depreciation/runs/{run_id}/post", response_model=AssetDepreciationRunRead)
+@router.post(
+    "/depreciation/runs/{run_id}/post", response_model=AssetDepreciationRunRead
+)
 def post_depreciation_run(
     run_id: UUID,
     posted_by_user_id: UUID = Query(...),
@@ -652,7 +657,9 @@ def list_depreciation_run_schedules(
     )
 
 
-@router.get("/maintenance/requests", response_model=ListResponse[MaintenanceRequestRead])
+@router.get(
+    "/maintenance/requests", response_model=ListResponse[MaintenanceRequestRead]
+)
 def list_maintenance_requests(
     organization_id: UUID = Depends(require_organization_id),
     asset_id: UUID | None = None,

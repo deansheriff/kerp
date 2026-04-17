@@ -7,7 +7,10 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models.fixed_assets.depreciation_run import DepreciationRun, DepreciationRunStatus
+from app.models.fixed_assets.depreciation_run import (
+    DepreciationRun,
+    DepreciationRunStatus,
+)
 from app.models.fixed_assets.depreciation_schedule import DepreciationSchedule
 from app.services.fixed_assets.depreciation import depreciation_service
 

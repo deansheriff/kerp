@@ -6,7 +6,17 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, Text, func, text
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -56,7 +66,9 @@ class AssetTrackingEvent(Base, AuditMixin, ERPNextSyncMixin):
         nullable=False,
     )
     tracking_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    tracked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    tracked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     location_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("core_org.location.location_id"),

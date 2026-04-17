@@ -159,8 +159,7 @@ class FixedAssetWebService:
         try:
             context["kpi"]["maintenance_due"] = (
                 db.scalar(
-                    select(func.count(MaintenanceRequest.maintenance_request_id))
-                    .where(
+                    select(func.count(MaintenanceRequest.maintenance_request_id)).where(
                         and_(
                             MaintenanceRequest.organization_id == org_id,
                             MaintenanceRequest.status.in_(maintenance_open_statuses),
@@ -178,8 +177,7 @@ class FixedAssetWebService:
         try:
             eligible_depreciation_assets = (
                 db.scalar(
-                    select(func.count(Asset.asset_id))
-                    .where(
+                    select(func.count(Asset.asset_id)).where(
                         and_(
                             Asset.organization_id == org_id,
                             Asset.status == AssetStatus.ACTIVE,
@@ -211,8 +209,7 @@ class FixedAssetWebService:
             if current_period_id:
                 has_posted_run = bool(
                     db.scalar(
-                        select(func.count(DepreciationRun.run_id))
-                        .where(
+                        select(func.count(DepreciationRun.run_id)).where(
                             and_(
                                 DepreciationRun.organization_id == org_id,
                                 DepreciationRun.fiscal_period_id == current_period_id,
@@ -233,8 +230,7 @@ class FixedAssetWebService:
         try:
             context["kpi"]["location_mismatch_count"] = (
                 db.scalar(
-                    select(func.count(AssetAuditDiscrepancy.discrepancy_id))
-                    .where(
+                    select(func.count(AssetAuditDiscrepancy.discrepancy_id)).where(
                         and_(
                             AssetAuditDiscrepancy.organization_id == org_id,
                             AssetAuditDiscrepancy.status == "OPEN",
@@ -325,8 +321,7 @@ class FixedAssetWebService:
         try:
             data["kpi"]["maintenance_due"] = (
                 db.scalar(
-                    select(func.count(MaintenanceRequest.maintenance_request_id))
-                    .where(
+                    select(func.count(MaintenanceRequest.maintenance_request_id)).where(
                         and_(
                             MaintenanceRequest.organization_id == org_id,
                             MaintenanceRequest.status.in_(maintenance_open_statuses),
@@ -357,7 +352,9 @@ class FixedAssetWebService:
                         MaintenanceRequest.due_date <= today,
                     )
                 )
-                .order_by(MaintenanceRequest.due_date.asc(), MaintenanceRequest.title.asc())
+                .order_by(
+                    MaintenanceRequest.due_date.asc(), MaintenanceRequest.title.asc()
+                )
                 .limit(row_limit)
             ).all()
 
@@ -379,25 +376,22 @@ class FixedAssetWebService:
             data["kpi"]["maintenance_due"] = 0
 
         try:
-            eligible_query = (
-                select(
-                    Asset.asset_id,
-                    Asset.asset_number,
-                    Asset.asset_name,
-                    Asset.net_book_value,
-                    Asset.residual_value,
-                    Asset.remaining_life_months,
-                    Asset.status,
-                )
-                .where(
-                    and_(
-                        Asset.organization_id == org_id,
-                        Asset.status == AssetStatus.ACTIVE,
-                        Asset.net_book_value > Asset.residual_value,
-                        Asset.remaining_life_months > 0,
-                        Asset.depreciation_start_date.is_not(None),
-                        Asset.depreciation_start_date <= today,
-                    )
+            eligible_query = select(
+                Asset.asset_id,
+                Asset.asset_number,
+                Asset.asset_name,
+                Asset.net_book_value,
+                Asset.residual_value,
+                Asset.remaining_life_months,
+                Asset.status,
+            ).where(
+                and_(
+                    Asset.organization_id == org_id,
+                    Asset.status == AssetStatus.ACTIVE,
+                    Asset.net_book_value > Asset.residual_value,
+                    Asset.remaining_life_months > 0,
+                    Asset.depreciation_start_date.is_not(None),
+                    Asset.depreciation_start_date <= today,
                 )
             )
 
@@ -432,9 +426,7 @@ class FixedAssetWebService:
                 ).all()
                 if posted_asset_ids:
                     eligible_query = eligible_query.where(
-                        Asset.asset_id.not_in(
-                            [row[0] for row in posted_asset_ids]
-                        )
+                        Asset.asset_id.not_in([row[0] for row in posted_asset_ids])
                     )
 
             data["kpi"]["depreciation_due"] = (
@@ -470,7 +462,8 @@ class FixedAssetWebService:
                     select(func.count(AssetAuditDiscrepancy.discrepancy_id)).where(
                         and_(
                             AssetAuditDiscrepancy.organization_id == org_id,
-                            AssetAuditDiscrepancy.status == normalized_discrepancy_status,
+                            AssetAuditDiscrepancy.status
+                            == normalized_discrepancy_status,
                             AssetAuditDiscrepancy.discrepancy_type.in_(mismatch_types),
                         )
                     )
@@ -524,7 +517,8 @@ class FixedAssetWebService:
                     select(func.count(AssetAuditDiscrepancy.discrepancy_id)).where(
                         and_(
                             AssetAuditDiscrepancy.organization_id == org_id,
-                            AssetAuditDiscrepancy.status == normalized_discrepancy_status,
+                            AssetAuditDiscrepancy.status
+                            == normalized_discrepancy_status,
                         )
                     )
                 )
@@ -571,9 +565,7 @@ class FixedAssetWebService:
             data["kpi"]["discrepancy_count"] = 0
 
         # Provide state distribution for overview and state-section cards.
-        data["kpi"]["by_state"] = dashboard_data.get("kpi", {}).get(
-            "by_state", []
-        )
+        data["kpi"]["by_state"] = dashboard_data.get("kpi", {}).get("by_state", [])
         return data
 
     @staticmethod
@@ -628,18 +620,27 @@ class FixedAssetWebService:
                 FiscalPeriod.start_date,
                 FiscalPeriod.end_date,
             )
-            .join(DepreciationRun, DepreciationSchedule.run_id == DepreciationRun.run_id)
+            .join(
+                DepreciationRun, DepreciationSchedule.run_id == DepreciationRun.run_id
+            )
             .join(
                 FiscalPeriod,
                 DepreciationRun.fiscal_period_id == FiscalPeriod.fiscal_period_id,
             )
             .where(DepreciationRun.organization_id == org_id)
-            .order_by(DepreciationRun.created_at.desc(), DepreciationSchedule.created_at.desc())
+            .order_by(
+                DepreciationRun.created_at.desc(),
+                DepreciationSchedule.created_at.desc(),
+            )
         ).all()
         depreciation_schedules = []
-        for schedule_id, run_number, period_name, start_date, end_date in (
-            depreciation_schedule_rows
-        ):
+        for (
+            schedule_id,
+            run_number,
+            period_name,
+            start_date,
+            end_date,
+        ) in depreciation_schedule_rows:
             depreciation_schedules.append(
                 {
                     "schedule_id": str(schedule_id),
@@ -791,9 +792,7 @@ class FixedAssetWebService:
                 currency_code=resolved_currency,
                 description=description,
                 depreciation_schedule_id=(
-                    UUID(depreciation_schedule_id)
-                    if depreciation_schedule_id
-                    else None
+                    UUID(depreciation_schedule_id) if depreciation_schedule_id else None
                 ),
             )
 
@@ -812,9 +811,7 @@ class FixedAssetWebService:
             context = base_context(request, auth, "New Asset", "fixed_assets")
             context.update(self.asset_form_context(db, str(auth.organization_id)))
             context["error"] = str(e)
-            context["selected_depreciation_schedule_id"] = (
-                depreciation_schedule_id
-            )
+            context["selected_depreciation_schedule_id"] = depreciation_schedule_id
             return templates.TemplateResponse(
                 request, "fixed_assets/asset_form.html", context
             )

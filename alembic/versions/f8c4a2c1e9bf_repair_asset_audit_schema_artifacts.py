@@ -84,7 +84,9 @@ def upgrade() -> None:
         )
 
     # Add missing indexes for new tables.
-    existing_indexes = {idx["name"] for idx in insp.get_indexes("asset_audit_discrepancy", schema="hr")}
+    existing_indexes = {
+        idx["name"] for idx in insp.get_indexes("asset_audit_discrepancy", schema="hr")
+    }
     if "idx_asset_audit_discrepancy_plan" not in existing_indexes:
         op.create_index(
             "idx_asset_audit_discrepancy_plan",
@@ -107,7 +109,9 @@ def upgrade() -> None:
             schema="hr",
         )
 
-    existing_indexes = {idx["name"] for idx in insp.get_indexes("asset_lifecycle_event", schema="hr")}
+    existing_indexes = {
+        idx["name"] for idx in insp.get_indexes("asset_lifecycle_event", schema="hr")
+    }
     if "idx_asset_lifecycle_event_asset" not in existing_indexes:
         op.create_index(
             "idx_asset_lifecycle_event_asset",
@@ -154,7 +158,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("asset_lifecycle_event_asset_fkey", "asset_lifecycle_event", type_="foreignkey", schema="hr")
+    op.drop_constraint(
+        "asset_lifecycle_event_asset_fkey",
+        "asset_lifecycle_event",
+        type_="foreignkey",
+        schema="hr",
+    )
     op.drop_table("asset_lifecycle_event", schema="hr")
     op.drop_table("asset_audit_discrepancy", schema="hr")
     op.drop_constraint("asset_pkey", "asset", type_="primary", schema="fa")

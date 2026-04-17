@@ -26,11 +26,21 @@ from app.models.inventory.inventory_transaction import TransactionType
 from app.models.inventory.item import Item
 from app.models.procurement.enums import UrgencyLevel
 from app.schemas.procurement.requisition import RequisitionCreate, RequisitionLineCreate
-from app.services.common import NotFoundError, PaginatedResult, PaginationParams, ValidationError
+from app.services.common import (
+    NotFoundError,
+    PaginatedResult,
+    PaginationParams,
+    ValidationError,
+)
 from app.services.inventory.balance import InventoryBalanceService
-from app.services.inventory.transaction import InventoryTransactionService, TransactionInput
+from app.services.inventory.transaction import (
+    InventoryTransactionService,
+    TransactionInput,
+)
 from app.services.procurement.requisition import RequisitionService
-from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
+from app.services.people.assets.lifecycle_event_service import (
+    record_asset_lifecycle_event,
+)
 
 __all__ = ["AssetMaintenanceService"]
 
@@ -52,13 +62,17 @@ class AssetMaintenanceService:
             raise NotFoundError("Asset not found")
         return asset
 
-    def _get_request(self, org_id: UUID, maintenance_request_id: UUID) -> MaintenanceRequest:
+    def _get_request(
+        self, org_id: UUID, maintenance_request_id: UUID
+    ) -> MaintenanceRequest:
         request = self.db.get(MaintenanceRequest, maintenance_request_id)
         if not request or request.organization_id != org_id:
             raise NotFoundError("Maintenance request not found")
         return request
 
-    def _get_work_order(self, org_id: UUID, work_order_id: UUID) -> MaintenanceWorkOrder:
+    def _get_work_order(
+        self, org_id: UUID, work_order_id: UUID
+    ) -> MaintenanceWorkOrder:
         work_order = self.db.get(MaintenanceWorkOrder, work_order_id)
         if not work_order or work_order.organization_id != org_id:
             raise NotFoundError("Maintenance work order not found")
@@ -150,19 +164,25 @@ class AssetMaintenanceService:
         )
 
     def _next_request_number(self, org_id: UUID) -> str:
-        total = self.db.scalar(
-            select(func.count(MaintenanceRequest.maintenance_request_id)).where(
-                MaintenanceRequest.organization_id == org_id
+        total = (
+            self.db.scalar(
+                select(func.count(MaintenanceRequest.maintenance_request_id)).where(
+                    MaintenanceRequest.organization_id == org_id
+                )
             )
-        ) or 0
+            or 0
+        )
         return f"FAMR-{int(total) + 1:06d}"
 
     def _next_work_order_number(self, org_id: UUID) -> str:
-        total = self.db.scalar(
-            select(func.count(MaintenanceWorkOrder.work_order_id)).where(
-                MaintenanceWorkOrder.organization_id == org_id
+        total = (
+            self.db.scalar(
+                select(func.count(MaintenanceWorkOrder.work_order_id)).where(
+                    MaintenanceWorkOrder.organization_id == org_id
+                )
             )
-        ) or 0
+            or 0
+        )
         return f"FAMWO-{int(total) + 1:06d}"
 
     def _next_procurement_requisition_number(self) -> str:
@@ -177,7 +197,9 @@ class AssetMaintenanceService:
         status: MaintenanceRequestStatus | None = None,
         pagination: PaginationParams | None = None,
     ) -> PaginatedResult[MaintenanceRequest]:
-        query = select(MaintenanceRequest).where(MaintenanceRequest.organization_id == org_id)
+        query = select(MaintenanceRequest).where(
+            MaintenanceRequest.organization_id == org_id
+        )
         if asset_id:
             query = query.where(MaintenanceRequest.asset_id == asset_id)
         if status:
@@ -231,7 +253,9 @@ class AssetMaintenanceService:
         status: MaintenanceWorkOrderStatus | None = None,
         pagination: PaginationParams | None = None,
     ) -> PaginatedResult[MaintenanceWorkOrder]:
-        query = select(MaintenanceWorkOrder).where(MaintenanceWorkOrder.organization_id == org_id)
+        query = select(MaintenanceWorkOrder).where(
+            MaintenanceWorkOrder.organization_id == org_id
+        )
         if maintenance_request_id:
             query = query.where(
                 MaintenanceWorkOrder.maintenance_request_id == maintenance_request_id
@@ -261,7 +285,10 @@ class AssetMaintenanceService:
         created_by_user_id: UUID | None,
     ) -> MaintenanceWorkOrder:
         request = self._get_request(org_id, maintenance_request_id)
-        if request.status in {MaintenanceRequestStatus.COMPLETED, MaintenanceRequestStatus.CANCELLED}:
+        if request.status in {
+            MaintenanceRequestStatus.COMPLETED,
+            MaintenanceRequestStatus.CANCELLED,
+        }:
             raise ValidationError("Cannot create work order for closed request")
         work_order = MaintenanceWorkOrder(
             organization_id=org_id,

@@ -27,7 +27,9 @@ from app.models.fixed_assets.asset import Asset, AssetStatus
 from app.models.fixed_assets.asset_disposal import AssetDisposal, DisposalType
 from app.services.audit_dispatcher import fire_audit_event
 from app.services.common import coerce_uuid
-from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
+from app.services.people.assets.lifecycle_event_service import (
+    record_asset_lifecycle_event,
+)
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)

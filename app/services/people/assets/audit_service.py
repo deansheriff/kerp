@@ -20,7 +20,12 @@ from app.models.people.assets.audit import (
     AssetAuditPlanStatus,
     AssetLifecycleEvent,
 )
-from app.services.common import NotFoundError, PaginatedResult, PaginationParams, ValidationError
+from app.services.common import (
+    NotFoundError,
+    PaginatedResult,
+    PaginationParams,
+    ValidationError,
+)
 
 __all__ = ["AssetAuditService"]
 
@@ -60,14 +65,19 @@ class AssetAuditService:
         )
         if status is not None:
             query = query.where(AssetAuditDiscrepancy.status == status)
-        return self.db.scalar(query.order_by(AssetAuditDiscrepancy.detected_at.asc()).limit(1))
+        return self.db.scalar(
+            query.order_by(AssetAuditDiscrepancy.detected_at.asc()).limit(1)
+        )
 
     def _next_plan_number(self, org_id: UUID) -> str:
-        total = self.db.scalar(
-            select(func.count(AssetAuditPlan.audit_plan_id)).where(
-                AssetAuditPlan.organization_id == org_id
+        total = (
+            self.db.scalar(
+                select(func.count(AssetAuditPlan.audit_plan_id)).where(
+                    AssetAuditPlan.organization_id == org_id
+                )
             )
-        ) or 0
+            or 0
+        )
         return f"FAAUD-{int(total) + 1:06d}"
 
     def _collect_discrepancy_payload(
@@ -107,8 +117,7 @@ class AssetAuditService:
         observed_state: dict[str, Any] = {}
 
         if (
-            line.expected_location_id is not None
-            or observed_location_id is not None
+            line.expected_location_id is not None or observed_location_id is not None
         ) and line.expected_location_id != observed_location_id:
             mismatch_types.append("LOCATION")
             expected_state["location_id"] = (
@@ -163,7 +172,9 @@ class AssetAuditService:
         detected_by_user_id: UUID | None,
         notes: str | None,
     ) -> AssetAuditDiscrepancy:
-        discrepancy = self._get_discrepancy(org_id=org_id, audit_line_id=line.audit_line_id, status="OPEN")
+        discrepancy = self._get_discrepancy(
+            org_id=org_id, audit_line_id=line.audit_line_id, status="OPEN"
+        )
 
         if discrepancy is None:
             discrepancy = AssetAuditDiscrepancy(
@@ -186,7 +197,9 @@ class AssetAuditService:
         discrepancy.observed_state = observed_state or None
         discrepancy.notes = notes or discrepancy.notes
         discrepancy.status = "OPEN"
-        discrepancy.detected_by_user_id = discrepancy.detected_by_user_id or detected_by_user_id
+        discrepancy.detected_by_user_id = (
+            discrepancy.detected_by_user_id or detected_by_user_id
+        )
         discrepancy.resolved_at = None
         discrepancy.resolved_by_user_id = None
         discrepancy.resolution_notes = None
@@ -357,7 +370,10 @@ class AssetAuditService:
         audit_plan_id: UUID,
     ) -> AssetAuditPlan:
         plan = self._get_plan(org_id, audit_plan_id)
-        if plan.status not in {AssetAuditPlanStatus.DRAFT, AssetAuditPlanStatus.CANCELLED}:
+        if plan.status not in {
+            AssetAuditPlanStatus.DRAFT,
+            AssetAuditPlanStatus.CANCELLED,
+        }:
             raise ValidationError(f"Cannot start plan in {plan.status.value} status")
         plan.status = AssetAuditPlanStatus.IN_PROGRESS
         plan.started_at = datetime.now(UTC)
@@ -386,12 +402,14 @@ class AssetAuditService:
         line.checked_by_user_id = checked_by_user_id
         line.physical_check_at = datetime.now(UTC)
 
-        discrepancy_type, expected_state, observed_state = self._collect_discrepancy_payload(
-            line=line,
-            is_found=is_found,
-            observed_location_id=observed_location_id,
-            observed_custodian_employee_id=observed_custodian_employee_id,
-            observed_status=observed_status,
+        discrepancy_type, expected_state, observed_state = (
+            self._collect_discrepancy_payload(
+                line=line,
+                is_found=is_found,
+                observed_location_id=observed_location_id,
+                observed_custodian_employee_id=observed_custodian_employee_id,
+                observed_status=observed_status,
+            )
         )
 
         if discrepancy_type is None:

@@ -73,9 +73,7 @@ def fa_reports(
             discrepancy_status=discrepancy_status,
         )
     )
-    return templates.TemplateResponse(
-        request, "fixed_assets/reports.html", context
-    )
+    return templates.TemplateResponse(request, "fixed_assets/reports.html", context)
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -99,7 +97,7 @@ def fa_import_dashboard(
         {
             "id": "assets",
             "name": "Assets",
-                "description": "Import asset records and depreciation schedule data",
+            "description": "Import asset records and depreciation schedule data",
             "order": 1,
         }
     ]
@@ -135,9 +133,7 @@ def fa_import_form(
         }
     }
 
-    context = base_context(
-        request, auth, "Import Asset Management", "fixed_assets"
-    )
+    context = base_context(request, auth, "Import Asset Management", "fixed_assets")
     context["entity_type"] = entity_type
     context["entity_name"] = "Asset Management"
     context["columns"] = columns[entity_type]

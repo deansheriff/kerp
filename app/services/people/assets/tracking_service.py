@@ -16,7 +16,9 @@ from app.models.people.assets.assignment import (
     AssignmentStatus,
 )
 from app.models.people.assets.tracking import AssetTrackingEvent, AssetTrackingMethod
-from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
+from app.services.people.assets.lifecycle_event_service import (
+    record_asset_lifecycle_event,
+)
 from app.services.common import NotFoundError, PaginatedResult, PaginationParams
 
 __all__ = ["AssetTrackingService"]
@@ -61,7 +63,9 @@ class AssetTrackingService:
         location_id: UUID | None = None,
         pagination: PaginationParams | None = None,
     ) -> PaginatedResult[AssetTrackingEvent]:
-        query = select(AssetTrackingEvent).where(AssetTrackingEvent.organization_id == org_id)
+        query = select(AssetTrackingEvent).where(
+            AssetTrackingEvent.organization_id == org_id
+        )
         if asset_id:
             query = query.where(AssetTrackingEvent.asset_id == asset_id)
         if tracking_method:
@@ -114,7 +118,9 @@ class AssetTrackingService:
                     from_employee_id=active_assignment.employee_id
                     if active_assignment
                     else None,
-                    to_employee_id=active_assignment.employee_id if active_assignment else None,
+                    to_employee_id=active_assignment.employee_id
+                    if active_assignment
+                    else None,
                     from_location_id=previous_location_id,
                     to_location_id=location_id,
                     moved_on=event_time.date(),

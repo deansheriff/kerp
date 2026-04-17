@@ -25,7 +25,9 @@ from app.models.fixed_assets.depreciation_run import DepreciationRun
 from app.models.fixed_assets.depreciation_schedule import DepreciationSchedule
 from app.services.common import coerce_uuid
 from app.services.finance.platform.sequence import SequenceService
-from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
+from app.services.people.assets.lifecycle_event_service import (
+    record_asset_lifecycle_event,
+)
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)

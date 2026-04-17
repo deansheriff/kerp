@@ -1066,11 +1066,7 @@ class WebAuthContext:
         def _is_module_enabled(module_name: str) -> bool:
             return is_module_enabled(_module_map.get(module_name, module_name))
 
-        return [
-            m
-            for m in modules
-            if m in _always_on or _is_module_enabled(m)
-        ]
+        return [m for m in modules if m in _always_on or _is_module_enabled(m)]
 
     def has_module_access(self, module: str) -> bool:
         """Check if user can access a specific module."""

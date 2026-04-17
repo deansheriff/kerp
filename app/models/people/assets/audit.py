@@ -283,7 +283,9 @@ class AssetLifecycleEvent(Base, AuditMixin, ERPNextSyncMixin):
             "asset_id",
             "event_at",
         ),
-        Index("idx_asset_lifecycle_event_category", "organization_id", "event_category"),
+        Index(
+            "idx_asset_lifecycle_event_category", "organization_id", "event_category"
+        ),
         Index("idx_asset_lifecycle_event_source", "source_type", "source_record_id"),
         {"schema": "hr"},
     )
@@ -318,7 +320,9 @@ class AssetLifecycleEvent(Base, AuditMixin, ERPNextSyncMixin):
         UUID(as_uuid=True),
         nullable=True,
     )
-    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
     previous_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
     new_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
     previous_location_id: Mapped[uuid.UUID | None] = mapped_column(

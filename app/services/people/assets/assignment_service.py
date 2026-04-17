@@ -18,7 +18,9 @@ from app.models.people.assets.assignment import (
     AssignmentStatus,
 )
 from app.models.people.hr.employee import Employee
-from app.services.people.assets.lifecycle_event_service import record_asset_lifecycle_event
+from app.services.people.assets.lifecycle_event_service import (
+    record_asset_lifecycle_event,
+)
 from app.services.common import (
     ConflictError,
     NotFoundError,
@@ -512,7 +514,9 @@ class AssetAssignmentService:
         self._log_movement(
             org_id,
             asset_id=asset.asset_id,
-            assignment_id=active_assignment.assignment_id if active_assignment else None,
+            assignment_id=active_assignment.assignment_id
+            if active_assignment
+            else None,
             movement_type=AssignmentMovementType.LOCATION_TRANSFERRED,
             from_employee_id=from_employee_id,
             to_employee_id=from_employee_id,

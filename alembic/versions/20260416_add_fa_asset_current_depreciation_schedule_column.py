@@ -20,7 +20,11 @@ def upgrade() -> None:
     """Add latest-depreciation-schedule reference on fa.asset."""
     bind = op.get_bind()
     inspector = sa.inspect(bind)
-    asset_columns = {col["name"] for col in inspector.get_columns("asset", schema="fa")} if inspector.has_table("asset", schema="fa") else set()
+    asset_columns = (
+        {col["name"] for col in inspector.get_columns("asset", schema="fa")}
+        if inspector.has_table("asset", schema="fa")
+        else set()
+    )
 
     if not asset_columns:
         return
@@ -45,16 +49,21 @@ def upgrade() -> None:
         )
 
 
-
 def downgrade() -> None:
     """Revert current depreciation schedule reference."""
     bind = op.get_bind()
     inspector = sa.inspect(bind)
-    asset_columns = {col["name"] for col in inspector.get_columns("asset", schema="fa")} if inspector.has_table("asset", schema="fa") else set()
+    asset_columns = (
+        {col["name"] for col in inspector.get_columns("asset", schema="fa")}
+        if inspector.has_table("asset", schema="fa")
+        else set()
+    )
 
     if not asset_columns:
         return
 
     if "current_depreciation_schedule_id" in asset_columns:
-        op.drop_index("idx_asset_depreciation_schedule", table_name="asset", schema="fa")
+        op.drop_index(
+            "idx_asset_depreciation_schedule", table_name="asset", schema="fa"
+        )
         op.drop_column("asset", "current_depreciation_schedule_id", schema="fa")
