@@ -41,7 +41,6 @@ from app.services.finance.payments.paystack_client import (
     PaystackError,
 )
 from app.services.finance.platform.org_context import org_context_service
-from app.services.expense.limit_service import ExpenseLimitServiceError
 from app.services.settings_spec import resolve_value
 
 logger = logging.getLogger(__name__)
@@ -939,39 +938,6 @@ class PaymentService:
                     detail=f"Cannot initiate transfer - claim status is '{locked_claim.status.value}'",
                 )
 
-            # Pre-check approver budget BEFORE calling Paystack.
-            # Once the transfer is initiated, the money leaves the account
-            # and cannot be recalled by a budget check failure.
-            if locked_claim.approver_id is not None:
-                from app.services.expense.expense_service import ExpenseService
-
-                expense_svc = ExpenseService(self.db)
-                try:
-                    expense_svc._validate_approver_weekly_budget(
-                        self.organization_id,
-                        locked_claim,
-                        locked_claim.approver_id,
-                    )
-                except ExpenseLimitServiceError as exc:
-                    intent.status = PaymentIntentStatus.ABANDONED
-                    intent.expires_at = datetime.now(UTC)
-                    intent.gateway_response = {
-                        **(intent.gateway_response or {}),
-                        "error": str(exc),
-                        "abandoned_reason": "expense_approver_budget_exhausted",
-                        "abandoned_at": datetime.now(UTC).isoformat(),
-                    }
-                    self.db.flush()
-                    self._commit_and_refresh(intent)
-                    logger.info(
-                        "Abandoned expense transfer intent after budget check failure",
-                        extra={
-                            "intent_id": str(intent.intent_id),
-                            "claim_id": str(locked_claim.claim_id),
-                        },
-                    )
-                    raise
-
         # Amount in kobo - use round to avoid truncation
         amount_kobo = int(
             (Decimal(intent.amount) * Decimal("100")).to_integral_value(
@@ -979,15 +945,23 @@ class PaymentService:
             )
         )
 
-        # Initiate the transfer
         with PaystackClient(paystack_config) as client:
-            result = client.initiate_transfer(
-                amount=amount_kobo,
-                recipient_code=intent.transfer_recipient_code,
-                reference=intent.paystack_reference,
-                reason=f"Expense reimbursement: {(intent.intent_metadata or {}).get('claim_number', '')}",
-                currency=intent.currency_code,
-            )
+            try:
+                result = client.initiate_transfer(
+                    amount=amount_kobo,
+                    recipient_code=intent.transfer_recipient_code,
+                    reference=intent.paystack_reference,
+                    reason=f"Expense reimbursement: {(intent.intent_metadata or {}).get('claim_number', '')}",
+                    currency=intent.currency_code,
+                )
+            except PaystackError as exc:
+                result = self._recover_transfer_initiation(
+                    intent=intent,
+                    client=client,
+                    error=exc,
+                )
+                if result is None:
+                    raise
 
         # Update intent with transfer code
         intent.transfer_code = result.transfer_code
@@ -1058,6 +1032,45 @@ class PaymentService:
         self._commit_and_refresh(intent)
 
         return intent
+
+    def _recover_transfer_initiation(
+        self,
+        *,
+        intent: PaymentIntent,
+        client: PaystackClient,
+        error: PaystackError,
+    ) -> Any | None:
+        """Recover from ambiguous initiate failures by verifying the reference."""
+        error_message = str(error)
+        is_timeout = "Request timed out" in error_message
+        is_duplicate_reference = "duplicate_transfer_reference" in error_message or (
+            "Reference already exists on a transfer" in error_message
+        )
+
+        if not (is_timeout or is_duplicate_reference):
+            return None
+
+        try:
+            verified = client.verify_transfer(intent.paystack_reference)
+        except PaystackError:
+            logger.warning(
+                "Failed to recover transfer initiation for intent %s after error: %s",
+                intent.intent_id,
+                error_message,
+            )
+            return None
+
+        logger.info(
+            "Recovered transfer initiation for intent %s via verify_transfer after error: %s",
+            intent.intent_id,
+            error_message,
+            extra={
+                "intent_id": str(intent.intent_id),
+                "transfer_code": verified.transfer_code,
+                "verified_status": verified.status,
+            },
+        )
+        return verified
 
     def build_transfer_result(self, intent: PaymentIntent) -> dict[str, Any]:
         """Build transfer result with claim status and user-facing message.

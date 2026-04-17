@@ -33,9 +33,8 @@ from app.models.finance.payments.payment_intent import (
     PaymentIntentStatus,
 )
 from app.models.finance.payments.payment_webhook import WebhookStatus
-from app.services.expense.limit_service import ApproverWeeklyBudgetExhaustedError
 from app.services.finance.payments.payment_service import PaymentService
-from app.services.finance.payments.paystack_client import PaystackConfig
+from app.services.finance.payments.paystack_client import PaystackConfig, PaystackError
 from app.services.finance.payments.webhook_service import WebhookService
 
 # ---------------------------------------------------------------------------
@@ -149,13 +148,24 @@ def _make_paystack_transfer_result(
 def _make_paystack_verify_result(
     *,
     status: str = "success",
+    transfer_code: str = "TRF_verify123",
+    reference: str = "EXP-verify-ref",
+    amount: int = 5000000,
+    currency: str = "NGN",
+    recipient_code: str = "RCP_test",
     fee: int | None = 5000,
     reason: str | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         status=status,
+        transfer_code=transfer_code,
+        reference=reference,
+        amount=amount,
+        currency=currency,
+        recipient_code=recipient_code,
         fee=fee,
         reason=reason,
+        completed_at=None,
     )
 
 
@@ -396,8 +406,8 @@ class TestInitiateExpenseTransfer:
         assert exc.value.status_code == 400
         assert "CANCELLED" in str(exc.value.detail)
 
-    def test_budget_exhaustion_abandons_intent_before_paystack_call(self) -> None:
-        """Budget failure should close the active intent so payment can restart."""
+    def test_transfer_does_not_recheck_approver_budget(self) -> None:
+        """Approved claims should not be blocked at payout by approver budget usage."""
         org_id = _org_id()
         db = MagicMock()
         approver_id = uuid.uuid4()
@@ -405,35 +415,93 @@ class TestInitiateExpenseTransfer:
         intent = _make_intent(org_id=org_id, source_id=claim.claim_id)
 
         db.scalar.return_value = claim
-        budget_error = ApproverWeeklyBudgetExhaustedError(
-            budget=Decimal("50000.00"),
-            used=Decimal("45000.00"),
-            claim_amount=Decimal("10000.00"),
-            period_label="since budget tracking began; manual reset required",
+        svc = self._svc(db, org_id)
+        paystack_client_cm = MagicMock()
+        paystack_client = paystack_client_cm.__enter__.return_value
+        paystack_client.initiate_transfer.return_value = SimpleNamespace(
+            transfer_code="TRF_test_ok",
+            status="pending",
+            amount=100000,
+            currency="NGN",
+        )
+
+        with patch(
+            "app.services.finance.payments.payment_service.PaystackClient",
+            return_value=paystack_client_cm,
+        ):
+            updated = svc.initiate_expense_transfer(intent, _CFG)
+
+        assert updated is intent
+        assert intent.status == PaymentIntentStatus.PROCESSING
+        assert intent.transfer_code == "TRF_test_ok"
+        assert intent.gateway_response is None
+        paystack_client.initiate_transfer.assert_called_once()
+        db.commit.assert_called()
+        db.refresh.assert_called_with(intent)
+
+    def test_timeout_recovers_by_verifying_reference(self) -> None:
+        """A timeout during initiation should reconcile by transfer reference."""
+        org_id = _org_id()
+        db = MagicMock()
+        claim = _make_claim(org_id=org_id)
+        intent = _make_intent(org_id=org_id, source_id=claim.claim_id)
+
+        db.scalar.return_value = claim
+        verify_result = _make_paystack_verify_result(
+            status="pending",
+            transfer_code="TRF_recovered_timeout",
+            reference=intent.paystack_reference,
+        )
+        client_cm = _paystack_client_context(verify_result=verify_result)
+        client = client_cm.__enter__.return_value
+        client.initiate_transfer.side_effect = PaystackError(
+            'Failed to initiate transfer: { "status": false, "message": "Request timed out"}'
         )
 
         svc = self._svc(db, org_id)
 
-        with (
-            patch(
-                "app.services.expense.expense_service.ExpenseService._validate_approver_weekly_budget",
-                side_effect=budget_error,
-            ),
-            patch(
-                "app.services.finance.payments.payment_service.PaystackClient"
-            ) as paystack_client,
+        with patch(
+            "app.services.finance.payments.payment_service.PaystackClient",
+            return_value=client_cm,
         ):
-            with pytest.raises(ApproverWeeklyBudgetExhaustedError):
-                svc.initiate_expense_transfer(intent, _CFG)
+            result = svc.initiate_expense_transfer(intent, _CFG)
 
-        assert intent.status == PaymentIntentStatus.ABANDONED
-        assert intent.transfer_code is None
-        assert intent.gateway_response is not None
-        assert intent.gateway_response["abandoned_reason"] == (
-            "expense_approver_budget_exhausted"
+        assert result.status == PaymentIntentStatus.PROCESSING
+        assert result.transfer_code == "TRF_recovered_timeout"
+        client.verify_transfer.assert_called_once_with(intent.paystack_reference)
+        db.commit.assert_called()
+        db.refresh.assert_called_with(intent)
+
+    def test_duplicate_reference_recovers_by_verifying_reference(self) -> None:
+        """A duplicate transfer reference error should reconcile by verify_transfer."""
+        org_id = _org_id()
+        db = MagicMock()
+        claim = _make_claim(org_id=org_id)
+        intent = _make_intent(org_id=org_id, source_id=claim.claim_id)
+
+        db.scalar.return_value = claim
+        verify_result = _make_paystack_verify_result(
+            status="pending",
+            transfer_code="TRF_recovered_duplicate",
+            reference=intent.paystack_reference,
         )
-        assert "approval budget is exhausted" in intent.gateway_response["error"]
-        paystack_client.assert_not_called()
+        client_cm = _paystack_client_context(verify_result=verify_result)
+        client = client_cm.__enter__.return_value
+        client.initiate_transfer.side_effect = PaystackError(
+            '{"status":false,"message":"Please provide a unique reference. Reference already exists on a transfer","code":"duplicate_transfer_reference"}'
+        )
+
+        svc = self._svc(db, org_id)
+
+        with patch(
+            "app.services.finance.payments.payment_service.PaystackClient",
+            return_value=client_cm,
+        ):
+            result = svc.initiate_expense_transfer(intent, _CFG)
+
+        assert result.status == PaymentIntentStatus.PROCESSING
+        assert result.transfer_code == "TRF_recovered_duplicate"
+        client.verify_transfer.assert_called_once_with(intent.paystack_reference)
         db.commit.assert_called()
         db.refresh.assert_called_with(intent)
 
