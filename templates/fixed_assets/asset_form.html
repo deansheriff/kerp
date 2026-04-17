@@ -109,15 +109,25 @@
 
                 <div>
                     <label class="form-label">
-                        Category <span class="text-rose-500">*</span>
+                        Main Category <span class="text-rose-500">*</span>
                     </label>
-                    <select name="category_id" required class="form-select">
-                        <option value="">Select category</option>
-                        {% for category in categories %}
-                        <option value="{{ category.category_id }}">
-                            {{ category.category_code }} - {{ category.category_name }}
+                    {% set selected_parent_category = form_parent_category_id if form_parent_category_id is defined else '' %}
+                    <select id="main-category-select" name="category_parent_id" required class="form-select">
+                        <option value="">Select main category</option>
+                        {% for category in main_categories %}
+                        <option value="{{ category.category_id }}" {{ 'selected' if selected_parent_category == category.category_id|string else '' }}>
+                            {{ category.category_name }}
                         </option>
                         {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label">
+                        Sub-category <span class="text-rose-500">*</span>
+                    </label>
+                    <select id="sub-category-select" name="category_id" required class="form-select">
+                        <option value="">Select sub-category</option>
                     </select>
                 </div>
 
@@ -229,4 +239,63 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const mainSelect = document.getElementById("main-category-select");
+  const subSelect = document.getElementById("sub-category-select");
+  if (!mainSelect || !subSelect) return;
+
+  const subCategories = {{ sub_categories | tojson }};
+  const selectedParent = {{ (form_parent_category_id if form_parent_category_id is defined else "") | tojson }};
+  let selectedSub = {{ (form_category_id if form_category_id is defined else "") | tojson }};
+
+  function renderSubCategories(parentId) {
+    const children = subCategories.filter(function (item) {
+      return item.parent_category_id === parentId;
+    });
+
+    subSelect.innerHTML = "";
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = children.length ? "Select sub-category" : "No sub-categories available";
+    subSelect.appendChild(defaultOption);
+
+    children.forEach(function (item) {
+      const opt = document.createElement("option");
+      opt.value = item.category_id;
+      opt.textContent = item.category_name;
+      if (selectedSub && selectedSub === item.category_id) {
+        opt.selected = true;
+      }
+      subSelect.appendChild(opt);
+    });
+
+    subSelect.disabled = children.length === 0;
+  }
+
+  if (!mainSelect.value && selectedParent) {
+    mainSelect.value = selectedParent;
+  }
+
+  if (!mainSelect.value && selectedSub) {
+    const matched = subCategories.find(function (item) {
+      return item.category_id === selectedSub;
+    });
+    if (matched) {
+      mainSelect.value = matched.parent_category_id;
+    }
+  }
+
+  renderSubCategories(mainSelect.value);
+
+  mainSelect.addEventListener("change", function () {
+    selectedSub = "";
+    renderSubCategories(mainSelect.value);
+  });
+});
+</script>
 {% endblock %}

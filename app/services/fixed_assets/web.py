@@ -587,6 +587,17 @@ class FixedAssetWebService:
             )
             .order_by(AssetCategory.category_code)
         ).all()
+        main_categories = [c for c in categories if c.parent_category_id is None]
+        sub_categories = [
+            {
+                "category_id": str(c.category_id),
+                "category_code": c.category_code,
+                "category_name": c.category_name,
+                "parent_category_id": str(c.parent_category_id),
+            }
+            for c in categories
+            if c.parent_category_id is not None
+        ]
 
         sequence = db.scalar(
             select(NumberingSequence).where(
@@ -669,6 +680,8 @@ class FixedAssetWebService:
 
         context = {
             "categories": categories,
+            "main_categories": main_categories,
+            "sub_categories": sub_categories,
             "suppliers_list": suppliers_list,
             "locations_list": locations_list,
             "depreciation_schedules": depreciation_schedules,
@@ -774,6 +787,8 @@ class FixedAssetWebService:
         context.update(self.asset_form_context(db, str(auth.organization_id)))
         context["form_asset_number"] = ""
         context["form_asset_name"] = ""
+        context["form_category_id"] = ""
+        context["form_parent_category_id"] = ""
         context["form_serial_number"] = ""
         context["form_location_id"] = ""
         return templates.TemplateResponse(
@@ -853,6 +868,18 @@ class FixedAssetWebService:
             context["error"] = str(e)
             context["form_asset_number"] = asset_number or ""
             context["form_asset_name"] = asset_name
+            context["form_category_id"] = category_id
+            context["form_parent_category_id"] = ""
+            try:
+                selected_category = db.get(AssetCategory, UUID(category_id))
+                if selected_category:
+                    context["form_parent_category_id"] = (
+                        str(selected_category.parent_category_id)
+                        if selected_category.parent_category_id
+                        else str(selected_category.category_id)
+                    )
+            except ValueError:
+                context["form_parent_category_id"] = ""
             context["form_serial_number"] = serial_number or ""
             context["form_location_id"] = location_id or ""
             context["form_acquisition_date"] = acquisition_date or ""
@@ -1392,6 +1419,18 @@ class FixedAssetWebService:
         context["asset"] = asset
         context["form_asset_number"] = asset.asset_number
         context["form_asset_name"] = asset.asset_name
+        context["form_category_id"] = (
+            str(asset.category_id) if asset.category_id else ""
+        )
+        context["form_parent_category_id"] = ""
+        if asset.category_id:
+            selected_category = db.get(AssetCategory, asset.category_id)
+            if selected_category:
+                context["form_parent_category_id"] = (
+                    str(selected_category.parent_category_id)
+                    if selected_category.parent_category_id
+                    else str(selected_category.category_id)
+                )
         context["form_serial_number"] = asset.serial_number or ""
         context["form_location_id"] = (
             str(asset.location_id) if asset.location_id else ""
