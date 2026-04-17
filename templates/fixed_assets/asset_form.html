@@ -24,6 +24,14 @@
             padding: 1rem;
         }
     }
+
+    .fixed-assets-form-page .form-input::placeholder {
+        color: rgb(100 116 139 / 0.45);
+    }
+
+    .dark .fixed-assets-form-page .form-input::placeholder {
+        color: rgb(148 163 184 / 0.4);
+    }
 </style>
 {% endblock %}
 
@@ -76,10 +84,13 @@
                 <div>
                     <label class="form-label">Asset Number</label>
                     <input type="text"
-                           value="{{ asset_number_preview if asset_number_preview else 'Auto-generated' }}"
-                           disabled
-                           class="form-input bg-slate-50 dark:bg-slate-800/70">
-                    <p class="form-hint">Assigned when the asset is created (set in Settings → Numbering)</p>
+                           name="asset_number"
+                           value="{{ form_asset_number or '' }}"
+                           maxlength="30"
+                           placeholder="Enter asset number"
+                           autocomplete="off"
+                           class="form-input">
+                    <p class="form-hint">Optional. Leave blank to auto-generate from Settings → Numbering.</p>
                 </div>
 
                 <div>
@@ -88,9 +99,11 @@
                     </label>
                     <input type="text"
                            name="asset_name"
+                           value="{{ form_asset_name or '' }}"
                            required
                            maxlength="200"
-                           placeholder="Office Workstation"
+                           placeholder="Enter asset name"
+                           autocomplete="off"
                            class="form-input">
                 </div>
 
@@ -106,6 +119,30 @@
                         </option>
                         {% endfor %}
                     </select>
+                </div>
+
+                <div>
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">Select location</option>
+                        {% set selected_location = form_location_id if form_location_id is defined else '' %}
+                        {% for location in locations_list %}
+                        <option value="{{ location.location_id }}" {{ 'selected' if location.location_id == selected_location else '' }}>
+                            {{ location.location_code }} - {{ location.location_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label">Serial Number</label>
+                    <input type="text"
+                           name="serial_number"
+                           value="{{ form_serial_number or '' }}"
+                           maxlength="100"
+                           placeholder="Enter serial number"
+                           autocomplete="off"
+                           class="form-input">
                 </div>
 
                 <div>
@@ -149,34 +186,33 @@
             <div class="p-6 grid gap-6 sm:grid-cols-2">
                 <div>
                     <label class="form-label">
-                        Acquisition Date <span class="text-rose-500">*</span>
+                        Acquisition Date
                     </label>
                     <input type="date"
                            name="acquisition_date"
-                           value="{{ today }}"
-                           required
+                           value="{{ form_acquisition_date if form_acquisition_date is defined else today }}"
                            class="form-input">
                 </div>
 
                 <div>
                     <label class="form-label">
-                        Acquisition Cost <span class="text-rose-500">*</span>
+                        Acquisition Cost
                     </label>
                     <input type="number"
                            name="acquisition_cost"
                            step="0.01"
                            min="0"
-                           required
+                           value="{{ form_acquisition_cost if form_acquisition_cost is defined else '' }}"
                            placeholder="0.00"
                            class="form-input">
                 </div>
 
                 <div>
                     <label class="form-label">
-                        Currency <span class="text-rose-500">*</span>
+                        Currency
                     </label>
-                    <select name="currency_code" required class="form-select">
-                        {% set selected_currency = default_currency_code %}
+                    <select name="currency_code" class="form-select">
+                        {% set selected_currency = form_currency_code if form_currency_code is defined else default_currency_code %}
                         {% for currency in currencies %}
                         <option value="{{ currency.code }}" {{ 'selected' if currency.code == selected_currency else '' }}>
                             {{ currency.code }} - {{ currency.name }}

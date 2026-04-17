@@ -22,6 +22,7 @@ from app.models.finance.core_config.numbering_sequence import (
     NumberingSequence,
     SequenceType,
 )
+from app.models.finance.core_org.location import Location
 from app.models.finance.gl.account import Account
 from app.models.finance.gl.fiscal_period import FiscalPeriod, PeriodStatus
 from app.models.fixed_assets.asset import Asset, AssetStatus
@@ -612,6 +613,23 @@ class FixedAssetWebService:
             for s in suppliers
         ]
 
+        locations = db.scalars(
+            select(Location)
+            .where(
+                Location.organization_id == org_id,
+                Location.is_active.is_(True),
+            )
+            .order_by(Location.location_name)
+        ).all()
+        locations_list = [
+            {
+                "location_id": str(loc.location_id),
+                "location_code": loc.location_code,
+                "location_name": loc.location_name,
+            }
+            for loc in locations
+        ]
+
         depreciation_schedule_rows = db.execute(
             select(
                 DepreciationSchedule.schedule_id,
@@ -652,6 +670,7 @@ class FixedAssetWebService:
         context = {
             "categories": categories,
             "suppliers_list": suppliers_list,
+            "locations_list": locations_list,
             "depreciation_schedules": depreciation_schedules,
             "today": _format_date(date.today()),
             "asset_number_preview": FixedAssetWebService._sequence_preview(sequence),
@@ -696,6 +715,7 @@ class FixedAssetWebService:
                     "asset_id": asset.asset_id,
                     "asset_number": asset.asset_number,
                     "asset_name": asset.asset_name,
+                    "serial_number": asset.serial_number,
                     "category_name": category_row.category_name,
                     "category_code": category_row.category_code,
                     "acquisition_date": _format_date(asset.acquisition_date),
@@ -752,6 +772,10 @@ class FixedAssetWebService:
     ) -> HTMLResponse:
         context = base_context(request, auth, "New Asset", "fixed_assets")
         context.update(self.asset_form_context(db, str(auth.organization_id)))
+        context["form_asset_number"] = ""
+        context["form_asset_name"] = ""
+        context["form_serial_number"] = ""
+        context["form_location_id"] = ""
         return templates.TemplateResponse(
             request, "fixed_assets/asset_form.html", context
         )
@@ -760,10 +784,13 @@ class FixedAssetWebService:
         self,
         request: Request,
         auth: WebAuthContext,
+        asset_number: str | None,
         asset_name: str,
+        serial_number: str | None,
+        location_id: str | None,
         category_id: str,
-        acquisition_date: str,
-        acquisition_cost: str,
+        acquisition_date: str | None,
+        acquisition_cost: str | None,
         currency_code: str | None,
         description: str | None,
         depreciation_schedule_id: str | None,
@@ -776,6 +803,16 @@ class FixedAssetWebService:
                 raise HTTPException(status_code=401, detail="Authentication required")
             if user_id is None:
                 raise HTTPException(status_code=401, detail="Authentication required")
+            parsed_acquisition_date = (
+                datetime.strptime(acquisition_date, "%Y-%m-%d").date()
+                if acquisition_date and acquisition_date.strip()
+                else date.today()
+            )
+            parsed_acquisition_cost = (
+                Decimal(acquisition_cost.strip())
+                if acquisition_cost and acquisition_cost.strip()
+                else Decimal("0")
+            )
             resolved_currency = (
                 currency_code
                 or org_context_service.get_functional_currency(
@@ -785,10 +822,13 @@ class FixedAssetWebService:
             )
 
             input_data = AssetInput(
+                asset_number=(asset_number.strip() if asset_number else None),
                 asset_name=asset_name,
+                serial_number=(serial_number.strip() if serial_number else None),
+                location_id=(UUID(location_id) if location_id else None),
                 category_id=UUID(category_id),
-                acquisition_date=datetime.strptime(acquisition_date, "%Y-%m-%d").date(),
-                acquisition_cost=Decimal(acquisition_cost),
+                acquisition_date=parsed_acquisition_date,
+                acquisition_cost=parsed_acquisition_cost,
                 currency_code=resolved_currency,
                 description=description,
                 depreciation_schedule_id=(
@@ -811,6 +851,13 @@ class FixedAssetWebService:
             context = base_context(request, auth, "New Asset", "fixed_assets")
             context.update(self.asset_form_context(db, str(auth.organization_id)))
             context["error"] = str(e)
+            context["form_asset_number"] = asset_number or ""
+            context["form_asset_name"] = asset_name
+            context["form_serial_number"] = serial_number or ""
+            context["form_location_id"] = location_id or ""
+            context["form_acquisition_date"] = acquisition_date or ""
+            context["form_acquisition_cost"] = acquisition_cost or ""
+            context["form_currency_code"] = currency_code or ""
             context["selected_depreciation_schedule_id"] = depreciation_schedule_id
             return templates.TemplateResponse(
                 request, "fixed_assets/asset_form.html", context
@@ -1288,6 +1335,7 @@ class FixedAssetWebService:
                     "asset_id": asset.asset_id,
                     "asset_code": asset.asset_number,
                     "asset_name": asset.asset_name,
+                    "serial_number": asset.serial_number,
                     "description": asset.description,
                     "category_name": category.category_name if category else None,
                     "status": asset.status.value if asset.status else "ACTIVE",
@@ -1342,6 +1390,12 @@ class FixedAssetWebService:
         context = base_context(request, auth, "Edit Asset", "fixed_assets")
         context.update(self.asset_form_context(db, str(auth.organization_id)))
         context["asset"] = asset
+        context["form_asset_number"] = asset.asset_number
+        context["form_asset_name"] = asset.asset_name
+        context["form_serial_number"] = asset.serial_number or ""
+        context["form_location_id"] = (
+            str(asset.location_id) if asset.location_id else ""
+        )
         context["selected_depreciation_schedule_id"] = (
             str(asset.current_depreciation_schedule_id)
             if asset.current_depreciation_schedule_id

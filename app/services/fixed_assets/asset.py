@@ -72,6 +72,7 @@ class AssetInput:
     acquisition_date: date
     acquisition_cost: Decimal
     currency_code: str
+    asset_number: str | None = None
     description: str | None = None
     location_id: UUID | None = None
     cost_center_id: UUID | None = None
@@ -317,14 +318,35 @@ class AssetService(ListResponseMixin):
             raise HTTPException(status_code=400, detail="Asset category is not active")
 
         # Check capitalization threshold
-        if input.acquisition_cost < category.capitalization_threshold:
+        if (
+            input.acquisition_cost > 0
+            and input.acquisition_cost < category.capitalization_threshold
+        ):
             raise HTTPException(
                 status_code=400,
                 detail=f"Acquisition cost {input.acquisition_cost} is below capitalization threshold {category.capitalization_threshold}",
             )
 
-        # Generate asset number
-        asset_number = SequenceService.get_next_number(db, org_id, SequenceType.ASSET)
+        # Use provided asset number or generate from numbering sequence.
+        asset_number = (input.asset_number or "").strip()
+        if not asset_number:
+            asset_number = SequenceService.get_next_number(
+                db, org_id, SequenceType.ASSET
+            )
+
+        existing_asset = db.scalars(
+            select(Asset).where(
+                and_(
+                    Asset.organization_id == org_id,
+                    Asset.asset_number == asset_number,
+                )
+            )
+        ).first()
+        if existing_asset:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Asset number '{asset_number}' already exists",
+            )
 
         # Calculate functional currency cost
         exchange_rate = input.exchange_rate or Decimal("1.0")
