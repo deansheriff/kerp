@@ -65,12 +65,23 @@
     {% call(filter_attrs) compact_filters(
         base_url="/finance/payments/transfers",
         active_filters=active_filters | default([]),
-        show_search=true,
         search=search | default('', true),
-        search_placeholder="Search by reference, recipient, account...",
         auto_submit=false,
         show_apply_button=true
     ) %}
+        <input type="hidden" name="limit" value="{{ limit }}">
+        <div class="sm:col-span-2 lg:col-span-3">
+            <label class="form-label text-xs">Search</label>
+            <div class="relative">
+                {{ icon_svg("search", "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400") }}
+                <input type="text"
+                       name="search"
+                       value="{{ search | default('', true) }}"
+                       placeholder="Search by reference, recipient, account..."
+                       autocomplete="off"
+                       class="form-input w-full pl-10">
+            </div>
+        </div>
         <div>
             <label class="form-label text-xs">Status</label>
             <select name="status" class="form-select w-full" {{ filter_attrs }}>
@@ -90,8 +101,18 @@
     <!-- Transfer List -->
     <div class="card overflow-hidden">
         {% if intents %}
+        {{ pagination(
+            page=page,
+            total_pages=total_pages,
+            total_count=total_count,
+            limit=limit,
+            search=search,
+            filters={"status": status_filter},
+            show_navigation=false,
+            bordered=false
+        ) }}
         <div class="table-container">
-            <table class="table-ledger">
+            <table class="table table-ledger">
                 <thead>
                     <tr>
                         <th scope="col">Reference</th>
@@ -149,7 +170,16 @@
     </div>
 
     {% if intents %}
-    {{ pagination(page=page, total_pages=total_pages, total_count=total_count, limit=25, search=search, filters={"status": status_filter}) }}
+    {{ pagination(
+        page=page,
+        total_pages=total_pages,
+        total_count=total_count,
+        limit=limit,
+        search=search,
+        filters={"status": status_filter},
+        show_summary=false,
+        show_size_selector=false
+    ) }}
     {% endif %}
     </div>{# /results-container #}
 </div>

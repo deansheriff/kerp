@@ -321,6 +321,7 @@ class PaymentWebService:
             "intents": intents,
             "search": search or "",
             "page": page,
+            "limit": per_page,
             "total_pages": total_pages,
             "total_count": filtered_total,
             "status_filter": status,

@@ -133,6 +133,7 @@ def transfer_list(
     search: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=200),
     auth: WebAuthContext = Depends(_require_expense_reimburse),
     db: Session = Depends(get_db),
 ):
@@ -144,7 +145,7 @@ def transfer_list(
     context = base_context(request, auth, "Transfers", "expense", db=db)
     context.update(
         payment_web_service.transfer_list_context(
-            db, auth.organization_id, search, status, page
+            db, auth.organization_id, search, status, page, per_page=limit
         )
     )
 
