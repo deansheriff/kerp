@@ -31,6 +31,7 @@ from app.models.finance.ap.supplier_invoice import (
 from app.models.finance.ap.supplier_invoice_line import SupplierInvoiceLine
 from app.models.finance.ap.supplier_invoice_line_tax import SupplierInvoiceLineTax
 from app.models.finance.common.attachment import AttachmentCategory
+from app.models.finance.gl.account import Account
 from app.models.finance.gl.account_category import IFRSCategory
 from app.models.finance.tax.tax_code import TaxCode, TaxType
 from app.models.notification import EntityType, NotificationType
@@ -503,6 +504,21 @@ class InvoiceWebService:
             invoice_id=invoice.invoice_id,
         )
         lines_view = [invoice_line_view(line, invoice.currency_code) for line in lines]
+        account_ids = {
+            account_id
+            for line in lines
+            for account_id in (line.asset_account_id, line.expense_account_id)
+            if account_id
+        }
+        account_map = {}
+        if account_ids:
+            accounts = db.scalars(
+                select(Account).where(
+                    Account.organization_id == org_id,
+                    Account.account_id.in_(account_ids),
+                )
+            ).all()
+            account_map = {account.account_id: account for account in accounts}
 
         # Enrich lines with tax metadata and VAT-per-line display values.
         primary_tax_ids = {line.tax_code_id for line in lines if line.tax_code_id}
@@ -521,7 +537,7 @@ class InvoiceWebService:
         vat_labels_by_line: dict[UUID, set[str]] = {}
         line_ids = [line.line_id for line in lines]
         if line_ids:
-            vat_taxes = db.execute(
+            line_taxes = db.execute(
                 select(SupplierInvoiceLineTax, TaxCode)
                 .join(
                     TaxCode, TaxCode.tax_code_id == SupplierInvoiceLineTax.tax_code_id
@@ -529,10 +545,9 @@ class InvoiceWebService:
                 .where(
                     SupplierInvoiceLineTax.line_id.in_(line_ids),
                     TaxCode.organization_id == org_id,
-                    TaxCode.tax_type.in_([TaxType.VAT, TaxType.GST]),
                 )
             ).all()
-            for line_tax, tax_code in vat_taxes:
+            for line_tax, tax_code in line_taxes:
                 tax_amount = line_tax.tax_amount or Decimal("0")
                 tax_rate = line_tax.tax_rate
                 if not isinstance(tax_rate, Decimal):
@@ -549,17 +564,40 @@ class InvoiceWebService:
                         inclusive_tax_by_line.get(line_tax.line_id, Decimal("0"))
                         + tax_amount
                     )
-                rate_label = (
-                    f"{(tax_rate * 100).quantize(Decimal('0.01'))}%"
-                    if tax_rate < 1
-                    else f"{tax_rate}%"
-                )
-                vat_labels_by_line.setdefault(line_tax.line_id, set()).add(
-                    f"{tax_code.tax_code} {rate_label}"
-                )
+                if tax_code.tax_type in {TaxType.VAT, TaxType.GST}:
+                    rate_label = (
+                        f"{(tax_rate * 100).quantize(Decimal('0.01'))}%"
+                        if tax_rate < 1
+                        else f"{tax_rate}%"
+                    )
+                    incl_suffix = " Incl." if line_tax.is_inclusive else ""
+                    vat_labels_by_line.setdefault(line_tax.line_id, set()).add(
+                        f"{tax_code.tax_code} {rate_label}{incl_suffix}"
+                    )
 
         for idx, line in enumerate(lines):
             line_view = lines_view[idx]
+            account_id = (
+                line.asset_account_id
+                if getattr(line, "capitalize_flag", False) and line.asset_account_id
+                else line.expense_account_id or line.asset_account_id
+            )
+            account = account_map.get(account_id) if account_id else None
+            if account:
+                line_view["account"] = {
+                    "account_id": account.account_id,
+                    "account_code": account.account_code,
+                    "account_name": account.account_name,
+                    "account_url": f"/finance/gl/accounts/{account.account_id}",
+                }
+            else:
+                line_view["account"] = None
+            if getattr(line, "capitalize_flag", False) and line.asset_account_id:
+                line_view["accounting_treatment"] = "Capitalize"
+            elif line.asset_account_id and not line.expense_account_id:
+                line_view["accounting_treatment"] = "Asset"
+            else:
+                line_view["accounting_treatment"] = "Expense"
             tax = tax_map.get(line.tax_code_id) if line.tax_code_id else None
             if tax:
                 line_view["tax_code"] = tax.tax_code
@@ -568,9 +606,17 @@ class InvoiceWebService:
 
             inclusive_tax = inclusive_tax_by_line.get(line.line_id, Decimal("0"))
             if inclusive_tax > 0:
-                display_amount = (line.line_amount or Decimal("0")) + inclusive_tax
+                display_amount = (
+                    (line.line_amount or Decimal("0"))
+                    + (line.tax_amount or Decimal("0"))
+                    - inclusive_tax
+                )
                 line_view["display_line_amount_raw"] = float(display_amount)
                 line_view["display_line_amount"] = format_currency(
+                    display_amount, invoice.currency_code
+                )
+                line_view["gross_amount_raw"] = float(display_amount)
+                line_view["gross_amount"] = format_currency(
                     display_amount, invoice.currency_code
                 )
 
@@ -816,11 +862,17 @@ class InvoiceWebService:
                     "expense_account_id": str(line.expense_account_id)
                     if line.expense_account_id
                     else "",
-                    "description": (line.description or "").replace("'", "\\'"),
-                    "quantity": line.quantity,
-                    "unit_price": line.unit_price,
+                    "description": line.description or "",
+                    "quantity": float(line.quantity)
+                    if line.quantity is not None
+                    else 0,
+                    "unit_price": float(line.unit_price)
+                    if line.unit_price is not None
+                    else 0,
                     "tax_code_id": str(line.tax_code_id) if line.tax_code_id else "",
-                    "tax_amount": line.tax_amount or 0,
+                    "tax_amount": float(line.tax_amount)
+                    if line.tax_amount is not None
+                    else 0,
                 }
                 for line in lines
             ],

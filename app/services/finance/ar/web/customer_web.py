@@ -654,6 +654,7 @@ class CustomerWebService:
                 organization_id=org_id,
                 input=input_data,
             )
+            db.commit()
 
             return RedirectResponse(
                 url=f"/finance/ar/customers/{customer.customer_id}?success=Customer+created+successfully",
@@ -661,6 +662,7 @@ class CustomerWebService:
             )
 
         except Exception as e:
+            db.rollback()
             logger.exception("create_customer_response: failed")
             context = base_context(request, auth, "New Customer", "ar")
             context.update(self.customer_form_context(db, str(auth.organization_id)))
@@ -692,6 +694,7 @@ class CustomerWebService:
                 customer_id=UUID(customer_id),
                 input=input_data,
             )
+            db.commit()
 
             return RedirectResponse(
                 url="/finance/ar/customers?success=Customer+updated+successfully",
@@ -699,6 +702,7 @@ class CustomerWebService:
             )
 
         except Exception as e:
+            db.rollback()
             logger.exception("update_customer_response: failed")
             context = base_context(request, auth, "Edit Customer", "ar")
             context.update(
