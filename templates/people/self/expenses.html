@@ -3,6 +3,38 @@
 
 {% block page_title %}My Expenses{% endblock %}
 
+{% block page_styles %}
+<style>
+    .self-expense-claim-modal .form-label {
+        color: var(--ink);
+    }
+
+    .dark .self-expense-claim-modal .form-label {
+        color: rgba(241, 245, 249, 0.92);
+    }
+
+    #expense-claim-form input::placeholder,
+    #expense-claim-form textarea::placeholder {
+        color: rgba(100, 116, 139, 0.18) !important;
+        opacity: 1;
+    }
+
+    .dark #expense-claim-form input::placeholder,
+    .dark #expense-claim-form textarea::placeholder {
+        color: rgba(148, 163, 184, 0.16) !important;
+        opacity: 1;
+    }
+
+    .self-expense-claim-modal .field-help {
+        color: rgba(100, 116, 139, 0.82);
+    }
+
+    .dark .self-expense-claim-modal .field-help {
+        color: rgba(148, 163, 184, 0.78);
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex">
@@ -161,7 +193,7 @@
                 </button>
             </div>
             <div class="max-h-[75vh] overflow-y-auto px-6 py-5">
-                <form id="expense-claim-form" method="post" action="/people/self/expenses/claims" enctype="multipart/form-data" class="grid gap-4 sm:grid-cols-2">
+                <form id="expense-claim-form" method="post" action="/people/self/expenses/claims" enctype="multipart/form-data" class="self-expense-claim-modal grid gap-4 sm:grid-cols-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div>
                         <label for="claim_date" class="form-label">Claim Date <span class="text-rose-500">*</span></label>
@@ -185,7 +217,7 @@
                             </option>
                             {% endfor %}
                         </select>
-                        <p class="mt-1 text-xs text-slate-400">Required for submission</p>
+                        <p class="field-help mt-1 text-xs">Required for submission</p>
                     </div>
                     <div class="sm:col-span-2 border-t border-slate-200 pt-4 dark:border-slate-700">
                         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -200,9 +232,9 @@
                                 <thead class="bg-slate-50 dark:bg-slate-800/50">
                                     <tr>
                                         <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">#</th>
-                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Category</th>
-                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Description</th>
-                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Amount</th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Category <span class="text-rose-500">*</span></th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Description <span class="text-rose-500">*</span></th>
+                                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Amount <span class="text-rose-500">*</span></th>
                                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Remove</th>
                                     </tr>
                                 </thead>
@@ -221,7 +253,7 @@
                     <div class="sm:col-span-2">
                         <label for="receipt_file" class="form-label">Receipt Files</label>
                         <input type="file" name="receipt_file" id="receipt_file" class="form-input w-full" multiple>
-                        <p class="mt-1 text-xs text-slate-400">Upload once here when the receipt covers the whole claim.</p>
+                        <p class="field-help mt-1 text-xs">Upload once here when the receipt covers the whole claim.</p>
                         <p id="receipt-hint" class="mt-1 hidden text-xs text-amber-600 dark:text-amber-400">
                             One or more selected categories require a receipt for this claim.
                         </p>
@@ -229,10 +261,10 @@
                     <div>
                         <label for="recipient_name" class="form-label">Beneficiary Name</label>
                         <input type="text" name="recipient_name" id="recipient_name" class="form-input w-full" placeholder="e.g. Ada Lovelace" value="{{ employee_recipient_name }}">
-                        <p class="mt-1 text-xs text-slate-400">Who should receive the reimbursement</p>
+                        <p class="field-help mt-1 text-xs">Who should receive the reimbursement</p>
                     </div>
                     <div>
-                        <label for="recipient_bank_name_display" class="form-label">Bank Name <span class="text-rose-500">*</span></label>
+                        <label for="recipient_bank_name_display" class="form-label">Bank Name</label>
                         <input type="hidden"
                                name="recipient_bank_name"
                                id="recipient_bank_name"
@@ -250,17 +282,17 @@
                             <option value="{{ bank.bank_name }}" data-sort-code="{{ bank.bank_sort_code }}"></option>
                             {% endfor %}
                         </datalist>
-                        <p class="mt-1 text-xs text-slate-400">Search and select a bank from the approved list</p>
+                        <p class="field-help mt-1 text-xs">Search and select a bank from the approved list</p>
                     </div>
                     <div>
-                        <label for="recipient_bank_code" class="form-label">Bank Code <span class="text-rose-500">*</span></label>
+                        <label for="recipient_bank_code" class="form-label">Bank Code</label>
                         <input type="text" name="recipient_bank_code" id="recipient_bank_code" class="form-input w-full" required readonly placeholder="Auto-filled from bank selection" value="{{ employee_bank_code }}">
-                        <p class="mt-1 text-xs text-slate-400">Paystack bank code for reimbursement</p>
+                        <p class="field-help mt-1 text-xs">Paystack bank code for reimbursement</p>
                     </div>
                     <div>
-                        <label for="recipient_account_number" class="form-label">Account Number <span class="text-rose-500">*</span></label>
+                        <label for="recipient_account_number" class="form-label">Account Number</label>
                         <input type="text" name="recipient_account_number" id="recipient_account_number" class="form-input w-full" required maxlength="10" pattern="[0-9]{10}" value="{{ employee_bank_account_number }}">
-                        <p class="mt-1 text-xs text-slate-400">10-digit account number</p>
+                        <p class="field-help mt-1 text-xs">10-digit account number</p>
                     </div>
                     <div>
                         <label for="cost_center_id" class="form-label">Cost Center (Optional)</label>
@@ -272,7 +304,7 @@
                             </option>
                             {% endfor %}
                         </select>
-                        <p class="mt-1 text-xs text-slate-400">Allocate expense to a cost center</p>
+                        <p class="field-help mt-1 text-xs">Allocate expense to a cost center</p>
                     </div>
                     <div>
                         <label for="project_search" class="form-label">Project (Optional)</label>
@@ -288,7 +320,7 @@
                             <option value="{{ proj.project_code }} - {{ proj.project_name }}" data-id="{{ proj.project_id }}"></option>
                             {% endfor %}
                         </datalist>
-                        <p class="mt-1 text-xs text-slate-400">Link expense to a project from ERPNext</p>
+                        <p class="field-help mt-1 text-xs">Link expense to a project from ERPNext</p>
                     </div>
                     <div>
                         <label for="ticket_search" class="form-label">Support Ticket (Optional)</label>
@@ -304,7 +336,7 @@
                             <option value="{{ ticket.ticket_number }} - {{ ticket.subject|truncate(40) }}" data-id="{{ ticket.ticket_id }}"></option>
                             {% endfor %}
                         </datalist>
-                        <p class="mt-1 text-xs text-slate-400">Link expense to a support ticket from ERPNext</p>
+                        <p class="field-help mt-1 text-xs">Link expense to a support ticket from ERPNext</p>
                     </div>
 	                    <div>
 	                        <label for="task_id" class="form-label">Task (Optional)</label>
@@ -316,7 +348,7 @@
 	                            </option>
 	                            {% endfor %}
 	                        </select>
-	                        <p class="mt-1 text-xs text-slate-400">Link expense to a specific project task</p>
+	                        <p class="field-help mt-1 text-xs">Link expense to a specific project task</p>
 	                    </div>
 		                    <div>
 		                        <label for="vehicle_id" id="vehicle_id_label" class="form-label">Fleet (Optional)</label>
@@ -328,7 +360,7 @@
 	                            </option>
 	                            {% endfor %}
 	                        </select>
-	                        <p id="vehicle_hint" class="mt-1 text-xs text-slate-400">Assign this claim to a fleet vehicle for reporting</p>
+	                        <p id="vehicle_hint" class="field-help mt-1 text-xs">Assign this claim to a fleet vehicle for reporting</p>
 	                    </div>
                     <div class="sm:col-span-2 flex items-center justify-between">
                         <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -353,16 +385,17 @@
         <td class="px-3 py-3 align-top">
             <input type="hidden" name="item_key" value="__KEY__">
             <label class="sr-only" for="category_id___KEY__">Category</label>
-                <select name="category_id___KEY__" id="category_id___KEY__" class="form-select w-full" required data-item-category>
-                    {% for cat in categories %}
-                    <option value="{{ cat.category_id }}"
-                            data-category-code="{{ cat.category_code }}"
-                            data-requires-receipt="{{ 'true' if cat.requires_receipt else 'false' }}"
-                            data-max-amount="{{ cat.max_amount_per_claim or '' }}">
-                        {{ cat.category_name }}{% if cat.requires_receipt %} *{% endif %}
-                    </option>
-                    {% endfor %}
-                </select>
+            <select name="category_id___KEY__" id="category_id___KEY__" class="form-select w-full" required data-item-category>
+                <option value="" selected disabled>Select category...</option>
+                {% for cat in categories %}
+                <option value="{{ cat.category_id }}"
+                        data-category-code="{{ cat.category_code }}"
+                        data-requires-receipt="{{ 'true' if cat.requires_receipt else 'false' }}"
+                        data-max-amount="{{ cat.max_amount_per_claim or '' }}">
+                    {{ cat.category_name }}{% if cat.requires_receipt %} *{% endif %}
+                </option>
+                {% endfor %}
+            </select>
         </td>
         <td class="px-3 py-3 align-top">
             <label class="sr-only" for="description___KEY__">Description</label>
