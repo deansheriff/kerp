@@ -33,9 +33,7 @@ from app.services.response import ListResponseMixin
 logger = logging.getLogger(__name__)
 
 ASSET_STATUS_UPDATE_ERROR = "Cannot update '{key}' after asset activation"
-PRE_USE_ASSET_STATUSES = frozenset(
-    {AssetStatus.NOT_IN_USE, AssetStatus.IN_STORE}
-)
+PRE_USE_ASSET_STATUSES = frozenset({AssetStatus.NOT_IN_USE, AssetStatus.IN_STORE})
 
 
 def _record_lifecycle_event(db: Session, **kwargs: Any) -> None:

@@ -539,18 +539,24 @@ class AssetImporter(BaseImporter[Asset]):
 
     def _parse_status(self, status_str: str | None) -> AssetStatus:
         """Parse asset status string."""
-        normalized = str(status_str or "ACTIVE").strip().upper().replace(" ", "_")
+        normalized = str(status_str or "NOT_IN_USE").strip().upper().replace(" ", "_")
         status_map = {
-            "ACTIVE": AssetStatus.ACTIVE,
-            "DRAFT": AssetStatus.DRAFT,
-            "DISPOSED": AssetStatus.DISPOSED,
-            "SOLD": AssetStatus.DISPOSED,
+            "ACTIVE": AssetStatus.IN_USE,
+            "IN_USE": AssetStatus.IN_USE,
+            "DRAFT": AssetStatus.NOT_IN_USE,
+            "NOT_IN_USE": AssetStatus.NOT_IN_USE,
+            "DISPOSED": AssetStatus.RETIRED,
+            "SOLD": AssetStatus.RETIRED,
+            "RETIRED": AssetStatus.RETIRED,
             "FULLY_DEPRECIATED": AssetStatus.FULLY_DEPRECIATED,
-            "IMPAIRED": AssetStatus.IMPAIRED,
-            "UNDER_CONSTRUCTION": AssetStatus.UNDER_CONSTRUCTION,
-            "WIP": AssetStatus.UNDER_CONSTRUCTION,
+            "IMPAIRED": AssetStatus.FAULTY,
+            "FAULTY": AssetStatus.FAULTY,
+            "UNDER_CONSTRUCTION": AssetStatus.IN_STORE,
+            "IN_STORE": AssetStatus.IN_STORE,
+            "WIP": AssetStatus.IN_STORE,
+            "UNDER_REPAIR": AssetStatus.UNDER_REPAIR,
         }
-        return status_map.get(normalized, AssetStatus.ACTIVE)
+        return status_map.get(normalized, AssetStatus.NOT_IN_USE)
 
     def import_file(self, file_path):
         """Override to ensure categories are created first."""

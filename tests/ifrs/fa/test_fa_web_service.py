@@ -403,7 +403,9 @@ class TestFAWebServiceAssetUpdate:
             person_id=uuid.uuid4(),
         )
 
-        with patch("app.services.fixed_assets.web.asset_service.update_asset") as mock_update:
+        with patch(
+            "app.services.fixed_assets.web.asset_service.update_asset"
+        ) as mock_update:
             response = await service.update_asset_response(
                 request=request,
                 auth=auth,
@@ -469,7 +471,9 @@ class TestFAWebServiceAssetUpdate:
             person_id=uuid.uuid4(),
         )
 
-        with patch("app.services.fixed_assets.web.asset_service.update_asset") as mock_update:
+        with patch(
+            "app.services.fixed_assets.web.asset_service.update_asset"
+        ) as mock_update:
             response = await service.update_asset_response(
                 request=request,
                 auth=auth,

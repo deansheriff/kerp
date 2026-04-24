@@ -131,7 +131,9 @@ def _insert_clone(
             "category_name": new_name,
             "description": template.description,
             "parent_category_id": (
-                str(template.parent_category_id) if template.parent_category_id else None
+                str(template.parent_category_id)
+                if template.parent_category_id
+                else None
             ),
             "depreciation_method": template.depreciation_method,
             "useful_life_months": template.useful_life_months,
@@ -189,7 +191,9 @@ def _set_parent(
     code: str,
     parent_code: str | None,
 ) -> None:
-    parent_id = _category_id(conn, organization_id, parent_code) if parent_code else None
+    parent_id = (
+        _category_id(conn, organization_id, parent_code) if parent_code else None
+    )
     conn.execute(
         sa.text(
             """
