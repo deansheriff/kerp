@@ -115,7 +115,7 @@ class MockAsset:
         net_book_value: Decimal = None,
         revalued_amount: Decimal | None = None,
         impairment_loss: Decimal = Decimal("0"),
-        status: MockAssetStatus = MockAssetStatus.DRAFT,
+        status: MockAssetStatus = MockAssetStatus.NOT_IN_USE,
         cash_generating_unit_id: uuid.UUID | None = None,
         serial_number: str | None = None,
         barcode: str | None = None,

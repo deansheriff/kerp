@@ -288,7 +288,7 @@ class TestAssetService:
         from app.services.fixed_assets.asset import AssetService
 
         mock_assets = [
-            MockAsset(organization_id=org_id, status=MockAssetStatus.ACTIVE)
+            MockAsset(organization_id=org_id, status=MockAssetStatus.IN_USE)
             for _ in range(3)
         ]
         mock_db.scalars.return_value.all.return_value = mock_assets
@@ -301,7 +301,7 @@ class TestAssetService:
         """Test successful asset update."""
         from app.services.fixed_assets.asset import AssetService
 
-        mock_asset.status = MockAssetStatus.DRAFT
+        mock_asset.status = MockAssetStatus.NOT_IN_USE
         mock_db.get.return_value = mock_asset
 
         AssetService.update_asset(
@@ -339,7 +339,7 @@ class TestAssetService:
 
         from app.services.fixed_assets.asset import AssetService
 
-        mock_asset.status = MockAssetStatus.ACTIVE  # Not DRAFT
+        mock_asset.status = MockAssetStatus.IN_USE  # Not pre-use
         mock_db.get.return_value = mock_asset
 
         with pytest.raises(HTTPException) as exc_info:
@@ -347,7 +347,7 @@ class TestAssetService:
                 mock_db,
                 org_id,
                 mock_asset.asset_id,
-                {"acquisition_cost": Decimal("10000")},  # Draft-only field
+                {"acquisition_cost": Decimal("10000")},  # Pre-use-only field
             )
 
         assert exc_info.value.status_code == 400
@@ -357,7 +357,7 @@ class TestAssetService:
         """Test successful asset activation."""
         from app.services.fixed_assets.asset import AssetService
 
-        mock_asset.status = MockAssetStatus.DRAFT
+        mock_asset.status = MockAssetStatus.NOT_IN_USE
         mock_db.get.return_value = mock_asset
 
         AssetService.activate_asset(mock_db, org_id, mock_asset.asset_id)
@@ -370,7 +370,7 @@ class TestAssetService:
 
         from app.services.fixed_assets.asset import AssetService
 
-        mock_asset.status = MockAssetStatus.ACTIVE  # Already active
+        mock_asset.status = MockAssetStatus.IN_USE  # Already in use
         mock_db.get.return_value = mock_asset
 
         with pytest.raises(HTTPException) as exc_info:
@@ -385,7 +385,7 @@ class TestAssetService:
         mock_assets = [
             MockAsset(
                 organization_id=org_id,
-                status=MockAssetStatus.ACTIVE,
+                status=MockAssetStatus.IN_USE,
                 acquisition_cost=Decimal("10000"),
                 accumulated_depreciation=Decimal("2000"),
                 net_book_value=Decimal("8000"),
@@ -405,9 +405,10 @@ class TestAssetService:
         """Test marking an asset as fully depreciated."""
         from app.services.fixed_assets.asset import AssetService
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_db.get.return_value = mock_asset
 
         AssetService.mark_fully_depreciated(mock_db, org_id, mock_asset.asset_id)
 
+        assert mock_asset.status == MockAssetStatus.FULLY_DEPRECIATED
         mock_db.flush.assert_called_once()

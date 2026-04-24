@@ -11,7 +11,10 @@ except ImportError:  # pragma: no cover
     UTC = timezone.utc
 
 from decimal import Decimal
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from app.web.deps import WebAuthContext
 
 
 class TestFAWebServiceHelpers:
@@ -57,16 +60,16 @@ class TestFAWebServiceHelpers:
         from app.models.fixed_assets.asset import AssetStatus
         from app.services.fixed_assets.web import _parse_status
 
-        result = _parse_status("ACTIVE")
-        assert result == AssetStatus.ACTIVE
+        result = _parse_status("IN_USE")
+        assert result == AssetStatus.IN_USE
 
     def test_parse_status_lowercase(self):
         """Test status parsing with lowercase value."""
         from app.models.fixed_assets.asset import AssetStatus
         from app.services.fixed_assets.web import _parse_status
 
-        result = _parse_status("active")
-        assert result == AssetStatus.ACTIVE
+        result = _parse_status("in_use")
+        assert result == AssetStatus.IN_USE
 
     def test_parse_status_none(self):
         """Test status parsing with None."""
@@ -120,7 +123,7 @@ class MockAsset:
         self.acquisition_cost = kwargs.get("acquisition_cost", Decimal("5000.00"))
         self.net_book_value = kwargs.get("net_book_value", Decimal("4000.00"))
         self.currency_code = kwargs.get("currency_code", "USD")
-        self.status = kwargs.get("status", AssetStatus.ACTIVE)
+        self.status = kwargs.get("status", AssetStatus.IN_USE)
         self.serial_number = kwargs.get("serial_number")
         self.barcode = kwargs.get("barcode")
 
@@ -231,11 +234,11 @@ class TestFAWebServiceListAssets:
             str(org_id),
             search=None,
             category=None,
-            status="ACTIVE",
+            status="IN_USE",
             page=1,
         )
 
-        assert result["status"] == "ACTIVE"
+        assert result["status"] == "IN_USE"
 
     def test_list_assets_context_with_category_uuid(self):
         """Test assets list context with category UUID filter."""
@@ -352,3 +355,131 @@ class TestFAWebServiceDepreciation:
         assert result["offset"] == 10
         assert result["total_count"] == 100
         assert result["total_pages"] == 10
+
+
+class TestFAWebServiceAssetUpdate:
+    """Tests for asset update response handling."""
+
+    @pytest.mark.asyncio
+    async def test_update_asset_response_filters_pre_use_only_fields_for_in_use_asset(
+        self,
+    ):
+        """In-use assets should ignore pre-use-only form fields and still save."""
+        from app.models.fixed_assets.asset import AssetStatus
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        service = FixedAssetWebService()
+        org_id = uuid.uuid4()
+        asset_id = uuid.uuid4()
+        location_id = uuid.uuid4()
+        active_asset = MockAsset(
+            asset_id=asset_id,
+            organization_id=org_id,
+            status=AssetStatus.IN_USE,
+        )
+
+        mock_db = MagicMock()
+        mock_db.get.return_value = active_asset
+
+        request = MagicMock()
+        request.form = AsyncMock(
+            return_value={
+                "asset_name": "Renamed Asset",
+                "category_id": str(uuid.uuid4()),
+                "serial_number": "SN-200",
+                "location_id": str(location_id),
+                "description": "Updated description",
+                "status": "UNDER_REPAIR",
+                "depreciation_schedule_id": "",
+                "asset_number": "FA-200",
+                "currency_code": "EUR",
+                "acquisition_date": "2026-04-01",
+                "acquisition_cost": "9000.00",
+            }
+        )
+        auth = WebAuthContext(
+            is_authenticated=True,
+            organization_id=org_id,
+            person_id=uuid.uuid4(),
+        )
+
+        with patch("app.services.fixed_assets.web.asset_service.update_asset") as mock_update:
+            response = await service.update_asset_response(
+                request=request,
+                auth=auth,
+                db=mock_db,
+                asset_id=str(asset_id),
+            )
+
+        assert response.status_code == 303
+        assert "success=Asset+updated" in response.headers["location"]
+        mock_db.commit.assert_called_once()
+        mock_db.rollback.assert_not_called()
+
+        updates = mock_update.call_args.args[3]
+        assert updates == {
+            "serial_number": "SN-200",
+            "location_id": location_id,
+            "description": "Updated description",
+            "status": AssetStatus.UNDER_REPAIR,
+            "current_depreciation_schedule_id": None,
+        }
+
+    @pytest.mark.asyncio
+    async def test_update_asset_response_saves_editable_form_fields_for_pre_use_asset(
+        self,
+    ):
+        """Pre-use assets should persist asset number, currency, and schedule."""
+        from app.models.fixed_assets.asset import AssetStatus
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        service = FixedAssetWebService()
+        org_id = uuid.uuid4()
+        asset_id = uuid.uuid4()
+        location_id = uuid.uuid4()
+        schedule_id = uuid.uuid4()
+        asset = MockAsset(
+            asset_id=asset_id,
+            organization_id=org_id,
+            status=AssetStatus.NOT_IN_USE,
+        )
+
+        mock_db = MagicMock()
+        mock_db.get.return_value = asset
+
+        request = MagicMock()
+        request.form = AsyncMock(
+            return_value={
+                "asset_number": "FA-200",
+                "asset_name": "Renamed Asset",
+                "category_id": str(uuid.uuid4()),
+                "serial_number": "SN-200",
+                "location_id": str(location_id),
+                "description": "Updated description",
+                "status": "IN_STORE",
+                "acquisition_date": "2026-04-01",
+                "acquisition_cost": "9000.00",
+                "currency_code": "EUR",
+                "depreciation_schedule_id": str(schedule_id),
+            }
+        )
+        auth = WebAuthContext(
+            is_authenticated=True,
+            organization_id=org_id,
+            person_id=uuid.uuid4(),
+        )
+
+        with patch("app.services.fixed_assets.web.asset_service.update_asset") as mock_update:
+            response = await service.update_asset_response(
+                request=request,
+                auth=auth,
+                db=mock_db,
+                asset_id=str(asset_id),
+            )
+
+        assert response.status_code == 303
+        updates = mock_update.call_args.args[3]
+        assert updates["asset_number"] == "FA-200"
+        assert updates["currency_code"] == "EUR"
+        assert updates["status"] == AssetStatus.IN_STORE
+        assert updates["current_depreciation_schedule_id"] == schedule_id

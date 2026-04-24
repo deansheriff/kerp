@@ -84,7 +84,7 @@ class AssetRevaluationService(ListResponseMixin):
         if not asset or asset.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Asset not found")
 
-        if asset.status != AssetStatus.ACTIVE:
+        if asset.status != AssetStatus.IN_USE:
             raise HTTPException(
                 status_code=400,
                 detail=f"Cannot revalue asset with status '{asset.status.value}'",

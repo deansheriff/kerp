@@ -41,7 +41,7 @@ class CapitalizationService:
     Service for creating fixed assets from AP invoice lines.
 
     Implements the AP → FA integration for capitalizable purchases.
-    Assets are created in DRAFT status for user review and activation.
+    Assets are created in NOT_IN_USE status for user review and activation.
     """
 
     @staticmethod
@@ -92,11 +92,11 @@ class CapitalizationService:
         user_id: UUID,
     ) -> CapitalizationResult:
         """
-        Create draft fixed assets from invoice lines marked for capitalization.
+        Create fixed assets in not-in-use status from invoice lines marked for capitalization.
 
         For each line with capitalize_flag=True and asset_category_id set:
         - Validates the amount meets the category's capitalization threshold
-        - Creates a DRAFT asset with source document linkage
+        - Creates a NOT_IN_USE asset with source document linkage
         - Updates the invoice line with the created_asset_id
 
         Args:
@@ -169,7 +169,7 @@ class CapitalizationService:
             )
 
             try:
-                # Create the asset in DRAFT status
+                # Create the asset in NOT_IN_USE status
                 asset = AssetService.create_asset(
                     db=db,
                     organization_id=org_id,
@@ -199,7 +199,7 @@ class CapitalizationService:
                 return CapitalizationResult(
                     success=True,
                     asset_ids=created_asset_ids,
-                    message=f"Successfully created {len(created_asset_ids)} draft asset(s)",
+                    message=f"Successfully created {len(created_asset_ids)} asset(s)",
                     errors=[],
                 )
         else:

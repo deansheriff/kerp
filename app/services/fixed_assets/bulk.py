@@ -26,8 +26,8 @@ class AssetBulkService(BulkActionService[Asset]):
     Bulk operations for fixed assets.
 
     Supported actions:
-    - delete: Remove assets (only DRAFT status with no depreciation)
-    - activate: Set status to ACTIVE
+    - delete: Remove assets (only NOT_IN_USE status with no depreciation)
+    - activate: Set status to IN_USE
     - export: Export to CSV
     """
 
@@ -56,14 +56,14 @@ class AssetBulkService(BulkActionService[Asset]):
         Check if an asset can be deleted.
 
         An asset can only be deleted if:
-        - Status is DRAFT
+        - Status is NOT_IN_USE
         - No depreciation schedules exist
         """
-        # Only DRAFT assets can be deleted
-        if entity.status != AssetStatus.DRAFT:
+        # Only assets not yet in use can be deleted.
+        if entity.status != AssetStatus.NOT_IN_USE:
             return (
                 False,
-                f"Cannot delete '{entity.asset_name}': only DRAFT assets can be deleted (current status: {entity.status.value})",
+                f"Cannot delete '{entity.asset_name}': only assets not in use can be deleted (current status: {entity.status.value})",
             )
 
         # Check for depreciation schedules

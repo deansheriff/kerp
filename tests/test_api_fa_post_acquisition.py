@@ -33,7 +33,7 @@ def test_post_asset_acquisition_creates_journal_lines(monkeypatch):
         remaining_life_months=60,
         residual_value=Decimal("0"),
         net_book_value=Decimal("1200.00"),
-        status="DRAFT",
+        status="NOT_IN_USE",
     )
 
     category = AssetCategory(

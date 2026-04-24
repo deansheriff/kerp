@@ -59,10 +59,14 @@ class AssetAssignmentService:
         issued_on: date,
         location_id: UUID | None = None,
     ) -> None:
-        if asset.status in {AssetStatus.DISPOSED, AssetStatus.IMPAIRED}:
+        if asset.status in {
+            AssetStatus.RETIRED,
+            AssetStatus.FAULTY,
+            AssetStatus.UNDER_REPAIR,
+        }:
             raise ValidationError(f"Cannot assign asset in {asset.status.value} status")
-        if asset.status == AssetStatus.DRAFT:
-            asset.status = AssetStatus.ACTIVE
+        if asset.status in {AssetStatus.NOT_IN_USE, AssetStatus.IN_STORE}:
+            asset.status = AssetStatus.IN_USE
             asset.in_service_date = asset.in_service_date or issued_on
             asset.depreciation_start_date = (
                 asset.depreciation_start_date or asset.in_service_date
@@ -192,7 +196,9 @@ class AssetAssignmentService:
         )
         query = select(Asset).where(
             Asset.organization_id == org_id,
-            Asset.status.notin_([AssetStatus.DISPOSED, AssetStatus.IMPAIRED]),
+            Asset.status.notin_(
+                [AssetStatus.RETIRED, AssetStatus.FAULTY, AssetStatus.UNDER_REPAIR]
+            ),
             ~Asset.asset_id.in_(select(active_assignment_subq.c.asset_id)),
         )
         if location_id:

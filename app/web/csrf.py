@@ -20,6 +20,16 @@ _SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 logger = logging.getLogger(__name__)
 
 
+def _is_fixed_asset_edit_post(request: Request) -> bool:
+    """Return True for fixed-asset edit POST requests."""
+    path = request.url.path
+    return (
+        request.method == "POST"
+        and path.startswith("/fixed-assets/assets/")
+        and path.endswith("/edit")
+    )
+
+
 def _default_port(scheme: str | None) -> int | None:
     if scheme == "https":
         return 443
@@ -154,6 +164,13 @@ def _should_enforce_csrf(request: Request) -> bool:
 async def _extract_csrf_token(request: Request) -> str | None:
     header_token = request.headers.get(CSRF_HEADER_NAME)
     if header_token:
+        if _is_fixed_asset_edit_post(request):
+            logger.info(
+                "CSRF token found in header for asset edit: path=%s content_type=%s content_length=%s",
+                request.url.path,
+                request.headers.get("content-type"),
+                request.headers.get("content-length"),
+            )
         return header_token.strip()
     content_type = (request.headers.get("content-type") or "").lower()
     if content_type.startswith(
@@ -167,9 +184,29 @@ async def _extract_csrf_token(request: Request) -> str | None:
             logger.exception("Ignored exception")
         form = getattr(request.state, "csrf_form", None)
         if form is None:
-            form = await request.form()
-            request.state.csrf_form = form
+            try:
+                form = await request.form()
+                request.state.csrf_form = form
+            except Exception:
+                if _is_fixed_asset_edit_post(request):
+                    logger.exception(
+                        "CSRF form parsing failed for asset edit: path=%s content_type=%s content_length=%s origin=%s referer=%s has_cookie=%s",
+                        request.url.path,
+                        request.headers.get("content-type"),
+                        request.headers.get("content-length"),
+                        request.headers.get("origin"),
+                        request.headers.get("referer"),
+                        bool(request.cookies.get(CSRF_COOKIE_NAME)),
+                    )
+                raise
         token = form.get(CSRF_FORM_FIELD)
+        if _is_fixed_asset_edit_post(request):
+            logger.info(
+                "CSRF token extracted from form for asset edit: path=%s has_token=%s form_keys=%s",
+                request.url.path,
+                bool(token),
+                sorted(str(key) for key in form),
+            )
         if token:
             return str(token)
     return None
@@ -205,6 +242,13 @@ async def csrf_middleware(
     if not csrf_cookie:
         request_token = await _extract_csrf_token(request)
         if not request_token:
+            if _is_fixed_asset_edit_post(request):
+                logger.warning(
+                    "Asset edit rejected: missing CSRF cookie and request token path=%s origin=%s referer=%s",
+                    request.url.path,
+                    request.headers.get("origin"),
+                    request.headers.get("referer"),
+                )
             raise HTTPException(status_code=400, detail="Missing CSRF token")
         csrf_cookie = request_token
         request.state.csrf_token = csrf_cookie
@@ -218,6 +262,16 @@ async def csrf_middleware(
             origin,
             request.headers.get("host"),
         )
+        if _is_fixed_asset_edit_post(request):
+            logger.warning(
+                "Asset edit rejected: invalid CSRF origin path=%s origin=%s referer=%s host=%s forwarded_host=%s forwarded_proto=%s",
+                request.url.path,
+                request.headers.get("origin"),
+                request.headers.get("referer"),
+                request.headers.get("host"),
+                request.headers.get("x-forwarded-host"),
+                request.headers.get("x-forwarded-proto"),
+            )
         raise HTTPException(status_code=400, detail="Invalid CSRF origin")
 
     if request_token is None:
@@ -228,12 +282,29 @@ async def csrf_middleware(
             request.url.path,
             bool(csrf_cookie),
         )
+        if _is_fixed_asset_edit_post(request):
+            logger.warning(
+                "Asset edit rejected: CSRF token missing path=%s has_cookie=%s origin=%s referer=%s",
+                request.url.path,
+                bool(csrf_cookie),
+                request.headers.get("origin"),
+                request.headers.get("referer"),
+            )
         raise HTTPException(status_code=400, detail="Missing CSRF token")
     if request_token != csrf_cookie:
         logger.warning(
             "CSRF token mismatch: path=%s",
             request.url.path,
         )
+        if _is_fixed_asset_edit_post(request):
+            logger.warning(
+                "Asset edit rejected: CSRF token mismatch path=%s cookie_len=%s token_len=%s origin=%s referer=%s",
+                request.url.path,
+                len(csrf_cookie),
+                len(request_token),
+                request.headers.get("origin"),
+                request.headers.get("referer"),
+            )
         raise HTTPException(status_code=400, detail="Invalid CSRF token")
 
     response = await call_next(request)

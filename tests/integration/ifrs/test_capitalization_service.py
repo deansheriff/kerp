@@ -106,7 +106,7 @@ class TestValidateCapitalizationThreshold:
 class TestCreateAssetsFromInvoice:
     """Tests for create_assets_from_invoice method."""
 
-    def test_creates_draft_asset_for_capitalizable_line(
+    def test_creates_not_in_use_asset_for_capitalizable_line(
         self,
         db: Session,
         org_id: uuid.UUID,
@@ -117,7 +117,7 @@ class TestCreateAssetsFromInvoice:
         expense_account,
         fa_asset_sequence,  # Required for asset code generation
     ):
-        """Should create DRAFT asset for line with capitalize_flag=True."""
+        """Should create a not-in-use asset for a capitalizable line."""
         # Create capitalizable invoice line
         line = SupplierInvoiceLine(
             invoice_id=supplier_invoice.invoice_id,
@@ -144,13 +144,13 @@ class TestCreateAssetsFromInvoice:
 
         assert result.success is True
         assert len(result.asset_ids) == 1
-        assert "Successfully created 1 draft asset" in result.message
+        assert "Successfully created 1 asset" in result.message
         assert len(result.errors) == 0
 
         # Verify asset was created with correct attributes
         asset = db.get(Asset, result.asset_ids[0])
         assert asset is not None
-        assert asset.status == AssetStatus.DRAFT
+        assert asset.status == AssetStatus.NOT_IN_USE
         assert asset.acquisition_cost == Decimal("2500.00")
         assert asset.category_id == asset_category.category_id
         assert asset.supplier_id == supplier.supplier_id
@@ -200,7 +200,7 @@ class TestCreateAssetsFromInvoice:
 
         assert result.success is True
         assert len(result.asset_ids) == 3
-        assert "Successfully created 3 draft asset" in result.message
+        assert "Successfully created 3 asset" in result.message
 
     def test_skips_non_capitalizable_lines(
         self,

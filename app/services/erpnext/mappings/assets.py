@@ -28,14 +28,14 @@ DEPRECIATION_METHOD_MAP = {
 
 # ERPNext status to DotMac ERP status
 ASSET_STATUS_MAP = {
-    "Draft": "DRAFT",
-    "Submitted": "ACTIVE",
-    "Partially Depreciated": "ACTIVE",
+    "Draft": "NOT_IN_USE",
+    "Submitted": "IN_USE",
+    "Partially Depreciated": "IN_USE",
     "Fully Depreciated": "FULLY_DEPRECIATED",
-    "Sold": "DISPOSED",
-    "Scrapped": "DISPOSED",
-    "In Maintenance": "ACTIVE",
-    "Out of Order": "ACTIVE",
+    "Sold": "RETIRED",
+    "Scrapped": "RETIRED",
+    "In Maintenance": "UNDER_REPAIR",
+    "Out of Order": "FAULTY",
 }
 
 
@@ -49,8 +49,8 @@ def map_depreciation_method(value: Any) -> str:
 def map_asset_status(value: Any) -> str:
     """Map ERPNext asset status."""
     if not value:
-        return "DRAFT"
-    return ASSET_STATUS_MAP.get(str(value), "ACTIVE")
+        return "NOT_IN_USE"
+    return ASSET_STATUS_MAP.get(str(value), "IN_USE")
 
 
 def calculate_useful_life_months(record: dict[str, Any]) -> int:
@@ -149,7 +149,7 @@ class AssetMapping(DocTypeMapping):
                     source="status",
                     target="status",
                     required=False,
-                    default="ACTIVE",
+                    default="IN_USE",
                     transformer=map_asset_status,
                 ),
                 FieldMapping(

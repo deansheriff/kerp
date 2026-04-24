@@ -215,7 +215,7 @@ class AssetSyncService(BaseSyncService[Asset]):
         data.pop("_source_modified", None)
 
         # Map status
-        status = AssetStatus.ACTIVE
+        status = AssetStatus.IN_USE
         if data.get("status"):
             try:
                 status = AssetStatus(data["status"])

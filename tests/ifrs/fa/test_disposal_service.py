@@ -25,7 +25,7 @@ class TestAssetDisposalService:
             DisposalInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("3000")
         mock_asset.organization_id = org_id
 
@@ -78,10 +78,10 @@ class TestAssetDisposalService:
 
         assert exc_info.value.status_code == 404
 
-    def test_create_disposal_asset_already_disposed(
+    def test_create_disposal_asset_already_retired(
         self, mock_db, org_id, mock_asset, user_id
     ):
-        """Test disposal creation fails for already disposed asset."""
+        """Test disposal creation fails for an already retired asset."""
         from fastapi import HTTPException
 
         from app.models.fixed_assets.asset_disposal import DisposalType
@@ -90,7 +90,7 @@ class TestAssetDisposalService:
             DisposalInput,
         )
 
-        mock_asset.status = MockAssetStatus.DISPOSED
+        mock_asset.status = MockAssetStatus.RETIRED
         mock_asset.organization_id = org_id
         mock_db.get.return_value = mock_asset
 
@@ -106,12 +106,12 @@ class TestAssetDisposalService:
             AssetDisposalService.create_disposal(mock_db, org_id, input_data, user_id)
 
         assert exc_info.value.status_code == 400
-        assert "already disposed" in exc_info.value.detail
+        assert "already retired" in exc_info.value.detail
 
-    def test_create_disposal_asset_draft_status(
+    def test_create_disposal_asset_not_in_use_status(
         self, mock_db, org_id, mock_asset, user_id
     ):
-        """Test disposal creation fails for draft asset."""
+        """Test disposal creation fails for an asset that is not in use."""
         from fastapi import HTTPException
 
         from app.models.fixed_assets.asset_disposal import DisposalType
@@ -120,7 +120,7 @@ class TestAssetDisposalService:
             DisposalInput,
         )
 
-        mock_asset.status = MockAssetStatus.DRAFT
+        mock_asset.status = MockAssetStatus.NOT_IN_USE
         mock_asset.organization_id = org_id
         mock_db.get.return_value = mock_asset
 
@@ -136,7 +136,7 @@ class TestAssetDisposalService:
             AssetDisposalService.create_disposal(mock_db, org_id, input_data, user_id)
 
         assert exc_info.value.status_code == 400
-        assert "draft" in exc_info.value.detail.lower()
+        assert "not yet in use" in exc_info.value.detail.lower()
 
     def test_calculate_gain_on_disposal(self, mock_db, org_id, mock_asset, user_id):
         """Test gain calculation on disposal."""
@@ -146,7 +146,7 @@ class TestAssetDisposalService:
             DisposalInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("3000")
         mock_asset.organization_id = org_id
         mock_asset.revalued_amount = None
@@ -183,7 +183,7 @@ class TestAssetDisposalService:
             DisposalInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("5000")
         mock_asset.organization_id = org_id
         mock_asset.revalued_amount = None
@@ -307,7 +307,7 @@ class TestAssetDisposalService:
             DisposalInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("3000")
         mock_asset.organization_id = org_id
         mock_asset.revalued_amount = None

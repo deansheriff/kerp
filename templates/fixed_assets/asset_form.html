@@ -2,6 +2,7 @@
 {% from "components/macros.html" import icon_svg %}
 
 {% set is_edit = asset is defined and asset %}
+{% set is_pre_use_asset = is_pre_use_asset if is_pre_use_asset is defined else True %}
 {% block page_title %}{{ "Edit Asset" if is_edit else "New Asset" }}{% endblock %}
 
 {% block head %}
@@ -52,6 +53,12 @@
         {{ "Update fixed asset details and acquisition information" if is_edit else "Register a fixed asset and capture acquisition details" }}
     </p>
 
+    {% if is_edit and not is_pre_use_asset %}
+    <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+        This asset is in use. Only operational fields such as location, serial number, and description can be changed here.
+    </div>
+    {% endif %}
+
     <form method="post" action="{{ '/fixed-assets/assets/' ~ asset.asset_id ~ '/edit' if is_edit else '/fixed-assets/assets/new' }}" class="space-y-6">
         {{ request.state.csrf_form | safe }}
         <div id="form-result">
@@ -87,11 +94,15 @@
                     <input type="text"
                            name="asset_number"
                            value="{{ form_asset_number or '' }}"
+                           {{ 'disabled' if is_edit and not is_pre_use_asset else '' }}
                            maxlength="30"
                            placeholder="Enter asset number"
                            autocomplete="off"
                            class="form-input">
                     <p class="form-hint">Optional. Leave blank to auto-generate from Settings → Numbering.</p>
+                    {% if is_edit and not is_pre_use_asset %}
+                    <p class="form-hint">Asset number is locked after activation.</p>
+                    {% endif %}
                 </div>
 
                 <div>
@@ -101,11 +112,14 @@
                     <input type="text"
                            name="asset_name"
                            value="{{ form_asset_name or '' }}"
-                           required
+                           {{ 'required' if is_pre_use_asset else 'disabled' }}
                            maxlength="200"
                            placeholder="Enter asset name"
                            autocomplete="off"
                            class="form-input">
+                    {% if is_edit and not is_pre_use_asset %}
+                    <p class="form-hint">Asset name is locked after activation.</p>
+                    {% endif %}
                 </div>
 
                 <div>
@@ -113,7 +127,7 @@
                         Main Category <span class="text-rose-500">*</span>
                     </label>
                     {% set selected_parent_category = form_parent_category_id if form_parent_category_id is defined else '' %}
-                    <select id="main-category-select" name="category_parent_id" required class="form-select">
+                    <select id="main-category-select" name="category_parent_id" {{ 'required' if is_pre_use_asset else 'disabled' }} class="form-select">
                         <option value="">Select main category</option>
                         {% for category in main_categories %}
                         <option value="{{ category.category_id }}" {{ 'selected' if selected_parent_category == category.category_id|string else '' }}>
@@ -127,9 +141,12 @@
                     <label class="form-label">
                         Sub-category <span class="text-rose-500">*</span>
                     </label>
-                    <select id="sub-category-select" name="category_id" required class="form-select">
+                    <select id="sub-category-select" name="category_id" {{ 'required' if is_pre_use_asset else 'disabled' }} class="form-select">
                         <option value="">Select sub-category</option>
                     </select>
+                    {% if is_edit and not is_pre_use_asset %}
+                    <p class="form-hint">Category is locked after activation.</p>
+                    {% endif %}
                 </div>
 
                 <div>
@@ -154,6 +171,19 @@
                            placeholder="Enter serial number"
                            autocomplete="off"
                            class="form-input">
+                </div>
+
+                <div>
+                    <label class="form-label">Status</label>
+                    {% set selected_status = form_status if form_status is defined and form_status else 'NOT_IN_USE' %}
+                    <select name="status" class="form-select">
+                        {% for option in asset_statuses %}
+                        <option value="{{ option.value }}" {{ 'selected' if option.value == selected_status else '' }}>
+                            {{ option.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p class="form-hint">Retired assets must still be handled through the disposal workflow.</p>
                 </div>
 
                 <div>
@@ -202,7 +232,11 @@
                     <input type="date"
                            name="acquisition_date"
                            value="{{ form_acquisition_date if form_acquisition_date is defined and form_acquisition_date else today }}"
+                           {{ 'disabled' if is_edit and not is_pre_use_asset else '' }}
                            class="form-input">
+                    {% if is_edit and not is_pre_use_asset %}
+                    <p class="form-hint">Acquisition date is locked after activation.</p>
+                    {% endif %}
                 </div>
 
                 <div>
@@ -215,14 +249,18 @@
                            min="0"
                            value="{{ form_acquisition_cost if form_acquisition_cost is defined else '' }}"
                            placeholder="0.00"
+                           {{ 'disabled' if is_edit and not is_pre_use_asset else '' }}
                            class="form-input">
+                    {% if is_edit and not is_pre_use_asset %}
+                    <p class="form-hint">Acquisition cost is locked after activation.</p>
+                    {% endif %}
                 </div>
 
                 <div>
                     <label class="form-label">
                         Currency
                     </label>
-                    <select name="currency_code" class="form-select">
+                    <select name="currency_code" {{ 'disabled' if is_edit and not is_pre_use_asset else '' }} class="form-select">
                         {% set selected_currency = form_currency_code if form_currency_code is defined else default_currency_code %}
                         {% for currency in currencies %}
                         <option value="{{ currency.code }}" {{ 'selected' if currency.code == selected_currency else '' }}>
@@ -230,6 +268,9 @@
                         </option>
                         {% endfor %}
                     </select>
+                    {% if is_edit and not is_pre_use_asset %}
+                    <p class="form-hint">Currency is locked after activation.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>

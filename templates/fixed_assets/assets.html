@@ -30,7 +30,7 @@
     {# Stats Row #}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {{ stats_card("Total Assets", total_count | default(assets | length if assets else 0), icon="building", color="slate") }}
-        {{ stats_card("Active", active_count | default(0), icon="check-circle", color="emerald") }}
+        {{ stats_card("In Use", active_count | default(0), icon="check-circle", color="emerald") }}
         {{ stats_card("Total Cost", total_cost | default("₦0.00"), icon="currency", color="teal") }}
         {{ stats_card("Net Book Value", total_nbv | default("₦0.00"), icon="chart", color="blue") }}
     </div>
@@ -48,9 +48,13 @@
             "Status",
             status,
             [
-                {"value": "ACTIVE", "label": "Active"},
-                {"value": "DISPOSED", "label": "Disposed"},
-                {"value": "FULLY_DEPRECIATED", "label": "Fully Depreciated"}
+                {"value": "IN_USE", "label": "In Use"},
+                {"value": "NOT_IN_USE", "label": "Not In Use"},
+                {"value": "IN_STORE", "label": "In Store"},
+                {"value": "FAULTY", "label": "Faulty"},
+                {"value": "UNDER_REPAIR", "label": "Under Repair"},
+                {"value": "FULLY_DEPRECIATED", "label": "Fully Depreciated"},
+                {"value": "RETIRED", "label": "Retired"}
             ],
             filter_attrs
         ) }}
@@ -104,7 +108,7 @@
                             <td class="text-right font-mono text-slate-600 dark:text-slate-300">{{ asset.acquisition_cost }}</td>
                             <td class="text-right font-mono font-medium text-slate-900 dark:text-white">{{ asset.net_book_value }}</td>
                             <td class="text-center">
-                            {{ status_badge(asset.status | default('active'), 'sm') }}
+                            {{ status_badge(asset.status | default('in_use'), 'sm') }}
                             </td>
                             <td>
                                 <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -165,7 +169,7 @@
                     "endpoint": "/fixed-assets/assets/bulk-delete",
                     "icon": bulk_icon_delete(),
                     "class": "btn-bulk-danger",
-                    "confirm": "Delete selected assets? Only DRAFT assets without depreciation can be deleted."
+                    "confirm": "Delete selected assets? Only assets not in use and without depreciation can be deleted."
                 }
             ],
             entity_name="assets"

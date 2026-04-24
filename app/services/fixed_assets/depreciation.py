@@ -358,7 +358,7 @@ class DepreciationService(ListResponseMixin):
                     select(Asset).where(
                         and_(
                             Asset.organization_id == org_id,
-                            Asset.status == AssetStatus.ACTIVE,
+                            Asset.status == AssetStatus.IN_USE,
                             Asset.remaining_life_months > 0,
                             Asset.net_book_value > Asset.residual_value,
                         )

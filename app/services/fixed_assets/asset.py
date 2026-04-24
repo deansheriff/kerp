@@ -33,6 +33,9 @@ from app.services.response import ListResponseMixin
 logger = logging.getLogger(__name__)
 
 ASSET_STATUS_UPDATE_ERROR = "Cannot update '{key}' after asset activation"
+PRE_USE_ASSET_STATUSES = frozenset(
+    {AssetStatus.NOT_IN_USE, AssetStatus.IN_STORE}
+)
 
 
 def _record_lifecycle_event(db: Session, **kwargs: Any) -> None:
@@ -96,6 +99,7 @@ class AssetInput:
     cash_generating_unit_id: UUID | None = None
     parent_asset_id: UUID | None = None
     exchange_rate: Decimal | None = None
+    status: AssetStatus | None = None
 
 
 class AssetCategoryService(ListResponseMixin):
@@ -294,7 +298,7 @@ class AssetService(ListResponseMixin):
         created_by_user_id: UUID,
     ) -> Asset:
         """
-        Create a new fixed asset in DRAFT status.
+        Create a new fixed asset in a pre-use status.
 
         Args:
             db: Database session
@@ -385,6 +389,22 @@ class AssetService(ListResponseMixin):
         # Calculate initial net book value
         net_book_value = input.acquisition_cost
 
+        initial_status = input.status or AssetStatus.NOT_IN_USE
+        if initial_status == AssetStatus.RETIRED:
+            raise HTTPException(
+                status_code=400,
+                detail="Retired status must be set through the disposal workflow",
+            )
+
+        in_service_date = input.in_service_date
+        depreciation_start_date = None
+        remaining_life_months = useful_life
+        if initial_status in {AssetStatus.IN_USE, AssetStatus.FULLY_DEPRECIATED}:
+            in_service_date = in_service_date or input.acquisition_date
+            depreciation_start_date = in_service_date
+        if initial_status == AssetStatus.FULLY_DEPRECIATED:
+            remaining_life_months = 0
+
         asset = Asset(
             organization_id=org_id,
             asset_number=asset_number,
@@ -395,7 +415,7 @@ class AssetService(ListResponseMixin):
             cost_center_id=input.cost_center_id,
             custodian_employee_id=input.custodian_user_id,
             acquisition_date=input.acquisition_date,
-            in_service_date=input.in_service_date,
+            in_service_date=in_service_date,
             acquisition_cost=input.acquisition_cost,
             currency_code=input.currency_code,
             functional_currency_cost=functional_cost,
@@ -405,13 +425,14 @@ class AssetService(ListResponseMixin):
             invoice_reference=input.invoice_reference,
             depreciation_method=depreciation_method,
             useful_life_months=useful_life,
-            remaining_life_months=useful_life,
+            remaining_life_months=remaining_life_months,
             residual_value=residual_value,
+            depreciation_start_date=depreciation_start_date,
             current_depreciation_schedule_id=schedule_id,
             accumulated_depreciation=Decimal("0"),
             net_book_value=net_book_value,
             impairment_loss=Decimal("0"),
-            status=AssetStatus.DRAFT,
+            status=initial_status,
             cash_generating_unit_id=input.cash_generating_unit_id,
             serial_number=input.serial_number,
             barcode=input.barcode,
@@ -437,8 +458,8 @@ class AssetService(ListResponseMixin):
             source_type="asset",
             source_record_id=asset.asset_id,
             actor_user_id=user_id,
-            new_status=AssetStatus.DRAFT.value,
-            notes="Asset created in draft state",
+            new_status=AssetStatus.NOT_IN_USE.value,
+            notes="Asset created and not yet in use",
             event_payload={"creation_method": "AssetService.create_asset"},
         )
         if asset.location_id:
@@ -500,14 +521,14 @@ class AssetService(ListResponseMixin):
         if not asset or asset.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Asset not found")
 
-        if asset.status != AssetStatus.DRAFT:
+        if asset.status not in PRE_USE_ASSET_STATUSES:
             raise HTTPException(
                 status_code=400,
                 detail=f"Cannot activate asset with status '{asset.status.value}'",
             )
 
         previous_status = asset.status
-        asset.status = AssetStatus.ACTIVE
+        asset.status = AssetStatus.IN_USE
         asset.in_service_date = in_service_date or asset.acquisition_date
         asset.depreciation_start_date = depreciation_start_date or asset.in_service_date
         _record_lifecycle_event(
@@ -559,6 +580,7 @@ class AssetService(ListResponseMixin):
         # Fields that can be updated after activation
         previous_location_id = asset.location_id
         previous_owner_id = getattr(asset, "custodian_employee_id", None)
+        previous_status = asset.status
         always_updatable = {
             "description",
             "location_id",
@@ -573,14 +595,18 @@ class AssetService(ListResponseMixin):
             "insured_value",
             "insurance_policy_number",
             "cash_generating_unit_id",
+            "current_depreciation_schedule_id",
+            "status",
         }
 
-        # Fields only updatable in DRAFT status
-        draft_only = {
+        # Fields only updatable before the asset is placed in use.
+        pre_use_only = {
+            "asset_number",
             "asset_name",
             "category_id",
             "acquisition_date",
             "acquisition_cost",
+            "currency_code",
             "depreciation_method",
             "useful_life_months",
             "residual_value",
@@ -588,16 +614,85 @@ class AssetService(ListResponseMixin):
 
         for key, value in updates.items():
             if key in always_updatable:
+                if key == "status":
+                    new_status = (
+                        value
+                        if isinstance(value, AssetStatus)
+                        else AssetStatus(str(value))
+                    )
+                    if new_status == AssetStatus.RETIRED:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Retired status must be set through the disposal workflow",
+                        )
+                    asset.status = new_status
+                    if new_status in {
+                        AssetStatus.IN_USE,
+                        AssetStatus.FULLY_DEPRECIATED,
+                    }:
+                        asset.in_service_date = (
+                            asset.in_service_date or asset.acquisition_date
+                        )
+                        asset.depreciation_start_date = (
+                            asset.depreciation_start_date or asset.in_service_date
+                        )
+                    if new_status == AssetStatus.FULLY_DEPRECIATED:
+                        asset.remaining_life_months = 0
+                    continue
+                if key == "current_depreciation_schedule_id":
+                    if value is not None:
+                        schedule_id = coerce_uuid(value)
+                        schedule = db.get(DepreciationSchedule, schedule_id)
+                        if not schedule:
+                            raise HTTPException(
+                                status_code=404,
+                                detail="Depreciation schedule not found",
+                            )
+                        depreciation_run = db.get(DepreciationRun, schedule.run_id)
+                        if (
+                            not depreciation_run
+                            or depreciation_run.organization_id != org_id
+                        ):
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Depreciation schedule does not belong to organization",
+                            )
+                        asset.current_depreciation_schedule_id = schedule_id
+                    else:
+                        asset.current_depreciation_schedule_id = None
                 if key == "custodian_user_id":
                     asset.custodian_employee_id = value
-                else:
+                elif key != "current_depreciation_schedule_id":
                     setattr(asset, key, value)
-            elif key in draft_only:
-                if asset.status != AssetStatus.DRAFT:
+            elif key in pre_use_only:
+                if asset.status not in PRE_USE_ASSET_STATUSES:
                     raise HTTPException(
                         status_code=400,
                         detail=ASSET_STATUS_UPDATE_ERROR.format(key=key),
                     )
+                if key == "asset_number":
+                    asset_number = (str(value) if value is not None else "").strip()
+                    if not asset_number:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Asset number is required",
+                        )
+                    existing_asset = db.scalars(
+                        select(Asset).where(
+                            and_(
+                                Asset.organization_id == org_id,
+                                Asset.asset_number == asset_number,
+                                Asset.asset_id != asset.asset_id,
+                            )
+                        )
+                    ).first()
+                    if existing_asset:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Asset number '{asset_number}' already exists",
+                        )
+                    asset.asset_number = asset_number
+                    continue
                 setattr(asset, key, value)
         if previous_location_id != asset.location_id:
             _record_lifecycle_event(
@@ -625,6 +720,19 @@ class AssetService(ListResponseMixin):
                 new_owner_employee_id=getattr(asset, "custodian_employee_id", None),
                 notes="Asset custodian updated",
             )
+        if previous_status != asset.status:
+            _record_lifecycle_event(
+                db,
+                org_id=org_id,
+                asset_id=asset.asset_id,
+                event_category="STATE",
+                event_type="STATE_CHANGED",
+                source_type="asset",
+                source_record_id=asset.asset_id,
+                previous_status=previous_status.value,
+                new_status=asset.status.value,
+                notes="Asset status updated",
+            )
 
         db.flush()
         db.refresh(asset)
@@ -645,10 +753,10 @@ class AssetService(ListResponseMixin):
         if not asset or asset.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Asset not found")
 
-        if asset.status != AssetStatus.ACTIVE:
+        if asset.status != AssetStatus.IN_USE:
             raise HTTPException(
                 status_code=400,
-                detail="Only ACTIVE assets can be marked fully depreciated",
+                detail="Only assets in use can be marked retired",
             )
 
         previous_status = asset.status
@@ -664,7 +772,7 @@ class AssetService(ListResponseMixin):
             source_record_id=asset.asset_id,
             previous_status=previous_status.value,
             new_status=asset.status.value,
-            notes="Asset marked fully depreciated",
+            notes="Asset retired after depreciation completion",
         )
 
         db.flush()
@@ -731,7 +839,7 @@ class AssetService(ListResponseMixin):
             .where(
                 and_(
                     Asset.organization_id == org_id,
-                    Asset.status == AssetStatus.ACTIVE,
+                    Asset.status == AssetStatus.IN_USE,
                     Asset.depreciation_start_date <= ref_date,
                     Asset.remaining_life_months > 0,
                     Asset.net_book_value > Asset.residual_value,

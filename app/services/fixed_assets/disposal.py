@@ -33,6 +33,9 @@ from app.services.people.assets.lifecycle_event_service import (
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
+PRE_USE_DISPOSAL_BLOCKED_STATUSES = frozenset(
+    {AssetStatus.NOT_IN_USE, AssetStatus.IN_STORE}
+)
 
 
 @dataclass
@@ -93,16 +96,22 @@ class AssetDisposalService(ListResponseMixin):
         if not asset or asset.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Asset not found")
 
-        if asset.status == AssetStatus.DISPOSED:
+        if asset.status == AssetStatus.RETIRED:
             raise HTTPException(
                 status_code=400,
-                detail="Asset is already disposed",
+                detail="Asset is already retired",
             )
 
-        if asset.status == AssetStatus.DRAFT:
+        if asset.status in PRE_USE_DISPOSAL_BLOCKED_STATUSES:
             raise HTTPException(
                 status_code=400,
-                detail="Cannot dispose of draft asset",
+                detail="Cannot retire an asset that is not yet in use",
+            )
+
+        if asset.status == AssetStatus.UNDER_REPAIR:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot retire an asset while it is under repair",
             )
 
         # Get values at disposal
@@ -177,7 +186,7 @@ class AssetDisposalService(ListResponseMixin):
         approved_by_user_id: UUID,
     ) -> AssetDisposal:
         """
-        Approve a disposal and mark asset as disposed.
+        Approve a disposal and mark asset as retired.
 
         Args:
             db: Database session
@@ -219,7 +228,7 @@ class AssetDisposalService(ListResponseMixin):
 
         # Update asset status
         previous_status = asset.status
-        asset.status = AssetStatus.DISPOSED
+        asset.status = AssetStatus.RETIRED
         asset.disposal_date = disposal.disposal_date
         asset.disposal_proceeds = disposal.net_proceeds
         asset.disposal_gain_loss = disposal.gain_loss_on_disposal
@@ -234,7 +243,7 @@ class AssetDisposalService(ListResponseMixin):
             actor_user_id=user_id,
             previous_status=previous_status.value,
             new_status=asset.status.value,
-            notes="Asset marked disposed after disposal approval",
+            notes="Asset marked retired after disposal approval",
         )
 
         try:
@@ -249,7 +258,7 @@ class AssetDisposalService(ListResponseMixin):
                 entity_id=disposal.disposal_id,
                 event="ON_APPROVAL",
                 old_values={},
-                new_values={"status": "DISPOSED"},
+                new_values={"status": "RETIRED"},
                 user_id=user_id,
             )
         except Exception:

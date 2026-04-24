@@ -26,7 +26,7 @@ class TestAssetRevaluationService:
             RevaluationInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("5000")
         mock_asset.organization_id = org_id
         mock_asset.accumulated_depreciation = Decimal("2000")
@@ -61,7 +61,7 @@ class TestAssetRevaluationService:
             RevaluationInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("5000")
         mock_asset.organization_id = org_id
         mock_asset.accumulated_depreciation = Decimal("2000")
@@ -109,10 +109,10 @@ class TestAssetRevaluationService:
 
         assert exc_info.value.status_code == 404
 
-    def test_create_revaluation_asset_not_active(
+    def test_create_revaluation_asset_not_in_use(
         self, mock_db, org_id, mock_asset, user_id
     ):
-        """Test revaluation fails for non-active asset."""
+        """Test revaluation fails for asset that is not in use."""
         from fastapi import HTTPException
 
         from app.services.fixed_assets.revaluation import (
@@ -120,7 +120,7 @@ class TestAssetRevaluationService:
             RevaluationInput,
         )
 
-        mock_asset.status = MockAssetStatus.DRAFT  # Not active
+        mock_asset.status = MockAssetStatus.NOT_IN_USE
         mock_asset.organization_id = org_id
 
         mock_db.get.return_value = mock_asset
@@ -151,7 +151,7 @@ class TestAssetRevaluationService:
             RevaluationInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.organization_id = org_id
 
         mock_category.revaluation_model_allowed = False  # Not allowed
@@ -185,7 +185,7 @@ class TestAssetRevaluationService:
             RevaluationInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.organization_id = org_id
 
         # Asset found, category not found
@@ -216,7 +216,7 @@ class TestAssetRevaluationService:
             RevaluationInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("6000")  # After prior revaluation
         mock_asset.organization_id = org_id
         mock_asset.accumulated_depreciation = Decimal("0")
@@ -255,7 +255,7 @@ class TestAssetRevaluationService:
             RevaluationInput,
         )
 
-        mock_asset.status = MockAssetStatus.ACTIVE
+        mock_asset.status = MockAssetStatus.IN_USE
         mock_asset.net_book_value = Decimal("4000")  # After prior impairment
         mock_asset.organization_id = org_id
         mock_asset.accumulated_depreciation = Decimal("0")

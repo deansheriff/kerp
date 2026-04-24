@@ -52,6 +52,15 @@ from app.web.deps import WebAuthContext, base_context
 
 logger = logging.getLogger(__name__)
 
+EDITABLE_ASSET_STATUSES = (
+    AssetStatus.NOT_IN_USE,
+    AssetStatus.IN_USE,
+    AssetStatus.IN_STORE,
+    AssetStatus.FAULTY,
+    AssetStatus.UNDER_REPAIR,
+    AssetStatus.FULLY_DEPRECIATED,
+)
+
 
 def _safe_form_text(value: object) -> str:
     if value is None or isinstance(value, UploadFile):
@@ -143,9 +152,10 @@ class FixedAssetWebService:
                 {
                     "status": status.value,
                     "label": status.value.replace("_", " ").title(),
-                    "count": state_counts.get(status.value, 0),
+                    "count": state_counts[status.value],
                 }
                 for status in AssetStatus
+                if state_counts.get(status.value, 0) > 0
             ]
         except SQLAlchemyError as exc:
             logger.warning("Unable to load asset state KPIs: %s", exc)
@@ -181,7 +191,7 @@ class FixedAssetWebService:
                     select(func.count(Asset.asset_id)).where(
                         and_(
                             Asset.organization_id == org_id,
-                            Asset.status == AssetStatus.ACTIVE,
+                            Asset.status == AssetStatus.IN_USE,
                             Asset.net_book_value > Asset.residual_value,
                             Asset.remaining_life_months > 0,
                             Asset.depreciation_start_date.is_not(None),
@@ -388,7 +398,7 @@ class FixedAssetWebService:
             ).where(
                 and_(
                     Asset.organization_id == org_id,
-                    Asset.status == AssetStatus.ACTIVE,
+                    Asset.status == AssetStatus.IN_USE,
                     Asset.net_book_value > Asset.residual_value,
                     Asset.remaining_life_months > 0,
                     Asset.depreciation_start_date.is_not(None),
@@ -587,7 +597,14 @@ class FixedAssetWebService:
             )
             .order_by(AssetCategory.category_code)
         ).all()
-        main_categories = [c for c in categories if c.parent_category_id is None]
+        parent_category_ids = {
+            c.parent_category_id for c in categories if c.parent_category_id is not None
+        }
+        main_categories = [
+            c
+            for c in categories
+            if c.parent_category_id is None and c.category_id in parent_category_ids
+        ]
         sub_categories = [
             {
                 "category_id": str(c.category_id),
@@ -685,6 +702,10 @@ class FixedAssetWebService:
             "suppliers_list": suppliers_list,
             "locations_list": locations_list,
             "depreciation_schedules": depreciation_schedules,
+            "asset_statuses": [
+                {"value": status.value, "label": status.value.replace("_", " ").title()}
+                for status in EDITABLE_ASSET_STATUSES
+            ],
             "today": _format_date(date.today()),
             "asset_number_preview": FixedAssetWebService._sequence_preview(sequence),
         }
@@ -802,6 +823,7 @@ class FixedAssetWebService:
         context["form_parent_category_id"] = ""
         context["form_serial_number"] = ""
         context["form_location_id"] = ""
+        context["form_status"] = AssetStatus.NOT_IN_USE.value
         return templates.TemplateResponse(
             request, "fixed_assets/asset_form.html", context
         )
@@ -818,6 +840,7 @@ class FixedAssetWebService:
         acquisition_date: str | None,
         acquisition_cost: str | None,
         currency_code: str | None,
+        status: str | None,
         description: str | None,
         depreciation_schedule_id: str | None,
         db: Session,
@@ -856,6 +879,11 @@ class FixedAssetWebService:
                 acquisition_date=parsed_acquisition_date,
                 acquisition_cost=parsed_acquisition_cost,
                 currency_code=resolved_currency,
+                status=(
+                    AssetStatus(status.strip())
+                    if status and status.strip()
+                    else AssetStatus.NOT_IN_USE
+                ),
                 description=description,
                 depreciation_schedule_id=(
                     UUID(depreciation_schedule_id) if depreciation_schedule_id else None
@@ -896,6 +924,7 @@ class FixedAssetWebService:
             context["form_acquisition_date"] = acquisition_date or ""
             context["form_acquisition_cost"] = acquisition_cost or ""
             context["form_currency_code"] = currency_code or ""
+            context["form_status"] = status or AssetStatus.NOT_IN_USE.value
             context["selected_depreciation_schedule_id"] = depreciation_schedule_id
             return templates.TemplateResponse(
                 request, "fixed_assets/asset_form.html", context
@@ -1376,7 +1405,7 @@ class FixedAssetWebService:
                     "serial_number": asset.serial_number,
                     "description": asset.description,
                     "category_name": category.category_name if category else None,
-                    "status": asset.status.value if asset.status else "ACTIVE",
+                    "status": asset.status.value if asset.status else "IN_USE",
                     "acquisition_date": _format_date(asset.acquisition_date),
                     "acquisition_cost": _format_currency(
                         asset.acquisition_cost, asset.currency_code
@@ -1419,15 +1448,19 @@ class FixedAssetWebService:
                 status_code=303,
             )
 
-        if asset.status not in [AssetStatus.DRAFT, AssetStatus.ACTIVE]:
+        if asset.status == AssetStatus.RETIRED:
             return RedirectResponse(
-                url=f"/fixed-assets/assets/{asset_id}?error=Only+draft+or+active+assets+can+be+edited",
+                url=f"/fixed-assets/assets/{asset_id}?error=Retired+assets+cannot+be+edited",
                 status_code=303,
             )
 
         context = base_context(request, auth, "Edit Asset", "fixed_assets")
         context.update(self.asset_form_context(db, str(auth.organization_id)))
         context["asset"] = asset
+        context["is_pre_use_asset"] = asset.status in {
+            AssetStatus.NOT_IN_USE,
+            AssetStatus.IN_STORE,
+        }
         context["form_asset_number"] = asset.asset_number
         context["form_asset_name"] = asset.asset_name
         context["form_category_id"] = (
@@ -1454,6 +1487,7 @@ class FixedAssetWebService:
             str(asset.acquisition_cost) if asset.acquisition_cost is not None else ""
         )
         context["form_currency_code"] = asset.currency_code or ""
+        context["form_status"] = asset.status.value if asset.status else ""
         context["selected_depreciation_schedule_id"] = (
             str(asset.current_depreciation_schedule_id)
             if asset.current_depreciation_schedule_id
@@ -1473,42 +1507,81 @@ class FixedAssetWebService:
         """Handle asset update."""
         try:
             form_data = await request.form()
+            logger.info(
+                "Asset edit handler entered: asset_id=%s form_keys=%s content_type=%s content_length=%s",
+                asset_id,
+                sorted(str(key) for key in form_data),
+                request.headers.get("content-type"),
+                request.headers.get("content-length"),
+            )
+            org_id = coerce_uuid(auth.organization_id)
+            ast_id = coerce_uuid(asset_id)
+            asset = db.get(Asset, ast_id)
+            if not asset or asset.organization_id != org_id:
+                raise HTTPException(status_code=404, detail="Asset not found")
+
+            is_pre_use_asset = asset.status in {
+                AssetStatus.NOT_IN_USE,
+                AssetStatus.IN_STORE,
+            }
             updates: dict[str, object] = {}
 
-            asset_name = _safe_form_text(form_data.get("asset_name")).strip()
-            category_id = _safe_form_text(form_data.get("category_id")).strip()
             serial_number = _safe_form_text(form_data.get("serial_number")).strip()
             location_id = _safe_form_text(form_data.get("location_id")).strip()
             description = _safe_form_text(form_data.get("description")).strip()
-            acquisition_date = _safe_form_text(
-                form_data.get("acquisition_date")
+            status = _safe_form_text(form_data.get("status")).strip()
+            depreciation_schedule_id = _safe_form_text(
+                form_data.get("depreciation_schedule_id")
             ).strip()
-            acquisition_cost = _safe_form_text(
-                form_data.get("acquisition_cost")
-            ).strip()
-
-            if asset_name:
-                updates["asset_name"] = asset_name
-            if category_id:
-                updates["category_id"] = UUID(category_id)
             updates["serial_number"] = serial_number or None
             updates["location_id"] = UUID(location_id) if location_id else None
             updates["description"] = description or None
+            if status:
+                updates["status"] = AssetStatus(status)
+            updates["current_depreciation_schedule_id"] = (
+                UUID(depreciation_schedule_id) if depreciation_schedule_id else None
+            )
 
-            if acquisition_date:
-                updates["acquisition_date"] = datetime.strptime(
-                    acquisition_date, "%Y-%m-%d"
-                ).date()
-            if acquisition_cost:
-                updates["acquisition_cost"] = Decimal(acquisition_cost)
+            if is_pre_use_asset:
+                asset_number = _safe_form_text(form_data.get("asset_number")).strip()
+                asset_name = _safe_form_text(form_data.get("asset_name")).strip()
+                category_id = _safe_form_text(form_data.get("category_id")).strip()
+                acquisition_date = _safe_form_text(
+                    form_data.get("acquisition_date")
+                ).strip()
+                acquisition_cost = _safe_form_text(
+                    form_data.get("acquisition_cost")
+                ).strip()
+                currency_code = _safe_form_text(form_data.get("currency_code")).strip()
+
+                if asset_number:
+                    updates["asset_number"] = asset_number
+                if asset_name:
+                    updates["asset_name"] = asset_name
+                if category_id:
+                    updates["category_id"] = UUID(category_id)
+                if acquisition_date:
+                    updates["acquisition_date"] = datetime.strptime(
+                        acquisition_date, "%Y-%m-%d"
+                    ).date()
+                if acquisition_cost:
+                    updates["acquisition_cost"] = Decimal(acquisition_cost)
+                if currency_code:
+                    updates["currency_code"] = currency_code
 
             asset_service.update_asset(
                 db,
-                coerce_uuid(auth.organization_id),
-                coerce_uuid(asset_id),
+                org_id,
+                ast_id,
                 updates,
             )
             db.commit()
+            logger.info(
+                "Asset edit committed: asset_id=%s updated_fields=%s status=%s",
+                asset_id,
+                sorted(updates.keys()),
+                asset.status.value if asset.status else None,
+            )
 
             return RedirectResponse(
                 url=f"/fixed-assets/assets/{asset_id}?success=Asset+updated",
@@ -1516,6 +1589,11 @@ class FixedAssetWebService:
             )
         except Exception as e:
             db.rollback()
+            logger.warning(
+                "Asset edit failed: asset_id=%s error=%s",
+                asset_id,
+                str(e),
+            )
             return RedirectResponse(
                 url=f"/fixed-assets/assets/{asset_id}?error={str(e)}",
                 status_code=303,

@@ -231,6 +231,7 @@ def list_assets(
     category: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=10, le=200),
     db: Session = Depends(get_db),
 ):
     """Assets list page."""
@@ -243,6 +244,7 @@ def list_assets(
             category=category,
             status=status,
             page=page,
+            limit=limit,
         )
     )
     return templates.TemplateResponse(request, "fixed_assets/assets.html", context)
@@ -270,6 +272,7 @@ def create_asset(
     acquisition_date: str | None = Form(default=None),
     acquisition_cost: str | None = Form(default=None),
     currency_code: str | None = Form(default=None),
+    status: str | None = Form(default=None),
     description: str | None = Form(default=None),
     depreciation_schedule_id: str | None = Form(default=None),
     db: Session = Depends(get_db),
@@ -286,6 +289,7 @@ def create_asset(
         acquisition_date,
         acquisition_cost,
         currency_code,
+        status,
         description,
         depreciation_schedule_id,
         db,

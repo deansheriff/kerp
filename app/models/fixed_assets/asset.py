@@ -29,12 +29,13 @@ from app.models.mixins import ERPNextSyncMixin
 
 
 class AssetStatus(str, enum.Enum):
-    DRAFT = "DRAFT"
-    ACTIVE = "ACTIVE"
+    NOT_IN_USE = "NOT_IN_USE"
+    IN_USE = "IN_USE"
+    IN_STORE = "IN_STORE"
+    FAULTY = "FAULTY"
+    UNDER_REPAIR = "UNDER_REPAIR"
     FULLY_DEPRECIATED = "FULLY_DEPRECIATED"
-    DISPOSED = "DISPOSED"
-    IMPAIRED = "IMPAIRED"
-    UNDER_CONSTRUCTION = "UNDER_CONSTRUCTION"
+    RETIRED = "RETIRED"
 
 
 class Asset(Base, ERPNextSyncMixin):
@@ -147,7 +148,7 @@ class Asset(Base, ERPNextSyncMixin):
     status: Mapped[AssetStatus] = mapped_column(
         Enum(AssetStatus, name="asset_status"),
         nullable=False,
-        default=AssetStatus.DRAFT,
+        default=AssetStatus.NOT_IN_USE,
     )
 
     current_depreciation_schedule_id: Mapped[uuid.UUID | None] = mapped_column(
