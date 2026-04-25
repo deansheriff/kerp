@@ -25,7 +25,6 @@ from starlette.datastructures import UploadFile
 
 from app.models.people.attendance import Attendance, AttendanceStatus
 from app.models.people.exp import (
-    ExpenseClaim,
     ExpenseClaimStatus,
 )
 from app.models.people.hr.employee import Employee, EmployeeStatus
@@ -2388,51 +2387,18 @@ class SelfServiceWebService:
         total_pages = (total + pagination.limit - 1) // pagination.limit if total else 1
 
         weekly_balance = None
-        approver = db.get(Employee, approver_employee_id)
-        if approver is not None:
-            limit_svc = ExpenseLimitService(db)
-            budget_info = limit_svc._get_approver_weekly_budget(org_id, approver)
-            if budget_info is not None:
-                budget_amount, limit_id = budget_info
-                now = datetime.now(UTC).date()
-                latest_reset = limit_svc.get_latest_weekly_reset(
-                    org_id,
-                    approver_id=approver_employee_id,
-                    approver_limit_id=limit_id,
-                    from_datetime=None,
-                )
-                usage_query = (
-                    select(
-                        func.coalesce(
-                            func.sum(ExpenseClaim.net_payable_amount), Decimal("0")
-                        )
-                    )
-                    .select_from(ExpenseClaim)
-                    .where(
-                        ExpenseClaim.organization_id == org_id,
-                        ExpenseClaim.status == ExpenseClaimStatus.PAID,
-                        ExpenseClaim.paid_on.isnot(None),
-                        ExpenseClaim.paid_on <= now,
-                        ExpenseClaim.approver_id == approver_employee_id,
-                    )
-                )
-                if latest_reset is not None:
-                    usage_query = usage_query.where(
-                        ExpenseClaim.paid_on >= latest_reset.reset_at.date()
-                    )
-
-                used_amount = db.scalar(usage_query) or Decimal("0")
-                weekly_balance = {
-                    "usage_label": (
-                        f"Since manual reset on {latest_reset.reset_at.date().isoformat()}"
-                        if latest_reset
-                        else "Since budget tracking began; manual reset required"
-                    ),
-                    "budget": budget_amount,
-                    "used": used_amount,
-                    "remaining": budget_amount - used_amount,
-                    "last_reset_at": latest_reset.reset_at if latest_reset else None,
-                }
+        budget_balance = ExpenseLimitService(db).get_approver_weekly_budget_balance(
+            org_id,
+            approver_employee_id,
+        )
+        if budget_balance is not None:
+            weekly_balance = {
+                "usage_label": budget_balance.usage_label,
+                "budget": budget_balance.budget,
+                "used": budget_balance.used,
+                "remaining": budget_balance.remaining,
+                "last_reset_at": budget_balance.last_reset_at,
+            }
 
         context = base_context(
             request, auth, "My Approvals", "self-my-approvals", db=db

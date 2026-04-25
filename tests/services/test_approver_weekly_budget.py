@@ -103,6 +103,45 @@ class TestWeeklyBudgetCheck:
         assert "expense_claim.paid_on" in sql
         assert "expense_claim_action" not in sql
 
+    def test_weekly_balance_reads_paid_claims_from_current_window(
+        self, org_id, approver_id
+    ):
+        db = MagicMock()
+        db.get.return_value = _make_employee(approver_id)
+        captured = {}
+
+        def _scalar(query):
+            captured["query"] = query
+            return Decimal("150000")
+
+        db.scalar.side_effect = _scalar
+
+        svc = ExpenseLimitService(db)
+        limit_id = uuid4()
+        with (
+            patch.object(
+                svc,
+                "_get_approver_weekly_budget",
+                return_value=(Decimal("500000"), limit_id),
+            ),
+            patch.object(svc, "get_latest_weekly_reset", return_value=None),
+        ):
+            balance = svc.get_approver_weekly_budget_balance(
+                org_id,
+                approver_id,
+                as_of=datetime(2026, 2, 24, 12, 0, tzinfo=UTC),
+            )
+
+        assert balance is not None
+        assert balance.used == Decimal("150000")
+        assert balance.remaining == Decimal("350000")
+        assert balance.usage_label == "This week starting 2026-02-23"
+        sql = str(captured["query"].compile(compile_kwargs={"literal_binds": True}))
+        assert "'PAID'" in sql
+        assert "expense_claim.status" in sql
+        assert "expense_claim.paid_on >= " in sql
+        assert "expense_claim_action" not in sql
+
     def test_no_manual_reset_uses_current_week_window(self, org_id, approver_id):
         db = MagicMock()
         db.get.return_value = _make_employee(approver_id)

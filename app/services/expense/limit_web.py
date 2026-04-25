@@ -52,6 +52,16 @@ def _safe_form_text(value: object | None, default: str = "") -> str:
 class ExpenseLimitWebService:
     """Service layer for expense limit web routes."""
 
+    def limits_index_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+    ) -> HTMLResponse:
+        """Show expense limit categories."""
+        context = base_context(request, auth, "Expense Limit", "limits", db=db)
+        return templates.TemplateResponse(request, "expense/limits/list.html", context)
+
     @staticmethod
     def _get_approver_scope_id(form, scope_type: str) -> str:
         """Resolve approver scope target from employee typeahead or scoped select."""

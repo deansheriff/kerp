@@ -2,24 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from datetime import date as date_type
 from decimal import Decimal
 
-try:
-    from datetime import UTC  # type: ignore
-except ImportError:  # pragma: no cover
-    UTC = timezone.utc
-
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from app.models.expense import (
-    ExpenseClaim,
-)
-from app.models.expense.expense_claim import ExpenseClaimStatus
-from app.models.people.hr.employee import Employee
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.expense.expense_service import ExpenseService, ExpenseServiceError
@@ -503,50 +492,18 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
 
         weekly_balance = None
         if approver_id:
-            approver = db.get(Employee, approver_id)
-            if approver is not None:
-                budget_info = limit_svc._get_approver_weekly_budget(org_id, approver)
-                if budget_info is not None:
-                    budget_amount, limit_id = budget_info
-                    now = datetime.now(UTC).date()
-                    window_start, latest_reset = limit_svc._get_weekly_budget_window(
-                        org_id,
-                        approver_id,
-                        limit_id,
-                        as_of=datetime.now(UTC),
-                    )
-                    usage_query = (
-                        select(
-                            func.coalesce(
-                                func.sum(ExpenseClaim.net_payable_amount),
-                                Decimal("0"),
-                            )
-                        )
-                        .select_from(ExpenseClaim)
-                        .where(
-                            ExpenseClaim.organization_id == org_id,
-                            ExpenseClaim.status == ExpenseClaimStatus.PAID,
-                            ExpenseClaim.approver_id == approver_id,
-                            ExpenseClaim.paid_on.isnot(None),
-                            ExpenseClaim.paid_on >= window_start.date(),
-                            ExpenseClaim.paid_on <= now,
-                        )
-                    )
-
-                    used_amount = db.scalar(usage_query) or Decimal("0")
-                    weekly_balance = {
-                        "usage_label": (
-                            f"Since manual reset on {latest_reset.reset_at.date().isoformat()}"
-                            if latest_reset
-                            else f"This week starting {window_start.date().isoformat()}"
-                        ),
-                        "budget": budget_amount,
-                        "used": used_amount,
-                        "remaining": budget_amount - used_amount,
-                        "last_reset_at": latest_reset.reset_at
-                        if latest_reset
-                        else None,
-                    }
+            budget_balance = limit_svc.get_approver_weekly_budget_balance(
+                org_id,
+                approver_id,
+            )
+            if budget_balance is not None:
+                weekly_balance = {
+                    "usage_label": budget_balance.usage_label,
+                    "budget": budget_balance.budget,
+                    "used": budget_balance.used,
+                    "remaining": budget_balance.remaining,
+                    "last_reset_at": budget_balance.last_reset_at,
+                }
 
         context = base_context(
             request, auth, "My Approvals Report", "reports-my-approvals"
