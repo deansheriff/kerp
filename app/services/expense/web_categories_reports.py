@@ -2,24 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from datetime import date as date_type
 from decimal import Decimal
 
-try:
-    from datetime import UTC  # type: ignore
-except ImportError:  # pragma: no cover
-    UTC = timezone.utc
-
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from app.models.expense import (
-    ExpenseClaim,
-)
-from app.models.expense.expense_claim import ExpenseClaimStatus
-from app.models.people.hr.employee import Employee
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.expense.expense_service import ExpenseService, ExpenseServiceError
@@ -30,51 +19,26 @@ from app.web.deps import base_context
 
 
 class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
-    # Accounts excluded from expense category dropdowns — not valid for
-    # employee expense claims / reimbursements.
-    _SYSTEM_EXPENSE_CODES: frozenset[str] = frozenset(
-        {
-            # COS — procurement / AP invoices
-            "5000",
-            "5010",
-            "5011",
-            "5012",
-            "5013",
-            "5014",
-            "5020",
-            "5030",
-            # Payroll / statutory
-            "6000",
-            "6001",
-            "6002",
-            "6039",
-            "6040",
-            "6041",
-            "6101",
-            # AP invoice items
-            "6010",
-            "6021",
-            "6030",
-            "6038",
-            "6060",
-            "6061",
-            "6070",
-            "6071",
-            "6080",
-            "6090",
-            # System / accounting
-            "6031",
-            "6034",
-            "6035",
-            "6036",
-            "6062",
-            "6091",
-            "6092",
-            "6094",
-            "6095",
-            "6100",
-        }
-    )
+    @staticmethod
+    def _load_allowed_expense_accounts(db, org_id):
+        """Load GL expense accounts filtered by admin-configured allowed list."""
+        from app.models.finance.gl.account import Account
+        from app.models.finance.gl.account_category import AccountCategory, IFRSCategory
+
+        allowed_ids = ExpenseWebCommonMixin.get_allowed_expense_account_ids(db, org_id)
+        stmt = (
+            select(Account)
+            .join(AccountCategory, Account.category_id == AccountCategory.category_id)
+            .where(
+                Account.organization_id == org_id,
+                AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
+                Account.is_active.is_(True),
+                AccountCategory.is_active.is_(True),
+            )
+        )
+        if allowed_ids is not None:
+            stmt = stmt.where(Account.account_id.in_(allowed_ids))
+        return list(db.scalars(stmt.order_by(Account.account_code)).all())
 
     @staticmethod
     def _safe_iso_date(value: str | None) -> date_type | None:
@@ -133,24 +97,10 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
 
     @staticmethod
     def new_category_form_response(request: Request, auth, db) -> HTMLResponse:
-        from app.models.finance.gl.account import Account
-        from app.models.finance.gl.account_category import AccountCategory, IFRSCategory
-
         org_id = coerce_uuid(auth.organization_id)
-        expense_accounts = db.scalars(
-            select(Account)
-            .join(AccountCategory, Account.category_id == AccountCategory.category_id)
-            .where(
-                Account.organization_id == org_id,
-                AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
-                Account.is_active.is_(True),
-                AccountCategory.is_active.is_(True),
-                Account.account_code.notin_(
-                    ExpenseCategoriesReportsWebMixin._SYSTEM_EXPENSE_CODES
-                ),
-            )
-            .order_by(Account.account_code)
-        ).all()
+        expense_accounts = (
+            ExpenseCategoriesReportsWebMixin._load_allowed_expense_accounts(db, org_id)
+        )
 
         context = base_context(request, auth, "New Expense Category", "categories")
         context.update(
@@ -162,8 +112,6 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
 
     @classmethod
     async def create_category_response(cls, request: Request, auth, db):
-        from app.models.finance.gl.account import Account
-        from app.models.finance.gl.account_category import AccountCategory, IFRSCategory
 
         form = getattr(request.state, "csrf_form", None) or await request.form()
         category_code = cls._form_str(form, "category_code")
@@ -196,22 +144,7 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
         svc = ExpenseService(db)
 
         if errors:
-            expense_accounts = db.scalars(
-                select(Account)
-                .join(
-                    AccountCategory, Account.category_id == AccountCategory.category_id
-                )
-                .where(
-                    Account.organization_id == org_id,
-                    AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
-                    Account.is_active.is_(True),
-                    AccountCategory.is_active.is_(True),
-                    Account.account_code.notin_(
-                        ExpenseCategoriesReportsWebMixin._SYSTEM_EXPENSE_CODES
-                    ),
-                )
-                .order_by(Account.account_code)
-            ).all()
+            expense_accounts = cls._load_allowed_expense_accounts(db, org_id)
             context = base_context(request, auth, "New Expense Category", "categories")
             context.update(
                 {
@@ -248,22 +181,7 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
             db.flush()
         except ExpenseServiceError as exc:
             db.rollback()
-            expense_accounts = db.scalars(
-                select(Account)
-                .join(
-                    AccountCategory, Account.category_id == AccountCategory.category_id
-                )
-                .where(
-                    Account.organization_id == org_id,
-                    AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
-                    Account.is_active.is_(True),
-                    AccountCategory.is_active.is_(True),
-                    Account.account_code.notin_(
-                        ExpenseCategoriesReportsWebMixin._SYSTEM_EXPENSE_CODES
-                    ),
-                )
-                .order_by(Account.account_code)
-            ).all()
+            expense_accounts = cls._load_allowed_expense_accounts(db, org_id)
             context = base_context(request, auth, "New Expense Category", "categories")
             context.update(
                 {
@@ -292,26 +210,13 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
     def edit_category_form_response(
         request: Request, auth, db, category_id: str
     ) -> HTMLResponse:
-        from app.models.finance.gl.account import Account
-        from app.models.finance.gl.account_category import AccountCategory, IFRSCategory
 
         org_id = coerce_uuid(auth.organization_id)
         svc = ExpenseService(db)
         category = svc.get_category(org_id, coerce_uuid(category_id))
-        expense_accounts = db.scalars(
-            select(Account)
-            .join(AccountCategory, Account.category_id == AccountCategory.category_id)
-            .where(
-                Account.organization_id == org_id,
-                AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
-                Account.is_active.is_(True),
-                AccountCategory.is_active.is_(True),
-                Account.account_code.notin_(
-                    ExpenseCategoriesReportsWebMixin._SYSTEM_EXPENSE_CODES
-                ),
-            )
-            .order_by(Account.account_code)
-        ).all()
+        expense_accounts = (
+            ExpenseCategoriesReportsWebMixin._load_allowed_expense_accounts(db, org_id)
+        )
 
         context = base_context(request, auth, "Edit Expense Category", "categories")
         context.update(
@@ -325,8 +230,6 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
     async def update_category_response(
         cls, request: Request, auth, db, category_id: str
     ):
-        from app.models.finance.gl.account import Account
-        from app.models.finance.gl.account_category import AccountCategory, IFRSCategory
 
         form = getattr(request.state, "csrf_form", None) or await request.form()
         category_code = cls._form_str(form, "category_code")
@@ -357,22 +260,7 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
         org_id = coerce_uuid(auth.organization_id)
         svc = ExpenseService(db)
         if errors:
-            expense_accounts = db.scalars(
-                select(Account)
-                .join(
-                    AccountCategory, Account.category_id == AccountCategory.category_id
-                )
-                .where(
-                    Account.organization_id == org_id,
-                    AccountCategory.ifrs_category == IFRSCategory.EXPENSES,
-                    Account.is_active.is_(True),
-                    AccountCategory.is_active.is_(True),
-                    Account.account_code.notin_(
-                        ExpenseCategoriesReportsWebMixin._SYSTEM_EXPENSE_CODES
-                    ),
-                )
-                .order_by(Account.account_code)
-            ).all()
+            expense_accounts = cls._load_allowed_expense_accounts(db, org_id)
             context = base_context(request, auth, "Edit Expense Category", "categories")
             context.update(
                 {
@@ -604,50 +492,18 @@ class ExpenseCategoriesReportsWebMixin(ExpenseWebCommonMixin):
 
         weekly_balance = None
         if approver_id:
-            approver = db.get(Employee, approver_id)
-            if approver is not None:
-                budget_info = limit_svc._get_approver_weekly_budget(org_id, approver)
-                if budget_info is not None:
-                    budget_amount, limit_id = budget_info
-                    now = datetime.now(UTC).date()
-                    window_start, latest_reset = limit_svc._get_weekly_budget_window(
-                        org_id,
-                        approver_id,
-                        limit_id,
-                        as_of=datetime.now(UTC),
-                    )
-                    usage_query = (
-                        select(
-                            func.coalesce(
-                                func.sum(ExpenseClaim.net_payable_amount),
-                                Decimal("0"),
-                            )
-                        )
-                        .select_from(ExpenseClaim)
-                        .where(
-                            ExpenseClaim.organization_id == org_id,
-                            ExpenseClaim.status == ExpenseClaimStatus.PAID,
-                            ExpenseClaim.approver_id == approver_id,
-                            ExpenseClaim.paid_on.isnot(None),
-                            ExpenseClaim.paid_on >= window_start.date(),
-                            ExpenseClaim.paid_on <= now,
-                        )
-                    )
-
-                    used_amount = db.scalar(usage_query) or Decimal("0")
-                    weekly_balance = {
-                        "usage_label": (
-                            f"Since manual reset on {latest_reset.reset_at.date().isoformat()}"
-                            if latest_reset
-                            else f"This week starting {window_start.date().isoformat()}"
-                        ),
-                        "budget": budget_amount,
-                        "used": used_amount,
-                        "remaining": budget_amount - used_amount,
-                        "last_reset_at": latest_reset.reset_at
-                        if latest_reset
-                        else None,
-                    }
+            budget_balance = limit_svc.get_approver_weekly_budget_balance(
+                org_id,
+                approver_id,
+            )
+            if budget_balance is not None:
+                weekly_balance = {
+                    "usage_label": budget_balance.usage_label,
+                    "budget": budget_balance.budget,
+                    "used": budget_balance.used,
+                    "remaining": budget_balance.remaining,
+                    "last_reset_at": budget_balance.last_reset_at,
+                }
 
         context = base_context(
             request, auth, "My Approvals Report", "reports-my-approvals"

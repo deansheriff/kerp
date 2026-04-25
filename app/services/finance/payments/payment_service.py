@@ -630,6 +630,110 @@ class PaymentService:
             return None
         return intent
 
+    def reset_expense_payment_intent(
+        self,
+        expense_claim_id: UUID,
+        reason: str | None = None,
+        force: bool = False,
+    ) -> PaymentIntent:
+        """Reset a stale expense payment intent so it can be retried.
+
+        This method is intended for manual recovery when a claim is still
+        APPROVED but payout initiation could not complete. It marks the latest
+        non-completed outbound expense intent as ABANDONED.
+        """
+        from app.models.expense.expense_claim import ExpenseClaim, ExpenseClaimStatus
+
+        claim_id = coerce_uuid(expense_claim_id)
+
+        claim = self.db.get(ExpenseClaim, claim_id)
+        if not claim:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Expense claim {expense_claim_id} not found",
+            )
+        if claim.organization_id != self.organization_id:
+            raise HTTPException(status_code=404, detail="Expense claim not found")
+        if claim.status != ExpenseClaimStatus.APPROVED:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Can only reset payment intent for claims in APPROVED state. "
+                    f"Current status: {claim.status.value}"
+                ),
+            )
+
+        intent = self.db.scalar(
+            select(PaymentIntent)
+            .where(
+                PaymentIntent.direction == PaymentDirection.OUTBOUND,
+                PaymentIntent.source_type == "EXPENSE_CLAIM",
+                PaymentIntent.source_id == claim_id,
+            )
+            .order_by(PaymentIntent.created_at.desc())
+            .limit(1)
+        )
+
+        if not intent:
+            raise HTTPException(
+                status_code=404,
+                detail="No payment intent found for this expense claim",
+            )
+
+        if intent.status == PaymentIntentStatus.COMPLETED:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot reset a completed payout intent",
+            )
+
+        if intent.status == PaymentIntentStatus.REVERSED:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot reset a reversed payout intent",
+            )
+
+        if not force and intent.status not in {
+            PaymentIntentStatus.ABANDONED,
+            PaymentIntentStatus.FAILED,
+            PaymentIntentStatus.EXPIRED,
+        }:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Intent is not in a retryable state (ABANDONED/FAILED/EXPIRED). "
+                    "Use force=true only for active intents."
+                ),
+            )
+
+        if force and intent.status in {
+            PaymentIntentStatus.ABANDONED,
+            PaymentIntentStatus.FAILED,
+            PaymentIntentStatus.EXPIRED,
+        }:
+            # These can be safely retried once marked with a fresh intent.
+            intent.status = PaymentIntentStatus.ABANDONED
+        else:
+            # Force mode allows operators to abandon active/edge intents.
+            intent.status = PaymentIntentStatus.ABANDONED
+
+        intent.expires_at = datetime.now(UTC)
+        intent.gateway_response = {
+            **(intent.gateway_response or {}),
+            "manual_revert": True,
+            "revert_reason": reason or "manual_retry_request",
+            "reverted_at": datetime.now(UTC).isoformat(),
+        }
+        self.db.flush()
+
+        logger.info(
+            "Reset expense payment intent %s for claim %s (force=%s)",
+            intent.intent_id,
+            claim_id,
+            force,
+        )
+
+        return intent
+
     @staticmethod
     def _map_channel_to_method(channel: str) -> PaymentMethod:
         """Map Paystack channel to AR PaymentMethod."""

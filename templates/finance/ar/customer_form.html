@@ -135,9 +135,11 @@
     }
 
     .dark .form-input {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(15, 23, 42, 0.95);
         border-color: rgba(255, 255, 255, 0.1);
-        color: white;
+        color: rgba(241, 245, 249, 0.98);
+        -webkit-text-fill-color: rgba(241, 245, 249, 0.98);
+        caret-color: rgba(241, 245, 249, 0.98);
     }
 
     .dark .form-input:hover {
@@ -151,6 +153,27 @@
 
     .dark .form-input::placeholder {
         color: rgba(255, 255, 255, 0.4);
+    }
+
+    .dark select.form-input {
+        background-color: rgba(15, 23, 42, 0.95);
+        color: rgba(241, 245, 249, 0.98);
+        -webkit-text-fill-color: rgba(241, 245, 249, 0.98);
+        color-scheme: dark;
+    }
+
+    .dark select.form-input option,
+    .dark select.form-input optgroup {
+        background-color: #0f172a;
+        color: rgba(241, 245, 249, 0.98);
+    }
+
+    .dark .form-input:-webkit-autofill,
+    .dark .form-input:-webkit-autofill:hover,
+    .dark .form-input:-webkit-autofill:focus {
+        -webkit-text-fill-color: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 0 0px 1000px rgba(15, 23, 42, 0.95) inset;
+        transition: background-color 9999s ease-in-out 0s;
     }
 
     /* Input with prefix */
@@ -560,7 +583,6 @@
                                value="{{ customer.credit_limit if customer else '' }}"
                                min="0"
                                step="0.01"
-                               placeholder="0.00"
                                class="form-input has-prefix">
                     </div>
                     <p class="form-help">Maximum outstanding balance allowed</p>

@@ -30,6 +30,11 @@
             <p class="text-sm font-medium text-rose-700 dark:text-rose-300">Payment could not be initiated</p>
             <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ error }}</p>
         </div>
+        {% elif success %}
+        <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/20">
+            <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Payment intent reset</p>
+            <p class="mt-1 text-xs text-emerald-600 dark:text-emerald-400">{{ success }}</p>
+        </div>
         {% endif %}
 
         <!-- Expense Claim Summary -->

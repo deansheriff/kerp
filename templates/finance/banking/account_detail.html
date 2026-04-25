@@ -156,7 +156,39 @@
 
     <!-- Mono Connect Integration -->
     {% if mono_enabled %}
-    <div class="card p-6" x-data='{ syncing: false, refreshing: false, linkingMono: false }'>
+    <div class="card p-6" x-data='{
+        syncing: false,
+        refreshing: false,
+        linkingMono: false,
+        async syncMono(accountId) {
+            this.syncing = true;
+            const pageUrl = location.href;
+            try {
+                const r = await fetch(`/api/v1/banking/accounts/${accountId}/sync-mono`, { method: "POST", credentials: "same-origin" });
+                const data = await r.json();
+                const state = (data.data && data.data.ingestion_state) || (data.status === "success" ? "completed" : "failed");
+                const message = data.message || data.detail || "Sync complete";
+                if (state === "pending") {
+                    // Mono is scraping the bank. Webhook will land lines in ~30s.
+                    // Reload only if the user is still on this page when it arrives.
+                    window.showToast(message, "info");
+                    setTimeout(() => { if (location.href === pageUrl) location.reload(); }, 45000);
+                } else if (state === "current") {
+                    // Bank genuinely has nothing new — no reload would change anything.
+                    window.showToast(message, "success");
+                } else if (state === "completed") {
+                    window.showToast(message, "success");
+                    setTimeout(() => { if (location.href === pageUrl) location.reload(); }, 1500);
+                } else {
+                    window.showToast(message, "error");
+                }
+            } catch (e) {
+                window.showToast("Sync failed", "error");
+            } finally {
+                this.syncing = false;
+            }
+        }
+    }'>
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
                 {{ icon_svg("building", "h-5 w-5 text-blue-600 dark:text-blue-400") }}
@@ -219,7 +251,7 @@
         {% endif %}
         <div class="flex items-center gap-3">
             <button
-                @click="syncing = true; fetch('/api/v1/banking/accounts/{{ account.bank_account_id }}/sync-mono', { method: 'POST', credentials: 'same-origin' }).then(r => r.json()).then(data => { syncing = false; window.showToast(data.message || data.detail || 'Sync complete', data.status === 'success' ? 'success' : 'error'); if(data.status === 'success') setTimeout(() => location.reload(), 1500); }).catch(() => { syncing = false; window.showToast('Sync failed', 'error'); })"
+                @click="syncMono('{{ account.bank_account_id }}')"
                 :disabled="syncing"
                 class="btn btn-secondary btn-sm">
                 <template x-if="!syncing">

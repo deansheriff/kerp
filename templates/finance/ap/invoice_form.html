@@ -989,6 +989,7 @@ function invoiceForm() {
     const selectedPO = {{ selected_po | tojson | safe if selected_po else 'null' }};
     const poLines = {{ po_lines | tojson | safe if po_lines else '[]' }};
     const items = {{ items_list | tojson | safe if items_list else '[]' }};
+    const duplicateSource = {{ duplicate_source | tojson | safe if duplicate_source else 'null' }};
 
     return {
         items,
@@ -1039,26 +1040,23 @@ function invoiceForm() {
                 {% endfor %}
             ];
             {% elif not invoice %}
-            {% if duplicate_source and duplicate_source.lines %}
             // Pre-populate from duplicated invoice
-            this.form.currency_code = '{{ duplicate_source.currency_code }}';
-            this.form.exchange_rate = '{{ duplicate_source.exchange_rate }}';
-            this.form.purpose = '{{ duplicate_source.purpose if duplicate_source.purpose else "" }}';
-            this.form.lines = [
-                {% for line in duplicate_source.lines %}
-                {
-                    item_id: '{{ line.item_id or "" }}',
-                    expense_account_id: '{{ line.expense_account_id }}',
-                    description: '{{ line.description }}',
-                    quantity: {{ line.quantity }},
-                    unit_price: {{ line.unit_price }},
-                    amount: {{ line.quantity * line.unit_price }},
-                    tax_code_id: '{{ line.tax_code_id }}',
-                    tax_amount: {{ line.tax_amount or 0 }}
-                },
-                {% endfor %}
-            ];
-            {% endif %}
+            if (duplicateSource && Array.isArray(duplicateSource.lines) && duplicateSource.lines.length > 0) {
+                this.form.invoice_number = duplicateSource.supplier_invoice_number || '';
+                this.form.currency_code = duplicateSource.currency_code || this.form.currency_code;
+                this.form.exchange_rate = duplicateSource.exchange_rate || this.form.exchange_rate;
+                this.form.purpose = duplicateSource.purpose || '';
+                this.form.lines = duplicateSource.lines.map((line) => ({
+                    item_id: line.item_id || '',
+                    expense_account_id: line.expense_account_id || '',
+                    description: line.description || '',
+                    quantity: line.quantity,
+                    unit_price: line.unit_price,
+                    amount: (line.quantity || 0) * (line.unit_price || 0),
+                    tax_code_id: line.tax_code_id || '',
+                    tax_amount: line.tax_amount || 0,
+                }));
+            }
             // Pre-populate lines from PO if available
             if (poLines && poLines.length > 0) {
                 this.form.lines = poLines.map(line => ({

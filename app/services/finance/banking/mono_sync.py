@@ -39,6 +39,7 @@ from app.services.finance.banking.mono_client import (
     MonoAccountInfo,
     MonoClient,
     MonoConfig,
+    MonoDataRefreshResult,
     MonoError,
     MonoTransaction,
 )
@@ -89,7 +90,20 @@ def _month_bounds(value: date) -> tuple[date, date]:
 
 @dataclass
 class MonoSyncResult:
-    """Result of a Mono sync operation for one account."""
+    """Result of a Mono sync operation for one account.
+
+    ``ingestion_state`` distinguishes the four outcomes the UI needs to
+    render differently:
+
+    * ``"completed"`` — transactions landed synchronously in this call.
+      Reload the page to show them.
+    * ``"pending"``  — Mono was asked to re-pull from the bank; the
+      ``account_updated`` webhook will drive ingest shortly. The UI
+      should *not* reload immediately — there's nothing new yet.
+    * ``"current"``  — Mono confirms the bank has no new data. No
+      webhook is coming; nothing will change on reload.
+    * ``"failed"``   — the refresh job failed (usually reauth needed).
+    """
 
     success: bool
     bank_account_id: UUID | None = None
@@ -100,6 +114,7 @@ class MonoSyncResult:
     total_debits: Decimal = Decimal("0")
     message: str = ""
     errors: list[str] = field(default_factory=list)
+    ingestion_state: str = "completed"
 
 
 class MonoSyncService:
@@ -307,9 +322,11 @@ class MonoSyncService:
     ) -> dict:
         """Incremental Mono sync for a tenant-scoped bank account.
 
-        Stateful — picks the window from the account's own watermark, so
-        repeated calls are idempotent and missed runs self-heal on the next
-        invocation.
+        Leads with a ``trigger_data_refresh`` so "Sync Now" always means
+        "ask the bank for the latest" rather than "read Mono's possibly-
+        stale indexed cache." Transaction ingest defers to the
+        ``account_updated`` webhook on success; falls back to a direct
+        cache pull when Mono rate-limits the refresh.
         """
         account = self.db.get(BankAccount, bank_account_id)
         if not account or account.organization_id != organization_id:
@@ -318,7 +335,7 @@ class MonoSyncService:
         if not account.mono_account_id:
             raise ValueError("Bank account is not linked to Mono")
 
-        result = self.sync_account_incremental(account, user_id=user_id)
+        result = self.sync_account_via_refresh(account, user_id=user_id)
         if not result.success:
             details = "; ".join(result.errors) if result.errors else result.message
             raise RuntimeError(details)
@@ -327,6 +344,7 @@ class MonoSyncService:
             "status": "success",
             "message": result.message,
             "data": {
+                "ingestion_state": result.ingestion_state,
                 "transactions_synced": result.transactions_synced,
                 "duplicates_skipped": result.duplicates_skipped,
                 "total_credits": str(result.total_credits),
@@ -379,6 +397,7 @@ class MonoSyncService:
         if event == "mono.events.account_updated":
             meta = event_data.get("meta") or {}
             data_status = meta.get("data_status", "")
+            sync_status = (meta.get("sync_status") or "").upper()
             mono_account_id = _extract_mono_account_id(event_data)
             # retrieved_data is the actionable diagnostic — Mono lists what it
             # successfully fetched ("balance", "transactions", "identity").
@@ -396,7 +415,17 @@ class MonoSyncService:
                 retrieved_data,
                 meta.get("data_request_id"),
             )
-            if data_status == "AVAILABLE" and mono_account_id:
+            # sync_status=FAILED means Mono's upstream bank scrape failed
+            # even when data_status=AVAILABLE (Mono can still serve cached
+            # data from a prior successful scrape). Record the error before
+            # the AVAILABLE branch so the banner appears — and *don't* queue
+            # a sync, because the direct-pull path clears mono_last_sync_error
+            # on success and would race-wipe the banner we just set. Any
+            # undrained cache will be picked up by the next successful
+            # scrape's account_updated event.
+            if sync_status == "FAILED" and mono_account_id:
+                self._record_webhook_failure(mono_account_id, meta)
+            elif data_status == "AVAILABLE" and mono_account_id:
                 from app.tasks.finance import sync_mono_account
 
                 sync_mono_account.delay(mono_account_id)
@@ -658,6 +687,134 @@ class MonoSyncService:
             end_date,
             user_id=user_id,
         )
+
+    def sync_account_via_refresh(
+        self,
+        bank_account: BankAccount,
+        *,
+        user_id: UUID | None = None,
+    ) -> MonoSyncResult:
+        """Scheduled-path sync: ask Mono to re-pull from the upstream bank.
+
+        Mono's ``/v2/accounts/{id}/transactions`` endpoint serves Mono's
+        internal indexed cache — without a ``trigger_data_refresh`` call the
+        cache never advances and every scheduled run finds "nothing new"
+        even when the bank has new lines. This method fires the refresh
+        and lets the resulting ``account_updated`` webhook drive
+        transaction ingest via :meth:`sync_by_mono_account_id` (which
+        reuses the direct-pull path against the now-fresh cache).
+
+        Always refreshes ``last_statement_balance`` and
+        ``mono_last_synced_at`` from the authoritative
+        ``/v2/accounts/{id}`` response so the dashboard shows current
+        balance and freshness even while the webhook is pending.
+
+        Falls back to :meth:`sync_account_incremental` when Mono
+        rate-limits the refresh (one per 5 min per account) so cycles
+        don't silently skip ingest of lines already sitting in the cache.
+        """
+        if not bank_account.mono_account_id:
+            return MonoSyncResult(
+                success=False,
+                bank_account_id=bank_account.bank_account_id,
+                message="Bank account not linked to Mono",
+            )
+        mono_account_id = bank_account.mono_account_id
+
+        config = self._get_mono_config()
+        refresh: MonoDataRefreshResult | None = None
+        account_info: MonoAccountInfo | None = None
+        try:
+            with MonoClient(config) as client:
+                try:
+                    refresh = client.trigger_data_refresh(mono_account_id)
+                except MonoError as exc:
+                    logger.info(
+                        "Mono refresh unavailable for account %s (%s); "
+                        "falling back to direct pull",
+                        bank_account.bank_account_id,
+                        exc.message,
+                    )
+                    return self.sync_account_incremental(bank_account, user_id=user_id)
+                account_info = client.get_account_info(mono_account_id)
+        except MonoError as exc:
+            logger.error(
+                "Mono sync failed for account %s: %s",
+                bank_account.bank_account_id,
+                exc.message,
+            )
+            bank_account.mono_last_sync_error = exc.message
+            self.db.flush()
+            return MonoSyncResult(
+                success=False,
+                bank_account_id=bank_account.bank_account_id,
+                message=f"Mono API error: {exc.message}",
+                errors=[exc.message],
+            )
+
+        self._apply_account_info_watermarks(bank_account, account_info)
+
+        if refresh.job_status == "failed":
+            bank_account.mono_last_sync_error = (
+                "Mono reported a failed bank pull; account may need reauthorisation."
+            )
+            self.db.flush()
+            return MonoSyncResult(
+                success=False,
+                bank_account_id=bank_account.bank_account_id,
+                message=("Mono bank pull failed; account may need reauthorisation."),
+                errors=["mono refresh job failed"],
+                ingestion_state="failed",
+            )
+
+        # "processing"    → webhook arrives when scrape completes.
+        # "finished" + new → webhook follows with a freshly-indexed cache.
+        # "finished" + no  → nothing at the bank; no webhook; done.
+        # job_status None  → Mono didn't echo the header; treat as
+        #                    processing so the webhook path still wins
+        #                    if one arrives.
+        deferring_to_webhook = refresh.job_status in (
+            None,
+            "processing",
+        ) or (refresh.job_status == "finished" and refresh.has_new_data)
+
+        self.db.flush()
+        if deferring_to_webhook:
+            msg = (
+                "Bank is syncing. New transactions will appear shortly "
+                "(usually within 30 seconds)."
+            )
+            ingestion_state = "pending"
+        else:
+            msg = "Up to date. Mono reports no new transactions at the bank."
+            ingestion_state = "current"
+        return MonoSyncResult(
+            success=True,
+            bank_account_id=bank_account.bank_account_id,
+            transactions_synced=0,
+            message=msg,
+            ingestion_state=ingestion_state,
+        )
+
+    def _apply_account_info_watermarks(
+        self,
+        bank_account: BankAccount,
+        account_info: MonoAccountInfo,
+    ) -> None:
+        """Advance balance + freshness from ``/v2/accounts/{id}``.
+
+        Mirrors the forward-only ``as-of-today`` semantics used inside
+        :meth:`_sync_window` for zero-transaction responses so the
+        refresh-first path and the direct-pull path can never disagree
+        about where the watermark sits.
+        """
+        bank_account.last_statement_balance = account_info.balance_major
+        as_of_date = date.today()
+        existing = _as_date(bank_account.last_statement_date)
+        if existing is None or as_of_date > existing:
+            bank_account.last_statement_date = as_of_date
+        bank_account.mono_last_synced_at = datetime.now(UTC)
+        bank_account.mono_last_sync_error = None
 
     def _sync_window(
         self,
@@ -963,7 +1120,7 @@ class MonoSyncService:
             account_id = account.bank_account_id
             try:
                 with self.db.begin_nested():
-                    result = self.sync_account_incremental(account, user_id=user_id)
+                    result = self.sync_account_via_refresh(account, user_id=user_id)
                 results.append(result)
                 if commit_per_account:
                     self.db.commit()

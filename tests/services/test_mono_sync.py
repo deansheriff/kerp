@@ -15,9 +15,10 @@ from sqlalchemy.exc import IntegrityError
 from app.models.finance.banking import BankStatement, BankStatementLine
 from app.services.finance.banking.bank_account import BankAccountService
 from app.services.finance.banking.mono_client import (
-    MonoClient,
     MonoAccountInfo,
+    MonoClient,
     MonoConfig,
+    MonoDataRefreshResult,
     MonoError,
     MonoExchangeResult,
     MonoTransaction,
@@ -130,7 +131,7 @@ def test_sync_account_by_id_raises_joined_result_errors() -> None:
     with (
         patch.object(
             svc,
-            "sync_account_incremental",
+            "sync_account_via_refresh",
             return_value=MonoSyncResult(
                 success=False,
                 message="fallback",
@@ -656,6 +657,62 @@ def test_webhook_failed_status_records_error_on_linked_account() -> None:
     assert linked_account.mono_last_sync_error is not None
     assert "Mono data refresh failed" in linked_account.mono_last_sync_error
     assert "job-42" in linked_account.mono_last_sync_error
+    db.flush.assert_called()
+
+
+def test_webhook_sync_status_failed_with_data_status_available_records_error() -> None:
+    """When Mono reports ``sync_status=FAILED`` alongside ``data_status=AVAILABLE``,
+    the bank scrape failed but Mono is still serving cached data from a prior
+    successful scrape. Without this branch the handler sees ``AVAILABLE`` and
+    silently enqueues a sync that reads the stale cache, returns zero new,
+    and clears any previously recorded error — so the operator never sees
+    that reauthorisation is needed.
+
+    Exact shape observed for the UBA account on 2026-04-20: ``data_status=AVAILABLE
+    sync_status=FAILED retrieved_data=['balance','transactions']``.
+    """
+    db = MagicMock()
+    linked_account = _account(
+        mono_account_id="mono-uba-failed",
+        mono_last_sync_error=None,
+    )
+    db.scalar.return_value = linked_account
+    payload = {
+        "event": "mono.events.account_updated",
+        "data": {
+            "account": {"_id": "mono-uba-failed"},
+            "meta": {
+                "data_status": "AVAILABLE",
+                "sync_status": "FAILED",
+                "job_id": "job-uba-42",
+                "has_new_data": False,
+                "retrieved_data": ["balance", "transactions"],
+                "data_request_id": "REQ-UBA-42",
+            },
+        },
+    }
+
+    with (
+        patch(
+            "app.services.finance.banking.mono_sync.resolve_value",
+            return_value="webhook-secret",
+        ),
+        patch("app.services.finance.banking.mono_sync.MonoClient") as mono_client,
+        patch("app.tasks.finance.sync_mono_account.delay") as enqueue,
+    ):
+        mono_client.return_value.verify_webhook.return_value = True
+        result = MonoSyncService(db).process_webhook(
+            "webhook-secret",
+            json.dumps(payload).encode(),
+        )
+
+    assert result["status"] == "success"
+    # Critical: the sync must NOT be enqueued. A zero-transaction sync on
+    # the stale cache would wipe the error banner we just set.
+    enqueue.assert_not_called()
+    assert linked_account.mono_last_sync_error is not None
+    assert "Mono data refresh failed" in linked_account.mono_last_sync_error
+    assert "job-uba-42" in linked_account.mono_last_sync_error
     db.flush.assert_called()
 
 
@@ -1588,6 +1645,189 @@ def test_mono_error_sets_error_and_success_clears_it() -> None:
     assert account.mono_last_sync_error is None
 
 
+def _refresh_client(
+    *,
+    has_new_data: bool,
+    job_status: str | None,
+    balance: int = 500000,
+    refresh_error: MonoError | None = None,
+):
+    """MagicMock MonoClient set up for sync_account_via_refresh tests.
+
+    Stubs trigger_data_refresh + get_account_info but deliberately leaves
+    get_all_transactions unset — these tests assert the refresh-path
+    NEVER pulls transactions directly; that's the whole point.
+    """
+    client = MagicMock()
+    if refresh_error is not None:
+        client.trigger_data_refresh.side_effect = refresh_error
+    else:
+        client.trigger_data_refresh.return_value = MonoDataRefreshResult(
+            has_new_data=has_new_data,
+            job_id="job-123",
+            job_status=job_status,
+        )
+    client.get_account_info.return_value = MonoAccountInfo(
+        id="mono-account-1",
+        name="Operations",
+        account_number="1234567890",
+        currency="NGN",
+        balance=balance,
+    )
+    client_cm = MagicMock()
+    client_cm.__enter__.return_value = client
+    return client, client_cm
+
+
+def test_via_refresh_defers_to_webhook_on_processing() -> None:
+    """When Mono reports the bank pull is in progress, the scheduled
+    task must NOT pull transactions — the account_updated webhook will
+    arrive later with a fresh cache and drive ingest from there.
+    Balance + freshness still advance from the authoritative account
+    endpoint so the dashboard doesn't stall waiting for the webhook.
+    """
+    db = MagicMock()
+    svc = MonoSyncService(db)
+    account = _account()
+    client, client_cm = _refresh_client(
+        has_new_data=True,
+        job_status="processing",
+    )
+
+    with (
+        patch.object(
+            svc,
+            "_get_mono_config",
+            return_value=MonoConfig(secret_key="s", public_key="p"),
+        ),
+        patch(
+            "app.services.finance.banking.mono_sync.MonoClient",
+            return_value=client_cm,
+        ),
+    ):
+        result = svc.sync_account_via_refresh(account)
+
+    assert result.success is True
+    assert result.transactions_synced == 0
+    assert result.ingestion_state == "pending"
+    client.trigger_data_refresh.assert_called_once_with("mono-account-1")
+    client.get_all_transactions.assert_not_called()
+    assert account.last_statement_balance == Decimal("5000.00")
+    assert account.mono_last_synced_at is not None
+    assert account.mono_last_sync_error is None
+
+
+def test_via_refresh_finished_with_no_new_data_reports_up_to_date() -> None:
+    """``finished`` + ``has_new_data=false`` means the bank genuinely has
+    nothing new. No webhook is coming, so the sync must still advance
+    balance + freshness here and surface a clear "up to date" message.
+    """
+    db = MagicMock()
+    svc = MonoSyncService(db)
+    account = _account()
+    client, client_cm = _refresh_client(
+        has_new_data=False,
+        job_status="finished",
+    )
+
+    with (
+        patch.object(
+            svc,
+            "_get_mono_config",
+            return_value=MonoConfig(secret_key="s", public_key="p"),
+        ),
+        patch(
+            "app.services.finance.banking.mono_sync.MonoClient",
+            return_value=client_cm,
+        ),
+    ):
+        result = svc.sync_account_via_refresh(account)
+
+    assert result.success is True
+    assert result.ingestion_state == "current"
+    assert "up to date" in result.message.lower()
+    client.get_all_transactions.assert_not_called()
+    assert account.last_statement_balance == Decimal("5000.00")
+
+
+def test_via_refresh_failed_job_records_reauth_error() -> None:
+    """Mono's ``failed`` job_status usually means the linked bank
+    credentials need reauthorisation. Record the error but still
+    refresh the balance so users can see the last-known value while
+    they fix the link.
+    """
+    db = MagicMock()
+    svc = MonoSyncService(db)
+    account = _account()
+    client, client_cm = _refresh_client(
+        has_new_data=False,
+        job_status="failed",
+    )
+
+    with (
+        patch.object(
+            svc,
+            "_get_mono_config",
+            return_value=MonoConfig(secret_key="s", public_key="p"),
+        ),
+        patch(
+            "app.services.finance.banking.mono_sync.MonoClient",
+            return_value=client_cm,
+        ),
+    ):
+        result = svc.sync_account_via_refresh(account)
+
+    assert result.success is False
+    assert result.ingestion_state == "failed"
+    assert "reauthorisation" in (account.mono_last_sync_error or "").lower()
+    client.get_all_transactions.assert_not_called()
+    # Balance update happens *before* the failure short-circuit so
+    # operators still see the latest-known balance.
+    assert account.last_statement_balance == Decimal("5000.00")
+
+
+def test_via_refresh_falls_back_to_direct_pull_on_rate_limit() -> None:
+    """Mono caps refresh at 1/5min/account — a 429 must NOT drop the
+    cycle. Fall through to sync_account_incremental so any lines
+    already sitting in Mono's cache still get ingested.
+    """
+    db = MagicMock()
+    svc = MonoSyncService(db)
+    account = _account()
+    _client, client_cm = _refresh_client(
+        has_new_data=False,
+        job_status=None,
+        refresh_error=MonoError("rate limited", status_code=429),
+    )
+
+    with (
+        patch.object(
+            svc,
+            "_get_mono_config",
+            return_value=MonoConfig(secret_key="s", public_key="p"),
+        ),
+        patch(
+            "app.services.finance.banking.mono_sync.MonoClient",
+            return_value=client_cm,
+        ),
+        patch.object(
+            svc,
+            "sync_account_incremental",
+            return_value=MonoSyncResult(
+                success=True,
+                bank_account_id=account.bank_account_id,
+                transactions_synced=3,
+                message="fallback ran",
+            ),
+        ) as fallback,
+    ):
+        result = svc.sync_account_via_refresh(account)
+
+    fallback.assert_called_once_with(account, user_id=None)
+    assert result.transactions_synced == 3
+    assert result.message == "fallback ran"
+
+
 def test_sync_all_persists_uncaught_account_failure() -> None:
     db = MagicMock()
     svc = MonoSyncService(db)
@@ -1595,7 +1835,7 @@ def test_sync_all_persists_uncaught_account_failure() -> None:
 
     with (
         patch.object(svc, "get_linked_accounts", return_value=[account]),
-        patch.object(svc, "sync_account_incremental", side_effect=KeyError("boom")),
+        patch.object(svc, "sync_account_via_refresh", side_effect=KeyError("boom")),
         patch.object(svc, "_record_account_sync_error") as record_error,
     ):
         result = svc.sync_all_linked_accounts(commit_per_account=True)

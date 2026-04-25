@@ -316,7 +316,7 @@ class TestGetCeleryConfig:
         assert "broker_url" in config
         assert "result_backend" in config
         assert "timezone" in config
-        assert config["timezone"] == "UTC"
+        assert config["timezone"] == "Africa/Lagos"
         mock_session.close.assert_called_once()
 
     @patch("app.services.scheduler_config.SessionLocal")

@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from app.models.people.hr.employee import Employee
 
-__all__ = ["ExpenseLimitService"]
+__all__ = ["ApproverWeeklyBudgetBalance", "ExpenseLimitService"]
 
 
 # =============================================================================
@@ -142,6 +142,18 @@ class EligibleApprover:
     max_approval_amount: Decimal
     is_direct_manager: bool = False
     grade_rank: int | None = None
+
+
+@dataclass
+class ApproverWeeklyBudgetBalance:
+    """Current weekly budget usage for an expense approver."""
+
+    usage_label: str
+    budget: Decimal
+    used: Decimal
+    remaining: Decimal
+    window_start: datetime
+    last_reset_at: datetime | None = None
 
 
 # =============================================================================
@@ -1327,7 +1339,7 @@ class ExpenseLimitService(ExpenseServiceBase):
         )
 
         usage_query = select(
-            func.coalesce(func.sum(ExpenseClaim.total_approved_amount), Decimal("0"))
+            func.coalesce(func.sum(ExpenseClaim.net_payable_amount), Decimal("0"))
         ).where(
             ExpenseClaim.organization_id == org_id,
             ExpenseClaim.approver_id == approver_id,
@@ -1352,6 +1364,60 @@ class ExpenseLimitService(ExpenseServiceBase):
                 claim_amount=claim_amount,
                 period_label=period_label,
             )
+
+    def get_approver_weekly_budget_balance(
+        self,
+        org_id: UUID,
+        approver_id: UUID,
+        *,
+        as_of: datetime | None = None,
+    ) -> ApproverWeeklyBudgetBalance | None:
+        """Return the approver's weekly budget usage based on paid claims only."""
+        from app.models.people.hr.employee import Employee
+
+        approver = self.db.get(Employee, approver_id)
+        if not approver:
+            return None
+
+        budget_info = self._get_approver_weekly_budget(org_id, approver)
+        if budget_info is None:
+            return None
+
+        budget, limit_id = budget_info
+        as_of_dt = as_of.astimezone(UTC) if as_of else datetime.now(UTC)
+        window_start, latest_reset = self._get_weekly_budget_window(
+            org_id,
+            approver_id,
+            limit_id,
+            as_of=as_of_dt,
+        )
+
+        usage_query = select(
+            func.coalesce(func.sum(ExpenseClaim.net_payable_amount), Decimal("0"))
+        ).where(
+            ExpenseClaim.organization_id == org_id,
+            ExpenseClaim.approver_id == approver_id,
+            ExpenseClaim.status == ExpenseClaimStatus.PAID,
+            ExpenseClaim.paid_on.isnot(None),
+            ExpenseClaim.paid_on >= window_start.date(),
+            ExpenseClaim.paid_on <= as_of_dt.date(),
+        )
+
+        used = self.db.scalar(usage_query) or Decimal("0")
+        usage_label = (
+            f"Since manual reset on {latest_reset.reset_at.date().isoformat()}"
+            if latest_reset is not None
+            else f"This week starting {window_start.date().isoformat()}"
+        )
+
+        return ApproverWeeklyBudgetBalance(
+            usage_label=usage_label,
+            budget=budget,
+            used=used,
+            remaining=budget - used,
+            window_start=window_start,
+            last_reset_at=latest_reset.reset_at if latest_reset else None,
+        )
 
     def _get_weekly_budget_window(
         self,
