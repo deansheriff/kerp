@@ -18,7 +18,8 @@ except ImportError:  # pragma: no cover
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.finance.gl.journal_entry import JournalEntry
+from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
+from app.services.common import coerce_uuid
 from app.services.finance.gl.journal import JournalInput, JournalService
 from app.services.finance.gl.ledger_posting import LedgerPostingService, PostingRequest
 
@@ -124,6 +125,9 @@ class BasePostingAdapter:
             )
 
             if not posting_result.success:
+                BasePostingAdapter._revert_unposted_journal(
+                    db, journal_entry_id, posting_result.message
+                )
                 return PostingResult(
                     success=False,
                     journal_entry_id=journal_entry_id,
@@ -137,8 +141,44 @@ class BasePostingAdapter:
                 message=success_message,
             )
         except Exception as exc:
+            BasePostingAdapter._revert_unposted_journal(db, journal_entry_id, str(exc))
             return PostingResult(
                 success=False,
                 journal_entry_id=journal_entry_id,
                 message=f"{error_prefix}: {str(exc)}",
             )
+
+    @staticmethod
+    def _revert_unposted_journal(
+        db: Session,
+        journal_entry_id: UUID,
+        reason: str,
+    ) -> None:
+        """Revert an APPROVED-but-unposted journal back to DRAFT.
+
+        Invariant enforced: a journal in APPROVED status must either be
+        currently being posted or already point to a successful posting
+        batch. When LedgerPostingService rejects (e.g. the period is
+        closed), the approve-step that ran earlier must be undone so the
+        journal does not strand as APPROVED-but-not-posted.
+
+        Only reverts when status is APPROVED *and* posting_batch_id is
+        NULL — never touches a journal that did partially post.
+        """
+        journal = db.get(JournalEntry, coerce_uuid(journal_entry_id))
+        if (
+            journal is None
+            or journal.status != JournalStatus.APPROVED
+            or journal.posting_batch_id is not None
+        ):
+            return
+
+        journal.status = JournalStatus.DRAFT
+        journal.approved_by_user_id = None
+        journal.approved_at = None
+        db.flush()
+        logger.warning(
+            "Reverted journal %s APPROVED->DRAFT after posting failure: %s",
+            journal.journal_number,
+            reason,
+        )
