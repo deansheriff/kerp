@@ -1,0 +1,333 @@
+{% extends "finance/base_finance.html" %}
+{% from "components/macros.html" import empty_state, icon_svg %}
+
+{% block page_title %}Tax Control Tracker{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2">
+        <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/finance/tax" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Tax</a></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Control Tracker</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<a href="/finance/tax/returns" class="btn btn-secondary">
+    {{ icon_svg("document-text", "h-4 w-4") }}
+    Tax Returns
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="card p-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-white">VAT and WHT Control Tracker</h2>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    This page separates filing basis, deduction basis, GL control basis, and workflow evidence so the 2025 tax position can be reconciled without forcing everything through one weak source.
+                </p>
+            </div>
+            <form method="GET" class="flex items-end gap-3">
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Year</label>
+                    <select name="year" class="form-select min-w-[120px]">
+                        {% for option in available_years %}
+                        <option value="{{ option.value }}" {% if option.value == year %}selected{% endif %}>{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    {{ icon_svg("filter", "h-4 w-4") }}
+                    Apply
+                </button>
+            </form>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">{{ start_date }} to {{ end_date }}</span>
+            <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">Control view, not filing proof</span>
+        </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {% for item in source_map %}
+        <div class="card p-5">
+            <div class="text-sm font-semibold text-slate-900 dark:text-white">{{ item.title }}</div>
+            <div class="mt-2 text-sm text-teal-700 dark:text-teal-300">{{ item.source }}</div>
+            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">{{ item.use_for }}</p>
+            <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ item.caveat }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {% for metric in summary_metrics %}
+        <div class="card p-5">
+            <div class="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ metric.title }}</div>
+            <div class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ metric.value }}</div>
+            <div class="mt-2 text-xs font-medium text-teal-700 dark:text-teal-300">{{ metric.source }}</div>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ metric.note }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card p-5">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Evidence and Workflow Gaps</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The tracker is only as strong as its supporting evidence. These checks highlight where the ERP still needs external support or better source capture.</p>
+            </div>
+        </div>
+        <div class="mt-4 overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Check</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Detail</th>
+                        <th scope="col">Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in evidence_statuses %}
+                    <tr>
+                        <td class="font-medium text-slate-900 dark:text-white">{{ item.label }}</td>
+                        <td>
+                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ item.status_class }}">{{ item.status_label }}</span>
+                        </td>
+                        <td class="text-sm text-slate-600 dark:text-slate-300">{{ item.detail }}</td>
+                        <td class="text-sm text-slate-500 dark:text-slate-400">{{ item.source }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="py-12">
+                            {{ empty_state('No evidence checks available', 'The tracker did not return any control checks for this year.', 'document') }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card p-5">
+        <div>
+            <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Monthly VAT Bridge</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">AR and AP invoice totals provide the filing basis. `4031`, `2120`, and `1440` provide the control-basis bridge.</p>
+        </div>
+        <div class="mt-4 overflow-x-auto">
+            <table class="table min-w-[1100px]">
+                <thead>
+                    <tr>
+                        <th scope="col">Month</th>
+                        <th scope="col" class="text-right">AR Output VAT</th>
+                        <th scope="col" class="text-right">AP Input VAT</th>
+                        <th scope="col" class="text-right">Customer VAT Withheld</th>
+                        <th scope="col" class="text-right">GL VAT Payable</th>
+                        <th scope="col" class="text-right">GL Input VAT</th>
+                        <th scope="col" class="text-right">ERP Net VAT</th>
+                        <th scope="col" class="text-right">GL Net VAT</th>
+                        <th scope="col" class="text-right">Variance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in monthly_vat_rows %}
+                    <tr>
+                        <td class="font-medium text-slate-900 dark:text-white">{{ row.month_label }}</td>
+                        <td class="table-cell-amount">{{ row.ar_output_vat }}</td>
+                        <td class="table-cell-amount">{{ row.ap_input_vat }}</td>
+                        <td class="table-cell-amount">{{ row.customer_vat_withheld }}</td>
+                        <td class="table-cell-amount">{{ row.gl_vat_payable }}</td>
+                        <td class="table-cell-amount">{{ row.gl_input_vat }}</td>
+                        <td class="table-cell-amount">{{ row.erp_net_vat }}</td>
+                        <td class="table-cell-amount">{{ row.gl_net_vat }}</td>
+                        <td class="table-cell-amount {% if row.variance_raw == 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-amber-600 dark:text-amber-400{% endif %}">{{ row.variance }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="py-12">
+                            {{ empty_state('No VAT bridge rows available', 'There were no VAT rows for the selected year.', 'receipt') }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card p-5">
+        <div>
+            <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Monthly WHT Bridge</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Supplier-side WHT comes from AP invoices. Customer-side WHT deducted against you comes from `1420`, while `2110` remains the liability control account.</p>
+        </div>
+        <div class="mt-4 overflow-x-auto">
+            <table class="table min-w-[900px]">
+                <thead>
+                    <tr>
+                        <th scope="col">Month</th>
+                        <th scope="col" class="text-right">AP Supplier WHT</th>
+                        <th scope="col" class="text-right">Customer WHT Receivable</th>
+                        <th scope="col" class="text-right">GL WHT Liability</th>
+                        <th scope="col" class="text-right">Variance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in monthly_wht_rows %}
+                    <tr>
+                        <td class="font-medium text-slate-900 dark:text-white">{{ row.month_label }}</td>
+                        <td class="table-cell-amount">{{ row.ap_supplier_wht }}</td>
+                        <td class="table-cell-amount">{{ row.customer_wht_receivable }}</td>
+                        <td class="table-cell-amount">{{ row.gl_wht_liability }}</td>
+                        <td class="table-cell-amount {% if row.variance_raw == 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-amber-600 dark:text-amber-400{% endif %}">{{ row.variance }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="py-12">
+                            {{ empty_state('No WHT bridge rows available', 'There were no WHT rows for the selected year.', 'document') }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-2">
+        <div class="card p-5">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Top Customer Deductions Against Us</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Derived from AR-side posted ledger lines on `4031` and `1420`. Use this as the certificate chase list.</p>
+                </div>
+                <a href="/finance/tax/control-tracker/customer-deductions/export?year={{ year }}" class="btn btn-secondary">
+                    {{ icon_svg("document-text", "h-4 w-4") }}
+                    Export CSV
+                </a>
+            </div>
+            <div class="mt-4 overflow-x-auto">
+                <table class="table min-w-[720px]">
+                    <thead>
+                        <tr>
+                            <th scope="col">Customer</th>
+                            <th scope="col" class="text-right">VAT Withheld</th>
+                            <th scope="col" class="text-right">WHT Receivable</th>
+                            <th scope="col" class="text-right">Combined</th>
+                            <th scope="col" class="text-center">Receipts</th>
+                            <th scope="col" class="text-center">Certificates</th>
+                            <th scope="col">Coverage</th>
+                            <th scope="col">Tracker Update</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in top_customer_deductions %}
+                        <tr>
+                            <td>
+                                <a href="{{ row.customer_url }}" class="font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">
+                                    {{ row.customer_name }}
+                                </a>
+                            </td>
+                            <td class="table-cell-amount">{{ row.vat_withheld }}</td>
+                            <td class="table-cell-amount">{{ row.wht_receivable }}</td>
+                            <td class="table-cell-amount {% if row.combined_total_raw > 0 %}text-amber-600 dark:text-amber-400{% endif %}">{{ row.combined_total }}</td>
+                            <td class="text-center text-sm text-slate-600 dark:text-slate-300">{{ row.receipt_count }}</td>
+                            <td class="text-center text-sm text-slate-600 dark:text-slate-300">{{ row.certificate_count }}</td>
+                            <td><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ row.certificate_status_class }}">{{ row.certificate_status }}</span></td>
+                            <td>
+                                <form method="POST" action="/finance/tax/control-tracker/evidence" class="grid gap-2">
+                                    <input type="hidden" name="year" value="{{ year }}">
+                                    <input type="hidden" name="evidence_type" value="CUSTOMER_WHT_CERTIFICATE">
+                                    <input type="hidden" name="entity_type" value="CUSTOMER">
+                                    <input type="hidden" name="entity_id" value="{{ row.customer_id }}">
+                                    <select name="status" class="form-select text-sm">
+                                        {% for opt in evidence_status_options %}
+                                        <option value="{{ opt.value }}" {% if row.evidence_status == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <input type="text" name="reference" value="{{ row.evidence_reference }}" placeholder="Certificate reference" class="form-input text-sm">
+                                    <input type="text" name="notes" value="{{ row.evidence_notes }}" placeholder="Notes" class="form-input text-sm">
+                                    <button type="submit" class="btn btn-secondary btn-sm">Save</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="py-12">
+                                {{ empty_state('No customer deduction rows available', 'There were no customer-side VAT or WHT deduction rows for the selected year.', 'users') }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card p-5">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Top Supplier VAT and WHT</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Derived from posted AP invoices. Use this as the operational remittance and invoice-support list.</p>
+                </div>
+                <a href="/finance/tax/control-tracker/supplier-wht/export?year={{ year }}" class="btn btn-secondary">
+                    {{ icon_svg("document-text", "h-4 w-4") }}
+                    Export CSV
+                </a>
+            </div>
+            <div class="mt-4 overflow-x-auto">
+                <table class="table min-w-[720px]">
+                    <thead>
+                        <tr>
+                            <th scope="col">Supplier</th>
+                            <th scope="col" class="text-right">Input VAT</th>
+                            <th scope="col" class="text-right">WHT Withheld</th>
+                            <th scope="col" class="text-center">Invoices</th>
+                            <th scope="col" class="text-center">WHT Payments</th>
+                            <th scope="col">Remittance Capture</th>
+                            <th scope="col">Tracker Update</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in top_supplier_wht %}
+                        <tr>
+                            <td>
+                                <a href="{{ row.supplier_url }}" class="font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">
+                                    {{ row.supplier_name }}
+                                </a>
+                            </td>
+                            <td class="table-cell-amount">{{ row.input_vat }}</td>
+                            <td class="table-cell-amount {% if row.withheld_wht_raw > 0 %}text-amber-600 dark:text-amber-400{% endif %}">{{ row.withheld_wht }}</td>
+                            <td class="text-center text-sm text-slate-600 dark:text-slate-300">{{ row.invoice_count }}</td>
+                            <td class="text-center text-sm text-slate-600 dark:text-slate-300">{{ row.payment_wht_count }}</td>
+                            <td><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ row.remittance_status_class }}">{{ row.remittance_status }}</span></td>
+                            <td>
+                                <form method="POST" action="/finance/tax/control-tracker/evidence" class="grid gap-2">
+                                    <input type="hidden" name="year" value="{{ year }}">
+                                    <input type="hidden" name="evidence_type" value="SUPPLIER_WHT_REMITTANCE">
+                                    <input type="hidden" name="entity_type" value="SUPPLIER">
+                                    <input type="hidden" name="entity_id" value="{{ row.supplier_id }}">
+                                    <select name="status" class="form-select text-sm">
+                                        {% for opt in evidence_status_options %}
+                                        <option value="{{ opt.value }}" {% if row.evidence_status == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <input type="text" name="reference" value="{{ row.evidence_reference }}" placeholder="Remittance reference" class="form-input text-sm">
+                                    <input type="text" name="notes" value="{{ row.evidence_notes }}" placeholder="Notes" class="form-input text-sm">
+                                    <button type="submit" class="btn btn-secondary btn-sm">Save</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="py-12">
+                                {{ empty_state('No supplier VAT or WHT rows available', 'There were no supplier invoice tax rows for the selected year.', 'document') }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

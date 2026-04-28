@@ -4,16 +4,30 @@ Tax Web Routes.
 HTML template routes for tax periods, returns, and reporting.
 """
 
+import io
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse
+
+from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
+from app.services.finance.tax.control_tracker import tax_control_tracker_service
 from app.services.finance.tax.web import tax_web_service
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context, get_db, require_finance_access
 
 router = APIRouter(prefix="/tax", tags=["tax-web"])
+
+
+def _csv_response(content: str, filename: str) -> StreamingResponse:
+    """Build a StreamingResponse for CSV download."""
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("", response_class=HTMLResponse)
@@ -298,6 +312,89 @@ def tax_liability_summary(
         end_date,
         group_by,
         db,
+    )
+
+
+@router.get("/control-tracker", response_class=HTMLResponse)
+def tax_control_tracker(
+    request: Request,
+    auth: WebAuthContext = Depends(require_finance_access),
+    year: int | None = Query(default=None, ge=2000, le=2100),
+    db: Session = Depends(get_db),
+):
+    """VAT/WHT control tracker built from source-specific bases."""
+    return tax_web_service.tax_control_tracker_response(
+        request=request,
+        auth=auth,
+        year=year,
+        db=db,
+    )
+
+
+@router.get("/control-tracker/customer-deductions/export")
+def export_tax_control_customer_deductions(
+    year: int | None = Query(default=None, ge=2000, le=2100),
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """Export tracker customer deduction rows as CSV."""
+    tracker_year = year or (date.today().year - 1)
+    csv = tax_control_tracker_service.export_customer_deductions_csv(
+        db=db,
+        organization_id=str(auth.organization_id),
+        year=tracker_year,
+    )
+    return _csv_response(csv, f"tax_control_customer_deductions_{tracker_year}.csv")
+
+
+@router.get("/control-tracker/supplier-wht/export")
+def export_tax_control_supplier_wht(
+    year: int | None = Query(default=None, ge=2000, le=2100),
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """Export tracker supplier WHT rows as CSV."""
+    tracker_year = year or (date.today().year - 1)
+    csv = tax_control_tracker_service.export_supplier_wht_csv(
+        db=db,
+        organization_id=str(auth.organization_id),
+        year=tracker_year,
+    )
+    return _csv_response(csv, f"tax_control_supplier_wht_{tracker_year}.csv")
+
+
+@router.post("/control-tracker/evidence", response_class=HTMLResponse)
+async def save_tax_control_evidence(
+    request: Request,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+):
+    """Save manual evidence tracking for customer certificates or supplier remittances."""
+    form = await request.form()
+    year = int(form.get("year") or (date.today().year - 1))
+    evidence_type = str(form.get("evidence_type") or "").strip().upper()
+    entity_type = str(form.get("entity_type") or "").strip().upper()
+    entity_id = str(form.get("entity_id") or "").strip()
+    status = str(form.get("status") or "MISSING").strip().upper()
+    reference = str(form.get("reference") or "").strip()
+    notes = str(form.get("notes") or "").strip()
+
+    tax_control_tracker_service.upsert_evidence(
+        db=db,
+        organization_id=str(auth.organization_id),
+        year=year,
+        evidence_type=evidence_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        status=status,
+        reference=reference,
+        notes=notes,
+        updated_by_user_id=str(auth.person_id),
+    )
+
+    return RedirectResponse(
+        url=f"/finance/tax/control-tracker?year={year}&saved=1",
+        status_code=303,
     )
 
 

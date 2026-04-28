@@ -38,6 +38,7 @@ from app.services.finance.tax import (
     tax_jurisdiction_service,
     tax_period_service,
 )
+from app.services.finance.tax.control_tracker import tax_control_tracker_service
 from app.services.finance.tax.seed import get_default_jurisdiction
 from app.services.finance.tax.tax_master import TaxCodeInput
 from app.services.finance.tax.tax_return import (
@@ -369,6 +370,170 @@ class TaxWebService:
                 {"value": "month", "label": "By Month"},
                 {"value": "tax_code", "label": "By Tax Code"},
                 {"value": "period", "label": "By Fiscal Period"},
+            ],
+        }
+
+    @staticmethod
+    def tax_control_tracker_context(
+        db: Session,
+        organization_id: str,
+        year: int,
+    ) -> dict:
+        """Get context for the VAT/WHT control tracker page."""
+        tracker = tax_control_tracker_service.build(
+            db=db,
+            organization_id=organization_id,
+            year=year,
+        )
+
+        summary_metrics = []
+        for metric in tracker.summary_metrics:
+            display_value = (
+                f"{int(metric.value)}"
+                if metric.title == "VAT returns stored in ERP"
+                else _format_currency(metric.value)
+            )
+            summary_metrics.append(
+                {
+                    "title": metric.title,
+                    "value": display_value,
+                    "value_raw": float(metric.value),
+                    "source": metric.source,
+                    "note": metric.note,
+                }
+            )
+
+        monthly_vat_rows = [
+            {
+                "month_label": row.month_start.strftime("%b %Y"),
+                "ar_output_vat": _format_currency(row.ar_output_vat),
+                "ap_input_vat": _format_currency(row.ap_input_vat),
+                "customer_vat_withheld": _format_currency(row.customer_vat_withheld),
+                "gl_vat_payable": _format_currency(row.gl_vat_payable),
+                "gl_input_vat": _format_currency(row.gl_input_vat),
+                "erp_net_vat": _format_currency(row.erp_net_vat),
+                "gl_net_vat": _format_currency(row.gl_net_vat),
+                "variance": _format_currency(row.variance),
+                "variance_raw": float(row.variance),
+            }
+            for row in tracker.monthly_vat_rows
+        ]
+
+        monthly_wht_rows = [
+            {
+                "month_label": row.month_start.strftime("%b %Y"),
+                "ap_supplier_wht": _format_currency(row.ap_supplier_wht),
+                "customer_wht_receivable": _format_currency(
+                    row.customer_wht_receivable
+                ),
+                "gl_wht_liability": _format_currency(row.gl_wht_liability),
+                "variance": _format_currency(row.variance),
+                "variance_raw": float(row.variance),
+            }
+            for row in tracker.monthly_wht_rows
+        ]
+
+        evidence_statuses = []
+        for item in tracker.evidence_statuses:
+            badge_class = {
+                "ok": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                "warn": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                "info": "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+            }.get(
+                item.status,
+                "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300",
+            )
+            evidence_statuses.append(
+                {
+                    "label": item.label,
+                    "status": item.status,
+                    "status_label": item.status.upper(),
+                    "status_class": badge_class,
+                    "detail": item.detail,
+                    "source": item.source,
+                }
+            )
+
+        return {
+            "year": tracker.year,
+            "start_date": tracker.start_date.isoformat(),
+            "end_date": tracker.end_date.isoformat(),
+            "source_map": [
+                {
+                    "title": item.title,
+                    "source": item.source,
+                    "use_for": item.use_for,
+                    "caveat": item.caveat,
+                }
+                for item in tracker.source_map
+            ],
+            "summary_metrics": summary_metrics,
+            "monthly_vat_rows": monthly_vat_rows,
+            "monthly_wht_rows": monthly_wht_rows,
+            "evidence_statuses": evidence_statuses,
+            "top_customer_deductions": [
+                {
+                    "customer_id": str(item.customer_id),
+                    "customer_name": item.customer_name,
+                    "customer_url": f"/finance/ar/customers/{item.customer_id}",
+                    "vat_withheld": _format_currency(item.vat_withheld),
+                    "wht_receivable": _format_currency(item.wht_receivable),
+                    "combined_total": _format_currency(item.combined_total),
+                    "combined_total_raw": float(item.combined_total),
+                    "receipt_count": item.receipt_count,
+                    "certificate_count": item.certificate_count,
+                    "certificate_status": (
+                        "Complete"
+                        if item.receipt_count > 0
+                        and item.certificate_count >= item.receipt_count
+                        else "Missing"
+                    ),
+                    "certificate_status_class": (
+                        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        if item.receipt_count > 0
+                        and item.certificate_count >= item.receipt_count
+                        else "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                    ),
+                    "evidence_status": item.evidence_status,
+                    "evidence_reference": item.evidence_reference,
+                    "evidence_notes": item.evidence_notes,
+                }
+                for item in tracker.top_customer_deductions
+            ],
+            "top_supplier_wht": [
+                {
+                    "supplier_id": str(item.supplier_id),
+                    "supplier_name": item.supplier_name,
+                    "supplier_url": f"/finance/ap/suppliers/{item.supplier_id}",
+                    "input_vat": _format_currency(item.input_vat),
+                    "withheld_wht": _format_currency(item.withheld_wht),
+                    "withheld_wht_raw": float(item.withheld_wht),
+                    "invoice_count": item.invoice_count,
+                    "payment_wht_count": item.payment_wht_count,
+                    "remittance_status": (
+                        "Captured" if item.payment_wht_count > 0 else "Missing"
+                    ),
+                    "remittance_status_class": (
+                        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        if item.payment_wht_count > 0
+                        else "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                    ),
+                    "evidence_status": item.evidence_status,
+                    "evidence_reference": item.evidence_reference,
+                    "evidence_notes": item.evidence_notes,
+                }
+                for item in tracker.top_supplier_wht
+            ],
+            "evidence_status_options": [
+                {"value": "MISSING", "label": "Missing"},
+                {"value": "REQUESTED", "label": "Requested"},
+                {"value": "RECEIVED", "label": "Received"},
+                {"value": "VERIFIED", "label": "Verified"},
+            ],
+            "available_years": [
+                {"value": tracker.year - 1, "label": str(tracker.year - 1)},
+                {"value": tracker.year, "label": str(tracker.year)},
+                {"value": tracker.year + 1, "label": str(tracker.year + 1)},
             ],
         }
 
@@ -1100,6 +1265,30 @@ class TaxWebService:
 
         return templates.TemplateResponse(
             request, "finance/tax/liability_summary.html", context
+        )
+
+    def tax_control_tracker_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        year: int | None,
+        db: Session,
+    ) -> HTMLResponse:
+        tracker_year = year or (date.today().year - 1)
+
+        context = base_context(request, auth, "Tax Control Tracker", "tax")
+        context.update(
+            self.tax_control_tracker_context(
+                db=db,
+                organization_id=str(auth.organization_id),
+                year=tracker_year,
+            )
+        )
+
+        return templates.TemplateResponse(
+            request,
+            "finance/tax/control_tracker.html",
+            context,
         )
 
     def view_tax_transaction_response(

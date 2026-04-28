@@ -2,6 +2,7 @@
 Tax Schema Models - IAS 12.
 """
 
+from app.models.finance.tax.control_evidence import TaxControlEvidence
 from app.models.finance.tax.deferred_tax_basis import DeferredTaxBasis, DifferenceType
 from app.models.finance.tax.deferred_tax_movement import DeferredTaxMovement
 from app.models.finance.tax.fiscal_position import (
@@ -21,6 +22,7 @@ from app.models.finance.tax.tax_return import TaxReturn, TaxReturnStatus, TaxRet
 from app.models.finance.tax.tax_transaction import TaxTransaction, TaxTransactionType
 
 __all__ = [
+    "TaxControlEvidence",
     "TaxJurisdiction",
     "TaxCode",
     "TaxType",
