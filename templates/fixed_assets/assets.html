@@ -41,7 +41,8 @@
         active_filters=active_filters | default([]),
         show_search=true,
         search=search,
-        search_placeholder="Search assets by number, name, or serial..."
+        search_placeholder="Search assets by number, name, or serial...",
+        default_open=true
     ) %}
         {{ filter_select_field(
             "status",
@@ -60,7 +61,14 @@
         ) }}
         {% call filter_custom_select_field("category", "Category", filter_attrs) %}
             {% for cat in categories %}
-            <option value="{{ cat.category_id }}" {{ 'selected' if category == cat.category_id|string else '' }}>{{ cat.category_name }}</option>
+            <option value="{{ cat.category_id }}" {{ 'selected' if category == cat.category_id|string else '' }}>
+                {{ cat.category_name }}
+            </option>
+            {% endfor %}
+        {% endcall %}
+        {% call filter_custom_select_field("location", "Location", filter_attrs) %}
+            {% for loc in locations %}
+            <option value="{{ loc.location_id }}" {{ 'selected' if location == loc.location_id|string else '' }}>{{ loc.location_name }}</option>
             {% endfor %}
         {% endcall %}
     {% endcall %}
@@ -103,7 +111,9 @@
                             </td>
                             <td class="hidden md:table-cell text-slate-600 dark:text-slate-300 font-mono text-xs">{{ asset.serial_number or '-' }}</td>
                             <td class="hidden lg:table-cell text-slate-600 dark:text-slate-300">{{ asset.location_name or '-' }}</td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ asset.category_name }}</td>
+                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">
+                                {{ asset.category_name }}
+                            </td>
                             <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ asset.acquisition_date }}</td>
                             <td class="text-right font-mono text-slate-600 dark:text-slate-300">{{ asset.acquisition_cost }}</td>
                             <td class="text-right font-mono font-medium text-slate-900 dark:text-white">{{ asset.net_book_value }}</td>
@@ -130,10 +140,10 @@
                             <td colspan="11" class="py-12">
                                 {{ empty_state(
                                     'No assets found',
-                                    'Get started by registering your first fixed asset' if not (search or category or status) else 'Try adjusting your search or filter criteria',
+                                    'Get started by registering your first fixed asset' if not (search or category or status or location) else 'Try adjusting your search or filter criteria',
                                     'building',
-                                    'New Asset' if not (search or category or status) else none,
-                                    '/fixed-assets/assets/new' if not (search or category or status) else none
+                                    'New Asset' if not (search or category or status or location) else none,
+                                    '/fixed-assets/assets/new' if not (search or category or status or location) else none
                                 ) }}
                             </td>
                         </tr>
@@ -149,7 +159,7 @@
                 total_count=total_count | default(assets | length if assets else 0),
                 limit=limit | default(50),
                 search=search,
-                filters={"category": category, "status": status}
+                filters={"category": category, "status": status, "location": location}
             ) }}
         </div>
 

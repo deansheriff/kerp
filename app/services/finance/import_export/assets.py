@@ -5,6 +5,8 @@ Imports fixed assets from CSV data into the IFRS-based fixed asset system.
 """
 
 import logging
+import re
+from difflib import get_close_matches
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -17,10 +19,42 @@ from app.config import settings
 from app.models.finance.core_org.location import Location
 from app.models.fixed_assets.asset import Asset, AssetStatus
 from app.models.fixed_assets.asset_category import AssetCategory, DepreciationMethod
+from app.models.finance.core_config.numbering_sequence import SequenceType
+from app.models.people.hr.department import Department
+from app.models.people.hr.employee import Employee, EmployeeStatus
+from app.models.person import Person
+from app.services.finance.platform.sequence import SequenceService
 
 from .base import BaseImporter, FieldMapping, ImportConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_header(header: str) -> str:
+    """Normalize a source header for case-insensitive matching."""
+    return " ".join(str(header).strip().replace("_", " ").split()).casefold()
+
+
+def _normalize_match_text(value: Any) -> str:
+    """Normalize free-text values for resilient import matching."""
+    text = str(value or "").strip().casefold()
+    if not text:
+        return ""
+    text = text.replace("&", " and ")
+    text = re.sub(r"[,\-\.]+", " ", text)
+    text = re.sub(r"\band\b", " and ", text)
+    text = " ".join(text.split())
+    return text
+
+
+def _get_row_value(row: dict[str, Any], *candidates: str) -> Any:
+    """Get a row value by header name without caring about header case."""
+    normalized = {_normalize_header(key): value for key, value in row.items()}
+    for candidate in candidates:
+        value = normalized.get(_normalize_header(candidate))
+        if value not in (None, ""):
+            return value
+    return None
 
 
 class AssetCategoryImporter(BaseImporter[AssetCategory]):
@@ -53,7 +87,7 @@ class AssetCategoryImporter(BaseImporter[AssetCategory]):
         return []
 
     def get_unique_key(self, row: dict[str, Any]) -> str:
-        value = row.get("Asset Category") or row.get("Asset Class") or "General Assets"
+        value = _get_row_value(row, "Asset Category", "Asset Class") or "General Assets"
         return str(value).strip()
 
     def check_duplicate(self, row: dict[str, Any]) -> AssetCategory | None:
@@ -71,7 +105,13 @@ class AssetCategoryImporter(BaseImporter[AssetCategory]):
         ).scalar_one_or_none()
 
         if existing:
-            self._category_cache[category_code] = existing.category_id
+            resolved = existing
+            if existing.parent_category_id:
+                parent = self.db.get(AssetCategory, existing.parent_category_id)
+                if parent and parent.organization_id == self.config.organization_id:
+                    resolved = parent
+            self._category_cache[category_code] = resolved.category_id
+            return resolved
 
         return existing
 
@@ -137,9 +177,7 @@ class AssetCategoryImporter(BaseImporter[AssetCategory]):
         unique_categories = set()
         for row in rows:
             cat_name = (
-                row.get("Asset Category")
-                or row.get("Asset Class")
-                or row.get("Category")
+                _get_row_value(row, "Asset Category", "Asset Class", "Category")
                 or "General Assets"
             )
             if cat_name:
@@ -185,7 +223,6 @@ class AssetImporter(BaseImporter[Asset]):
         gain_loss_disposal_account_id: UUID,
     ):
         super().__init__(db, config)
-        self._code_counter = 0
         self._category_importer = AssetCategoryImporter(
             db,
             config,
@@ -195,6 +232,15 @@ class AssetImporter(BaseImporter[Asset]):
             gain_loss_disposal_account_id,
         )
         self._location_cache: dict[str, UUID | None] = {}
+        self._seen_serial_numbers: set[str] = set()
+        self._department_lookup_loaded = False
+        self._department_by_id: dict[str, tuple[UUID, str]] = {}
+        self._department_by_code: dict[str, tuple[UUID, str]] = {}
+        self._department_by_normalized_name: dict[str, list[tuple[UUID, str]]] = {}
+        self._employee_lookup_loaded = False
+        self._employee_by_id: dict[str, tuple[UUID, str, str | None]] = {}
+        self._employee_by_code: dict[str, tuple[UUID, str, str | None]] = {}
+        self._employee_by_email: dict[str, list[tuple[UUID, str, str | None]]] = {}
 
     def get_field_mappings(self) -> list[FieldMapping]:
         """Define flexible field mappings supporting various CSV formats."""
@@ -301,7 +347,14 @@ class AssetImporter(BaseImporter[Asset]):
             FieldMapping("Manufacturer", "manufacturer", required=False),
             FieldMapping("Model", "model", required=False),
             FieldMapping("Location", "location", required=False),
-            FieldMapping("Department", "department_alt", required=False),
+            FieldMapping("Department", "department_name", required=False),
+            FieldMapping("Department Name", "department_name_alt", required=False),
+            FieldMapping("Department Code", "department_code", required=False),
+            FieldMapping("Department ID", "department_id", required=False),
+            FieldMapping("Assign To", "assign_to", required=False),
+            FieldMapping("Employee Email", "employee_email", required=False),
+            FieldMapping("Employee Code", "employee_code", required=False),
+            FieldMapping("Employee ID", "employee_id", required=False),
             # Insurance
             FieldMapping(
                 "Insured Value",
@@ -322,29 +375,46 @@ class AssetImporter(BaseImporter[Asset]):
         ]
 
     def get_unique_key(self, row: dict[str, Any]) -> str:
-        """Unique key is asset number or code."""
-        code = (
-            row.get("Asset Number")
-            or row.get("Asset Code")
-            or row.get("Tag Number")
-            or ""
-        ).strip()
-        if code:
-            return code
-        # Fallback to name + date
-        name = (row.get("Asset Name") or row.get("Name") or "").strip()
-        return name
+        """Unique key is serial number when present."""
+        serial = str(_get_row_value(row, "Serial Number", "Serial") or "").strip()
+        if serial:
+            return serial.casefold()
+        return ""
+
+    def _normalize_source_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Canonicalize known source headers so import mapping is case-insensitive."""
+        canonical_headers = {
+            mapping.source_field for mapping in self.get_field_mappings()
+        }
+        canonical_by_normalized = {
+            _normalize_header(header): header for header in canonical_headers
+        }
+        normalized_row: dict[str, Any] = {}
+
+        for key, value in row.items():
+            canonical_key = canonical_by_normalized.get(_normalize_header(key), key)
+            normalized_row[canonical_key] = value
+
+        return normalized_row
+
+    def _prepare_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Normalize incoming rows before category creation and field mapping."""
+        return [self._normalize_source_row(row) for row in rows]
 
     def check_duplicate(self, row: dict[str, Any]) -> Asset | None:
-        """Check if asset already exists."""
+        """Check if asset already exists by serial number."""
         key = self.get_unique_key(row)
         if not key:
             return None
 
+        if key in self._seen_serial_numbers:
+            return Asset()
+        self._seen_serial_numbers.add(key)
+
         existing = self.db.execute(
             select(Asset).where(
                 Asset.organization_id == self.config.organization_id,
-                Asset.asset_number == key,
+                Asset.serial_number == key,
             )
         ).scalar_one_or_none()
 
@@ -360,16 +430,12 @@ class AssetImporter(BaseImporter[Asset]):
             or "Unknown Asset"
         ).strip()
 
-        # Get asset number
-        asset_number = (
-            row.get("asset_number")
-            or row.get("asset_code_alt")
-            or row.get("tag_number_alt")
-            or ""
-        ).strip()
-        if not asset_number:
-            self._code_counter += 1
-            asset_number = f"FA{self._code_counter:06d}"
+        # Always generate the next asset number from the sequence.
+        asset_number = SequenceService.get_next_number(
+            self.db,
+            self.config.organization_id,
+            SequenceType.ASSET,
+        )
 
         # Get category
         category_name = (
@@ -379,8 +445,18 @@ class AssetImporter(BaseImporter[Asset]):
             or "General Assets"
         )
         category_id = self._category_importer.get_category_id(category_name)
-        location_id = self._resolve_location_id(
-            row.get("location") or row.get("department_alt")
+        location_id = self._resolve_location_id(row.get("location"))
+        department_name = row.get("department_name") or row.get("department_name_alt")
+        department_id = self._resolve_department_id(
+            department_id_value=row.get("department_id"),
+            department_code=row.get("department_code"),
+            department_name=department_name,
+        )
+        custodian_employee_id = self._resolve_employee_id(
+            employee_id_value=row.get("employee_id"),
+            employee_code=row.get("employee_code"),
+            employee_email=row.get("employee_email") or row.get("assign_to"),
+            department_id=department_id,
         )
 
         # Get acquisition details
@@ -445,6 +521,7 @@ class AssetImporter(BaseImporter[Asset]):
             description=row.get("description"),
             category_id=category_id,
             location_id=location_id,
+            custodian_employee_id=custodian_employee_id,
             acquisition_date=acquisition_date,
             in_service_date=acquisition_date,
             acquisition_cost=acquisition_cost,
@@ -472,6 +549,206 @@ class AssetImporter(BaseImporter[Asset]):
         )
 
         return asset
+
+    def _load_department_lookup(self) -> None:
+        if self._department_lookup_loaded:
+            return
+
+        departments = (
+            self.db.execute(
+                select(Department).where(
+                    Department.organization_id == self.config.organization_id,
+                    Department.is_active.is_(True),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for department in departments:
+            display_name = department.department_name
+            self._department_by_id[str(department.department_id)] = (
+                department.department_id,
+                display_name,
+            )
+            self._department_by_code[department.department_code.casefold()] = (
+                department.department_id,
+                display_name,
+            )
+            normalized_name = _normalize_match_text(display_name)
+            self._department_by_normalized_name.setdefault(normalized_name, []).append(
+                (department.department_id, display_name)
+            )
+        self._department_lookup_loaded = True
+
+    def _load_employee_lookup(self) -> None:
+        if self._employee_lookup_loaded:
+            return
+
+        employee_rows = self.db.execute(
+            select(
+                Employee.employee_id,
+                Employee.employee_code,
+                Employee.department_id,
+                Person.email,
+                Person.first_name,
+                Person.last_name,
+                Person.display_name,
+            )
+            .join(Person, Person.id == Employee.person_id)
+            .where(
+                Employee.organization_id == self.config.organization_id,
+                Employee.status == EmployeeStatus.ACTIVE,
+            )
+        ).all()
+
+        for row in employee_rows:
+            full_name = (
+                row.display_name
+                or f"{row.first_name or ''} {row.last_name or ''}".strip()
+                or row.email
+            )
+            department_id = str(row.department_id) if row.department_id else None
+            entry = (row.employee_id, full_name, department_id)
+            self._employee_by_id[str(row.employee_id)] = entry
+            if row.employee_code:
+                self._employee_by_code[row.employee_code.casefold()] = entry
+            if row.email:
+                normalized_email = str(row.email).strip().casefold()
+                self._employee_by_email.setdefault(normalized_email, []).append(entry)
+        self._employee_lookup_loaded = True
+
+    def _resolve_department_id(
+        self,
+        *,
+        department_id_value: Any = None,
+        department_code: Any = None,
+        department_name: Any = None,
+    ) -> UUID | None:
+        self._load_department_lookup()
+
+        raw_id = str(department_id_value or "").strip()
+        if raw_id:
+            match = self._department_by_id.get(raw_id)
+            if match:
+                return match[0]
+
+        raw_code = str(department_code or "").strip()
+        if raw_code:
+            match = self._department_by_code.get(raw_code.casefold())
+            if match:
+                return match[0]
+
+        raw_name = str(department_name or "").strip()
+        if not raw_name:
+            return None
+
+        normalized_name = _normalize_match_text(raw_name)
+        matches = self._department_by_normalized_name.get(normalized_name, [])
+        if len(matches) == 1:
+            return matches[0][0]
+        if len(matches) > 1:
+            options = ", ".join(sorted(name for _, name in matches))
+            raise ValueError(f'Ambiguous department "{raw_name}". Matches: {options}')
+
+        suggestions = self._closest_department_suggestions(normalized_name)
+        if suggestions:
+            raise ValueError(
+                f'Department "{raw_name}" not found. Did you mean: {", ".join(suggestions)}?'
+            )
+        raise ValueError(f'Department "{raw_name}" not found.')
+
+    def _resolve_employee_id(
+        self,
+        *,
+        employee_id_value: Any = None,
+        employee_code: Any = None,
+        employee_email: Any = None,
+        department_id: UUID | None = None,
+    ) -> UUID | None:
+        self._load_employee_lookup()
+
+        raw_id = str(employee_id_value or "").strip()
+        if raw_id:
+            match = self._employee_by_id.get(raw_id)
+            if match:
+                self._ensure_employee_department_match(
+                    employee_name=match[1],
+                    employee_department_id=match[2],
+                    department_id=department_id,
+                )
+                return match[0]
+
+        raw_code = str(employee_code or "").strip()
+        if raw_code:
+            match = self._employee_by_code.get(raw_code.casefold())
+            if match:
+                self._ensure_employee_department_match(
+                    employee_name=match[1],
+                    employee_department_id=match[2],
+                    department_id=department_id,
+                )
+                return match[0]
+
+        raw_email = str(employee_email or "").strip()
+        if not raw_email:
+            return None
+
+        matches = self._employee_by_email.get(raw_email.casefold(), [])
+        if len(matches) == 1:
+            match = matches[0]
+            self._ensure_employee_department_match(
+                employee_name=match[1],
+                employee_department_id=match[2],
+                department_id=department_id,
+            )
+            return match[0]
+        if len(matches) > 1:
+            options = ", ".join(sorted(match[1] for match in matches))
+            raise ValueError(f'Ambiguous employee "{raw_email}". Matches: {options}')
+
+        suggestions = self._closest_employee_suggestions(raw_email.casefold())
+        if suggestions:
+            raise ValueError(
+                f'Employee "{raw_email}" not found. Did you mean: {", ".join(suggestions)}?'
+            )
+        raise ValueError(f'Employee "{raw_email}" not found.')
+
+    def _ensure_employee_department_match(
+        self,
+        *,
+        employee_name: str,
+        employee_department_id: str | None,
+        department_id: UUID | None,
+    ) -> None:
+        if department_id is None:
+            return
+        if employee_department_id != str(department_id):
+            raise ValueError(
+                f'Employee "{employee_name}" does not belong to the selected department'
+            )
+
+    def _closest_department_suggestions(self, normalized_name: str) -> list[str]:
+        suggestion_keys = get_close_matches(
+            normalized_name,
+            list(self._department_by_normalized_name.keys()),
+            n=3,
+            cutoff=0.6,
+        )
+        suggestions: list[str] = []
+        for key in suggestion_keys:
+            for _, display_name in self._department_by_normalized_name.get(key, []):
+                if display_name not in suggestions:
+                    suggestions.append(display_name)
+        return suggestions[:3]
+
+    def _closest_employee_suggestions(self, normalized_email: str) -> list[str]:
+        matches = get_close_matches(
+            normalized_email,
+            list(self._employee_by_email.keys()),
+            n=3,
+            cutoff=0.6,
+        )
+        return matches[:3]
 
     def _resolve_location_id(self, raw_location: Any) -> UUID | None:
         """Resolve free-text location value to an organization location_id."""
@@ -570,12 +847,19 @@ class AssetImporter(BaseImporter[Asset]):
 
         with open(file_path, encoding=self.config.encoding) as f:
             reader = csv.DictReader(f)
-            rows = list(reader)
+            rows = self._prepare_rows(list(reader))
 
         # Ensure categories exist
         self._category_importer.ensure_categories(rows)
         self.db.flush()
 
+        return super().import_rows(rows)
+
+    def import_rows(self, rows: list[dict[str, Any]]):
+        """Override list import to normalize headers and create categories first."""
+        rows = self._prepare_rows(rows)
+        self._category_importer.ensure_categories(rows)
+        self.db.flush()
         return super().import_rows(rows)
 
     def import_xlsx_file(self, file_path):
@@ -587,7 +871,7 @@ class AssetImporter(BaseImporter[Asset]):
             self.result.add_error(0, f"File not found: {file_path}", None)
             return self.result
 
-        rows = self.parse_xlsx_file(file_path)
+        rows = self._prepare_rows(self.parse_xlsx_file(file_path))
         self._category_importer.ensure_categories(rows)
         self.db.flush()
 

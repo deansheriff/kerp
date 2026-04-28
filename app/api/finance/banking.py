@@ -919,31 +919,6 @@ def refresh_mono_account(
         _raise_mono_http_error(exc)
 
 
-@router.post("/accounts/{account_id}/reauthorise-mono")
-def reauthorise_mono_account(
-    account_id: UUID,
-    auth: dict = Depends(require_tenant_permission("banking:account:update")),
-    db: Session = Depends(get_db),
-):
-    """Issue a Mono reauthorisation token for re-entry through Connect widget.
-
-    Used when Mono's transaction index is stale or empty despite a valid
-    link — typically after a ``data_status=FAILED`` webhook. The returned
-    token is passed to the Mono Connect widget as ``reauth_token``; the
-    user re-enters their bank credentials and Mono triggers a fresh data
-    pull, emitting a new ``account_updated`` webhook when complete.
-    """
-    from app.services.finance.banking.mono_sync import MonoSyncService
-
-    try:
-        return MonoSyncService(db).request_reauthorisation_token(
-            _get_org_id(auth),
-            account_id,
-        )
-    except (LookupError, PermissionError, RuntimeError, ValueError) as exc:
-        _raise_mono_http_error(exc)
-
-
 # Webhook endpoint — no auth required, uses secret verification
 mono_webhook_router = APIRouter(tags=["mono-webhooks"])
 

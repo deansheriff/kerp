@@ -209,39 +209,6 @@ class MonoSyncService:
             "data": {"mono_account_id": result.account_id},
         }
 
-    def request_reauthorisation_token(
-        self,
-        organization_id: UUID,
-        bank_account_id: UUID,
-    ) -> dict:
-        """Issue a Mono reauthorisation token for a linked bank account.
-
-        Used when Mono's transaction index is stale or empty despite a
-        valid link — the user re-enters credentials in the Mono Connect
-        widget using the returned ``token`` as ``reauth_token``, which
-        triggers a fresh data pull on Mono's side. Mono then emits a
-        fresh ``account_updated`` webhook when indexing completes.
-        """
-        account = self.db.get(BankAccount, bank_account_id)
-        if not account or account.organization_id != organization_id:
-            raise LookupError("Bank account not found")
-
-        if not account.mono_account_id:
-            raise ValueError("Bank account is not linked to Mono")
-
-        config = self._get_mono_config()
-        try:
-            with MonoClient(config) as client:
-                token = client.request_reauthorisation(account.mono_account_id)
-        except MonoError as exc:
-            raise RuntimeError(f"Mono reauthorisation failed: {exc.message}") from exc
-
-        return {
-            "status": "success",
-            "message": "Reauthorisation token issued",
-            "data": {"token": token},
-        }
-
     def trigger_data_refresh(
         self,
         organization_id: UUID,

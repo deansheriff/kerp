@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models.fixed_assets.asset import Asset, AssetStatus
 from app.models.fixed_assets.depreciation_schedule import DepreciationSchedule
+from app.models.people.assets.audit import AssetLifecycleEvent
 from app.services.bulk_actions import BulkActionService
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,21 @@ class AssetBulkService(BulkActionService[Asset]):
                 f"Cannot delete '{entity.asset_name}': has {schedule_count} depreciation schedule(s)",
             )
 
+        lifecycle_event_count = self.db.scalar(
+            select(func.count())
+            .select_from(AssetLifecycleEvent)
+            .where(
+                AssetLifecycleEvent.organization_id == self.organization_id,
+                AssetLifecycleEvent.asset_id == entity.asset_id,
+            )
+        )
+
+        if lifecycle_event_count and lifecycle_event_count > 0:
+            return (
+                False,
+                f"Cannot delete '{entity.asset_name}': has lifecycle history and cannot be deleted",
+            )
+
         return (True, "")
 
     def _get_export_value(self, entity: Asset, field_name: str) -> str:
@@ -113,9 +129,13 @@ class AssetBulkService(BulkActionService[Asset]):
         from app.services.fixed_assets.asset_query import build_asset_query
 
         category = ""
+        location = ""
         if extra_filters:
             category = str(
                 extra_filters.get("category") or extra_filters.get("category_id") or ""
+            )
+            location = str(
+                extra_filters.get("location") or extra_filters.get("location_id") or ""
             )
 
         query = build_asset_query(
@@ -124,6 +144,7 @@ class AssetBulkService(BulkActionService[Asset]):
             search=search,
             category=category or None,
             status=status,
+            location=location or None,
         )
 
         entities = list(self.db.scalars(query).all())

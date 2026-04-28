@@ -558,35 +558,6 @@ class MonoClient:
             retrieved_data=retrieved_data,
         )
 
-    def request_reauthorisation(self, account_id: str) -> str:
-        """Request a short-lived reauthorisation token for a linked account.
-
-        When Mono's indexer has stale or missing transaction data — commonly
-        after a ``data_status=FAILED`` webhook — the user must re-enter their
-        bank credentials through the Mono Connect widget to kick off a fresh
-        data pull. This endpoint returns the token the widget needs. The
-        token is passed to the widget as ``reauth_token``; the user completes
-        the flow, and Mono then emits a fresh ``account_updated`` webhook
-        when indexing is complete.
-
-        Args:
-            account_id: Mono account ID of the already-linked account.
-
-        Returns:
-            Short-lived reauth token to pass to Mono Connect widget.
-        """
-        response = self._request(
-            "POST",
-            f"/v2/accounts/{account_id}/reauthorise",
-            operation="reauthorise",
-        )
-        data = response.get("data") or {}
-        token = data.get("token")
-        if not token:
-            raise MonoError("Mono reauthorisation response missing token")
-        logger.info("Mono reauthorisation token issued for account_id=%s", account_id)
-        return str(token)
-
     def get_account_identity(self, account_id: str) -> MonoAccountIdentity:
         """
         Get identity information for a linked account.

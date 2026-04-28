@@ -670,8 +670,6 @@ app.include_router(admin_web_router)
 app.include_router(profile_web_router)
 app.include_router(notifications_web_router)
 app.include_router(workflow_tasks_web_router)
-app.include_router(module_settings_web_router)  # /settings/* web routes
-
 # ---------------------------------------------------------------------------
 # People/HR module
 # ---------------------------------------------------------------------------
@@ -733,6 +731,8 @@ if is_module_enabled("expense"):
     _include_api_router(
         expense_limits_router, dependencies=[Depends(require_tenant_auth)]
     )
+
+app.include_router(module_settings_web_router)  # /settings/* generic module routes
 
 # ---------------------------------------------------------------------------
 # Support/Helpdesk module

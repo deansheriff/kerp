@@ -43,6 +43,45 @@ def _record_lifecycle_event(db: Session, **kwargs: Any) -> None:
     record_asset_lifecycle_event(db, **kwargs)
 
 
+_MAX_CATEGORY_PARENT_WALK = 16
+
+
+def _resolve_primary_category(
+    db: Session, organization_id: UUID, category_id: UUID
+) -> AssetCategory:
+    """Resolve a category reference to its top-level (root) ancestor.
+
+    Walks ``parent_category_id`` until it lands on a category with no parent.
+    The cap (``_MAX_CATEGORY_PARENT_WALK``) is a defence against accidental
+    cycles in the data — a non-malicious tree should never go that deep.
+    """
+    org_id = coerce_uuid(organization_id)
+    category = db.get(AssetCategory, coerce_uuid(category_id))
+    if not category or category.organization_id != org_id:
+        raise HTTPException(status_code=404, detail="Asset category not found")
+
+    visited: set[UUID] = set()
+    for _ in range(_MAX_CATEGORY_PARENT_WALK):
+        if category.parent_category_id is None:
+            break
+        if category.category_id in visited:
+            raise HTTPException(
+                status_code=400, detail="Asset category hierarchy contains a cycle"
+            )
+        visited.add(category.category_id)
+        parent_category = db.get(AssetCategory, category.parent_category_id)
+        if not parent_category or parent_category.organization_id != org_id:
+            raise HTTPException(status_code=404, detail="Asset category not found")
+        category = parent_category
+    else:
+        raise HTTPException(status_code=400, detail="Asset category hierarchy too deep")
+
+    if not category.is_active:
+        raise HTTPException(status_code=400, detail="Asset category is not active")
+
+    return category
+
+
 @dataclass
 class AssetCategoryInput:
     """Input for creating/updating an asset category."""
@@ -147,7 +186,7 @@ class AssetCategoryService(ListResponseMixin):
             category_code=input.category_code,
             category_name=input.category_name,
             description=input.description,
-            parent_category_id=input.parent_category_id,
+            parent_category_id=None,
             depreciation_method=input.depreciation_method,
             useful_life_months=input.useful_life_months,
             residual_value_percent=input.residual_value_percent,
@@ -200,6 +239,8 @@ class AssetCategoryService(ListResponseMixin):
                 AssetCategory.organization_id == coerce_uuid(organization_id)
             )
 
+        query = query.where(AssetCategory.parent_category_id.is_(None))
+
         if is_active is not None:
             query = query.where(AssetCategory.is_active == is_active)
 
@@ -240,7 +281,7 @@ class AssetCategoryService(ListResponseMixin):
         category.category_code = input.category_code
         category.category_name = input.category_name
         category.description = input.description
-        category.parent_category_id = input.parent_category_id
+        category.parent_category_id = None
         category.depreciation_method = input.depreciation_method
         category.useful_life_months = input.useful_life_months
         category.residual_value_percent = input.residual_value_percent
@@ -309,15 +350,8 @@ class AssetService(ListResponseMixin):
         """
         org_id = coerce_uuid(organization_id)
         user_id = coerce_uuid(created_by_user_id)
-        cat_id = coerce_uuid(input.category_id)
-
-        # Load category for defaults
-        category = db.get(AssetCategory, cat_id)
-        if not category or category.organization_id != org_id:
-            raise HTTPException(status_code=404, detail="Asset category not found")
-
-        if not category.is_active:
-            raise HTTPException(status_code=400, detail="Asset category is not active")
+        category = _resolve_primary_category(db, org_id, input.category_id)
+        cat_id = category.category_id
 
         # Check capitalization threshold
         if (
@@ -690,6 +724,10 @@ class AssetService(ListResponseMixin):
                             detail=f"Asset number '{asset_number}' already exists",
                         )
                     asset.asset_number = asset_number
+                    continue
+                if key == "category_id":
+                    resolved_category = _resolve_primary_category(db, org_id, value)
+                    asset.category_id = resolved_category.category_id
                     continue
                 setattr(asset, key, value)
         if previous_location_id != asset.location_id:

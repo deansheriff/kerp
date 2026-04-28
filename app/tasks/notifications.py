@@ -24,7 +24,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from app.db import SessionLocal
 from app.models.email_profile import EmailModule
-from app.models.notification import Notification, NotificationChannel
+from app.models.notification import EntityType, Notification, NotificationChannel
 from app.services.email import person_can_receive_email, send_email
 
 logger = logging.getLogger(__name__)
@@ -70,6 +70,20 @@ class NotificationEmailDispatchResults(TypedDict):
     skipped: int
     failed: int
     dead_letter: int
+
+
+def _email_module_for_notification(notification: Notification) -> EmailModule:
+    """Route notification emails through the appropriate email profile."""
+    if notification.entity_type == EntityType.LEAVE:
+        return EmailModule.PEOPLE_PAYROLL
+    return EmailModule.ADMIN
+
+
+def _email_action_label_for_notification(notification: Notification) -> str:
+    """Return the email CTA label for a notification."""
+    if notification.entity_type == EntityType.LEAVE:
+        return "Review leave"
+    return "Open notification"
 
 
 @shared_task(
@@ -187,8 +201,11 @@ def process_pending_notification_emails(
                         url = notification.action_url
                         if url.startswith("/") or url.startswith("http"):
                             safe_url = html.escape(url)
+                            action_label = _email_action_label_for_notification(
+                                notification
+                            )
                             body_html += (
-                                f'<p><a href="{safe_url}">Open notification</a></p>'
+                                f'<p><a href="{safe_url}">{action_label}</a></p>'
                             )
 
                     ok = send_email(
@@ -197,7 +214,7 @@ def process_pending_notification_emails(
                         subject=notification.title,
                         body_html=body_html,
                         body_text=body_text,
-                        module=EmailModule.ADMIN,
+                        module=_email_module_for_notification(notification),
                         organization_id=notification.organization_id,
                     )
                     if ok:

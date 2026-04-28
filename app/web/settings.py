@@ -9,14 +9,23 @@ from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from app.services.finance.settings_web import settings_web_service
 from app.services.module_settings_web import (
     MODULE_SETTINGS_BY_KEY,
     module_settings_web_service,
 )
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_settings_access
+from app.web.deps import (
+    WebAuthContext,
+    base_context,
+    get_async_db,
+    get_db,
+    require_finance_access,
+    require_settings_access,
+)
 
 router = APIRouter(prefix="/settings", tags=["settings-web"])
 
@@ -95,6 +104,26 @@ def settings_index(
     context.update(module_settings_web_service.get_hub_context(auth.organization_id))
 
     return templates.TemplateResponse(request, "settings/index.html", context)
+
+
+@router.get("/numbering", response_class=HTMLResponse)
+async def finance_numbering_sequences(
+    request: Request,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: AsyncSession = Depends(get_async_db),
+    sync_db: Session = Depends(get_db),
+):
+    """Finance numbering sequences page exposed from the shared settings URL."""
+    result = await settings_web_service.get_numbering_list_context(
+        db, auth.organization_id
+    )
+
+    context = base_context(request, auth, "Numbering Sequences", "settings", db=sync_db)
+    context.update(result)
+
+    return templates.TemplateResponse(
+        request, "finance/settings/numbering.html", context
+    )
 
 
 def _get_module_config(module_key: str):

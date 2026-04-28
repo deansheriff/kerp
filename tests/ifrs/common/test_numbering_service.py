@@ -86,13 +86,14 @@ class TestDefaultPrefixes:
         assert DEFAULT_PREFIXES[SequenceType.JOURNAL] == "JE"
         assert DEFAULT_PREFIXES[SequenceType.PURCHASE_ORDER] == "PO"
         assert DEFAULT_PREFIXES[SequenceType.SUPPLIER_INVOICE] == "SINV"
-        assert DEFAULT_PREFIXES[SequenceType.ASSET] == "FA"
+        assert DEFAULT_PREFIXES[SequenceType.ASSET] == "DT-AST"
         assert DEFAULT_PREFIXES[SequenceType.LEASE] == "LS"
         assert DEFAULT_PREFIXES[SequenceType.GOODS_RECEIPT] == "GR"
         assert DEFAULT_PREFIXES[SequenceType.QUOTE] == "QT"
         assert DEFAULT_PREFIXES[SequenceType.SALES_ORDER] == "SO"
         assert DEFAULT_PREFIXES[SequenceType.SHIPMENT] == "SHP"
         assert DEFAULT_PREFIXES[SequenceType.EXPENSE] == "EXP"
+        assert DEFAULT_PREFIXES[SequenceType.CONTRACT] == "CTR"
 
 
 class TestSyncNumberingServiceGetSequence:

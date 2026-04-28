@@ -126,6 +126,7 @@ class MockAsset:
         self.status = kwargs.get("status", AssetStatus.IN_USE)
         self.serial_number = kwargs.get("serial_number")
         self.barcode = kwargs.get("barcode")
+        self.custodian_employee_id = kwargs.get("custodian_employee_id")
 
 
 class MockAssetCategory:
@@ -189,6 +190,7 @@ class TestFAWebServiceListAssets:
             search=None,
             category=None,
             status=None,
+            location=None,
             page=1,
         )
 
@@ -213,6 +215,7 @@ class TestFAWebServiceListAssets:
             search="computer",
             category=None,
             status=None,
+            location=None,
             page=1,
         )
 
@@ -235,6 +238,7 @@ class TestFAWebServiceListAssets:
             search=None,
             category=None,
             status="IN_USE",
+            location=None,
             page=1,
         )
 
@@ -257,6 +261,7 @@ class TestFAWebServiceListAssets:
             search=None,
             category=str(category_id),
             status=None,
+            location=None,
             page=1,
         )
 
@@ -278,10 +283,50 @@ class TestFAWebServiceListAssets:
             search=None,
             category="EQUIPMENT",
             status=None,
+            location=None,
             page=1,
         )
 
         assert result["category"] == "EQUIPMENT"
+
+    def test_list_assets_context_with_location(self):
+        """Location filter should be preserved in the returned context."""
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        mock_db = MagicMock()
+        org_id = uuid.uuid4()
+        location_id = uuid.uuid4()
+
+        mock_db.scalar.return_value = 0
+        mock_db.execute.return_value.all.return_value = []
+        result = FixedAssetWebService.list_assets_context(
+            mock_db,
+            str(org_id),
+            search=None,
+            category=None,
+            status=None,
+            location=str(location_id),
+            page=1,
+        )
+
+        assert result["location"] == str(location_id)
+
+    def test_build_asset_query_filters_by_location_uuid(self):
+        """Asset query should include location_id filtering when provided."""
+        from app.services.fixed_assets.asset_query import build_asset_query
+
+        org_id = uuid.uuid4()
+        location_id = uuid.uuid4()
+
+        query = build_asset_query(
+            db=MagicMock(),
+            organization_id=str(org_id),
+            location=str(location_id),
+        )
+        compiled = query.compile()
+
+        assert "asset.location_id" in str(compiled)
+        assert location_id in compiled.params.values()
 
 
 class TestFAWebServiceDepreciation:
@@ -422,6 +467,7 @@ class TestFAWebServiceAssetUpdate:
         assert updates == {
             "serial_number": "SN-200",
             "location_id": location_id,
+            "custodian_employee_id": None,
             "description": "Updated description",
             "status": AssetStatus.UNDER_REPAIR,
             "current_depreciation_schedule_id": None,
@@ -487,3 +533,189 @@ class TestFAWebServiceAssetUpdate:
         assert updates["currency_code"] == "EUR"
         assert updates["status"] == AssetStatus.IN_STORE
         assert updates["current_depreciation_schedule_id"] == schedule_id
+
+    @pytest.mark.asyncio
+    async def test_update_asset_response_saves_custodian_assignment(self):
+        """Assigned employee should be forwarded in asset updates."""
+        from app.models.fixed_assets.asset import AssetStatus
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        service = FixedAssetWebService()
+        org_id = uuid.uuid4()
+        asset_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+        department_id = uuid.uuid4()
+        asset = MockAsset(
+            asset_id=asset_id,
+            organization_id=org_id,
+            status=AssetStatus.IN_USE,
+        )
+
+        mock_db = MagicMock()
+        mock_db.get.return_value = asset
+
+        request = MagicMock()
+        request.form = AsyncMock(
+            return_value={
+                "serial_number": "SN-200",
+                "location_id": "",
+                "department_id": str(department_id),
+                "custodian_employee_id": str(employee_id),
+                "description": "",
+                "status": "IN_USE",
+                "depreciation_schedule_id": "",
+            }
+        )
+        auth = WebAuthContext(
+            is_authenticated=True,
+            organization_id=org_id,
+            person_id=uuid.uuid4(),
+        )
+
+        with (
+            patch.object(
+                service,
+                "_validate_assignment_selection",
+                return_value=(department_id, employee_id),
+            ) as mock_validate,
+            patch(
+                "app.services.fixed_assets.web.asset_service.update_asset"
+            ) as mock_update,
+        ):
+            response = await service.update_asset_response(
+                request=request,
+                auth=auth,
+                db=mock_db,
+                asset_id=str(asset_id),
+            )
+
+        assert response.status_code == 303
+        mock_validate.assert_called_once()
+        updates = mock_update.call_args.args[3]
+        assert updates["custodian_employee_id"] == employee_id
+
+
+class TestFAWebServiceAssetCreate:
+    """Tests for asset create response handling."""
+
+    def test_create_asset_response_commits_on_success(self):
+        """Successful asset creation should commit before redirecting."""
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        service = FixedAssetWebService()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        category_id = uuid.uuid4()
+        location_id = uuid.uuid4()
+        department_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+        created_asset = MockAsset(
+            organization_id=org_id,
+            category_id=category_id,
+            asset_name="Bill Counter",
+        )
+
+        mock_db = MagicMock()
+        request = MagicMock()
+        auth = WebAuthContext(
+            is_authenticated=True,
+            organization_id=org_id,
+            person_id=user_id,
+        )
+
+        with (
+            patch(
+                "app.services.fixed_assets.web.asset_service.create_asset",
+                return_value=created_asset,
+            ) as mock_create,
+            patch.object(
+                service,
+                "_validate_assignment_selection",
+                return_value=(department_id, employee_id),
+            ) as mock_validate,
+        ):
+            response = service.create_asset_response(
+                request=request,
+                auth=auth,
+                asset_number=None,
+                asset_name="Bill Counter",
+                serial_number="106170kol57544",
+                location_id=str(location_id),
+                department_id=str(department_id),
+                custodian_employee_id=str(employee_id),
+                category_id=str(category_id),
+                acquisition_date="2026-04-27",
+                acquisition_cost="0",
+                currency_code="NGN",
+                status="IN_USE",
+                description=None,
+                depreciation_schedule_id=None,
+                db=mock_db,
+            )
+
+        assert response.status_code == 303
+        assert "success=Record+created+successfully" in response.headers["location"]
+        mock_create.assert_called_once()
+        mock_validate.assert_called_once()
+        mock_db.commit.assert_called_once()
+        mock_db.rollback.assert_not_called()
+        asset_input = mock_create.call_args.args[2]
+        assert asset_input.custodian_user_id == employee_id
+
+    def test_create_asset_response_rolls_back_on_error(self):
+        """Create errors should rollback the session before re-rendering the form."""
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        service = FixedAssetWebService()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        category_id = uuid.uuid4()
+
+        mock_db = MagicMock()
+        mock_db.get.return_value = None
+        request = MagicMock()
+        auth = WebAuthContext(
+            is_authenticated=True,
+            organization_id=org_id,
+            person_id=user_id,
+        )
+
+        with (
+            patch(
+                "app.services.fixed_assets.web.asset_service.create_asset",
+                side_effect=ValueError("boom"),
+            ),
+            patch(
+                "app.services.fixed_assets.web.base_context",
+                return_value={},
+            ),
+            patch.object(
+                service,
+                "asset_form_context",
+                return_value={},
+            ),
+            patch(
+                "app.services.fixed_assets.web.templates.TemplateResponse",
+                return_value=MagicMock(),
+            ),
+        ):
+            service.create_asset_response(
+                request=request,
+                auth=auth,
+                asset_number=None,
+                asset_name="Bill Counter",
+                serial_number="106170kol57544",
+                location_id=None,
+                department_id=None,
+                custodian_employee_id=None,
+                category_id=str(category_id),
+                acquisition_date="2026-04-27",
+                acquisition_cost="0",
+                currency_code="NGN",
+                status="IN_USE",
+                description=None,
+                depreciation_schedule_id=None,
+                db=mock_db,
+            )
+
+        mock_db.rollback.assert_called_once()

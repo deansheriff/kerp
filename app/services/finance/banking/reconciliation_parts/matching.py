@@ -38,6 +38,30 @@ from app.services.finance.banking.reconciliation_parts.base import (
 class ReconciliationMatchingService:
     """Bank reconciliation methods for matching."""
 
+    @staticmethod
+    def _derive_match_source(
+        gl_line: JournalEntryLine,
+    ) -> tuple[str | None, UUID | None]:
+        """Derive (source_type, source_id) for a bank-line ↔ GL match.
+
+        Reads the linked journal entry's ``source_document_type`` and
+        ``source_document_id``. Returns ``(None, None)`` if the journal
+        entry has no source-document attribution (manual journals, opening
+        balances, etc.). Used to keep ``BankStatementLineMatch`` audit-trail
+        columns populated automatically — without it, downstream auditors
+        cannot trace a bank movement back to its originating customer
+        receipt / supplier payment / invoice without re-walking the GL.
+        """
+        entry = gl_line.journal_entry
+        if entry is None:
+            return None, None
+        # ``getattr`` with default lets test SimpleNamespace mocks omit these
+        # attributes; on real ``JournalEntry`` rows the columns always exist
+        # (nullable, so genuine NULL → None passes through unchanged).
+        source_type = getattr(entry, "source_document_type", None)
+        source_id = getattr(entry, "source_document_id", None)
+        return source_type, source_id
+
     def add_match(
         self,
         db: Session,
@@ -1363,12 +1387,15 @@ class ReconciliationMatchingService:
         # Create junction table rows
         now = datetime.now(tz=UTC)
         for i, gl_line in enumerate(gl_lines):
+            source_type, source_id = self._derive_match_source(gl_line)
             match_row = BankStatementLineMatch(
                 statement_line_id=statement_line_id,
                 journal_line_id=gl_line.line_id,
                 matched_at=now,
                 matched_by=matched_by,
                 is_primary=(i == 0),
+                source_type=source_type,
+                source_id=source_id,
             )
             db.add(match_row)
 
@@ -1499,6 +1526,11 @@ class ReconciliationMatchingService:
                 BankStatementLineMatch.statement_line_id == statement_line_id
             )
         )
+
+        # Fall back to deriving source from the linked journal entry when the
+        # caller did not pass an explicit override (most callers don't).
+        if source_type is None and source_id is None:
+            source_type, source_id = self._derive_match_source(gl_line)
 
         match_row = BankStatementLineMatch(
             statement_line_id=statement_line_id,

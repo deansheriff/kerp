@@ -1153,7 +1153,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
     base_url, target_id="results-container", active_filters=[],
     show_search=false, search="", search_name="search", search_placeholder="Search...",
     date_range=false, start_date="", end_date="", debounce_ms=300,
-    auto_submit=true, show_apply_button=false
+    auto_submit=true, show_apply_button=false, default_open=false
 ) %}
 {% set filter_count = active_filters | length %}
 {% set caller_attrs = (
@@ -1163,7 +1163,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
     'hx-get="' ~ base_url ~ '" hx-target="#' ~ target_id ~ '" hx-select="#' ~ target_id ~ '" hx-push-url="true" hx-indicator="closest [data-live-search]"'
 ) if (not auto_submit and show_apply_button) else "" %}
 <div class="card" data-compact-filters data-live-search
-     x-data='{ open: {{ "true" if filter_count > 0 else "false" }} }'>
+     x-data='{ open: {{ "true" if (default_open or filter_count > 0) else "false" }} }'>
 
   {# ── Top bar: toggle + count badge + clear ── #}
   <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700"

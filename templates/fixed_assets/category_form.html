@@ -68,7 +68,7 @@
                     </div>
                     <div>
                         <h2 class="text-lg font-semibold text-slate-900 dark:text-white font-display">Category Details</h2>
-                        <p class="text-sm text-slate-500 dark:text-slate-400">Identification and hierarchy</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Identification and defaults</p>
                     </div>
                 </div>
             </div>
@@ -98,20 +98,6 @@
                            maxlength="100"
                            placeholder="Equipment"
                            class="form-input">
-                </div>
-
-                <div>
-                    <label class="form-label">Parent Category</label>
-                    <select name="parent_category_id" class="form-select">
-                        <option value="">No parent</option>
-                        {% for parent in categories %}
-                        {% if not category or parent.category_id != category.category_id %}
-                        <option value="{{ parent.category_id }}" {{ 'selected' if category and category.parent_category_id == parent.category_id else '' }}>
-                            {{ parent.category_code }} - {{ parent.category_name }}
-                        </option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
                 </div>
 
                 <div class="sm:col-span-2">

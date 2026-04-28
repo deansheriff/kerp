@@ -1506,6 +1506,211 @@ def test_multi_match_statement_line_happy_path() -> None:
     db.flush.assert_called_once()
 
 
+def test_multi_match_statement_line_populates_source_from_journal_entry() -> None:
+    """Each junction row carries source_type/source_id from its GL line's journal entry.
+
+    Regression for FY2025 audit P1-2: 39,485 of 39,517 match rows had
+    NULL source attribution because this code path skipped the columns.
+    """
+    svc = BankReconciliationService()
+    db = MagicMock()
+    org_id = uuid4()
+    user_id = uuid4()
+
+    receipt_doc_id = uuid4()
+    refund_doc_id = uuid4()
+
+    stmt_line = SimpleNamespace(
+        line_id=uuid4(),
+        signed_amount=Decimal("100.00"),
+        is_matched=False,
+        matched_at=None,
+        matched_by=None,
+        matched_journal_line_id=None,
+        statement=SimpleNamespace(
+            organization_id=org_id, matched_lines=0, unmatched_lines=2
+        ),
+    )
+    gl1 = SimpleNamespace(
+        line_id=uuid4(),
+        debit_amount=Decimal("60.00"),
+        credit_amount=Decimal("0"),
+        journal_entry=SimpleNamespace(
+            organization_id=org_id,
+            source_document_type="CUSTOMER_PAYMENT",
+            source_document_id=receipt_doc_id,
+        ),
+    )
+    gl2 = SimpleNamespace(
+        line_id=uuid4(),
+        debit_amount=Decimal("40.00"),
+        credit_amount=Decimal("0"),
+        journal_entry=SimpleNamespace(
+            organization_id=org_id,
+            source_document_type="CREDIT_NOTE",
+            source_document_id=refund_doc_id,
+        ),
+    )
+
+    db.get.side_effect = [stmt_line, gl1, gl2]
+
+    svc.multi_match_statement_line(
+        db,
+        org_id,
+        stmt_line.line_id,
+        journal_line_ids=[gl1.line_id, gl2.line_id],
+        matched_by=user_id,
+    )
+
+    added_matches = [
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], BankStatementLineMatch)
+    ]
+    assert len(added_matches) == 2
+    assert added_matches[0].source_type == "CUSTOMER_PAYMENT"
+    assert added_matches[0].source_id == receipt_doc_id
+    assert added_matches[1].source_type == "CREDIT_NOTE"
+    assert added_matches[1].source_id == refund_doc_id
+
+
+def test_multi_match_statement_line_handles_journal_without_source_doc() -> None:
+    """Manual journals (no source_document_*) yield None source on the match row."""
+    svc = BankReconciliationService()
+    db = MagicMock()
+    org_id = uuid4()
+
+    stmt_line = SimpleNamespace(
+        line_id=uuid4(),
+        signed_amount=Decimal("50.00"),
+        is_matched=False,
+        matched_at=None,
+        matched_by=None,
+        matched_journal_line_id=None,
+        statement=SimpleNamespace(
+            organization_id=org_id, matched_lines=0, unmatched_lines=1
+        ),
+    )
+    gl_line = SimpleNamespace(
+        line_id=uuid4(),
+        debit_amount=Decimal("50.00"),
+        credit_amount=Decimal("0"),
+        journal_entry=SimpleNamespace(
+            organization_id=org_id,
+            source_document_type=None,
+            source_document_id=None,
+        ),
+    )
+    db.get.side_effect = [stmt_line, gl_line]
+
+    svc.multi_match_statement_line(
+        db, org_id, stmt_line.line_id, journal_line_ids=[gl_line.line_id]
+    )
+
+    added_matches = [
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], BankStatementLineMatch)
+    ]
+    assert len(added_matches) == 1
+    assert added_matches[0].source_type is None
+    assert added_matches[0].source_id is None
+
+
+def test_match_statement_line_falls_back_to_derived_source() -> None:
+    """When caller passes no source_*, derive from the linked journal entry."""
+    svc = BankReconciliationService()
+    db = MagicMock()
+    org_id = uuid4()
+    payment_doc_id = uuid4()
+
+    stmt_line = SimpleNamespace(
+        line_id=uuid4(),
+        signed_amount=Decimal("100.00"),
+        is_matched=False,
+        matched_at=None,
+        matched_by=None,
+        matched_journal_line_id=None,
+        statement=SimpleNamespace(
+            organization_id=org_id, matched_lines=0, unmatched_lines=1
+        ),
+    )
+    gl_line = SimpleNamespace(
+        line_id=uuid4(),
+        debit_amount=Decimal("100.00"),
+        credit_amount=Decimal("0"),
+        journal_entry=SimpleNamespace(
+            organization_id=org_id,
+            source_document_type="SUPPLIER_PAYMENT",
+            source_document_id=payment_doc_id,
+        ),
+    )
+    db.execute.return_value = MagicMock(scalar_one_or_none=lambda: None)
+    db.get.side_effect = [stmt_line, gl_line]
+
+    svc.match_statement_line(db, org_id, stmt_line.line_id, gl_line.line_id)
+
+    added_matches = [
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], BankStatementLineMatch)
+    ]
+    assert len(added_matches) == 1
+    assert added_matches[0].source_type == "SUPPLIER_PAYMENT"
+    assert added_matches[0].source_id == payment_doc_id
+
+
+def test_match_statement_line_explicit_source_overrides_derivation() -> None:
+    """Caller-provided source_type/source_id win over the derived defaults."""
+    svc = BankReconciliationService()
+    db = MagicMock()
+    org_id = uuid4()
+    explicit_id = uuid4()
+    derived_id = uuid4()
+
+    stmt_line = SimpleNamespace(
+        line_id=uuid4(),
+        signed_amount=Decimal("75.00"),
+        is_matched=False,
+        matched_at=None,
+        matched_by=None,
+        matched_journal_line_id=None,
+        statement=SimpleNamespace(
+            organization_id=org_id, matched_lines=0, unmatched_lines=1
+        ),
+    )
+    gl_line = SimpleNamespace(
+        line_id=uuid4(),
+        debit_amount=Decimal("75.00"),
+        credit_amount=Decimal("0"),
+        journal_entry=SimpleNamespace(
+            organization_id=org_id,
+            source_document_type="CUSTOMER_PAYMENT",
+            source_document_id=derived_id,
+        ),
+    )
+    db.execute.return_value = MagicMock(scalar_one_or_none=lambda: None)
+    db.get.side_effect = [stmt_line, gl_line]
+
+    svc.match_statement_line(
+        db,
+        org_id,
+        stmt_line.line_id,
+        gl_line.line_id,
+        source_type="MANUAL_ADJUSTMENT",
+        source_id=explicit_id,
+    )
+
+    added_matches = [
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], BankStatementLineMatch)
+    ]
+    assert len(added_matches) == 1
+    assert added_matches[0].source_type == "MANUAL_ADJUSTMENT"
+    assert added_matches[0].source_id == explicit_id
+
+
 def test_multi_match_statement_line_not_found() -> None:
     """Raises 404 when statement line does not exist."""
     svc = BankReconciliationService()

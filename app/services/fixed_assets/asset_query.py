@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models.fixed_assets.asset import Asset, AssetStatus
 from app.models.fixed_assets.asset_category import AssetCategory
+from app.models.finance.core_org.location import Location
 from app.services.common import coerce_uuid
 
 
@@ -42,6 +43,7 @@ def build_asset_query(
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
+    location: str | None = None,
 ) -> Select:
     """
     Build the base asset query with filters applied.
@@ -49,9 +51,12 @@ def build_asset_query(
     org_id = coerce_uuid(organization_id)
     status_value = _parse_status(status)
     category_id = _try_uuid(category)
+    location_id = _try_uuid(location)
 
-    query = select(Asset).join(
-        AssetCategory, Asset.category_id == AssetCategory.category_id
+    query = (
+        select(Asset)
+        .join(AssetCategory, Asset.category_id == AssetCategory.category_id)
+        .outerjoin(Location, Asset.location_id == Location.location_id)
     )
     query = query.where(Asset.organization_id == org_id)
 
@@ -61,6 +66,10 @@ def build_asset_query(
         query = query.where(Asset.category_id == category_id)
     elif category:
         query = query.where(AssetCategory.category_code == category)
+    if location_id:
+        query = query.where(Asset.location_id == location_id)
+    elif location:
+        query = query.where(Location.location_code == location)
     if search:
         search_pattern = f"%{search}%"
         query = query.where(

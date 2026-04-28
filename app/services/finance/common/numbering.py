@@ -31,7 +31,7 @@ DEFAULT_PREFIXES = {
     SequenceType.PURCHASE_ORDER: "PO",
     SequenceType.SUPPLIER_INVOICE: "SINV",
     SequenceType.ITEM: "ITEM",
-    SequenceType.ASSET: "FA",
+    SequenceType.ASSET: "DT-AST",
     SequenceType.LEASE: "LS",
     SequenceType.GOODS_RECEIPT: "GR",
     SequenceType.QUOTE: "QT",
@@ -48,6 +48,7 @@ DEFAULT_PREFIXES = {
     SequenceType.SALARY_SLIP: "SLIP",
     SequenceType.PAYROLL_ENTRY: "PAY",
     SequenceType.EXPENSE_INVOICE: "EXP-INV",
+    SequenceType.CONTRACT: "CTR",
 }
 
 DEFAULT_SEQUENCE_CONFIGS = {
@@ -141,6 +142,15 @@ DEFAULT_SEQUENCE_CONFIGS = {
         "year_format": 4,
         "reset_frequency": ResetFrequency.YEARLY,
     },
+    SequenceType.ASSET: {
+        "prefix": "DT-AST",
+        "separator": "-",
+        "min_digits": 4,
+        "include_year": False,
+        "include_month": False,
+        "year_format": 4,
+        "reset_frequency": ResetFrequency.NEVER,
+    },
     SequenceType.MATERIAL_REQUEST: {
         "prefix": "MAT-MR-",
         "separator": "-",
@@ -158,6 +168,15 @@ DEFAULT_SEQUENCE_CONFIGS = {
         "include_month": False,
         "year_format": 4,
         "reset_frequency": ResetFrequency.YEARLY,
+    },
+    SequenceType.CONTRACT: {
+        "prefix": "CTR",
+        "separator": "-",
+        "min_digits": 6,
+        "include_year": False,
+        "include_month": False,
+        "year_format": 4,
+        "reset_frequency": ResetFrequency.NEVER,
     },
 }
 

@@ -13,7 +13,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.datastructures import UploadFile
@@ -38,7 +38,6 @@ from app.models.people.assets.audit import AssetAuditDiscrepancy
 from app.services.common import coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.finance.platform.currency_context import get_currency_context
-from app.services.finance.platform.org_context import org_context_service
 from app.services.fixed_assets.asset import (
     AssetCategoryInput,
     AssetInput,
@@ -93,6 +92,163 @@ def _try_uuid(value: str | None) -> UUID | None:
 
 class FixedAssetWebService:
     """View service for fixed assets web routes."""
+
+    @staticmethod
+    def _assignment_options(
+        db: Session,
+        organization_id: str,
+        selected_employee_id: UUID | None = None,
+    ) -> dict[str, object]:
+        """Load department + employee options for asset assignment fields."""
+        from app.models.people.hr.department import Department
+        from app.models.people.hr.employee import Employee, EmployeeStatus
+        from app.models.person import Person
+
+        org_id = coerce_uuid(organization_id)
+        selected_employee_uuid = (
+            coerce_uuid(selected_employee_id) if selected_employee_id else None
+        )
+
+        departments = db.scalars(
+            select(Department)
+            .where(
+                Department.organization_id == org_id,
+                Department.is_active.is_(True),
+            )
+            .order_by(Department.department_name)
+        ).all()
+
+        employee_query = (
+            select(
+                Employee.employee_id,
+                Employee.employee_code,
+                Employee.department_id,
+                Person.name_expr().label("full_name"),
+            )
+            .join(Person, Person.id == Employee.person_id)
+            .where(Employee.organization_id == org_id)
+            .order_by(Person.first_name, Person.last_name)
+        )
+        if selected_employee_uuid is not None:
+            employee_query = employee_query.where(
+                or_(
+                    Employee.status == EmployeeStatus.ACTIVE,
+                    Employee.employee_id == selected_employee_uuid,
+                )
+            )
+        else:
+            employee_query = employee_query.where(
+                Employee.status == EmployeeStatus.ACTIVE
+            )
+
+        employee_rows = db.execute(employee_query).all()
+        employees = [
+            {
+                "employee_id": str(row.employee_id),
+                "employee_code": row.employee_code,
+                "department_id": (
+                    str(row.department_id) if row.department_id is not None else ""
+                ),
+                "full_name": row.full_name,
+            }
+            for row in employee_rows
+        ]
+
+        selected_department_id = ""
+        if selected_employee_uuid is not None:
+            selected_employee = next(
+                (
+                    employee
+                    for employee in employees
+                    if employee["employee_id"] == str(selected_employee_uuid)
+                ),
+                None,
+            )
+            if selected_employee:
+                selected_department_id = str(selected_employee["department_id"] or "")
+
+        return {
+            "departments_list": [
+                {
+                    "department_id": str(department.department_id),
+                    "department_code": department.department_code,
+                    "department_name": department.department_name,
+                }
+                for department in departments
+            ],
+            "department_employees": employees,
+            "selected_department_id": selected_department_id,
+        }
+
+    @staticmethod
+    def _validate_assignment_selection(
+        db: Session,
+        organization_id: str,
+        department_id: str | None,
+        custodian_employee_id: str | None,
+        *,
+        allowed_employee_id: UUID | None = None,
+    ) -> tuple[UUID | None, UUID | None]:
+        """Validate department/employee pairing and return normalized UUIDs."""
+        from app.models.people.hr.department import Department
+        from app.models.people.hr.employee import Employee, EmployeeStatus
+
+        org_id = coerce_uuid(organization_id)
+        resolved_department_id = (
+            coerce_uuid(department_id)
+            if department_id and department_id.strip()
+            else None
+        )
+        resolved_employee_id = (
+            coerce_uuid(custodian_employee_id)
+            if custodian_employee_id and custodian_employee_id.strip()
+            else None
+        )
+
+        if resolved_department_id is not None:
+            department = db.get(Department, resolved_department_id)
+            if (
+                not department
+                or department.organization_id != org_id
+                or not department.is_active
+            ):
+                raise HTTPException(
+                    status_code=400, detail="Selected department is invalid"
+                )
+
+        if resolved_employee_id is None:
+            return resolved_department_id, None
+
+        employee_query = select(Employee).where(
+            Employee.organization_id == org_id,
+            Employee.employee_id == resolved_employee_id,
+        )
+        if allowed_employee_id is not None:
+            employee_query = employee_query.where(
+                or_(
+                    Employee.status == EmployeeStatus.ACTIVE,
+                    Employee.employee_id == coerce_uuid(allowed_employee_id),
+                )
+            )
+        else:
+            employee_query = employee_query.where(
+                Employee.status == EmployeeStatus.ACTIVE
+            )
+
+        employee = db.scalar(employee_query)
+        if employee is None:
+            raise HTTPException(status_code=400, detail="Selected employee is invalid")
+
+        if (
+            resolved_department_id is not None
+            and employee.department_id != resolved_department_id
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Selected employee does not belong to the chosen department",
+            )
+
+        return resolved_department_id, resolved_employee_id
 
     @staticmethod
     def _sequence_preview(sequence: NumberingSequence | None) -> str | None:
@@ -583,6 +739,7 @@ class FixedAssetWebService:
     def asset_form_context(
         db: Session,
         organization_id: str,
+        selected_employee_id: UUID | None = None,
     ) -> dict:
         """Build context for new asset form."""
         from app.models.finance.ap.supplier import Supplier
@@ -594,27 +751,10 @@ class FixedAssetWebService:
             .where(
                 AssetCategory.organization_id == org_id,
                 AssetCategory.is_active.is_(True),
+                AssetCategory.parent_category_id.is_(None),
             )
             .order_by(AssetCategory.category_code)
         ).all()
-        parent_category_ids = {
-            c.parent_category_id for c in categories if c.parent_category_id is not None
-        }
-        main_categories = [
-            c
-            for c in categories
-            if c.parent_category_id is None and c.category_id in parent_category_ids
-        ]
-        sub_categories = [
-            {
-                "category_id": str(c.category_id),
-                "category_code": c.category_code,
-                "category_name": c.category_name,
-                "parent_category_id": str(c.parent_category_id),
-            }
-            for c in categories
-            if c.parent_category_id is not None
-        ]
 
         sequence = db.scalar(
             select(NumberingSequence).where(
@@ -657,6 +797,11 @@ class FixedAssetWebService:
             }
             for loc in locations
         ]
+        assignment_options = FixedAssetWebService._assignment_options(
+            db,
+            organization_id,
+            selected_employee_id=selected_employee_id,
+        )
 
         depreciation_schedule_rows = db.execute(
             select(
@@ -697,10 +842,10 @@ class FixedAssetWebService:
 
         context = {
             "categories": categories,
-            "main_categories": main_categories,
-            "sub_categories": sub_categories,
             "suppliers_list": suppliers_list,
             "locations_list": locations_list,
+            "departments_list": assignment_options["departments_list"],
+            "department_employees": assignment_options["department_employees"],
             "depreciation_schedules": depreciation_schedules,
             "asset_statuses": [
                 {"value": status.value, "label": status.value.replace("_", " ").title()}
@@ -708,6 +853,7 @@ class FixedAssetWebService:
             ],
             "today": _format_date(date.today()),
             "asset_number_preview": FixedAssetWebService._sequence_preview(sequence),
+            "selected_department_id": assignment_options["selected_department_id"],
         }
         context.update(get_currency_context(db, organization_id))
         return context
@@ -719,6 +865,7 @@ class FixedAssetWebService:
         search: str | None,
         category: str | None,
         status: str | None,
+        location: str | None,
         page: int,
         limit: int = 50,
     ) -> dict:
@@ -732,12 +879,12 @@ class FixedAssetWebService:
             search=search,
             category=category,
             status=status,
+            location=location,
         )
 
         total_count = db.scalar(select(func.count()).select_from(query.subquery())) or 0
         rows = db.execute(
-            query.outerjoin(Location, Asset.location_id == Location.location_id)
-            .add_columns(AssetCategory, Location)
+            query.add_columns(AssetCategory, Location)
             .order_by(Asset.asset_number)
             .limit(limit)
             .offset(offset)
@@ -781,26 +928,50 @@ class FixedAssetWebService:
             .where(
                 AssetCategory.organization_id == org_id,
                 AssetCategory.is_active.is_(True),
+                AssetCategory.parent_category_id.is_(None),
             )
             .order_by(AssetCategory.category_code)
         ).all()
+        locations = db.scalars(
+            select(Location)
+            .where(
+                Location.organization_id == org_id,
+                Location.is_active.is_(True),
+            )
+            .order_by(Location.location_name)
+        ).all()
 
         active_filters = build_active_filters(
-            params={"search": search, "category": category, "status": status},
-            labels={"search": "Search", "category": "Category", "status": "Status"},
+            params={
+                "search": search,
+                "category": category,
+                "status": status,
+                "location": location,
+            },
+            labels={
+                "search": "Search",
+                "category": "Category",
+                "status": "Status",
+                "location": "Location",
+            },
             options={
                 "category": {
                     str(cat.category_id): cat.category_name for cat in categories
-                }
+                },
+                "location": {
+                    str(loc.location_id): loc.location_name for loc in locations
+                },
             },
         )
 
         return {
             "assets": assets_view,
             "categories": categories,
+            "locations": locations,
             "search": search,
             "category": category,
             "status": status,
+            "location": location,
             "page": page,
             "limit": limit,
             "offset": offset,
@@ -820,9 +991,10 @@ class FixedAssetWebService:
         context["form_asset_number"] = ""
         context["form_asset_name"] = ""
         context["form_category_id"] = ""
-        context["form_parent_category_id"] = ""
         context["form_serial_number"] = ""
         context["form_location_id"] = ""
+        context["form_department_id"] = ""
+        context["form_custodian_employee_id"] = ""
         context["form_status"] = AssetStatus.NOT_IN_USE.value
         return templates.TemplateResponse(
             request, "fixed_assets/asset_form.html", context
@@ -836,6 +1008,8 @@ class FixedAssetWebService:
         asset_name: str,
         serial_number: str | None,
         location_id: str | None,
+        department_id: str | None,
+        custodian_employee_id: str | None,
         category_id: str,
         acquisition_date: str | None,
         acquisition_cost: str | None,
@@ -852,6 +1026,12 @@ class FixedAssetWebService:
                 raise HTTPException(status_code=401, detail="Authentication required")
             if user_id is None:
                 raise HTTPException(status_code=401, detail="Authentication required")
+            if not acquisition_date or not acquisition_date.strip():
+                raise ValueError("Acquisition date is required")
+            if not acquisition_cost or not acquisition_cost.strip():
+                raise ValueError("Acquisition cost is required")
+            if not currency_code or not currency_code.strip():
+                raise ValueError("Currency is required")
             parsed_acquisition_date = (
                 datetime.strptime(acquisition_date, "%Y-%m-%d").date()
                 if acquisition_date and acquisition_date.strip()
@@ -862,11 +1042,13 @@ class FixedAssetWebService:
                 if acquisition_cost and acquisition_cost.strip()
                 else Decimal("0")
             )
-            resolved_currency = (
-                currency_code
-                or org_context_service.get_functional_currency(
+            resolved_currency = currency_code.strip()
+            resolved_department_id, resolved_custodian_employee_id = (
+                self._validate_assignment_selection(
                     db,
-                    org_id,
+                    str(org_id),
+                    department_id,
+                    custodian_employee_id,
                 )
             )
 
@@ -876,6 +1058,7 @@ class FixedAssetWebService:
                 serial_number=(serial_number.strip() if serial_number else None),
                 location_id=(UUID(location_id) if location_id else None),
                 category_id=UUID(category_id),
+                custodian_user_id=resolved_custodian_employee_id,
                 acquisition_date=parsed_acquisition_date,
                 acquisition_cost=parsed_acquisition_cost,
                 currency_code=resolved_currency,
@@ -896,31 +1079,37 @@ class FixedAssetWebService:
                 input_data,
                 created_by_user_id=user_id,
             )
+            db.commit()
             return RedirectResponse(
                 url="/fixed-assets/assets?success=Record+created+successfully",
                 status_code=303,
             )
 
         except Exception as e:
+            db.rollback()
             context = base_context(request, auth, "New Asset", "fixed_assets")
-            context.update(self.asset_form_context(db, str(auth.organization_id)))
+            selected_employee_id = (
+                _try_uuid(custodian_employee_id) if custodian_employee_id else None
+            )
+            context.update(
+                self.asset_form_context(
+                    db,
+                    str(auth.organization_id),
+                    selected_employee_id=selected_employee_id,
+                )
+            )
             context["error"] = str(e)
             context["form_asset_number"] = asset_number or ""
             context["form_asset_name"] = asset_name
             context["form_category_id"] = category_id
-            context["form_parent_category_id"] = ""
-            try:
-                selected_category = db.get(AssetCategory, UUID(category_id))
-                if selected_category:
-                    context["form_parent_category_id"] = (
-                        str(selected_category.parent_category_id)
-                        if selected_category.parent_category_id
-                        else str(selected_category.category_id)
-                    )
-            except ValueError:
-                context["form_parent_category_id"] = ""
             context["form_serial_number"] = serial_number or ""
             context["form_location_id"] = location_id or ""
+            context["form_department_id"] = department_id or (
+                str(resolved_department_id)
+                if "resolved_department_id" in locals() and resolved_department_id
+                else ""
+            )
+            context["form_custodian_employee_id"] = custodian_employee_id or ""
             context["form_acquisition_date"] = acquisition_date or ""
             context["form_acquisition_cost"] = acquisition_cost or ""
             context["form_currency_code"] = currency_code or ""
@@ -940,8 +1129,10 @@ class FixedAssetWebService:
     ) -> dict:
         org_id = coerce_uuid(organization_id)
         offset = (page - 1) * limit
-
-        query = select(AssetCategory).where(AssetCategory.organization_id == org_id)
+        query = select(AssetCategory).where(
+            AssetCategory.organization_id == org_id,
+            AssetCategory.parent_category_id.is_(None),
+        )
         if is_active is not None:
             query = query.where(
                 AssetCategory.is_active.is_(True)
@@ -950,12 +1141,13 @@ class FixedAssetWebService:
             )
 
         total_count = db.scalar(select(func.count()).select_from(query.subquery())) or 0
-        rows = db.scalars(
+        rows = db.execute(
             query.order_by(AssetCategory.category_code).limit(limit).offset(offset)
         ).all()
 
         categories_view = []
-        for category in rows:
+        for row in rows:
+            category = row[0]
             categories_view.append(
                 {
                     "category_id": category.category_id,
@@ -999,7 +1191,10 @@ class FixedAssetWebService:
         org_id = coerce_uuid(organization_id)
         categories = db.scalars(
             select(AssetCategory)
-            .where(AssetCategory.organization_id == org_id)
+            .where(
+                AssetCategory.organization_id == org_id,
+                AssetCategory.parent_category_id.is_(None),
+            )
             .order_by(AssetCategory.category_code)
         ).all()
         accounts = FixedAssetWebService._get_accounts(db, org_id)
@@ -1007,6 +1202,8 @@ class FixedAssetWebService:
         category = None
         if category_id:
             category = db.get(AssetCategory, coerce_uuid(category_id))
+            if category and category.parent_category_id:
+                category = None
 
         return {
             "category": category,
@@ -1103,11 +1300,7 @@ class FixedAssetWebService:
                 )
                 if _safe_form_text(form.get("impairment_loss_account_id"))
                 else None,
-                parent_category_id=coerce_uuid(
-                    _safe_form_text(form.get("parent_category_id"))
-                )
-                if _safe_form_text(form.get("parent_category_id"))
-                else None,
+                parent_category_id=None,
                 description=_safe_form_text(form.get("description")) or None,
             )
 
@@ -1129,6 +1322,8 @@ class FixedAssetWebService:
     ) -> HTMLResponse | RedirectResponse:
         category = asset_category_service.get(db, category_id, auth.organization_id)
         if not category or category.organization_id != auth.organization_id:
+            return RedirectResponse(url="/fixed-assets/categories", status_code=302)
+        if category.parent_category_id:
             return RedirectResponse(url="/fixed-assets/categories", status_code=302)
 
         context = base_context(request, auth, "Edit Asset Category", "fixed_assets")
@@ -1196,11 +1391,7 @@ class FixedAssetWebService:
                 )
                 if _safe_form_text(form.get("impairment_loss_account_id"))
                 else None,
-                parent_category_id=coerce_uuid(
-                    _safe_form_text(form.get("parent_category_id"))
-                )
-                if _safe_form_text(form.get("parent_category_id"))
-                else None,
+                parent_category_id=None,
                 description=_safe_form_text(form.get("description")) or None,
             )
 
@@ -1390,7 +1581,6 @@ class FixedAssetWebService:
                 status_code=303,
             )
 
-        # Get category info
         category = (
             db.get(AssetCategory, asset.category_id) if asset.category_id else None
         )
@@ -1455,7 +1645,13 @@ class FixedAssetWebService:
             )
 
         context = base_context(request, auth, "Edit Asset", "fixed_assets")
-        context.update(self.asset_form_context(db, str(auth.organization_id)))
+        context.update(
+            self.asset_form_context(
+                db,
+                str(auth.organization_id),
+                selected_employee_id=asset.custodian_employee_id,
+            )
+        )
         context["asset"] = asset
         context["is_pre_use_asset"] = asset.status in {
             AssetStatus.NOT_IN_USE,
@@ -1466,18 +1662,13 @@ class FixedAssetWebService:
         context["form_category_id"] = (
             str(asset.category_id) if asset.category_id else ""
         )
-        context["form_parent_category_id"] = ""
-        if asset.category_id:
-            selected_category = db.get(AssetCategory, asset.category_id)
-            if selected_category:
-                context["form_parent_category_id"] = (
-                    str(selected_category.parent_category_id)
-                    if selected_category.parent_category_id
-                    else str(selected_category.category_id)
-                )
         context["form_serial_number"] = asset.serial_number or ""
         context["form_location_id"] = (
             str(asset.location_id) if asset.location_id else ""
+        )
+        context["form_department_id"] = context.get("selected_department_id", "") or ""
+        context["form_custodian_employee_id"] = (
+            str(asset.custodian_employee_id) if asset.custodian_employee_id else ""
         )
         context["form_description"] = asset.description or ""
         context["form_acquisition_date"] = (
@@ -1528,13 +1719,25 @@ class FixedAssetWebService:
 
             serial_number = _safe_form_text(form_data.get("serial_number")).strip()
             location_id = _safe_form_text(form_data.get("location_id")).strip()
+            department_id = _safe_form_text(form_data.get("department_id")).strip()
+            custodian_employee_id = _safe_form_text(
+                form_data.get("custodian_employee_id")
+            ).strip()
             description = _safe_form_text(form_data.get("description")).strip()
             status = _safe_form_text(form_data.get("status")).strip()
             depreciation_schedule_id = _safe_form_text(
                 form_data.get("depreciation_schedule_id")
             ).strip()
+            _, resolved_custodian_employee_id = self._validate_assignment_selection(
+                db,
+                str(org_id),
+                department_id,
+                custodian_employee_id,
+                allowed_employee_id=asset.custodian_employee_id,
+            )
             updates["serial_number"] = serial_number or None
             updates["location_id"] = UUID(location_id) if location_id else None
+            updates["custodian_employee_id"] = resolved_custodian_employee_id
             updates["description"] = description or None
             if status:
                 updates["status"] = AssetStatus(status)

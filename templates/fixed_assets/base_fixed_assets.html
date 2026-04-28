@@ -98,6 +98,8 @@
         <!-- Navigation -->
         <nav class="flex-1 space-y-1 overflow-y-auto p-3" aria-label="Asset Management navigation">
             <a href="/fixed-assets"
+               data-no-context
+               @click.stop
                :aria-current="['dashboard','fixed_assets'].includes(activeModule) ? 'page' : false"
                :class="['dashboard','fixed_assets'].includes(activeModule) ? 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
@@ -110,6 +112,8 @@
             </div>
 
             <a href="/fixed-assets/assets"
+               data-no-context
+               @click.stop
                :aria-current="activeModule === 'assets' ? 'page' : false"
                :class="activeModule === 'assets' ? 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
@@ -118,6 +122,8 @@
             </a>
 
             <a href="/fixed-assets/import"
+               data-no-context
+               @click.stop
                :aria-current="activeModule === 'import' ? 'page' : false"
                :class="activeModule === 'import' ? 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
@@ -126,6 +132,8 @@
             </a>
 
             <a href="/fixed-assets/categories"
+               data-no-context
+               @click.stop
                :aria-current="activeModule === 'categories' ? 'page' : false"
                :class="activeModule === 'categories' ? 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
@@ -134,6 +142,8 @@
             </a>
 
             <a href="/fixed-assets/depreciation"
+               data-no-context
+               @click.stop
                :aria-current="activeModule === 'depreciation' ? 'page' : false"
                :class="activeModule === 'depreciation' ? 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">
@@ -142,6 +152,8 @@
             </a>
 
             <a href="/fixed-assets/reports"
+               data-no-context
+               @click.stop
                :aria-current="activeModule === 'reports' ? 'page' : false"
                :class="activeModule === 'reports' ? 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all">

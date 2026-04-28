@@ -99,6 +99,7 @@ SEQUENCE_TYPE_LABELS = {
     SequenceType.SALARY_SLIP: "Salary Slip",
     SequenceType.PAYROLL_ENTRY: "Payroll Entry",
     SequenceType.EXPENSE_INVOICE: "Expense Invoice",
+    SequenceType.CONTRACT: "Contract",
 }
 
 RESET_FREQUENCY_LABELS = {

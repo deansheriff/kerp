@@ -338,7 +338,8 @@ code {
     top: 0;
     height: 100vh;
     max-height: 100vh;
-    z-index: 40;
+    z-index: 60;
+    isolation: isolate;
     overflow: hidden;
     transform: translateX(0);
     transition: width 0.3s ease, transform 0.3s ease;
@@ -1220,10 +1221,16 @@ textarea,
     min-height: 44px;
     display: flex;
     align-items: center;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
 }
 
 .app-sidebar nav button {
     min-height: 44px;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
 }
 
 /* Touch device minimum targets (48px Material Design, 44px Apple) */

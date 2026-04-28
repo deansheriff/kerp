@@ -117,3 +117,4 @@ dotmac_books_backup.sql.gz
 .seabone/prompts/
 .worktrees/
 .agent-run.sh
+.codex

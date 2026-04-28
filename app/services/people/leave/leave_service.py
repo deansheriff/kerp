@@ -34,6 +34,9 @@ from app.models.people.leave import (
     LeaveType,
     LeaveTypePolicy,
 )
+from app.models.notification import EntityType, NotificationChannel, NotificationType
+from app.models.person import Person, PersonStatus
+from app.models.rbac import PersonRole, Role
 from app.services.audit_dispatcher import fire_audit_event
 from app.services.common import (
     ConflictError,
@@ -41,9 +44,13 @@ from app.services.common import (
     PaginationParams,
     ValidationError,
 )
+from app.services.notification import NotificationService
 from app.services.state_machine import StateMachine
 
 logger = logging.getLogger(__name__)
+
+# Role names that should be notified when a leave application is submitted.
+LEAVE_NOTIFICATION_ROLES = ("hr_manager",)
 
 if TYPE_CHECKING:
     from app.web.deps import WebAuthContext
@@ -329,6 +336,64 @@ class LeaveService:
             raise LeaveApplicationStatusError(
                 current_status.value, new_status.value
             ) from None
+
+    def _get_hr_manager_recipients(self, org_id: UUID) -> list[Person]:
+        """Return active people in the organization holding any leave-notification role."""
+        stmt = (
+            select(Person)
+            .join(PersonRole, PersonRole.person_id == Person.id)
+            .join(Role, Role.id == PersonRole.role_id)
+            .where(
+                Person.organization_id == org_id,
+                Person.is_active.is_(True),
+                Person.status == PersonStatus.active,
+                Role.name.in_(LEAVE_NOTIFICATION_ROLES),
+                Role.is_active.is_(True),
+            )
+            .distinct()
+        )
+        return list(self.db.scalars(stmt).all())
+
+    def _notify_leave_submitted(
+        self,
+        org_id: UUID,
+        application: LeaveApplication,
+    ) -> None:
+        """Create HR manager notifications for a submitted leave application."""
+        recipients = self._get_hr_manager_recipients(org_id)
+        if not recipients:
+            return
+
+        employee = self.db.get(Employee, application.employee_id)
+        employee_name = (
+            employee.full_name
+            if employee and getattr(employee, "full_name", None)
+            else str(application.employee_id)
+        )
+        title = "Leave application submitted"
+        message = (
+            f"{employee_name} submitted leave request "
+            f"{application.application_number} for "
+            f"{application.from_date} to {application.to_date}."
+        )
+        action_url = f"/people/leave/applications/{application.application_id}"
+        actor_id = self.ctx.person_id if self.ctx else None
+        notification_service = NotificationService()
+
+        for recipient in recipients:
+            notification_service.create(
+                self.db,
+                organization_id=org_id,
+                recipient_id=recipient.id,
+                entity_type=EntityType.LEAVE,
+                entity_id=application.application_id,
+                notification_type=NotificationType.SUBMITTED,
+                title=title,
+                message=message,
+                channel=NotificationChannel.BOTH,
+                action_url=action_url,
+                actor_id=actor_id,
+            )
 
     # =========================================================================
     # Leave Types
@@ -1266,6 +1331,7 @@ class LeaveService:
 
         self.db.add(application)
         self.db.flush()
+        self._notify_leave_submitted(org_id, application)
 
         fire_audit_event(
             db=self.db,

@@ -73,6 +73,31 @@ class TestAssetCategoryService:
         assert exc_info.value.status_code == 400
         assert "already exists" in exc_info.value.detail
 
+    def test_create_category_ignores_parent_category(self, mock_db, org_id):
+        """New categories should always be top-level categories."""
+        from app.services.fixed_assets.asset import (
+            AssetCategoryInput,
+            AssetCategoryService,
+        )
+
+        input_data = AssetCategoryInput(
+            category_code="IT",
+            category_name="IT Equipment",
+            asset_account_id=uuid.uuid4(),
+            accumulated_depreciation_account_id=uuid.uuid4(),
+            depreciation_expense_account_id=uuid.uuid4(),
+            gain_loss_disposal_account_id=uuid.uuid4(),
+            useful_life_months=60,
+            parent_category_id=uuid.uuid4(),
+        )
+
+        mock_db.scalars.return_value.first.return_value = None
+
+        AssetCategoryService.create_category(mock_db, org_id, input_data)
+
+        created_category = mock_db.add.call_args.args[0]
+        assert created_category.parent_category_id is None
+
     def test_get_category_success(self, mock_db, mock_category):
         """Test getting a category by ID."""
         from app.services.fixed_assets.asset import AssetCategoryService
@@ -221,6 +246,122 @@ class TestAssetService:
 
         assert exc_info.value.status_code == 400
         assert "capitalization threshold" in exc_info.value.detail
+
+    def test_create_asset_child_category_uses_parent(self, mock_db, org_id, user_id):
+        """Assets assigned to a child category should be normalized to the parent."""
+        from app.services.fixed_assets.asset import AssetInput, AssetService
+
+        parent_category = MockAssetCategory(organization_id=org_id)
+        child_category = MockAssetCategory(
+            organization_id=org_id,
+            parent_category_id=parent_category.category_id,
+        )
+        mock_db.get.side_effect = [child_category, parent_category]
+        mock_db.scalars.return_value.first.return_value = None
+
+        input_data = AssetInput(
+            asset_name="Office Computer",
+            category_id=child_category.category_id,
+            acquisition_date=date.today(),
+            acquisition_cost=Decimal("5000.00"),
+            currency_code="USD",
+        )
+
+        with patch(
+            "app.services.fixed_assets.asset.SequenceService.get_next_number"
+        ) as mock_seq:
+            mock_seq.return_value = "FA-0001"
+            AssetService.create_asset(mock_db, org_id, input_data, user_id)
+
+        created_asset = mock_db.add.call_args.args[0]
+        assert created_asset.category_id == parent_category.category_id
+
+    def test_create_asset_grandchild_category_walks_to_root(
+        self, mock_db, org_id, user_id
+    ):
+        """A 3-level chain (grandchild → child → root) must resolve all the way up."""
+        from app.services.fixed_assets.asset import AssetInput, AssetService
+
+        root_category = MockAssetCategory(organization_id=org_id)
+        child_category = MockAssetCategory(
+            organization_id=org_id,
+            parent_category_id=root_category.category_id,
+        )
+        grandchild_category = MockAssetCategory(
+            organization_id=org_id,
+            parent_category_id=child_category.category_id,
+        )
+        mock_db.get.side_effect = [
+            grandchild_category,
+            child_category,
+            root_category,
+        ]
+        mock_db.scalars.return_value.first.return_value = None
+
+        input_data = AssetInput(
+            asset_name="Office Computer",
+            category_id=grandchild_category.category_id,
+            acquisition_date=date.today(),
+            acquisition_cost=Decimal("5000.00"),
+            currency_code="USD",
+        )
+
+        with patch(
+            "app.services.fixed_assets.asset.SequenceService.get_next_number"
+        ) as mock_seq:
+            mock_seq.return_value = "FA-0001"
+            AssetService.create_asset(mock_db, org_id, input_data, user_id)
+
+        created_asset = mock_db.add.call_args.args[0]
+        assert created_asset.category_id == root_category.category_id
+
+    def test_create_asset_category_cycle_raises(self, mock_db, org_id, user_id):
+        """A cyclic parent_category_id chain must raise rather than loop forever."""
+        from fastapi import HTTPException
+
+        from app.services.fixed_assets.asset import AssetInput, AssetService
+
+        cat_a = MockAssetCategory(organization_id=org_id)
+        cat_b = MockAssetCategory(
+            organization_id=org_id, parent_category_id=cat_a.category_id
+        )
+        # Close the loop: A → B → A.
+        cat_a.parent_category_id = cat_b.category_id
+        mock_db.get.side_effect = [cat_a, cat_b, cat_a]
+
+        input_data = AssetInput(
+            asset_name="Office Computer",
+            category_id=cat_a.category_id,
+            acquisition_date=date.today(),
+            acquisition_cost=Decimal("5000.00"),
+            currency_code="USD",
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            AssetService.create_asset(mock_db, org_id, input_data, user_id)
+        assert exc_info.value.status_code == 400
+        assert "cycle" in exc_info.value.detail.lower()
+
+    def test_update_asset_child_category_uses_parent(self, mock_db, org_id):
+        """Updating category should also normalize child categories to the parent."""
+        from app.services.fixed_assets.asset import AssetService
+
+        asset = MockAsset(organization_id=org_id, status=MockAssetStatus.NOT_IN_USE)
+        parent_category = MockAssetCategory(organization_id=org_id)
+        child_category = MockAssetCategory(
+            organization_id=org_id,
+            parent_category_id=parent_category.category_id,
+        )
+        mock_db.get.side_effect = [asset, child_category, parent_category]
+
+        AssetService.update_asset(
+            mock_db,
+            org_id,
+            asset.asset_id,
+            {"category_id": child_category.category_id},
+        )
+
+        assert asset.category_id == parent_category.category_id
 
     def test_get_asset_success(self, mock_db, mock_asset):
         """Test getting an asset by ID."""

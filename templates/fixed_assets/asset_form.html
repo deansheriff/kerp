@@ -124,25 +124,16 @@
 
                 <div>
                     <label class="form-label">
-                        Main Category <span class="text-rose-500">*</span>
+                        Category <span class="text-rose-500">*</span>
                     </label>
-                    {% set selected_parent_category = form_parent_category_id if form_parent_category_id is defined else '' %}
-                    <select id="main-category-select" name="category_parent_id" {{ 'required' if is_pre_use_asset else 'disabled' }} class="form-select">
-                        <option value="">Select main category</option>
-                        {% for category in main_categories %}
-                        <option value="{{ category.category_id }}" {{ 'selected' if selected_parent_category == category.category_id|string else '' }}>
+                    <select name="category_id" {{ 'required' if is_pre_use_asset else 'disabled' }} class="form-select">
+                        <option value="">Select category</option>
+                        {% set selected_category = form_category_id if form_category_id is defined else '' %}
+                        {% for category in categories %}
+                        <option value="{{ category.category_id }}" {{ 'selected' if selected_category == category.category_id|string else '' }}>
                             {{ category.category_name }}
                         </option>
                         {% endfor %}
-                    </select>
-                </div>
-
-                <div>
-                    <label class="form-label">
-                        Sub-category <span class="text-rose-500">*</span>
-                    </label>
-                    <select id="sub-category-select" name="category_id" {{ 'required' if is_pre_use_asset else 'disabled' }} class="form-select">
-                        <option value="">Select sub-category</option>
                     </select>
                     {% if is_edit and not is_pre_use_asset %}
                     <p class="form-hint">Category is locked after activation.</p>
@@ -160,6 +151,28 @@
                         </option>
                         {% endfor %}
                     </select>
+                </div>
+
+                <div>
+                    <label class="form-label">Department</label>
+                    {% set selected_department = form_department_id if form_department_id is defined else (selected_department_id if selected_department_id is defined else '') %}
+                    <select id="asset-department-select" name="department_id" class="form-select">
+                        <option value="">Select department</option>
+                        {% for department in departments_list %}
+                        <option value="{{ department.department_id }}" {{ 'selected' if selected_department == department.department_id else '' }}>
+                            {{ department.department_code }} - {{ department.department_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p class="form-hint">Optional. Choose a department first to narrow the employee list.</p>
+                </div>
+
+                <div>
+                    <label class="form-label">Assign To</label>
+                    <select id="asset-custodian-select" name="custodian_employee_id" class="form-select">
+                        <option value="">Select employee</option>
+                    </select>
+                    <p class="form-hint">Optional. This links the asset to the employee currently responsible for it.</p>
                 </div>
 
                 <div>
@@ -227,11 +240,12 @@
             <div class="p-6 grid gap-6 sm:grid-cols-2">
                 <div>
                     <label class="form-label">
-                        Acquisition Date
+                        Acquisition Date <span class="text-rose-500">*</span>
                     </label>
                     <input type="date"
                            name="acquisition_date"
                            value="{{ form_acquisition_date if form_acquisition_date is defined and form_acquisition_date else today }}"
+                           {{ 'required' if is_pre_use_asset else '' }}
                            {{ 'disabled' if is_edit and not is_pre_use_asset else '' }}
                            class="form-input">
                     {% if is_edit and not is_pre_use_asset %}
@@ -241,7 +255,7 @@
 
                 <div>
                     <label class="form-label">
-                        Acquisition Cost
+                        Acquisition Cost <span class="text-rose-500">*</span>
                     </label>
                     <input type="number"
                            name="acquisition_cost"
@@ -249,6 +263,7 @@
                            min="0"
                            value="{{ form_acquisition_cost if form_acquisition_cost is defined else '' }}"
                            placeholder="0.00"
+                           {{ 'required' if is_pre_use_asset else '' }}
                            {{ 'disabled' if is_edit and not is_pre_use_asset else '' }}
                            class="form-input">
                     {% if is_edit and not is_pre_use_asset %}
@@ -258,9 +273,9 @@
 
                 <div>
                     <label class="form-label">
-                        Currency
+                        Currency <span class="text-rose-500">*</span>
                     </label>
-                    <select name="currency_code" {{ 'disabled' if is_edit and not is_pre_use_asset else '' }} class="form-select">
+                    <select name="currency_code" {{ 'required' if is_pre_use_asset else '' }} {{ 'disabled' if is_edit and not is_pre_use_asset else '' }} class="form-select">
                         {% set selected_currency = form_currency_code if form_currency_code is defined else default_currency_code %}
                         {% for currency in currencies %}
                         <option value="{{ currency.code }}" {{ 'selected' if currency.code == selected_currency else '' }}>
@@ -287,57 +302,50 @@
 {{ super() }}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  const mainSelect = document.getElementById("main-category-select");
-  const subSelect = document.getElementById("sub-category-select");
-  if (!mainSelect || !subSelect) return;
+  const departmentSelect = document.getElementById("asset-department-select");
+  const custodianSelect = document.getElementById("asset-custodian-select");
+  const departmentEmployees = {{ department_employees | tojson }};
+  const selectedDepartment = {{ (form_department_id if form_department_id is defined else (selected_department_id if selected_department_id is defined else "")) | tojson }};
+  let selectedCustodian = {{ (form_custodian_employee_id if form_custodian_employee_id is defined else "") | tojson }};
 
-  const subCategories = {{ sub_categories | tojson }};
-  const selectedParent = {{ (form_parent_category_id if form_parent_category_id is defined else "") | tojson }};
-  let selectedSub = {{ (form_category_id if form_category_id is defined else "") | tojson }};
+  function renderDepartmentEmployees(departmentId) {
+    if (!departmentSelect || !custodianSelect) return;
 
-  function renderSubCategories(parentId) {
-    const children = subCategories.filter(function (item) {
-      return item.parent_category_id === parentId;
+    const employees = departmentEmployees.filter(function (item) {
+      return item.department_id === departmentId;
     });
 
-    subSelect.innerHTML = "";
+    custodianSelect.innerHTML = "";
     const defaultOption = document.createElement("option");
     defaultOption.value = "";
-    defaultOption.textContent = children.length ? "Select sub-category" : "No sub-categories available";
-    subSelect.appendChild(defaultOption);
+    defaultOption.textContent = departmentId ? "Select employee" : "Select department first";
+    custodianSelect.appendChild(defaultOption);
 
-    children.forEach(function (item) {
+    employees.forEach(function (item) {
       const opt = document.createElement("option");
-      opt.value = item.category_id;
-      opt.textContent = item.category_name;
-      if (selectedSub && selectedSub === item.category_id) {
+      opt.value = item.employee_id;
+      opt.textContent = item.employee_code ? item.employee_code + " - " + item.full_name : item.full_name;
+      if (selectedCustodian && selectedCustodian === item.employee_id) {
         opt.selected = true;
       }
-      subSelect.appendChild(opt);
+      custodianSelect.appendChild(opt);
     });
 
-    subSelect.disabled = children.length === 0;
+    custodianSelect.disabled = !departmentId || employees.length === 0;
   }
 
-  if (!mainSelect.value && selectedParent) {
-    mainSelect.value = selectedParent;
-  }
-
-  if (!mainSelect.value && selectedSub) {
-    const matched = subCategories.find(function (item) {
-      return item.category_id === selectedSub;
-    });
-    if (matched) {
-      mainSelect.value = matched.parent_category_id;
+  if (departmentSelect && custodianSelect) {
+    if (!departmentSelect.value && selectedDepartment) {
+      departmentSelect.value = selectedDepartment;
     }
+
+    renderDepartmentEmployees(departmentSelect.value);
+
+    departmentSelect.addEventListener("change", function () {
+      selectedCustodian = "";
+      renderDepartmentEmployees(departmentSelect.value);
+    });
   }
-
-  renderSubCategories(mainSelect.value);
-
-  mainSelect.addEventListener("change", function () {
-    selectedSub = "";
-    renderSubCategories(mainSelect.value);
-  });
 });
 </script>
 {% endblock %}

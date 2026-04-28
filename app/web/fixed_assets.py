@@ -230,6 +230,7 @@ def list_assets(
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
+    location: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=200),
     db: Session = Depends(get_db),
@@ -243,6 +244,7 @@ def list_assets(
             search=search,
             category=category,
             status=status,
+            location=location,
             page=page,
             limit=limit,
         )
@@ -268,6 +270,8 @@ def create_asset(
     asset_name: str = Form(...),
     serial_number: str | None = Form(default=None),
     location_id: str | None = Form(default=None),
+    department_id: str | None = Form(default=None),
+    custodian_employee_id: str | None = Form(default=None),
     category_id: str = Form(...),
     acquisition_date: str | None = Form(default=None),
     acquisition_cost: str | None = Form(default=None),
@@ -285,6 +289,8 @@ def create_asset(
         asset_name,
         serial_number,
         location_id,
+        department_id,
+        custodian_employee_id,
         category_id,
         acquisition_date,
         acquisition_cost,
@@ -302,6 +308,7 @@ async def export_all_assets(
     search: str = "",
     status: str = "",
     category: str = "",
+    location: str = "",
     auth: WebAuthContext = Depends(require_fixed_assets_access),
     db: Session = Depends(get_db),
 ):
@@ -309,7 +316,14 @@ async def export_all_assets(
     from app.services.fixed_assets.bulk import get_asset_bulk_service
 
     service = get_asset_bulk_service(db, auth.organization_id, auth.user_id)
-    extra = {"category_id": category} if category else None
+    extra = {
+        key: value
+        for key, value in {
+            "category_id": category,
+            "location_id": location,
+        }.items()
+        if value
+    } or None
     return await service.export_all(search=search, status=status, extra_filters=extra)
 
 
