@@ -33,6 +33,11 @@ class TaxTransactionType(str, enum.Enum):
     REFUND = "REFUND"
 
 
+class TaxRecognitionBasis(str, enum.Enum):
+    ACCRUAL = "accrual"
+    CASH = "cash"
+
+
 class TaxTransaction(Base):
     """
     Tax transaction record.
@@ -75,6 +80,16 @@ class TaxTransaction(Base):
     transaction_type: Mapped[TaxTransactionType] = mapped_column(
         Enum(TaxTransactionType, name="tax_transaction_type"),
         nullable=False,
+    )
+    recognition_basis: Mapped[TaxRecognitionBasis] = mapped_column(
+        Enum(
+            TaxRecognitionBasis,
+            name="tax_recognition_basis",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        default=TaxRecognitionBasis.ACCRUAL,
+        server_default=TaxRecognitionBasis.ACCRUAL.value,
     )
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
 

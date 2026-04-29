@@ -69,7 +69,10 @@ class DashboardWebService:
 
     @staticmethod
     def dashboard_context(
-        db: Session, organization_id, year: str | None = None
+        db: Session,
+        organization_id,
+        year: str | None = None,
+        basis: str = "accrual",
     ) -> dict:
         currency_settings = org_context_service.get_currency_settings(
             db, organization_id
@@ -82,7 +85,9 @@ class DashboardWebService:
         currency_zero = f"{currency_prefix}0.00"
         available_years = dashboard_service.get_available_years(db, organization_id)
         selected_year = _resolve_year_selection(year, available_years)
-        stats = dashboard_service.get_stats(db, organization_id, year=selected_year)
+        stats = dashboard_service.get_stats(
+            db, organization_id, year=selected_year, basis=basis
+        )
 
         # Reuse GL control balances from stats to avoid duplicate queries.
         gl_balances = (stats.ar_control_balance, stats.ap_control_balance)
@@ -96,13 +101,13 @@ class DashboardWebService:
 
         # Chart data
         monthly_trend = dashboard_service.get_monthly_revenue_expenses(
-            db, organization_id, months=12, year=selected_year
+            db, organization_id, months=12, year=selected_year, basis=basis
         )
         account_balances = dashboard_service.get_account_balances_by_ifrs_category(
             db, organization_id, year=selected_year
         )
         top_customers = dashboard_service.get_top_customers(
-            db, organization_id, limit=5, year=selected_year
+            db, organization_id, limit=5, year=selected_year, basis=basis
         )
         top_suppliers = dashboard_service.get_top_suppliers(
             db, organization_id, limit=5, year=selected_year
@@ -241,6 +246,7 @@ class DashboardWebService:
             "metrics_snapshot": metrics_snapshot,
             "balances_stale": stale_balance_count > 0,
             "stale_balance_count": stale_balance_count,
+            "basis": basis if basis == "cash" else "accrual",
         }
 
 

@@ -25,7 +25,7 @@ from app.models.finance.core_org import Organization
 from app.models.finance.gl.account import Account
 from app.models.people.hr.department import Department
 from app.models.people.hr.designation import Designation
-from app.models.people.hr.employee import Employee, EmployeeStatus
+from app.models.people.hr.employee import Employee
 from app.models.people.hr.employment_type import EmploymentType
 from app.models.people.payroll.payroll_entry import PayrollEntry, PayrollEntryStatus
 from app.models.people.payroll.salary_assignment import SalaryStructureAssignment
@@ -34,6 +34,7 @@ from app.models.people.payroll.salary_structure import PayrollFrequency, SalaryS
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.finance.platform.org_context import org_context_service
 from app.services.people.hr import EmploymentTypeFilters, OrganizationService
+from app.services.people.payroll.eligibility import payroll_employee_eligibility_clause
 from app.services.people.payroll.payroll_service import (
     PayrollService,
 )
@@ -152,8 +153,9 @@ class RunWebService:
                     )
                 )
                 .where(
-                    Employee.status.in_(
-                        [EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]
+                    payroll_employee_eligibility_clause(
+                        period_start=effective_date,
+                        period_end=effective_date,
                     )
                 )
             )

@@ -179,6 +179,11 @@ class Employee(Base, AuditMixin, SoftDeleteMixin, ERPNextSyncMixin, VersionMixin
         Date,
         nullable=True,
     )
+    final_payroll_cutoff_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+        comment="Last date eligible for one-time final payroll after exit",
+    )
     personal_email: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
@@ -364,6 +369,14 @@ class Employee(Base, AuditMixin, SoftDeleteMixin, ERPNextSyncMixin, VersionMixin
     notes: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+    eligible_for_final_payroll: Mapped[bool] = mapped_column(
+        default=False,
+        comment="Allow one final prorated payroll after employee exit",
+    )
+    final_payroll_processed_at: Mapped[datetime | None] = mapped_column(
+        nullable=True,
+        comment="When the final payroll exception was consumed",
     )
 
     # Batch operation tracking (for audit trail of bulk imports/scripts)

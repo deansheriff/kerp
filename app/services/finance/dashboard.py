@@ -216,6 +216,7 @@ class DashboardService:
         db: Session,
         organization_id: UUID,
         year: int | None = None,
+        basis: str = "accrual",
     ) -> tuple[Decimal, Decimal]:
         org_id = coerce_uuid(organization_id)
         revenue_expense_stmt = (
@@ -258,6 +259,12 @@ class DashboardService:
         revenue_expense_stmt = _apply_year_filter(
             revenue_expense_stmt, PostedLedgerLine.posting_date, year
         )
+        if basis == "cash":
+            from app.services.finance.rpt.common import _apply_cash_basis_filter_pll
+
+            revenue_expense_stmt = _apply_cash_basis_filter_pll(
+                revenue_expense_stmt, db, org_id
+            )
         revenue_total, expense_total = db.execute(revenue_expense_stmt).one()
         return _safe_decimal(revenue_total), _safe_decimal(expense_total)
 
@@ -266,6 +273,7 @@ class DashboardService:
         db: Session,
         organization_id: UUID,
         year: int | None = None,
+        basis: str = "accrual",
     ) -> tuple[Decimal, Decimal, Decimal, Decimal]:
         """Combined query for revenue, expenses, COGS, and OPEX in one scan."""
         org_id = coerce_uuid(organization_id)
@@ -315,6 +323,10 @@ class DashboardService:
             )
         )
         stmt = _apply_year_filter(stmt, PostedLedgerLine.posting_date, year)
+        if basis == "cash":
+            from app.services.finance.rpt.common import _apply_cash_basis_filter_pll
+
+            stmt = _apply_cash_basis_filter_pll(stmt, db, org_id)
         row = db.execute(stmt).one()
         return (
             _safe_decimal(row.revenue),
@@ -547,6 +559,7 @@ class DashboardService:
         db: Session,
         organization_id: UUID,
         year: int | None = None,
+        basis: str = "accrual",
     ) -> DashboardStats:
         """
         Get dashboard statistics.
@@ -554,6 +567,12 @@ class DashboardService:
         Args:
             db: Database session
             organization_id: Organization scope
+            year: Filter to a specific year (None = all-time)
+            basis: ``"accrual"`` totals all posted GL movement.
+                ``"cash"`` restricts revenue/expense queries to journals
+                tied to actual cash movement (CUSTOMER_PAYMENT,
+                SUPPLIER_PAYMENT, EXPENSE_PAYMENT, BANK_TRANSFER) or
+                journals that touch a cash/bank account.
 
         Returns:
             DashboardStats with revenue, expenses, and invoice counts
@@ -561,8 +580,13 @@ class DashboardService:
         org_id = coerce_uuid(organization_id)
 
         revenue, expenses, cogs_spend, opex_spend = (
-            DashboardService.get_gl_revenue_expenses_with_cogs(db, org_id, year=year)
+            DashboardService.get_gl_revenue_expenses_with_cogs(
+                db, org_id, year=year, basis=basis
+            )
         )
+        # AR/AP control balances and cash-flow summary are not affected
+        # by basis: control accounts and cash accounts already represent
+        # cash-side reality regardless of accrual classification.
         ar_control_balance, ap_control_balance = (
             DashboardService.get_gl_control_balances(db, org_id, year=year)
         )
@@ -577,11 +601,14 @@ class DashboardService:
         outflow = _safe_decimal(cash_outflow)
         net_cash = _safe_decimal(net_cash_flow)
 
-        # Get aging data
+        # Get aging data (always accrual — aging only makes sense on
+        # outstanding receivables which is an accrual concept)
         aging = DashboardService.get_ar_aging(db, org_id, year=year)
 
         # Get trend data
-        trends = DashboardService.get_revenue_expense_trend(db, org_id, year=year)
+        trends = DashboardService.get_revenue_expense_trend(
+            db, org_id, year=year, basis=basis
+        )
         cash_flow_trend = DashboardService.get_cash_flow_trend(db, org_id, year=year)
 
         return DashboardStats(
@@ -724,6 +751,7 @@ class DashboardService:
         organization_id: UUID,
         months: int = 12,
         year: int | None = None,
+        basis: str = "accrual",
     ) -> list[dict]:
         """
         Get monthly revenue and expense totals for trend chart.
@@ -745,7 +773,7 @@ class DashboardService:
         else:
             start_date, end_date = _year_bounds(year)
 
-        monthly_rows = db.execute(
+        monthly_stmt = (
             select(
                 extract("year", PostedLedgerLine.posting_date).label("year"),
                 extract("month", PostedLedgerLine.posting_date).label("month"),
@@ -789,7 +817,13 @@ class DashboardService:
                 extract("year", PostedLedgerLine.posting_date),
                 extract("month", PostedLedgerLine.posting_date),
             )
-        ).all()
+        )
+        if basis == "cash":
+            from app.services.finance.rpt.common import _apply_cash_basis_filter_pll
+
+            monthly_stmt = _apply_cash_basis_filter_pll(monthly_stmt, db, org_id)
+
+        monthly_rows = db.execute(monthly_stmt).all()
 
         monthly_dict = {
             (int(r.year), int(r.month)): {
@@ -940,19 +974,29 @@ class DashboardService:
         organization_id: UUID,
         limit: int = 5,
         year: int | None = None,
+        basis: str = "accrual",
     ) -> list[dict]:
         """
-        Get top customers by posted GL revenue.
+        Get top customers by revenue.
 
         Args:
             db: Database session
             organization_id: Organization scope
             limit: Maximum number of customers
+            year: Filter to a specific year (None = all-time / current year)
+            basis: ``"accrual"`` reads posted GL revenue (recognized at
+                invoice time). ``"cash"`` derives from AR receipts via
+                payment_allocation × invoice subtotal ratio.
 
         Returns:
             List of dicts with customer name and total amount
         """
         org_id = coerce_uuid(organization_id)
+
+        if basis == "cash":
+            return DashboardService._get_top_customers_cash(
+                db, org_id, limit=limit, year=year
+            )
 
         customers_stmt = (
             select(
@@ -1000,6 +1044,34 @@ class DashboardService:
             }
             for r in results
             if _safe_decimal(r.total) > 0
+        ]
+
+    @staticmethod
+    def _get_top_customers_cash(
+        db: Session,
+        org_id: UUID,
+        limit: int,
+        year: int | None,
+    ) -> list[dict]:
+        """Cash-basis top customers — delegates to rpt/common helper."""
+        from app.services.finance.rpt.common import _cash_basis_revenue_by_customer
+
+        if year is not None:
+            start, end = _year_bounds(year)
+        else:
+            today = date.today()
+            start = date(today.year, 1, 1)
+            end = today
+
+        rows = _cash_basis_revenue_by_customer(db, org_id, start, end, limit=limit)
+        return [
+            {
+                "name": r["customer_name"],
+                "value": float(r["net_revenue"]),
+                "revenue": float(r["net_revenue"]),
+            }
+            for r in rows
+            if r["net_revenue"] > 0
         ]
 
     @staticmethod
@@ -1279,6 +1351,7 @@ class DashboardService:
         db: Session,
         organization_id: UUID,
         year: int | None = None,
+        basis: str = "accrual",
     ) -> dict:
         """
         Calculate period-over-period trend for revenue and net income.
@@ -1309,7 +1382,7 @@ class DashboardService:
 
         def get_period_totals(start: date, end: date) -> tuple[Decimal, Decimal]:
             """Get revenue and expenses for a date range."""
-            result = db.execute(
+            stmt = (
                 select(
                     func.coalesce(
                         func.sum(
@@ -1351,7 +1424,14 @@ class DashboardService:
                     AccountCategory.organization_id == org_id,
                     Account.is_active.is_(True),
                 )
-            ).one()
+            )
+            if basis == "cash":
+                from app.services.finance.rpt.common import (
+                    _apply_cash_basis_filter_pll,
+                )
+
+                stmt = _apply_cash_basis_filter_pll(stmt, db, org_id)
+            result = db.execute(stmt).one()
             return _safe_decimal(result.revenue), _safe_decimal(result.expenses)
 
         current_revenue, current_expenses = get_period_totals(

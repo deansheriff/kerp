@@ -225,6 +225,7 @@ class EmployeeUpdateData:
     default_shift_type_id: uuid.UUID | None = None
     date_of_joining: date | None = None
     date_of_leaving: date | None = None
+    final_payroll_cutoff_date: date | None = None
     probation_end_date: date | None = None
     confirmation_date: date | None = None
     nysc_start_date: date | None = None
@@ -245,6 +246,7 @@ class EmployeeUpdateData:
     bank_sort_code: str | None = None
     bank_account_name: str | None = None
     notes: str | None = None
+    eligible_for_final_payroll: bool | None = None
     # Tracks which fields were explicitly provided (for null handling)
     provided_fields: set[str] = field(default_factory=set, repr=False)
 
@@ -281,6 +283,8 @@ class TerminationData:
     date_of_leaving: date
     reason: str | None = None
     exit_interview_notes: str | None = None
+    eligible_for_final_payroll: bool = False
+    final_payroll_cutoff_date: date | None = None
 
 
 @dataclass

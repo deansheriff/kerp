@@ -1,0 +1,194 @@
+{% extends "finance/base_finance.html" %}
+
+{% from "components/macros.html" import empty_state, icon_svg %}
+{% block page_title %}Stamp duty report{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex">
+        <li><a href="/dashboard" class="hover:text-primary-600 dark:hover:text-primary-400">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="/finance/reports" class="hover:text-primary-600 dark:hover:text-primary-400">Reports</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">Stamp duty report</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Stamp duty report</h2>
+            <p class="mt-1 text-sm text-slate-500">Stamp duty charged on customer and supplier invoices for the selected period.</p>
+        </div>
+        <form method="GET" class="flex items-center gap-2">
+            <input type="date" name="start_date" value="{{ start_date }}" class="form-input text-sm">
+            <span class="text-slate-400">to</span>
+            <input type="date" name="end_date" value="{{ end_date }}" class="form-input text-sm">
+            <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">
+                Update
+            </button>
+        </form>
+    </div>
+
+    <div class="rounded-lg bg-violet-50 px-4 py-3 dark:bg-violet-900/20">
+        <p class="text-sm text-violet-700 dark:text-violet-300">
+            Report period: <span class="font-medium">{{ start_date }}</span> to <span class="font-medium">{{ end_date }}</span>
+        </p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-800/50">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400">
+                    {{ icon_svg("document-text") }}
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Customer invoices</p>
+                    <p class="font-mono tabular-nums mt-1 text-xl font-bold text-cyan-600 dark:text-cyan-400">{{ report.stamp_duty_on_sales|format_currency }}</p>
+                </div>
+            </div>
+            <p class="mt-3 text-xs text-slate-500">{{ report.sales_count }} AR invoices</p>
+            <p class="text-xs text-slate-400">Stamp duty recorded on sales-side invoices</p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-800/50">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    {{ icon_svg("receipt") }}
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Supplier invoices</p>
+                    <p class="font-mono tabular-nums mt-1 text-xl font-bold text-amber-600 dark:text-amber-400">{{ report.stamp_duty_on_purchases|format_currency }}</p>
+                </div>
+            </div>
+            <p class="mt-3 text-xs text-slate-500">{{ report.purchase_count }} AP invoices</p>
+            <p class="text-xs text-slate-400">Stamp duty recorded on purchase-side invoices</p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-800/50">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                    {{ icon_svg("scale") }}
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Total stamp duty</p>
+                    <p class="font-mono tabular-nums mt-1 text-xl font-bold text-violet-600 dark:text-violet-400">{{ report.total_stamp_duty|format_currency }}</p>
+                </div>
+            </div>
+            <p class="mt-3 text-xs text-slate-500">{{ report.sales_count + report.purchase_count }} total invoices</p>
+            <p class="text-xs text-slate-400">Combined AR and AP stamp duty in period</p>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-800/50">
+        <div class="border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Breakdown by stamp duty code</h2>
+        </div>
+        <div class="table-container">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-slate-700">
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Code</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Rate</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Source</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">Stamp Duty</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">Count</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                    {% for item in report.by_code %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td class="px-6 py-4">
+                            <p class="font-medium text-slate-900 dark:text-white">{{ item.tax_code }}</p>
+                            <p class="text-xs text-slate-500">{{ item.tax_name }}</p>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{{ item.rate }}%</td>
+                        <td class="px-6 py-4">
+                            {% if item.source_module == 'AP' %}
+                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                Supplier Invoices
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-medium text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400">
+                                Customer Invoices
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="font-mono tabular-nums px-6 py-4 text-right text-sm font-medium text-violet-600 dark:text-violet-400">
+                            {{ item.stamp_duty_amount|format_currency }}
+                        </td>
+                        <td class="px-6 py-4 text-right text-sm text-slate-600 dark:text-slate-300">{{ item.count }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-sm text-slate-500">
+                            No stamp duty transactions found for this period
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if report.transactions %}
+    <div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-800/50">
+        <div class="border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Transaction Details</h2>
+        </div>
+        <div class="table-container">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-slate-700">
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Date</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Reference</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Counterparty</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Tax ID</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Code</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Source</th>
+                        <th scope="col" class="px-6 py-3 text-xs font-semibold uppercase tracking-wider">Treatment</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">Stamp Duty</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                    {% for txn in report.transactions %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-300">{{ txn.transaction_date }}</td>
+                        <td class="px-6 py-3 text-sm font-medium text-slate-900 dark:text-white">{{ txn.reference or '-' }}</td>
+                        <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-300">{{ txn.counterparty_name or '-' }}</td>
+                        <td class="px-6 py-3 text-sm text-slate-500">{{ txn.counterparty_tax_id or '-' }}</td>
+                        <td class="px-6 py-3">
+                            <span class="text-sm text-slate-600 dark:text-slate-300">{{ txn.tax_code }}</span>
+                            <span class="text-xs text-slate-400">({{ txn.rate }}%)</span>
+                        </td>
+                        <td class="px-6 py-3 text-sm text-slate-600 dark:text-slate-300">{{ txn.source_module }}</td>
+                        <td class="px-6 py-3 text-sm text-slate-500">{{ txn.treatment or '-' }}</td>
+                        <td class="font-mono tabular-nums px-6 py-3 text-right text-sm font-medium text-violet-600 dark:text-violet-400">
+                            {{ txn.stamp_duty_amount|format_currency }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="99" class="p-0">
+                            {{ empty_state("No report found", "There are no report to display.") }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="flex justify-end gap-3">
+        <a href="/finance/tax/reports/by-type?start_date={{ start_date }}&end_date={{ end_date }}"
+           class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+            Back to summary
+        </a>
+        <button type="button" onclick="window.print()"
+                class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">
+            Print report
+        </button>
+    </div>
+</div>
+{% endblock %}

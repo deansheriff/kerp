@@ -32,6 +32,8 @@ class TestTaxCodeService:
             jurisdiction_id=mock_jurisdiction.jurisdiction_id,
             tax_rate=Decimal("0.20"),
             effective_from=date(2024, 1, 1),
+            tax_collected_account_id=uuid.uuid4(),
+            tax_paid_account_id=uuid.uuid4(),
         )
 
         TaxCodeService.create_tax_code(mock_db, org_id, input_data)
@@ -63,6 +65,90 @@ class TestTaxCodeService:
 
         assert exc_info.value.status_code == 400
         assert "already exists" in exc_info.value.detail
+
+    def test_create_sales_vat_requires_collected_account(
+        self, mock_db, org_id, mock_jurisdiction
+    ):
+        """VAT/GST codes used on sales must have a collected account."""
+        from fastapi import HTTPException
+
+        from app.services.finance.tax.tax_master import TaxCodeInput, TaxCodeService
+
+        mock_db.scalars.return_value.first.return_value = None
+
+        input_data = TaxCodeInput(
+            tax_code="VAT7.5",
+            tax_name="VAT 7.5%",
+            tax_type=TaxType.VAT,
+            jurisdiction_id=mock_jurisdiction.jurisdiction_id,
+            tax_rate=Decimal("0.075"),
+            effective_from=date(2024, 1, 1),
+            applies_to_sales=True,
+            applies_to_purchases=False,
+            tax_collected_account_id=None,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            TaxCodeService.create_tax_code(mock_db, org_id, input_data)
+
+        assert exc_info.value.status_code == 400
+        assert "tax collected account" in exc_info.value.detail
+
+    def test_create_recoverable_purchase_vat_requires_paid_account(
+        self, mock_db, org_id, mock_jurisdiction
+    ):
+        """Recoverable VAT/GST codes used on purchases must have a paid account."""
+        from fastapi import HTTPException
+
+        from app.services.finance.tax.tax_master import TaxCodeInput, TaxCodeService
+
+        mock_db.scalars.return_value.first.return_value = None
+
+        input_data = TaxCodeInput(
+            tax_code="VAT7.5-INC",
+            tax_name="VAT 7.5% Inclusive",
+            tax_type=TaxType.VAT,
+            jurisdiction_id=mock_jurisdiction.jurisdiction_id,
+            tax_rate=Decimal("0.075"),
+            effective_from=date(2024, 1, 1),
+            applies_to_sales=False,
+            applies_to_purchases=True,
+            is_recoverable=True,
+            tax_paid_account_id=None,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            TaxCodeService.create_tax_code(mock_db, org_id, input_data)
+
+        assert exc_info.value.status_code == 400
+        assert "tax paid account" in exc_info.value.detail
+
+    def test_create_non_recoverable_purchase_vat_allows_missing_paid_account(
+        self, mock_db, org_id, mock_jurisdiction
+    ):
+        """Non-recoverable purchase VAT/GST codes do not require a paid account."""
+        from app.services.finance.tax.tax_master import TaxCodeInput, TaxCodeService
+
+        mock_db.scalars.return_value.first.return_value = None
+
+        input_data = TaxCodeInput(
+            tax_code="VAT-NR",
+            tax_name="VAT Non Recoverable",
+            tax_type=TaxType.VAT,
+            jurisdiction_id=mock_jurisdiction.jurisdiction_id,
+            tax_rate=Decimal("0.075"),
+            effective_from=date(2024, 1, 1),
+            applies_to_sales=False,
+            applies_to_purchases=True,
+            is_recoverable=False,
+            recovery_rate=Decimal("0"),
+            tax_paid_account_id=None,
+        )
+
+        TaxCodeService.create_tax_code(mock_db, org_id, input_data)
+
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
 
     def test_calculate_tax_success(self, mock_db, org_id, mock_tax_code):
         """Test successful tax calculation."""

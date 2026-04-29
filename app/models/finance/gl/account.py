@@ -125,6 +125,18 @@ class Account(Base, ERPNextSyncMixin):
     is_financial_instrument: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    is_deferral: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="Marks VAT/WHT deferral control accounts",
+    )
+    deferral_pair_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("gl.account.account_id"),
+        nullable=True,
+        comment="Paired current/deferred tax control account",
+    )
 
     # Audit fields
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -152,6 +164,11 @@ class Account(Base, ERPNextSyncMixin):
     category: Mapped["AccountCategory"] = relationship(
         "AccountCategory",
         back_populates="accounts",
+    )
+    deferral_pair_account: Mapped["Account | None"] = relationship(
+        "Account",
+        remote_side="Account.account_id",
+        foreign_keys=[deferral_pair_account_id],
     )
 
 

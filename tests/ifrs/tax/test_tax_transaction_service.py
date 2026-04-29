@@ -10,8 +10,13 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
-from app.models.finance.tax.tax_transaction import TaxTransactionType
+from app.models.finance.tax.tax_transaction import (
+    TaxRecognitionBasis,
+    TaxTransaction,
+    TaxTransactionType,
+)
 from app.services.finance.tax.tax_transaction import (
     TaxReturnSummary,
     TaxTransactionInput,
@@ -149,8 +154,9 @@ class TestCreateTransaction:
         TaxTransactionService.create_transaction(mock_db, org_id, input_data)
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
-        mock_db.refresh.assert_called_once()
+        mock_db.flush.assert_called_once()
+        mock_db.commit.assert_not_called()
+        mock_db.refresh.assert_not_called()
 
     def test_create_transaction_invalid_tax_code(self, mock_db, org_id):
         """Test that invalid tax code raises error."""
@@ -244,6 +250,7 @@ class TestCreateFromInvoiceLine:
             input_data = call_args[0][2]  # Third positional arg is input
 
             assert input_data.transaction_type == TaxTransactionType.OUTPUT
+            assert input_data.recognition_basis == TaxRecognitionBasis.ACCRUAL
             assert input_data.source_document_type == "AR_INVOICE"
             assert input_data.counterparty_type == "CUSTOMER"
 
@@ -279,8 +286,50 @@ class TestCreateFromInvoiceLine:
             input_data = call_args[0][2]
 
             assert input_data.transaction_type == TaxTransactionType.INPUT
+            assert input_data.recognition_basis == TaxRecognitionBasis.ACCRUAL
             assert input_data.source_document_type == "AP_INVOICE"
             assert input_data.counterparty_type == "SUPPLIER"
+
+
+class TestCreatePaymentRecognition:
+    def test_recognition_basis_enum_binds_lowercase_value(self):
+        enum_type = TaxTransaction.__table__.c.recognition_basis.type
+        bind_processor = enum_type.bind_processor(postgresql.dialect())
+
+        assert bind_processor is not None
+        assert bind_processor(TaxRecognitionBasis.CASH) == "cash"
+        assert bind_processor(TaxRecognitionBasis.ACCRUAL) == "accrual"
+
+    def test_create_payment_recognition_sets_cash_basis(
+        self, mock_db, org_id, mock_tax_code
+    ):
+        mock_db.get.return_value = mock_tax_code
+
+        with patch.object(TaxTransactionService, "create_transaction") as mock_create:
+            mock_create.return_value = MockTaxTransaction()
+
+            TaxTransactionService.create_payment_recognition(
+                db=mock_db,
+                organization_id=org_id,
+                fiscal_period_id=uuid4(),
+                tax_code_id=mock_tax_code.tax_code_id,
+                transaction_date=date.today(),
+                source_document_type="CUSTOMER_PAYMENT",
+                source_document_id=uuid4(),
+                source_document_line_id=uuid4(),
+                source_document_reference="RCT-001",
+                is_purchase=False,
+                base_amount=Decimal("1000.00"),
+                tax_amount=Decimal("75.00"),
+                currency_code="NGN",
+                exchange_rate=Decimal("1.0"),
+                counterparty_name="Test Customer",
+            )
+
+            input_data = mock_create.call_args[0][2]
+            assert input_data.transaction_type == TaxTransactionType.OUTPUT
+            assert input_data.recognition_basis == TaxRecognitionBasis.CASH
+            assert input_data.source_document_type == "CUSTOMER_PAYMENT"
 
     def test_tax_calculation_from_base_amount(self, mock_db, org_id, mock_tax_code):
         """Test that tax is correctly calculated from base amount."""

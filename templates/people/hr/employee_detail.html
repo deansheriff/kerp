@@ -57,6 +57,13 @@
                     'RETIRED': 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
                 } %}
                 {{ status_badge(employee.status.value) }}
+                {% if employee.eligible_for_final_payroll %}
+                <div class="mt-2">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                        Final Payroll Enabled
+                    </span>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -124,8 +131,16 @@
                 <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/resign" class="space-y-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <label for="resign_date" class="form-label">Resignation Date</label>
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-col gap-2">
                         <input type="date" id="resign_date" name="date_of_leaving" class="form-input w-full">
+                        {% if can_manage_final_payroll %}
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                            <input type="checkbox" name="eligible_for_final_payroll" value="1" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500">
+                            <span>Include in final payroll</span>
+                        </label>
+                        <label class="form-label" for="resign_final_payroll_cutoff_date">Payroll cutoff date</label>
+                        <input type="date" id="resign_final_payroll_cutoff_date" name="final_payroll_cutoff_date" class="form-input w-full" placeholder="Final payroll cutoff date">
+                        {% endif %}
                         <button type="submit" class="btn btn-secondary">Resign</button>
                     </div>
                 </form>
@@ -138,6 +153,14 @@
                     <div class="flex flex-col gap-2">
                         <input type="date" id="terminate_date" name="date_of_leaving" class="form-input w-full">
                         <input type="text" name="reason" placeholder="Reason (optional)" class="form-input w-full">
+                        {% if can_manage_final_payroll %}
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                            <input type="checkbox" name="eligible_for_final_payroll" value="1" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500">
+                            <span>Include in final payroll</span>
+                        </label>
+                        <label class="form-label" for="terminate_final_payroll_cutoff_date">Payroll cutoff date</label>
+                        <input type="date" id="terminate_final_payroll_cutoff_date" name="final_payroll_cutoff_date" class="form-input w-full" placeholder="Final payroll cutoff date">
+                        {% endif %}
                         <button type="submit" class="btn btn-danger">Terminate</button>
                     </div>
                 </form>
@@ -155,6 +178,27 @@
                 </form>
                 {% endif %}
             </div>
+
+            {% if can_manage_final_payroll and employee.status.value in ['RESIGNED', 'TERMINATED', 'RETIRED'] %}
+            <div class="border-t border-slate-200 pt-4 dark:border-slate-700">
+                <form method="post" action="/people/hr/employees/{{ employee.employee_id }}/final-payroll" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div>
+                        <h4 class="text-sm font-medium text-slate-900 dark:text-white">Final Payroll</h4>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Use this for employees who have already exited but still need one last payroll.</p>
+                    </div>
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                        <input type="checkbox" name="eligible_for_final_payroll" value="1" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500" {% if employee.eligible_for_final_payroll %}checked{% endif %}>
+                        <span>Include in final payroll</span>
+                    </label>
+                    <div>
+                        <label class="form-label" for="existing_final_payroll_cutoff_date">Payroll cutoff date</label>
+                        <input type="date" id="existing_final_payroll_cutoff_date" name="final_payroll_cutoff_date" class="form-input w-full" value="{{ employee.final_payroll_cutoff_date.isoformat() if employee.final_payroll_cutoff_date else (employee.date_of_leaving.isoformat() if employee.date_of_leaving else '') }}">
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Save Final Payroll Settings</button>
+                </form>
+            </div>
+            {% endif %}
         </div>
     </div>
 

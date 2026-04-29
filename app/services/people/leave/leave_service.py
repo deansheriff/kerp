@@ -339,18 +339,28 @@ class LeaveService:
 
     def _get_hr_manager_recipients(self, org_id: UUID) -> list[Person]:
         """Return active people in the organization holding any leave-notification role."""
+        recipient_ids = list(
+            self.db.scalars(
+                select(Person.id)
+                .join(PersonRole, PersonRole.person_id == Person.id)
+                .join(Role, Role.id == PersonRole.role_id)
+                .where(
+                    Person.organization_id == org_id,
+                    Person.is_active.is_(True),
+                    Person.status == PersonStatus.active,
+                    Role.name.in_(LEAVE_NOTIFICATION_ROLES),
+                    Role.is_active.is_(True),
+                )
+                .distinct()
+            ).all()
+        )
+        if not recipient_ids:
+            return []
+
         stmt = (
             select(Person)
-            .join(PersonRole, PersonRole.person_id == Person.id)
-            .join(Role, Role.id == PersonRole.role_id)
-            .where(
-                Person.organization_id == org_id,
-                Person.is_active.is_(True),
-                Person.status == PersonStatus.active,
-                Role.name.in_(LEAVE_NOTIFICATION_ROLES),
-                Role.is_active.is_(True),
-            )
-            .distinct()
+            .where(Person.id.in_(recipient_ids))
+            .order_by(Person.first_name, Person.last_name, Person.id)
         )
         return list(self.db.scalars(stmt).all())
 

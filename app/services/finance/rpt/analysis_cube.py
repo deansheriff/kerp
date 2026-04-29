@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover
 
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, column, func, select, table, text
 from sqlalchemy.orm import Session
 
 from app.models.finance.rpt.analysis_cube import AnalysisCube
@@ -78,15 +78,15 @@ class AnalysisCubeService:
         dim_map = {d["field"]: d for d in (cube.dimensions or []) if d.get("field")}
         measure_map = {m["field"]: m for m in (cube.measures or []) if m.get("field")}
 
-        select_parts: list[str] = []
         group_parts: list[str] = []
-        params: dict[str, object] = {"org_id": str(organization_id), "limit": limit}
+        params: dict[str, object] = {"org_id": str(organization_id)}
+        referenced_fields: set[str] = {"organization_id"}
 
         for dim in row_dimensions:
             if dim not in dim_map:
                 raise ValueError(f"Unknown dimension: {dim}")
             field = self._safe_ident(str(dim_map[dim]["field"]))
-            select_parts.append(f"{field} AS {field}")
+            referenced_fields.add(field)
             group_parts.append(field)
 
         for measure in measures:
@@ -94,13 +94,11 @@ class AnalysisCubeService:
                 raise ValueError(f"Unknown measure: {measure}")
             mdef = measure_map[measure]
             field = self._safe_ident(str(mdef["field"]))
+            referenced_fields.add(field)
             agg = str(mdef.get("agg", "sum")).lower()
             if not _AGG_RE.match(agg):
                 raise ValueError(f"Unsupported aggregation: {agg}")
-            alias = self._safe_ident(measure)
-            select_parts.append(f"{agg}({field}) AS {alias}")
 
-        where_parts = ["organization_id = :org_id::uuid"]
         filter_items = filters or []
         for idx, filter_item in enumerate(filter_items):
             field_name = str(filter_item.get("field") or "")
@@ -108,26 +106,45 @@ class AnalysisCubeService:
             if field_name not in dim_map and field_name not in measure_map:
                 raise ValueError(f"Unknown filter field: {field_name}")
             field = self._safe_ident(field_name)
+            referenced_fields.add(field)
             param_key = f"f_{idx}"
-            where_parts.append(f"{field} = :{param_key}")
             params[param_key] = value
 
-        from_clause = self._safe_view(cube.source_view)
-        select_clause = ", ".join(select_parts)
-        where_clause = " AND ".join(where_parts)
-        group_clause = ", ".join(group_parts)
+        view_name = self._safe_view(cube.source_view)
+        schema_name, _, relation_name = view_name.partition(".")
+        if not relation_name:
+            relation_name = schema_name
+            schema_name = ""
 
-        sql = (
-            f"SELECT {select_clause} "  # nosec B608
-            f"FROM {from_clause} "
-            f"WHERE {where_clause} "
-            f"GROUP BY {group_clause} "
-            f"ORDER BY {group_clause} "
-            f"LIMIT :limit"
+        source = table(
+            relation_name,
+            *(column(field) for field in sorted(referenced_fields)),
+            schema=schema_name or None,
         )
-        rows = [
-            dict(row) for row in self.db.execute(text(sql), params).mappings().all()
-        ]
+
+        dimension_columns = [source.c[field].label(field) for field in group_parts]
+        measure_columns = []
+        for measure in measures:
+            mdef = measure_map[measure]
+            field = self._safe_ident(str(mdef["field"]))
+            agg = str(mdef.get("agg", "sum")).lower()
+            alias = self._safe_ident(measure)
+            measure_columns.append(getattr(func, agg)(source.c[field]).label(alias))
+
+        stmt = (
+            select(*dimension_columns, *measure_columns)
+            .select_from(source)
+            .where(source.c.organization_id == bindparam("org_id"))
+            .group_by(*(source.c[field] for field in group_parts))
+            .order_by(*(source.c[field] for field in group_parts))
+            .limit(limit)
+        )
+
+        for idx, filter_item in enumerate(filter_items):
+            field_name = self._safe_ident(str(filter_item.get("field") or ""))
+            stmt = stmt.where(source.c[field_name] == bindparam(f"f_{idx}"))
+
+        rows = [dict(row) for row in self.db.execute(stmt, params).mappings().all()]
         columns = [*row_dimensions, *measures]
         return CubeQueryResult(cube_code=cube.code, columns=columns, rows=rows)
 

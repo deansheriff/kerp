@@ -19,6 +19,7 @@ from app.models.finance.ar.invoice import Invoice, InvoiceStatus, InvoiceType
 from app.models.finance.ar.invoice_line import InvoiceLine
 from app.models.finance.gl.fiscal_period import FiscalPeriod
 from app.models.finance.gl.journal_entry import JournalType
+from app.models.finance.gl.account import Account
 from app.models.finance.ar.invoice_line_tax import InvoiceLineTax
 from app.models.finance.tax.tax_code import TaxCode, TaxType
 from app.services.common import coerce_uuid
@@ -72,7 +73,7 @@ def _resolve_tax_accounts(
     organization_id: UUID,
     lines: list[InvoiceLine],
 ) -> dict[UUID, UUID]:
-    """Resolve tax code -> tax_collected_account_id for the invoice lines."""
+    """Resolve tax code -> posting account for the invoice tax leg."""
     tax_code_ids = {line.tax_code_id for line in lines if line.tax_code_id}
     if not tax_code_ids:
         return {}
@@ -89,10 +90,17 @@ def _resolve_tax_accounts(
 
     accounts_by_tax_code: dict[UUID, UUID] = {}
     for tax_code in tax_codes:
-        if tax_code.tax_collected_account_id:
-            accounts_by_tax_code[tax_code.tax_code_id] = (
-                tax_code.tax_collected_account_id
-            )
+        current_account_id = tax_code.tax_collected_account_id
+        if not current_account_id:
+            continue
+
+        account_id = current_account_id
+        if tax_code.tax_type in {TaxType.VAT, TaxType.GST}:
+            current_account = db.get(Account, current_account_id)
+            if current_account and current_account.deferral_pair_account_id:
+                account_id = current_account.deferral_pair_account_id
+
+        accounts_by_tax_code[tax_code.tax_code_id] = account_id
     return accounts_by_tax_code
 
 

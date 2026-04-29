@@ -45,6 +45,7 @@ from app.net import get_request_host, get_request_scheme
 from app.schemas.person import PersonUpdate
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
+from app.services.formatters import parse_bool
 from app.services.people.attendance.attendance_service import AttendanceService
 from app.services.people.hr import (
     DepartmentFilters,
@@ -113,6 +114,8 @@ NIGERIA_STATES = [
 class HRWebService:
     """Service for HR web views."""
 
+    FINAL_PAYROLL_EDITOR_ROLES = frozenset({"admin", "hr_director", "hr_manager"})
+
     # =========================================================================
     # Employees
     # =========================================================================
@@ -130,6 +133,11 @@ class HRWebService:
         if form is None or isinstance(form, str):
             return await request.form()
         return form
+
+    @staticmethod
+    def _can_manage_final_payroll(auth: WebAuthContext) -> bool:
+        roles = {role.strip().lower() for role in auth.roles if role and role.strip()}
+        return bool(roles.intersection(HRWebService.FINAL_PAYROLL_EDITOR_ROLES))
 
     @staticmethod
     def _clean_person_text(value: str | None) -> str | None:
@@ -1269,14 +1277,38 @@ class HRWebService:
         """Record employee resignation."""
         form = await self._request_form(request)
         date_of_leaving = self._form_str(form, "date_of_leaving")
+        eligible_for_final_payroll = parse_bool(
+            self._form_str(form, "eligible_for_final_payroll")
+        )
+        final_payroll_cutoff_date = self._parse_date(
+            self._form_str(form, "final_payroll_cutoff_date")
+        )
 
         org_id = coerce_uuid(auth.organization_id)
         svc = EmployeeService(db, org_id)
 
+        if eligible_for_final_payroll and not self._can_manage_final_payroll(auth):
+            employee = svc.get_employee(employee_id)
+            context = self._employee_detail_context(request, auth, db, employee)
+            context.update(
+                {
+                    "employee": employee,
+                    "error": "Only admin, HR Director, or HR Manager can enable final payroll.",
+                }
+            )
+            return templates.TemplateResponse(
+                request, "people/hr/employee_detail.html", context
+            )
+
         leaving_date = self._parse_date(date_of_leaving)
 
         if leaving_date:
-            svc.resign_employee(employee_id, leaving_date)
+            svc.resign_employee(
+                employee_id,
+                leaving_date,
+                eligible_for_final_payroll=eligible_for_final_payroll,
+                final_payroll_cutoff_date=final_payroll_cutoff_date,
+            )
             db.commit()
             return RedirectResponse(
                 url=f"/people/hr/employees/{employee_id}?saved=1", status_code=303
@@ -1341,9 +1373,28 @@ class HRWebService:
         form = await self._request_form(request)
         date_of_leaving = self._form_str(form, "date_of_leaving")
         reason = self._form_str(form, "reason")
+        eligible_for_final_payroll = parse_bool(
+            self._form_str(form, "eligible_for_final_payroll")
+        )
+        final_payroll_cutoff_date = self._parse_date(
+            self._form_str(form, "final_payroll_cutoff_date")
+        )
 
         org_id = coerce_uuid(auth.organization_id)
         svc = EmployeeService(db, org_id)
+
+        if eligible_for_final_payroll and not self._can_manage_final_payroll(auth):
+            employee = svc.get_employee(employee_id)
+            context = self._employee_detail_context(request, auth, db, employee)
+            context.update(
+                {
+                    "employee": employee,
+                    "error": "Only admin, HR Director, or HR Manager can enable final payroll.",
+                }
+            )
+            return templates.TemplateResponse(
+                request, "people/hr/employee_detail.html", context
+            )
 
         leaving_date = self._parse_date(date_of_leaving)
 
@@ -1353,6 +1404,8 @@ class HRWebService:
                 TerminationData(
                     date_of_leaving=leaving_date,
                     reason=reason or None,
+                    eligible_for_final_payroll=eligible_for_final_payroll,
+                    final_payroll_cutoff_date=final_payroll_cutoff_date,
                 ),
             )
             db.commit()
@@ -1370,6 +1423,73 @@ class HRWebService:
         )
         return templates.TemplateResponse(
             request, "people/hr/employee_detail.html", context
+        )
+
+    async def update_final_payroll_response(
+        self,
+        request: Request,
+        employee_id: UUID,
+        auth: WebAuthContext,
+        db: Session,
+    ) -> RedirectResponse | HTMLResponse:
+        """Update final payroll settings for an exited employee."""
+        org_id = coerce_uuid(auth.organization_id)
+        svc = EmployeeService(db, org_id)
+        employee = svc.get_employee(employee_id)
+
+        if not self._can_manage_final_payroll(auth):
+            context = self._employee_detail_context(request, auth, db, employee)
+            context.update(
+                {
+                    "employee": employee,
+                    "error": "Only admin, HR Director, or HR Manager can enable final payroll.",
+                }
+            )
+            return templates.TemplateResponse(
+                request, "people/hr/employee_detail.html", context
+            )
+
+        if employee.status not in {
+            EmployeeStatus.RESIGNED,
+            EmployeeStatus.TERMINATED,
+            EmployeeStatus.RETIRED,
+        }:
+            context = self._employee_detail_context(request, auth, db, employee)
+            context.update(
+                {
+                    "employee": employee,
+                    "error": "Final payroll can only be managed for exited employees.",
+                }
+            )
+            return templates.TemplateResponse(
+                request, "people/hr/employee_detail.html", context
+            )
+
+        form = await self._request_form(request)
+        eligible_for_final_payroll = parse_bool(
+            self._form_str(form, "eligible_for_final_payroll")
+        )
+        cutoff_date = self._parse_date(
+            self._form_str(form, "final_payroll_cutoff_date")
+        )
+
+        if eligible_for_final_payroll and cutoff_date is None:
+            cutoff_date = employee.date_of_leaving
+
+        svc.update_employee(
+            employee_id,
+            EmployeeUpdateData(
+                eligible_for_final_payroll=eligible_for_final_payroll,
+                final_payroll_cutoff_date=cutoff_date,
+                provided_fields={
+                    "eligible_for_final_payroll",
+                    "final_payroll_cutoff_date",
+                },
+            ),
+        )
+        db.commit()
+        return RedirectResponse(
+            url=f"/people/hr/employees/{employee_id}?saved=1", status_code=303
         )
 
     async def toggle_user_credential_response(
@@ -1564,6 +1684,7 @@ class HRWebService:
             "salary_assignments": salary_assignments,
             "tax_profile": tax_profile,
             "onboarding": onboarding,
+            "can_manage_final_payroll": self._can_manage_final_payroll(auth),
         }
 
     def employee_detail_response(

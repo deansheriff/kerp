@@ -23,6 +23,7 @@ from app.models.finance.ap.supplier_invoice import (
     SupplierInvoiceType,
 )
 from app.models.finance.ap.supplier_invoice_line import SupplierInvoiceLine
+from app.models.finance.gl.account import Account
 from app.models.finance.gl.journal_entry import JournalType
 from app.models.finance.tax.tax_code import TaxCode, TaxType
 from app.services.common import coerce_uuid
@@ -193,7 +194,21 @@ def post_invoice(
                 message=f"No expense account for line {inv_line.line_number}",
             )
 
-        line_total = inv_line.line_amount + inv_line.tax_amount
+        tax_amount = inv_line.tax_amount or Decimal("0")
+        tax_code = (
+            db.get(TaxCode, inv_line.tax_code_id) if inv_line.tax_code_id else None
+        )
+        split_tax_from_expense = bool(
+            tax_amount != Decimal("0")
+            and tax_code
+            and tax_code.organization_id == org_id
+            and tax_code.tax_type in {TaxType.VAT, TaxType.GST}
+            and tax_code.tax_paid_account_id
+        )
+
+        line_total = inv_line.line_amount + (
+            Decimal("0") if split_tax_from_expense else tax_amount
+        )
         functional_amount = line_total * exchange_rate
 
         # For standard invoice: debit expense
@@ -226,6 +241,43 @@ def post_invoice(
                     cost_center_id=inv_line.cost_center_id,
                     project_id=inv_line.project_id,
                     segment_id=inv_line.segment_id,
+                )
+            )
+
+        if not split_tax_from_expense or not tax_code:
+            continue
+
+        tax_account_id = tax_code.tax_paid_account_id
+        current_tax_account = db.get(Account, tax_code.tax_paid_account_id)
+        if current_tax_account and current_tax_account.deferral_pair_account_id:
+            tax_account_id = current_tax_account.deferral_pair_account_id
+        if tax_account_id is None:
+            return APPostingResult(
+                success=False,
+                message=f"Tax posting account is not configured for {tax_code.tax_code}",
+            )
+
+        functional_tax = tax_amount * exchange_rate
+        if invoice.invoice_type == SupplierInvoiceType.CREDIT_NOTE:
+            journal_lines.append(
+                JournalLineInput(
+                    account_id=tax_account_id,
+                    debit_amount=Decimal("0"),
+                    credit_amount=abs(tax_amount),
+                    debit_amount_functional=Decimal("0"),
+                    credit_amount_functional=abs(functional_tax),
+                    description=f"AP Credit Note Tax: {inv_line.description}",
+                )
+            )
+        else:
+            journal_lines.append(
+                JournalLineInput(
+                    account_id=tax_account_id,
+                    debit_amount=tax_amount,
+                    credit_amount=Decimal("0"),
+                    debit_amount_functional=functional_tax,
+                    credit_amount_functional=Decimal("0"),
+                    description=f"AP Invoice Tax: {inv_line.description}",
                 )
             )
 

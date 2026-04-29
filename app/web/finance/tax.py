@@ -465,12 +465,13 @@ def tax_summary_by_type(
     request: Request,
     start_date: str | None = None,
     end_date: str | None = None,
+    basis: str = "accrual",
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db),
 ):
     """Tax summary report grouped by tax type."""
     return tax_web_service.tax_summary_by_type_page(
-        request, start_date, end_date, auth, db
+        request, start_date, end_date, auth, db, basis=basis
     )
 
 
@@ -480,12 +481,43 @@ def wht_report(
     start_date: str | None = None,
     end_date: str | None = None,
     include_details: bool = True,
+    basis: str = "accrual",
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db),
 ):
     """Withholding tax report."""
     return tax_web_service.wht_report_page(
+        request, start_date, end_date, include_details, auth, db, basis=basis
+    )
+
+
+@router.get("/reports/stamp-duty", response_class=HTMLResponse)
+def stamp_duty_report(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    include_details: bool = True,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+):
+    """Stamp duty report."""
+    return tax_web_service.stamp_duty_report_page(
         request, start_date, end_date, include_details, auth, db
+    )
+
+
+@router.get("/reports/vat-return", response_class=HTMLResponse)
+def vat_return(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    basis: str = "cash",
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+):
+    """VAT return (FIRS Form 002). Defaults to cash basis (Nigerian filing rule)."""
+    return tax_web_service.vat_return_page(
+        request, start_date, end_date, auth, db, basis=basis
     )
 
 

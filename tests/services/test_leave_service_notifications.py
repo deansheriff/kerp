@@ -93,12 +93,42 @@ def test_get_hr_manager_recipients_returns_unique_people():
         organization_id=org_id,
     )
 
-    db.scalars.return_value = SimpleNamespace(all=lambda: [person])
+    db.scalars.side_effect = [
+        SimpleNamespace(all=lambda: [person_id, person_id]),
+        SimpleNamespace(all=lambda: [person]),
+    ]
 
     recipients = service._get_hr_manager_recipients(org_id)
 
     assert recipients == [person]
-    assert db.scalars.call_count == 1
+    assert db.scalars.call_count == 2
+
+
+def test_get_hr_manager_recipients_skips_person_distinct_on_json_rows():
+    db = MagicMock()
+    service = LeaveService(db)
+    org_id = uuid4()
+    person_id = uuid4()
+    person = Person(
+        id=person_id,
+        organization_id=org_id,
+    )
+
+    db.scalars.side_effect = [
+        SimpleNamespace(all=lambda: [person_id]),
+        SimpleNamespace(all=lambda: [person]),
+    ]
+
+    recipients = service._get_hr_manager_recipients(org_id)
+
+    assert recipients == [person]
+    first_stmt = db.scalars.call_args_list[0].args[0]
+    second_stmt = db.scalars.call_args_list[1].args[0]
+    first_sql = str(first_stmt)
+    second_sql = str(second_stmt)
+
+    assert "SELECT DISTINCT people.id" in first_sql
+    assert "SELECT people.id, people.organization_id" in second_sql
 
 
 def test_create_application_triggers_hr_manager_notifications():

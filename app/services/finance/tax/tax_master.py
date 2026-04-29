@@ -100,6 +100,28 @@ class TaxCodeService(ListResponseMixin):
     """
 
     @staticmethod
+    def validate_account_mappings(input: TaxCodeInput) -> None:
+        """Validate required GL mappings for tax codes that post to control accounts."""
+        if input.tax_type not in {TaxType.VAT, TaxType.GST}:
+            return
+
+        if input.applies_to_sales and input.tax_collected_account_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="VAT/GST tax codes that apply to sales require a tax collected account",
+            )
+
+        if (
+            input.applies_to_purchases
+            and input.is_recoverable
+            and input.tax_paid_account_id is None
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Recoverable VAT/GST tax codes that apply to purchases require a tax paid account",
+            )
+
+    @staticmethod
     def create_tax_code(
         db: Session,
         organization_id: UUID,
@@ -129,6 +151,8 @@ class TaxCodeService(ListResponseMixin):
                 status_code=400,
                 detail=f"Tax code '{input.tax_code}' already exists",
             )
+
+        TaxCodeService.validate_account_mappings(input)
 
         tax_code = TaxCode(
             organization_id=org_id,

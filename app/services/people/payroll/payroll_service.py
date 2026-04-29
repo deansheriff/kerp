@@ -21,7 +21,7 @@ from sqlalchemy import func, literal_column, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.domain_settings import SettingDomain
-from app.models.people.hr.employee import Employee, EmployeeStatus
+from app.models.people.hr.employee import Employee
 from app.models.people.payroll.employee_tax_profile import EmployeeTaxProfile
 from app.models.people.payroll.payroll_entry import PayrollEntry, PayrollEntryStatus
 from app.models.people.payroll.salary_assignment import SalaryStructureAssignment
@@ -39,6 +39,10 @@ from app.models.people.payroll.salary_structure import (
 from app.services.common import PaginatedResult, PaginationParams, coerce_uuid
 from app.services.finance.platform.org_context import org_context_service
 from app.services.people.integrations.payroll_gl_adapter import PayrollGLAdapter
+from app.services.people.payroll.eligibility import (
+    is_employee_payroll_eligible_for_period,
+    payroll_employee_eligibility_clause,
+)
 from app.services.people.payroll.salary_slip_service import (
     SalarySlipInput,
     salary_slip_service,
@@ -782,6 +786,14 @@ class PayrollService:
                     result.skipped += 1
                     continue
 
+                if not is_employee_payroll_eligible_for_period(
+                    employee,
+                    period_start=entry.start_date,
+                    period_end=entry.end_date,
+                ):
+                    result.skipped += 1
+                    continue
+
                 # Check employee readiness
                 readiness = readiness_service._check_employee_readiness(
                     employee=employee,
@@ -1086,14 +1098,20 @@ class PayrollService:
             slip.paid_at = datetime.now(UTC)
             slip.paid_by_id = paid_by_id
             slip.payment_reference = payment_reference
+
+            employee = self.db.get(Employee, slip.employee_id)
+            if employee and employee.eligible_for_final_payroll:
+                employee.eligible_for_final_payroll = False
+                employee.final_payroll_processed_at = slip.paid_at
+
             updated += 1
             paid_slips.append(slip)
 
             # Send payment notification to employee
             try:
-                employee = slip.employee
-                if employee:
-                    notification_service.notify_payslip_paid(slip, employee)
+                notify_employee = slip.employee
+                if notify_employee:
+                    notification_service.notify_payslip_paid(slip, notify_employee)
             except Exception as notify_err:
                 import logging
 
@@ -1153,7 +1171,10 @@ class PayrollService:
                     SalaryStructureAssignment.to_date.is_(None),
                     SalaryStructureAssignment.to_date >= entry.start_date,
                 ),
-                Employee.status.in_([EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]),
+                payroll_employee_eligibility_clause(
+                    period_start=entry.start_date,
+                    period_end=entry.end_date,
+                ),
             )
         )
         if entry.department_id:

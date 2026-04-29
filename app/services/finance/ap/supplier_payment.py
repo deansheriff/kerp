@@ -54,6 +54,63 @@ from app.services.response import ListResponseMixin
 logger = logging.getLogger(__name__)
 
 
+def _reverse_vat_cash_basis_for_payment(
+    db: Session,
+    organization_id: UUID,
+    payment: SupplierPayment,
+    user_id: UUID,
+    reason: str,
+) -> None:
+    from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
+    from app.services.finance.gl.reversal import ReversalService
+    from app.services.finance.tax.tax_transaction import tax_transaction_service
+
+    vat_reclass_journal = db.scalar(
+        select(JournalEntry).where(
+            JournalEntry.organization_id == organization_id,
+            JournalEntry.source_module == "AP",
+            JournalEntry.source_document_type == "SUPPLIER_PAYMENT_VAT_RECLASS",
+            JournalEntry.source_document_id == payment.payment_id,
+        )
+    )
+    if (
+        vat_reclass_journal
+        and vat_reclass_journal.status == JournalStatus.POSTED
+        and not vat_reclass_journal.reversal_journal_id
+    ):
+        result = ReversalService.create_reversal(
+            db=db,
+            organization_id=organization_id,
+            original_journal_id=vat_reclass_journal.journal_entry_id,
+            reversal_date=date.today(),
+            created_by_user_id=user_id,
+            reason=reason,
+            auto_post=True,
+            idempotency_key=(
+                f"{organization_id}:AP:PAY:{payment.payment_id}:void-vat-reversal:v1"
+            ),
+        )
+        if not result.success:
+            logger.warning(
+                "VAT reclass reversal failed for supplier payment %s: %s",
+                payment.payment_id,
+                result.message,
+            )
+
+    deleted = tax_transaction_service.delete_cash_recognition_for_source(
+        db,
+        organization_id,
+        "SUPPLIER_PAYMENT",
+        payment.payment_id,
+    )
+    if deleted:
+        logger.info(
+            "Deleted %d cash-basis VAT rows for supplier payment %s",
+            deleted,
+            payment.payment_id,
+        )
+
+
 @dataclass
 class PaymentAllocationInput:
     """Input for allocating payment to an invoice."""
@@ -686,8 +743,10 @@ class SupplierPaymentService(ListResponseMixin):
                 f"Cannot void payment with status '{payment.status.value}'"
             )
 
+        was_sent = payment.status == APPaymentStatus.SENT
+
         # If payment was posted, reverse the allocations
-        if payment.status == APPaymentStatus.SENT:
+        if was_sent:
             allocations = list(
                 db.scalars(
                     select(APPaymentAllocation).where(
@@ -704,6 +763,41 @@ class SupplierPaymentService(ListResponseMixin):
                         invoice.status = SupplierInvoiceStatus.POSTED
                     else:
                         invoice.status = SupplierInvoiceStatus.PARTIALLY_PAID
+
+        if was_sent and payment.journal_entry_id:
+            try:
+                from app.services.finance.gl.reversal import ReversalService
+
+                result = ReversalService.create_reversal(
+                    db=db,
+                    organization_id=org_id,
+                    original_journal_id=payment.journal_entry_id,
+                    reversal_date=date.today(),
+                    created_by_user_id=coerce_uuid(voided_by_user_id),
+                    reason=f"Payment voided: {reason}",
+                    auto_post=True,
+                    idempotency_key=f"{org_id}:AP:PAY:{pay_id}:void-reversal:v1",
+                )
+                if not result.success:
+                    logger.warning(
+                        "GL reversal failed for voided supplier payment %s: %s",
+                        pay_id,
+                        result.message,
+                    )
+            except Exception as exc:
+                logger.exception(
+                    "Failed to create GL reversal for voided supplier payment %s: %s",
+                    pay_id,
+                    exc,
+                )
+
+            _reverse_vat_cash_basis_for_payment(
+                db,
+                org_id,
+                payment,
+                coerce_uuid(voided_by_user_id),
+                f"Payment voided: {reason}",
+            )
 
         old_status = payment.status.value
         payment.status = APPaymentStatus.VOID

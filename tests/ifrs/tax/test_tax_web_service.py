@@ -13,6 +13,8 @@ except ImportError:  # pragma: no cover
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class MockTaxReturn:
     """Mock TaxReturn model for testing."""
@@ -52,6 +54,16 @@ class MockBoxValue:
         self.description = kwargs.get("description", "Standard Rate Sales")
         self.amount = kwargs.get("amount", Decimal("1000.00"))
         self.transaction_count = kwargs.get("transaction_count", 10)
+
+
+class MockFormRequest:
+    """Minimal request stub for async form handlers."""
+
+    def __init__(self, form_data):
+        self._form_data = form_data
+
+    async def form(self):
+        return self._form_data
 
 
 class TestTaxWebServiceHelpers:
@@ -233,3 +245,157 @@ class TestBoxValueView:
         assert result["description"] == "Standard Rate Sales"
         assert result["amount"] == "USD 5,000.00"
         assert result["transaction_count"] == 25
+
+
+class TestTaxCodeFormValidation:
+    """Tests for tax code create/update form validation."""
+
+    @pytest.mark.asyncio
+    @patch("app.services.finance.tax.web.tax_code_service")
+    async def test_create_tax_code_response_surfaces_guardrail_error(
+        self, mock_service
+    ):
+        """Create form should surface service-level VAT/GST account validation errors."""
+        from fastapi import HTTPException
+
+        from app.services.finance.tax.web import TaxWebService
+
+        mock_service.create_tax_code.side_effect = HTTPException(
+            status_code=400,
+            detail="VAT/GST tax codes that apply to sales require a tax collected account",
+        )
+
+        service = TaxWebService()
+        service.new_tax_code_form_response = MagicMock(return_value="FORM_ERROR")
+
+        request = MockFormRequest(
+            {
+                "tax_code": "VAT-7.5",
+                "tax_name": "VAT 7.5%",
+                "tax_type": "VAT",
+                "jurisdiction_id": str(uuid.uuid4()),
+                "rate_type": "percentage",
+                "tax_rate_percentage": "7.5",
+                "effective_from": "2026-01-01",
+                "is_recoverable": "true",
+                "applies_to_sales": "true",
+                "applies_to_purchases": "false",
+            }
+        )
+        auth = MagicMock(organization_id=str(uuid.uuid4()))
+        db = MagicMock()
+
+        result = await service.create_tax_code_response(request, auth, db)
+
+        assert result == "FORM_ERROR"
+        service.new_tax_code_form_response.assert_called_once()
+        assert (
+            service.new_tax_code_form_response.call_args.kwargs["error"]
+            == "VAT/GST tax codes that apply to sales require a tax collected account"
+        )
+
+    @pytest.mark.asyncio
+    @patch("app.services.finance.tax.web.tax_code_service")
+    async def test_update_tax_code_response_validates_missing_paid_account(
+        self, mock_service
+    ):
+        """Edit form should reject recoverable purchase VAT/GST without a paid account."""
+        from app.models.finance.tax.tax_code import TaxType
+        from app.services.finance.tax.tax_master import TaxCodeService
+        from app.services.finance.tax.web import TaxWebService
+
+        existing = MagicMock()
+        existing.tax_code = "VAT-7.5 (inclusive)"
+        existing.organization_id = uuid.uuid4()
+        existing.tax_type = TaxType.VAT
+        mock_service.get.return_value = existing
+        mock_service.get_by_code.return_value = None
+        mock_service.validate_account_mappings.side_effect = (
+            TaxCodeService.validate_account_mappings
+        )
+
+        service = TaxWebService()
+        service.edit_tax_code_form_response = MagicMock(return_value="EDIT_ERROR")
+
+        request = MockFormRequest(
+            {
+                "tax_code": "VAT-7.5 (inclusive)",
+                "tax_name": "VAT 7.5% Inclusive",
+                "tax_type": "VAT",
+                "jurisdiction_id": str(uuid.uuid4()),
+                "rate_type": "percentage",
+                "tax_rate_percentage": "7.5",
+                "effective_from": "2026-01-01",
+                "is_recoverable": "true",
+                "is_active": "true",
+                "applies_to_sales": "false",
+                "applies_to_purchases": "true",
+                "tax_collected_account_id": "",
+                "tax_paid_account_id": "",
+            }
+        )
+        auth = MagicMock(organization_id=str(existing.organization_id))
+        db = MagicMock()
+
+        result = await service.update_tax_code_response(
+            request,
+            auth,
+            str(uuid.uuid4()),
+            db,
+        )
+
+        assert result == "EDIT_ERROR"
+        service.edit_tax_code_form_response.assert_called_once()
+        assert (
+            service.edit_tax_code_form_response.call_args.kwargs["error"]
+            == "Recoverable VAT/GST tax codes that apply to purchases require a tax paid account"
+        )
+
+
+class TestTaxReportPages:
+    """Tests for tax report page rendering."""
+
+    @patch("app.services.finance.tax.tax_reports.tax_report_service")
+    @patch("app.services.finance.tax.web.get_currency_context", return_value={})
+    @patch("app.services.finance.tax.web.base_context", return_value={})
+    @patch(
+        "app.services.finance.tax.web.templates.TemplateResponse",
+        return_value="STAMP_DUTY_REPORT",
+    )
+    def test_stamp_duty_report_page(
+        self,
+        mock_template_response,
+        _mock_base_context,
+        _mock_currency_context,
+        mock_report_service,
+    ):
+        """Stamp duty report page should render the dedicated template."""
+        from app.services.finance.tax.tax_reports import StampDutyReportData
+        from app.services.finance.tax.web import TaxWebService
+
+        org_id = uuid.uuid4()
+        mock_report_service.get_stamp_duty_report.return_value = StampDutyReportData(
+            period_start=date(2026, 2, 1),
+            period_end=date(2026, 2, 28),
+        )
+
+        service = TaxWebService()
+        request = MagicMock()
+        auth = MagicMock(organization_id=str(org_id))
+        db = MagicMock()
+
+        result = service.stamp_duty_report_page(
+            request=request,
+            start_date_str="2026-02-01",
+            end_date_str="2026-02-28",
+            include_details=True,
+            auth=auth,
+            db=db,
+        )
+
+        assert result == "STAMP_DUTY_REPORT"
+        mock_report_service.get_stamp_duty_report.assert_called_once()
+        assert (
+            mock_template_response.call_args.args[1]
+            == "finance/reports/stamp_duty_report.html"
+        )

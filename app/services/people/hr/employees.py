@@ -1014,9 +1014,22 @@ class EmployeeService:
 
         if data.date_of_leaving is not None:
             employee.date_of_leaving = data.date_of_leaving
+        elif use_provided_fields and "date_of_leaving" in provided_fields:
+            employee.date_of_leaving = None
+
+        if data.final_payroll_cutoff_date is not None:
+            employee.final_payroll_cutoff_date = data.final_payroll_cutoff_date
+        elif use_provided_fields and "final_payroll_cutoff_date" in provided_fields:
+            employee.final_payroll_cutoff_date = None
 
         if data.status is not None:
             employee.status = data.status
+
+        if data.eligible_for_final_payroll is not None:
+            employee.eligible_for_final_payroll = data.eligible_for_final_payroll
+            if not data.eligible_for_final_payroll:
+                employee.final_payroll_cutoff_date = None
+                employee.final_payroll_processed_at = None
 
         if data.probation_end_date is not None:
             employee.probation_end_date = data.probation_end_date
@@ -1279,6 +1292,13 @@ class EmployeeService:
 
         employee.status = EmployeeStatus.TERMINATED
         employee.date_of_leaving = data.date_of_leaving
+        employee.eligible_for_final_payroll = data.eligible_for_final_payroll
+        employee.final_payroll_cutoff_date = (
+            data.final_payroll_cutoff_date or data.date_of_leaving
+            if data.eligible_for_final_payroll
+            else None
+        )
+        employee.final_payroll_processed_at = None
         employee.updated_at = datetime.now(UTC)
         employee.updated_by_id = self.principal.id if self.principal else None
 
@@ -1297,7 +1317,12 @@ class EmployeeService:
         return employee
 
     def resign_employee(
-        self, employee_id: uuid.UUID, date_of_leaving: date
+        self,
+        employee_id: uuid.UUID,
+        date_of_leaving: date,
+        *,
+        eligible_for_final_payroll: bool = False,
+        final_payroll_cutoff_date: date | None = None,
     ) -> Employee:
         """Record employee resignation.
 
@@ -1314,6 +1339,13 @@ class EmployeeService:
         employee = self.get_employee(employee_id)
         employee.status = EmployeeStatus.RESIGNED
         employee.date_of_leaving = date_of_leaving
+        employee.eligible_for_final_payroll = eligible_for_final_payroll
+        employee.final_payroll_cutoff_date = (
+            final_payroll_cutoff_date or date_of_leaving
+            if eligible_for_final_payroll
+            else None
+        )
+        employee.final_payroll_processed_at = None
         employee.updated_at = datetime.now(UTC)
         employee.updated_by_id = self.principal.id if self.principal else None
         return employee
@@ -1348,6 +1380,9 @@ class EmployeeService:
         employee.status = EmployeeStatus.ACTIVE
         employee.date_of_joining = date_of_rejoining
         employee.date_of_leaving = None
+        employee.eligible_for_final_payroll = False
+        employee.final_payroll_cutoff_date = None
+        employee.final_payroll_processed_at = None
         employee.updated_at = datetime.now(UTC)
         employee.updated_by_id = self.principal.id if self.principal else None
 

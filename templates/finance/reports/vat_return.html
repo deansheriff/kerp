@@ -1,0 +1,169 @@
+{% extends "finance/base_finance.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}VAT Return{% if basis == 'cash' %} (Cash Basis){% else %} (Accrual Basis){% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex">
+        <li><a href="/dashboard" class="hover:text-primary-600 dark:hover:text-primary-400">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="/finance/reports" class="hover:text-primary-600 dark:hover:text-primary-400">Reports</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">VAT Return</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white">VAT Return — FIRS Form 002</h2>
+            <p class="mt-1 text-sm text-slate-500">
+                {% if basis == 'cash' %}
+                VAT recognized when cash is received from customers and paid to suppliers (Nigerian filing rule).
+                {% else %}
+                VAT recognized at invoice time. Use this view to reconcile against the cash-basis filing.
+                {% endif %}
+            </p>
+        </div>
+        <form method="GET" class="flex items-center gap-2">
+            <input type="date" name="start_date" value="{{ start_date }}" class="form-input text-sm">
+            <span class="text-slate-400">to</span>
+            <input type="date" name="end_date" value="{{ end_date }}" class="form-input text-sm">
+            <input type="hidden" name="basis" value="{{ basis }}">
+            <button type="submit" class="btn btn-primary h-9 px-3">Update</button>
+        </form>
+    </div>
+
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="rounded-lg bg-blue-50 px-4 py-3 dark:bg-blue-900/20 flex-1">
+            <p class="text-sm text-blue-700 dark:text-blue-300">
+                Report period: <span class="font-medium">{{ start_date }}</span> to <span class="font-medium">{{ end_date }}</span>
+                &middot;
+                {% if basis == 'cash' %}
+                <span class="font-medium">Cash basis</span>
+                {% else %}
+                <span class="font-medium">Accrual basis</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <a href="?start_date={{ start_date }}&end_date={{ end_date }}&basis=accrual"
+               class="px-3 py-1.5 text-sm font-medium transition-colors duration-150 {% if basis != 'cash' %}bg-teal-600 text-white{% else %}bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+                Accrual
+            </a>
+            <a href="?start_date={{ start_date }}&end_date={{ end_date }}&basis=cash"
+               class="px-3 py-1.5 text-sm font-medium border-l border-slate-200 dark:border-slate-700 transition-colors duration-150 {% if basis == 'cash' %}bg-teal-600 text-white{% else %}bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+                Cash
+            </a>
+        </div>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-800/50">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Output VAT</p>
+            <p class="font-mono tabular-nums mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ vat_return.box2_output_vat|format_currency }}</p>
+            <p class="mt-1 text-xs text-slate-400">VAT collected on sales</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-800/50">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Input VAT</p>
+            <p class="font-mono tabular-nums mt-2 text-2xl font-bold text-blue-600 dark:text-blue-400">{{ vat_return.box4_input_vat|format_currency }}</p>
+            <p class="mt-1 text-xs text-slate-400">VAT paid on purchases</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-800/50">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Zero-rated supplies</p>
+            <p class="font-mono tabular-nums mt-2 text-2xl font-bold text-slate-600 dark:text-slate-300">{{ vat_return.box6_zero_rated|format_currency }}</p>
+            <p class="mt-1 text-xs text-slate-400">No VAT charged</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-800/50">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Net VAT payable</p>
+            <p class="font-mono tabular-nums mt-2 text-2xl font-bold {% if vat_return.box5_net_vat >= 0 %}text-rose-600 dark:text-rose-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">{{ vat_return.box5_net_vat|format_currency }}</p>
+            <p class="mt-1 text-xs text-slate-400">Output VAT &minus; Input VAT</p>
+        </div>
+    </div>
+
+    <div class="card p-6">
+        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">FIRS Form 002 — Boxes</h3>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Box</th>
+                        <th scope="col">Description</th>
+                        <th scope="col" class="text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="font-mono">1</td>
+                        <td>Total value of taxable supplies (excl. VAT)</td>
+                        <td class="text-right font-mono tabular-nums">{{ vat_return.box1_taxable_supplies|format_currency }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">2</td>
+                        <td>Output VAT on sales</td>
+                        <td class="text-right font-mono tabular-nums">{{ vat_return.box2_output_vat|format_currency }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">3</td>
+                        <td>Total value of taxable purchases (excl. VAT)</td>
+                        <td class="text-right font-mono tabular-nums">{{ vat_return.box3_taxable_purchases|format_currency }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">4</td>
+                        <td>Input VAT on purchases</td>
+                        <td class="text-right font-mono tabular-nums">{{ vat_return.box4_input_vat|format_currency }}</td>
+                    </tr>
+                    <tr class="bg-slate-50 dark:bg-slate-800/50 font-semibold">
+                        <td class="font-mono">5</td>
+                        <td>Net VAT payable (Box 2 &minus; Box 4)</td>
+                        <td class="text-right font-mono tabular-nums">{{ vat_return.box5_net_vat|format_currency }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">6</td>
+                        <td>Zero-rated supplies</td>
+                        <td class="text-right font-mono tabular-nums">{{ vat_return.box6_zero_rated|format_currency }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-mono">7</td>
+                        <td>Exempt supplies</td>
+                        <td class="text-right font-mono tabular-nums">{{ vat_return.box7_exempt|format_currency }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if vat_return.rate_breakdown %}
+    <div class="card p-6">
+        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Breakdown by rate</h3>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Direction</th>
+                        <th scope="col" class="text-right">Rate</th>
+                        <th scope="col" class="text-right">Base</th>
+                        <th scope="col" class="text-right">VAT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in vat_return.rate_breakdown %}
+                    <tr>
+                        <td>{{ row.transaction_type | replace('_', ' ') | title }}</td>
+                        <td class="text-right font-mono tabular-nums">{{ '%.2f%%' % (row.rate * 100) }}</td>
+                        <td class="text-right font-mono tabular-nums">{{ row.base_amount|format_currency }}</td>
+                        <td class="text-right font-mono tabular-nums">{{ row.tax_amount|format_currency }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-slate-500 py-4">No rate breakdown available.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

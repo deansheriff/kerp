@@ -18,16 +18,22 @@ from app.models.finance.ap.ap_payment_allocation import APPaymentAllocation
 from app.models.finance.ap.supplier import Supplier
 from app.models.finance.ap.supplier_invoice import SupplierInvoice
 from app.models.finance.banking.bank_account import BankAccount
+from app.models.finance.gl.fiscal_period import FiscalPeriod
 from app.models.finance.gl.account import Account
+from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
 from app.models.finance.gl.journal_entry import JournalType
 from app.services.common import coerce_uuid
-from app.services.finance.ap.posting.helpers import create_wht_transaction
+from app.services.finance.ap.posting.helpers import (
+    build_cash_vat_reclass_entries,
+    create_wht_transaction,
+)
 from app.services.finance.ap.posting.result import APPostingResult
 from app.services.finance.gl.journal import (
     JournalInput,
     JournalLineInput,
 )
 from app.services.finance.posting.base import BasePostingAdapter
+from app.services.finance.tax.tax_transaction import tax_transaction_service
 
 
 def _resolve_bank_gl_account_id(
@@ -49,6 +55,155 @@ def _resolve_bank_gl_account_id(
         mapped_gl = db.get(Account, bank_account.gl_account_id)
         if mapped_gl and mapped_gl.organization_id == organization_id:
             return bank_account.gl_account_id
+
+    return None
+
+
+def post_vat_reclass_for_payment(
+    db: Session,
+    *,
+    organization_id: UUID,
+    payment,
+    supplier: Supplier,
+    posting_date: date,
+    posted_by_user_id: UUID,
+    allocations: list[APPaymentAllocation] | None = None,
+) -> APPostingResult | None:
+    """Post deferred input VAT reclass and cash-basis tax rows for an AP payment."""
+    org_id = coerce_uuid(organization_id)
+    pay_id = payment.payment_id
+    user_id = coerce_uuid(posted_by_user_id)
+    exchange_rate = payment.exchange_rate or Decimal("1.0")
+
+    if allocations is None:
+        allocations = list(
+            db.scalars(
+                select(APPaymentAllocation).where(
+                    APPaymentAllocation.payment_id == pay_id
+                )
+            ).all()
+        )
+
+    reclass_entries, tax_payloads = build_cash_vat_reclass_entries(
+        db, org_id, allocations
+    )
+    if not reclass_entries:
+        return None
+
+    existing_reclass_journal = db.scalar(
+        select(JournalEntry).where(
+            JournalEntry.source_module == "AP",
+            JournalEntry.source_document_type == "SUPPLIER_PAYMENT_VAT_RECLASS",
+            JournalEntry.source_document_id == pay_id,
+            JournalEntry.status.notin_([JournalStatus.VOID, JournalStatus.REVERSED]),
+        )
+    )
+    if existing_reclass_journal:
+        return None
+
+    grouped: dict[tuple[UUID, UUID], Decimal] = {}
+    for row in reclass_entries:
+        key = (
+            row["current_account_id"],
+            row["deferred_account_id"],
+        )
+        grouped[key] = grouped.get(key, Decimal("0")) + row["tax_amount"]
+
+    reclass_lines: list[JournalLineInput] = []
+    for (current_account_id, deferred_account_id), tax_amount in grouped.items():
+        functional_tax = tax_amount * exchange_rate
+        reclass_lines.append(
+            JournalLineInput(
+                account_id=current_account_id,
+                debit_amount=tax_amount,
+                credit_amount=Decimal("0"),
+                debit_amount_functional=functional_tax,
+                credit_amount_functional=Decimal("0"),
+                description=f"Input VAT recognized on payment {payment.payment_number}",
+            )
+        )
+        reclass_lines.append(
+            JournalLineInput(
+                account_id=deferred_account_id,
+                debit_amount=Decimal("0"),
+                credit_amount=tax_amount,
+                debit_amount_functional=Decimal("0"),
+                credit_amount_functional=functional_tax,
+                description=f"Deferred input VAT released on payment {payment.payment_number}",
+            )
+        )
+
+    reclass_input = JournalInput(
+        journal_type=JournalType.STANDARD,
+        entry_date=payment.payment_date,
+        posting_date=posting_date,
+        description=f"AP VAT reclass {payment.payment_number} - {supplier.legal_name}",
+        reference=payment.reference or payment.payment_number,
+        currency_code=payment.currency_code,
+        exchange_rate=exchange_rate,
+        lines=reclass_lines,
+        source_module="AP",
+        source_document_type="SUPPLIER_PAYMENT_VAT_RECLASS",
+        source_document_id=pay_id,
+        correlation_id=payment.correlation_id,
+    )
+    reclass_journal, reclass_error = BasePostingAdapter.create_and_approve_journal(
+        db,
+        org_id,
+        reclass_input,
+        user_id,
+        error_prefix="VAT reclass journal creation failed",
+    )
+    if reclass_error:
+        return APPostingResult(success=False, message=reclass_error.message)
+
+    reclass_result = BasePostingAdapter.post_to_ledger(
+        db,
+        organization_id=org_id,
+        journal_entry_id=reclass_journal.journal_entry_id,
+        posting_date=posting_date,
+        idempotency_key=BasePostingAdapter.make_idempotency_key(
+            org_id, "AP:PAY:VAT", pay_id, action="post"
+        ),
+        source_module="AP",
+        correlation_id=payment.correlation_id,
+        posted_by_user_id=user_id,
+        success_message="VAT reclass posted successfully",
+    )
+    if not reclass_result.success:
+        return APPostingResult(
+            success=False,
+            journal_entry_id=reclass_journal.journal_entry_id,
+            message=reclass_result.message,
+        )
+
+    fiscal_period = db.scalar(
+        select(FiscalPeriod).where(
+            FiscalPeriod.organization_id == org_id,
+            FiscalPeriod.start_date <= payment.payment_date,
+            FiscalPeriod.end_date >= payment.payment_date,
+        )
+    )
+    if fiscal_period:
+        for payload in tax_payloads:
+            tax_transaction_service.create_payment_recognition(
+                db=db,
+                organization_id=org_id,
+                fiscal_period_id=fiscal_period.fiscal_period_id,
+                tax_code_id=payload["tax_code_id"],
+                transaction_date=payment.payment_date,
+                source_document_type="SUPPLIER_PAYMENT",
+                source_document_id=pay_id,
+                source_document_line_id=payload["source_document_line_id"],
+                source_document_reference=payload["source_document_reference"],
+                is_purchase=True,
+                base_amount=payload["base_amount"],
+                tax_amount=payload["tax_amount"],
+                currency_code=payment.currency_code,
+                exchange_rate=exchange_rate,
+                counterparty_name=supplier.legal_name,
+                counterparty_tax_id=supplier.tax_identification_number,
+            )
 
     return None
 
@@ -301,6 +456,18 @@ def post_payment(
             journal_entry_id=journal.journal_entry_id,
             message=posting_result.message,
         )
+
+    vat_reclass_result = post_vat_reclass_for_payment(
+        db,
+        organization_id=org_id,
+        payment=payment,
+        supplier=supplier,
+        posting_date=posting_date,
+        posted_by_user_id=user_id,
+        allocations=allocations,
+    )
+    if vat_reclass_result is not None and not vat_reclass_result.success:
+        return vat_reclass_result
 
     # Create WHT tax transaction for reporting
     if wht_amount > Decimal("0") and payment.withholding_tax_code_id:

@@ -41,11 +41,72 @@ from app.services.finance.ar.input_utils import (
     require_uuid,
     resolve_currency_code,
 )
-from app.services.finance.ar.posting.payment import _resolve_bank_gl_account_id
+from app.services.finance.ar.posting.payment import (
+    _resolve_bank_gl_account_id,
+    post_vat_reclass_for_payment,
+)
 from app.services.finance.platform.sequence import SequenceService
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
+
+
+def _reverse_vat_cash_basis_for_payment(
+    db: Session,
+    organization_id: UUID,
+    payment: CustomerPayment,
+    user_id: UUID,
+    reason: str,
+    action: str,
+) -> None:
+    from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
+    from app.services.finance.gl.reversal import ReversalService
+    from app.services.finance.tax.tax_transaction import tax_transaction_service
+
+    vat_reclass_journal = db.scalar(
+        select(JournalEntry).where(
+            JournalEntry.organization_id == organization_id,
+            JournalEntry.source_module == "AR",
+            JournalEntry.source_document_type == "CUSTOMER_PAYMENT_VAT_RECLASS",
+            JournalEntry.source_document_id == payment.payment_id,
+        )
+    )
+    if (
+        vat_reclass_journal
+        and vat_reclass_journal.status == JournalStatus.POSTED
+        and not vat_reclass_journal.reversal_journal_id
+    ):
+        result = ReversalService.create_reversal(
+            db=db,
+            organization_id=organization_id,
+            original_journal_id=vat_reclass_journal.journal_entry_id,
+            reversal_date=date.today(),
+            created_by_user_id=user_id,
+            reason=reason,
+            auto_post=True,
+            idempotency_key=(
+                f"{organization_id}:AR:PAY:{payment.payment_id}:{action}:vat-reversal:v1"
+            ),
+        )
+        if not result.success:
+            logger.warning(
+                "VAT reclass reversal failed for payment %s: %s",
+                payment.payment_id,
+                result.message,
+            )
+
+    deleted = tax_transaction_service.delete_cash_recognition_for_source(
+        db,
+        organization_id,
+        "CUSTOMER_PAYMENT",
+        payment.payment_id,
+    )
+    if deleted:
+        logger.info(
+            "Deleted %d cash-basis VAT rows for payment %s",
+            deleted,
+            payment.payment_id,
+        )
 
 
 @dataclass
@@ -603,6 +664,17 @@ class CustomerPaymentService(ListResponseMixin):
                 else:
                     invoice.status = InvoiceStatus.PARTIALLY_PAID
 
+        vat_reclass_result = post_vat_reclass_for_payment(
+            db,
+            organization_id=org_id,
+            payment=payment,
+            customer=customer,
+            posting_date=posting_date or payment.payment_date,
+            posted_by_user_id=user_id,
+        )
+        if vat_reclass_result is not None and not vat_reclass_result.success:
+            raise ValidationError(vat_reclass_result.message)
+
         db.flush()
 
         return payment
@@ -750,6 +822,14 @@ class CustomerPaymentService(ListResponseMixin):
                     pay_id,
                     e,
                 )
+            _reverse_vat_cash_basis_for_payment(
+                db,
+                org_id,
+                payment,
+                coerce_uuid(voided_by_user_id),
+                f"Payment voided: {reason}",
+                "void",
+            )
 
         payment.status = PaymentStatus.VOID
 
@@ -834,6 +914,14 @@ class CustomerPaymentService(ListResponseMixin):
                     pay_id,
                     e,
                 )
+            _reverse_vat_cash_basis_for_payment(
+                db,
+                org_id,
+                payment,
+                payment.created_by_user_id,
+                f"Payment bounced: {reason}",
+                "bounce",
+            )
 
         payment.status = PaymentStatus.BOUNCED
 

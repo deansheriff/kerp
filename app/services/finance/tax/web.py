@@ -1737,6 +1737,36 @@ class TaxWebService:
                 if existing:
                     raise ValueError(f"Tax code '{tax_code_str}' already exists")
 
+            tax_code_service.validate_account_mappings(
+                TaxCodeInput(
+                    tax_code=tax_code_str,
+                    tax_name=tax_name,
+                    tax_type=TaxType(tax_type_str),
+                    jurisdiction_id=coerce_uuid(jurisdiction_id_str),
+                    tax_rate=new_tax_rate,
+                    effective_from=effective_from,
+                    description=description,
+                    effective_to=effective_to,
+                    is_compound=is_compound,
+                    is_inclusive=is_inclusive,
+                    is_recoverable=is_recoverable,
+                    recovery_rate=recovery_rate,
+                    applies_to_purchases=applies_to_purchases,
+                    applies_to_sales=applies_to_sales,
+                    tax_return_box=tax_return_box,
+                    reporting_code=reporting_code,
+                    tax_collected_account_id=coerce_uuid(tax_collected_account_id)
+                    if tax_collected_account_id
+                    else None,
+                    tax_paid_account_id=coerce_uuid(tax_paid_account_id)
+                    if tax_paid_account_id
+                    else None,
+                    tax_expense_account_id=coerce_uuid(tax_expense_account_id)
+                    if tax_expense_account_id
+                    else None,
+                )
+            )
+
             # Update all fields
             tax_code.tax_code = tax_code_str
             tax_code.tax_name = tax_name
@@ -1813,6 +1843,7 @@ class TaxWebService:
         end_date_str: str | None,
         auth: WebAuthContext,
         db: Session,
+        basis: str = "accrual",
     ) -> HTMLResponse:
         """Tax summary by type report page."""
         from app.services.finance.tax.tax_reports import tax_report_service
@@ -1837,9 +1868,15 @@ class TaxWebService:
         else:
             end_date = today
 
+        report_basis: str = "cash" if basis == "cash" else "accrual"
+
         # Get tax summary by type
         summaries = tax_report_service.get_tax_summary_by_type(
-            db, org_id, start_date, end_date
+            db,
+            org_id,
+            start_date,
+            end_date,
+            basis=report_basis,  # type: ignore[arg-type]
         )
 
         # Calculate totals
@@ -1858,6 +1895,7 @@ class TaxWebService:
                 "total_input": total_input,
                 "total_wht_withheld": total_wht_withheld,
                 "net_position": net_position,
+                "basis": report_basis,
             }
         )
         context.update(get_currency_context(db, str(org_id)))
@@ -1876,6 +1914,7 @@ class TaxWebService:
         include_details: bool,
         auth: WebAuthContext,
         db: Session,
+        basis: str = "accrual",
     ) -> HTMLResponse:
         """WHT report page."""
         from app.services.finance.tax.tax_reports import tax_report_service
@@ -1900,12 +1939,75 @@ class TaxWebService:
         else:
             end_date = today
 
+        report_basis: str = "cash" if basis == "cash" else "accrual"
+
         # Get WHT report data
         report = tax_report_service.get_wht_report(
-            db, org_id, start_date, end_date, include_transactions=include_details
+            db,
+            org_id,
+            start_date,
+            end_date,
+            include_transactions=include_details,
+            basis=report_basis,  # type: ignore[arg-type]
         )
 
         context = base_context(request, auth, "WHT Report", "tax")
+        context.update(
+            {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "report": report,
+                "basis": report_basis,
+            }
+        )
+        context.update(get_currency_context(db, str(org_id)))
+
+        return templates.TemplateResponse(
+            request,
+            "finance/reports/wht_report.html",
+            context,
+        )
+
+    def stamp_duty_report_page(
+        self,
+        request: Request,
+        start_date_str: str | None,
+        end_date_str: str | None,
+        include_details: bool,
+        auth: WebAuthContext,
+        db: Session,
+    ) -> HTMLResponse:
+        """Stamp duty report page."""
+        from app.services.finance.tax.tax_reports import tax_report_service
+
+        org_id = coerce_uuid(auth.organization_id)
+
+        today = date.today()
+        if start_date_str:
+            try:
+                start_date = date.fromisoformat(start_date_str)
+            except ValueError:
+                start_date = today.replace(day=1)
+        else:
+            start_date = today.replace(day=1)
+
+        if end_date_str:
+            try:
+                end_date = date.fromisoformat(end_date_str)
+            except ValueError:
+                end_date = today
+        else:
+            end_date = today
+
+        report = tax_report_service.get_stamp_duty_report(
+            db,
+            org_id,
+            start_date,
+            end_date,
+            include_transactions=include_details,
+        )
+
+        context = base_context(request, auth, "Stamp Duty Report", "tax")
         context.update(
             {
                 "start_date": start_date.isoformat(),
@@ -1917,7 +2019,70 @@ class TaxWebService:
 
         return templates.TemplateResponse(
             request,
-            "finance/reports/wht_report.html",
+            "finance/reports/stamp_duty_report.html",
+            context,
+        )
+
+    def vat_return_page(
+        self,
+        request: Request,
+        start_date_str: str | None,
+        end_date_str: str | None,
+        auth: WebAuthContext,
+        db: Session,
+        basis: str = "cash",
+    ) -> HTMLResponse:
+        """VAT return (FIRS Form 002) page.
+
+        Defaults to ``basis="cash"`` because Nigerian VAT is filed on
+        cash basis. The toggle lets users compare against the accrual
+        view for reconciliation purposes.
+        """
+        from app.services.finance.tax.tax_reports import tax_report_service
+
+        org_id = coerce_uuid(auth.organization_id)
+
+        today = date.today()
+        if start_date_str:
+            try:
+                start_date = date.fromisoformat(start_date_str)
+            except ValueError:
+                start_date = today.replace(day=1)
+        else:
+            start_date = today.replace(day=1)
+
+        if end_date_str:
+            try:
+                end_date = date.fromisoformat(end_date_str)
+            except ValueError:
+                end_date = today
+        else:
+            end_date = today
+
+        report_basis: str = "accrual" if basis == "accrual" else "cash"
+
+        return_data = tax_report_service.get_vat_return_data(
+            db,
+            org_id,
+            start_date,
+            end_date,
+            basis=report_basis,  # type: ignore[arg-type]
+        )
+
+        context = base_context(request, auth, "VAT Return", "tax")
+        context.update(
+            {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "vat_return": return_data,
+                "basis": report_basis,
+            }
+        )
+        context.update(get_currency_context(db, str(org_id)))
+
+        return templates.TemplateResponse(
+            request,
+            "finance/reports/vat_return.html",
             context,
         )
 

@@ -5,6 +5,7 @@ Thin API wrapper for HR Core endpoints. All business logic is in services.
 """
 
 import json
+from collections.abc import Set as AbstractSet
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -120,6 +121,25 @@ def parse_enum(value: str | None, enum_type, field_name: str):
         raise HTTPException(
             status_code=400, detail=f"Invalid {field_name}: {value}"
         ) from exc
+
+
+FINAL_PAYROLL_EDITOR_ROLES = {"admin", "hr_director", "hr_manager"}
+
+
+def _require_final_payroll_editor(auth: dict) -> None:
+    roles = {
+        str(role).strip().lower() for role in auth.get("roles", []) if str(role).strip()
+    }
+    if not roles.intersection(FINAL_PAYROLL_EDITOR_ROLES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin, HR Director, or HR Manager can enable final payroll",
+        )
+
+
+def _payload_updates_final_payroll(payload, *field_names: str) -> bool:
+    provided_fields: AbstractSet[str] = getattr(payload, "model_fields_set", set())
+    return any(field_name in provided_fields for field_name in field_names)
 
 
 # =============================================================================
@@ -802,10 +822,17 @@ def get_employee(
 def update_employee(
     employee_id: UUID,
     payload: EmployeeUpdate,
+    auth: dict = Depends(require_tenant_auth),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db),
 ):
     """Update an employee."""
+    if _payload_updates_final_payroll(
+        payload,
+        "eligible_for_final_payroll",
+        "final_payroll_cutoff_date",
+    ):
+        _require_final_payroll_editor(auth)
     svc = EmployeeService(db, organization_id)
     data = EmployeeUpdateData(
         employee_number=payload.employee_code,
@@ -819,6 +846,7 @@ def update_employee(
         default_shift_type_id=payload.default_shift_type_id,
         date_of_joining=payload.date_of_joining,
         date_of_leaving=payload.date_of_leaving,
+        final_payroll_cutoff_date=payload.final_payroll_cutoff_date,
         status=payload.status,
         cost_center_id=payload.cost_center_id,
         ctc=payload.ctc,
@@ -828,6 +856,7 @@ def update_employee(
         bank_sort_code=payload.bank_branch_code,
         bank_account_name=payload.bank_account_name,
         notes=payload.notes,
+        eligible_for_final_payroll=payload.eligible_for_final_payroll,
     )
     emp = svc.update_employee(employee_id, data)
     return EmployeeRead.model_validate(emp)
@@ -913,15 +942,24 @@ def suspend_employee(
 def terminate_employee(
     employee_id: UUID,
     payload: TerminationRequest,
+    auth: dict = Depends(require_tenant_auth),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db),
 ):
     """Terminate an employee."""
+    if _payload_updates_final_payroll(
+        payload,
+        "eligible_for_final_payroll",
+        "final_payroll_cutoff_date",
+    ):
+        _require_final_payroll_editor(auth)
     svc = EmployeeService(db, organization_id)
     data = TerminationData(
         date_of_leaving=payload.date_of_leaving,
         reason=payload.reason,
         exit_interview_notes=payload.exit_interview_notes,
+        eligible_for_final_payroll=payload.eligible_for_final_payroll,
+        final_payroll_cutoff_date=payload.final_payroll_cutoff_date,
     )
     emp = svc.terminate_employee(employee_id, data)
     return EmployeeRead.model_validate(emp)
@@ -931,12 +969,24 @@ def terminate_employee(
 def resign_employee(
     employee_id: UUID,
     payload: ResignationRequest,
+    auth: dict = Depends(require_tenant_auth),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db),
 ):
     """Record employee resignation."""
+    if _payload_updates_final_payroll(
+        payload,
+        "eligible_for_final_payroll",
+        "final_payroll_cutoff_date",
+    ):
+        _require_final_payroll_editor(auth)
     svc = EmployeeService(db, organization_id)
-    emp = svc.resign_employee(employee_id, payload.date_of_leaving)
+    emp = svc.resign_employee(
+        employee_id,
+        payload.date_of_leaving,
+        eligible_for_final_payroll=payload.eligible_for_final_payroll,
+        final_payroll_cutoff_date=payload.final_payroll_cutoff_date,
+    )
     return EmployeeRead.model_validate(emp)
 
 

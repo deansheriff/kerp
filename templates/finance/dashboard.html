@@ -27,8 +27,29 @@
                     <option value="{{ year_option }}" {% if year_option == selected_year %}selected{% endif %}>{{ year_option }}</option>
                     {% endfor %}
                 </select>
+                <input type="hidden" name="basis" value="{{ basis if basis else 'accrual' }}">
+                <div class="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden ml-2"
+                     title="Switch between accrual (invoice-time) and cash (payment-time) basis">
+                    <a href="?year={{ selected_year if selected_year else 'all' }}&basis=accrual"
+                       class="px-3 py-1.5 text-sm font-medium transition-colors duration-150 {% if basis != 'cash' %}bg-teal-600 text-white{% else %}bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+                        Accrual
+                    </a>
+                    <a href="?year={{ selected_year if selected_year else 'all' }}&basis=cash"
+                       class="px-3 py-1.5 text-sm font-medium border-l border-slate-200 dark:border-slate-700 transition-colors duration-150 {% if basis == 'cash' %}bg-teal-600 text-white{% else %}bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+                        Cash
+                    </a>
+                </div>
             </form>
         </div>
+
+        {% if basis == 'cash' %}
+        <div class="mt-3 rounded-lg bg-amber-50 px-4 py-2 dark:bg-amber-900/20 inline-flex items-center gap-2">
+            <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+            <span class="text-xs text-amber-700 dark:text-amber-300">
+                Cash basis &mdash; revenue and expenses recognized only when cash moves. AR/AP balances and aging remain on accrual.
+            </span>
+        </div>
+        {% endif %}
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
             <!-- Revenue -->

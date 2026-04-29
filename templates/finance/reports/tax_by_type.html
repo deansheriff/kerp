@@ -25,17 +25,35 @@
             <input type="date" name="start_date" value="{{ start_date }}" class="form-input text-sm">
             <span class="text-slate-400">to</span>
             <input type="date" name="end_date" value="{{ end_date }}" class="form-input text-sm">
+            <input type="hidden" name="basis" value="{{ basis if basis else 'accrual' }}">
             <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">
                 Update
             </button>
         </form>
     </div>
 
-    <!-- Period Info -->
-    <div class="rounded-lg bg-blue-50 px-4 py-3 dark:bg-blue-900/20">
-        <p class="text-sm text-blue-700 dark:text-blue-300">
-            Report period: <span class="font-medium">{{ start_date }}</span> to <span class="font-medium">{{ end_date }}</span>
-        </p>
+    <!-- Period Info + Basis Toggle -->
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="rounded-lg bg-blue-50 px-4 py-3 dark:bg-blue-900/20 flex-1">
+            <p class="text-sm text-blue-700 dark:text-blue-300">
+                Report period: <span class="font-medium">{{ start_date }}</span> to <span class="font-medium">{{ end_date }}</span>
+                {% if basis == 'cash' %}
+                &middot; <span class="font-medium">Cash basis</span> (recognized when cash moves)
+                {% else %}
+                &middot; <span class="font-medium">Accrual basis</span> (recognized at invoice time)
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <a href="?start_date={{ start_date }}&end_date={{ end_date }}&basis=accrual"
+               class="px-3 py-1.5 text-sm font-medium transition-colors duration-150 {% if basis != 'cash' %}bg-teal-600 text-white{% else %}bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+                Accrual
+            </a>
+            <a href="?start_date={{ start_date }}&end_date={{ end_date }}&basis=cash"
+               class="px-3 py-1.5 text-sm font-medium border-l border-slate-200 dark:border-slate-700 transition-colors duration-150 {% if basis == 'cash' %}bg-teal-600 text-white{% else %}bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+                Cash
+            </a>
+        </div>
     </div>
 
     <!-- Summary Cards -->

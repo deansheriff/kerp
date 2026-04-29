@@ -16,11 +16,15 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.finance.tax.tax_code import TaxCode
-from app.models.finance.tax.tax_transaction import TaxTransaction, TaxTransactionType
+from app.models.finance.tax.tax_transaction import (
+    TaxRecognitionBasis,
+    TaxTransaction,
+    TaxTransactionType,
+)
 from app.services.common import coerce_uuid
 from app.services.finance.platform.org_context import org_context_service
 from app.services.response import ListResponseMixin
@@ -45,6 +49,7 @@ class TaxTransactionInput:
     tax_amount: Decimal
     functional_base_amount: Decimal
     functional_tax_amount: Decimal
+    recognition_basis: TaxRecognitionBasis = TaxRecognitionBasis.ACCRUAL
     source_document_line_id: UUID | None = None
     source_document_reference: str | None = None
     counterparty_type: str | None = None
@@ -71,6 +76,7 @@ class TaxTransactionCreateInput:
     base_amount: Decimal
     tax_amount: Decimal
     is_input_tax: bool | None = None
+    recognition_basis: TaxRecognitionBasis = TaxRecognitionBasis.ACCRUAL
     source_document_line_id: UUID | None = None
     source_document_reference: str | None = None
     counterparty_type: str | None = None
@@ -149,6 +155,7 @@ class TaxTransactionService(ListResponseMixin):
             tax_code_id=input.tax_code_id,
             jurisdiction_id=input.jurisdiction_id,
             transaction_type=input.transaction_type,
+            recognition_basis=input.recognition_basis,
             transaction_date=input.transaction_date,
             source_document_type=input.source_document_type,
             source_document_id=input.source_document_id,
@@ -173,8 +180,7 @@ class TaxTransactionService(ListResponseMixin):
         )
 
         db.add(transaction)
-        db.commit()
-        db.refresh(transaction)
+        db.flush()
 
         return transaction
 
@@ -236,6 +242,7 @@ class TaxTransactionService(ListResponseMixin):
             tax_code_id=input.tax_code_id,
             jurisdiction_id=tax_code.jurisdiction_id,
             transaction_type=tx_type,
+            recognition_basis=input.recognition_basis,
             transaction_date=input.transaction_date,
             source_document_type=input.source_document_type,
             source_document_id=input.source_document_id,
@@ -273,6 +280,7 @@ class TaxTransactionService(ListResponseMixin):
         is_purchase: bool,
         base_amount: Decimal,
         currency_code: str,
+        recognition_basis: TaxRecognitionBasis = TaxRecognitionBasis.ACCRUAL,
         counterparty_name: str | None = None,
         counterparty_tax_id: str | None = None,
         exchange_rate: Decimal = Decimal("1.0"),
@@ -339,11 +347,85 @@ class TaxTransactionService(ListResponseMixin):
             transaction_type=TaxTransactionType.INPUT
             if is_purchase
             else TaxTransactionType.OUTPUT,
+            recognition_basis=recognition_basis,
             transaction_date=transaction_date,
             source_document_type="AP_INVOICE" if is_purchase else "AR_INVOICE",
             source_document_id=invoice_id,
             source_document_line_id=invoice_line_id,
             source_document_reference=invoice_number,
+            counterparty_type="SUPPLIER" if is_purchase else "CUSTOMER",
+            counterparty_name=counterparty_name,
+            counterparty_tax_id=counterparty_tax_id,
+            currency_code=currency_code,
+            base_amount=base_amount,
+            tax_rate=tax_code.tax_rate,
+            tax_amount=tax_amount,
+            exchange_rate=exchange_rate,
+            functional_base_amount=functional_base,
+            functional_tax_amount=functional_tax,
+            recoverable_amount=recoverable,
+            non_recoverable_amount=non_recoverable,
+        )
+
+        return TaxTransactionService.create_transaction(db, organization_id, input_data)
+
+    @staticmethod
+    def create_payment_recognition(
+        db: Session,
+        organization_id: UUID,
+        *,
+        fiscal_period_id: UUID,
+        tax_code_id: UUID,
+        transaction_date: date,
+        source_document_type: str,
+        source_document_id: UUID,
+        source_document_line_id: UUID | None,
+        source_document_reference: str | None,
+        is_purchase: bool,
+        base_amount: Decimal,
+        tax_amount: Decimal,
+        currency_code: str,
+        exchange_rate: Decimal = Decimal("1.0"),
+        counterparty_name: str | None = None,
+        counterparty_tax_id: str | None = None,
+    ) -> TaxTransaction:
+        """Create payment-time tax recognition for cash-basis reporting."""
+        org_id = coerce_uuid(organization_id)
+        tax_code = db.get(TaxCode, tax_code_id)
+        if not tax_code or tax_code.organization_id != org_id:
+            raise HTTPException(status_code=404, detail="Tax code not found")
+
+        functional_base = (base_amount * exchange_rate).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        functional_tax = (tax_amount * exchange_rate).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        recoverable = Decimal("0")
+        non_recoverable = Decimal("0")
+        if is_purchase:
+            if tax_code.is_recoverable:
+                recoverable = (tax_amount * tax_code.recovery_rate).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                non_recoverable = tax_amount - recoverable
+            else:
+                non_recoverable = tax_amount
+
+        input_data = TaxTransactionInput(
+            fiscal_period_id=fiscal_period_id,
+            tax_code_id=tax_code_id,
+            jurisdiction_id=tax_code.jurisdiction_id,
+            transaction_type=TaxTransactionType.INPUT
+            if is_purchase
+            else TaxTransactionType.OUTPUT,
+            recognition_basis=TaxRecognitionBasis.CASH,
+            transaction_date=transaction_date,
+            source_document_type=source_document_type,
+            source_document_id=source_document_id,
+            source_document_line_id=source_document_line_id,
+            source_document_reference=source_document_reference,
             counterparty_type="SUPPLIER" if is_purchase else "CUSTOMER",
             counterparty_name=counterparty_name,
             counterparty_tax_id=counterparty_tax_id,
@@ -391,6 +473,39 @@ class TaxTransactionService(ListResponseMixin):
 
         db.commit()
         return updated
+
+    @staticmethod
+    def delete_cash_recognition_for_source(
+        db: Session,
+        organization_id: UUID,
+        source_document_type: str,
+        source_document_id: UUID,
+    ) -> int:
+        """Delete unfiled cash-basis tax rows for a payment source document."""
+        org_id = coerce_uuid(organization_id)
+
+        deletable_ids = list(
+            db.scalars(
+                select(TaxTransaction.transaction_id).where(
+                    TaxTransaction.organization_id == org_id,
+                    TaxTransaction.source_document_type == source_document_type,
+                    TaxTransaction.source_document_id == source_document_id,
+                    TaxTransaction.recognition_basis == TaxRecognitionBasis.CASH,
+                    TaxTransaction.is_included_in_return.is_(False),
+                )
+            ).all()
+        )
+        if not deletable_ids:
+            return 0
+
+        db.execute(
+            delete(TaxTransaction).where(
+                TaxTransaction.organization_id == org_id,
+                TaxTransaction.transaction_id.in_(deletable_ids),
+            )
+        )
+        db.flush()
+        return len(deletable_ids)
 
     @staticmethod
     def get_return_summary(

@@ -27,6 +27,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.finance.audit.audit_log import AuditAction
+from app.models.people.hr.employee import Employee
 from app.models.people.payroll.payroll_entry import PayrollEntry, PayrollEntryStatus
 from app.models.people.payroll.salary_slip import (
     SalarySlip,
@@ -509,6 +510,13 @@ class PayrollLifecycle:
         slip.paid_by_id = user_id
         if payment_reference:
             slip.payment_reference = payment_reference
+
+        employee_id = getattr(slip, "employee_id", None)
+        if employee_id is not None:
+            employee = self.db.get(Employee, employee_id)
+            if employee and employee.eligible_for_final_payroll:
+                employee.eligible_for_final_payroll = False
+                employee.final_payroll_processed_at = slip.paid_at
 
         self.db.flush()
 

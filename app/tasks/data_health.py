@@ -772,50 +772,61 @@ def fix_unbalanced_posted_journals(
     errors: list[str] = []
 
     with SessionLocal() as db:
-        from sqlalchemy import text
+        from sqlalchemy import func, select
+
+        from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
+        from app.models.finance.gl.journal_entry_line import JournalEntryLine
 
         org_id = _resolve_org_id(organization_id)
-        # Find unbalanced POSTED journals using raw SQL for efficiency
-        org_filter = (
-            "AND je.organization_id = :organization_id" if org_id is not None else ""
+        debit_total = func.sum(
+            func.coalesce(
+                JournalEntryLine.debit_amount_functional,
+                JournalEntryLine.debit_amount,
+                0,
+            )
         )
-        _sql = f"""
-            SELECT
-                je.journal_entry_id,
-                je.journal_number,
-                je.organization_id,
-                je.entry_date,
-                je.description,
-                je.created_by_user_id,
-                SUM(COALESCE(jel.debit_amount_functional, jel.debit_amount, 0))
-                    AS total_debit,
-                SUM(COALESCE(jel.credit_amount_functional, jel.credit_amount, 0))
-                    AS total_credit,
-                SUM(COALESCE(jel.debit_amount_functional, jel.debit_amount, 0))
-                - SUM(COALESCE(jel.credit_amount_functional, jel.credit_amount, 0))
-                    AS imbalance
-            FROM gl.journal_entry_line jel
-            JOIN gl.journal_entry je
-                ON je.journal_entry_id = jel.journal_entry_id
-            WHERE je.status = 'POSTED'
-              {org_filter}
-            GROUP BY je.journal_entry_id
-            HAVING ABS(
-                SUM(COALESCE(jel.debit_amount_functional, jel.debit_amount, 0))
-                - SUM(COALESCE(jel.credit_amount_functional, jel.credit_amount, 0))
-            ) > 0.01
-            ORDER BY ABS(
-                SUM(COALESCE(jel.debit_amount_functional, jel.debit_amount, 0))
-                - SUM(COALESCE(jel.credit_amount_functional, jel.credit_amount, 0))
-            ) DESC
-            LIMIT :batch_size
-        """  # nosec B608  -- org_filter is a hardcoded SQL fragment, not user input
-        unbalanced_sql = text(_sql)
-
-        params: dict[str, Any] = {"batch_size": batch_size}
+        credit_total = func.sum(
+            func.coalesce(
+                JournalEntryLine.credit_amount_functional,
+                JournalEntryLine.credit_amount,
+                0,
+            )
+        )
+        imbalance_expr = debit_total - credit_total
+        unbalanced_stmt = (
+            select(
+                JournalEntry.journal_entry_id,
+                JournalEntry.journal_number,
+                JournalEntry.organization_id,
+                JournalEntry.entry_date,
+                JournalEntry.description,
+                JournalEntry.created_by_user_id,
+                debit_total.label("total_debit"),
+                credit_total.label("total_credit"),
+                imbalance_expr.label("imbalance"),
+            )
+            .join(
+                JournalEntryLine,
+                JournalEntryLine.journal_entry_id == JournalEntry.journal_entry_id,
+            )
+            .where(JournalEntry.status == JournalStatus.POSTED)
+            .group_by(
+                JournalEntry.journal_entry_id,
+                JournalEntry.journal_number,
+                JournalEntry.organization_id,
+                JournalEntry.entry_date,
+                JournalEntry.description,
+                JournalEntry.created_by_user_id,
+            )
+            .having(func.abs(imbalance_expr) > Decimal("0.01"))
+            .order_by(func.abs(imbalance_expr).desc())
+            .limit(batch_size)
+        )
         if org_id is not None:
-            params["organization_id"] = org_id
-        rows = db.execute(unbalanced_sql, params).all()
+            unbalanced_stmt = unbalanced_stmt.where(
+                JournalEntry.organization_id == org_id
+            )
+        rows = db.execute(unbalanced_stmt).all()
         found = len(rows)
 
         for row in rows:
@@ -912,39 +923,53 @@ def run_data_health_check(
     results: dict[str, Any] = {}
 
     with SessionLocal() as db:
-        from sqlalchemy import func, select, text
+        from sqlalchemy import exists, func, select
 
+        from app.models.finance.ar.customer_payment import (
+            CustomerPayment,
+            PaymentStatus,
+        )
         from app.models.finance.ar.invoice import Invoice, InvoiceStatus
+        from app.models.finance.ar.payment_allocation import PaymentAllocation
         from app.models.finance.gl.account_balance import AccountBalance
         from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
+        from app.models.finance.gl.journal_entry_line import JournalEntryLine
         from app.models.finance.platform.event_outbox import EventOutbox, EventStatus
         from app.models.notification import Notification
 
         org_id = _resolve_org_id(organization_id)
         # 1. Unbalanced posted journals
-        org_filter_1 = (
-            "AND je.organization_id = :organization_id" if org_id is not None else ""
+        debit_total = func.sum(
+            func.coalesce(
+                JournalEntryLine.debit_amount_functional,
+                JournalEntryLine.debit_amount,
+                0,
+            )
         )
-        _sql_1 = f"""
-            SELECT COUNT(*) FROM (
-                SELECT jel.journal_entry_id
-                FROM gl.journal_entry_line jel
-                JOIN gl.journal_entry je ON je.journal_entry_id = jel.journal_entry_id
-                WHERE je.status = 'POSTED'
-                  {org_filter_1}
-                GROUP BY jel.journal_entry_id
-                HAVING ABS(
-                    SUM(COALESCE(jel.debit_amount_functional, jel.debit_amount, 0))
-                    - SUM(COALESCE(jel.credit_amount_functional, jel.credit_amount, 0))
-                ) > 0.01
-            ) sub
-        """  # nosec B608  -- org_filter is a hardcoded SQL fragment
-        unbalanced_sql = text(_sql_1)
-        unbalanced_params: dict[str, Any] = (
-            {"organization_id": org_id} if org_id is not None else {}
+        credit_total = func.sum(
+            func.coalesce(
+                JournalEntryLine.credit_amount_functional,
+                JournalEntryLine.credit_amount,
+                0,
+            )
         )
+        imbalance_expr = debit_total - credit_total
+        unbalanced_stmt = (
+            select(JournalEntryLine.journal_entry_id)
+            .join(
+                JournalEntry,
+                JournalEntry.journal_entry_id == JournalEntryLine.journal_entry_id,
+            )
+            .where(JournalEntry.status == JournalStatus.POSTED)
+            .group_by(JournalEntryLine.journal_entry_id)
+            .having(func.abs(imbalance_expr) > Decimal("0.01"))
+        )
+        if org_id is not None:
+            unbalanced_stmt = unbalanced_stmt.where(
+                JournalEntry.organization_id == org_id
+            )
         results["unbalanced_journals"] = (
-            db.scalar(unbalanced_sql, unbalanced_params) or 0
+            db.scalar(select(func.count()).select_from(unbalanced_stmt.subquery())) or 0
         )
 
         # 2. False-PAID invoices
@@ -1024,24 +1049,20 @@ def run_data_health_check(
         results["approved_invoices_stuck"] = db.scalar(approved_invoices_stmt) or 0
 
         # 9. Unallocated payments (APPROVED/CLEARED with no allocation records)
-        org_filter_9 = (
-            "AND cp.organization_id = :organization_id" if org_id is not None else ""
+        unallocated_stmt = select(func.count(CustomerPayment.payment_id)).where(
+            CustomerPayment.status.in_([PaymentStatus.APPROVED, PaymentStatus.CLEARED]),
+            CustomerPayment.amount > 0,
+            ~exists(
+                select(PaymentAllocation.allocation_id).where(
+                    PaymentAllocation.payment_id == CustomerPayment.payment_id
+                )
+            ),
         )
-        _sql_9 = f"""
-            SELECT COUNT(*) FROM ar.customer_payment cp
-            WHERE cp.status IN ('APPROVED', 'CLEARED')
-              AND cp.amount > 0
-              {org_filter_9}
-              AND NOT EXISTS (
-                  SELECT 1 FROM ar.payment_allocation pa
-                  WHERE pa.payment_id = cp.payment_id
-              )
-        """  # nosec B608  -- org_filter is a hardcoded SQL fragment
-        unalloc_sql = text(_sql_9)
-        unalloc_params: dict[str, Any] = (
-            {"organization_id": org_id} if org_id is not None else {}
-        )
-        results["unallocated_payments"] = db.scalar(unalloc_sql, unalloc_params) or 0
+        if org_id is not None:
+            unallocated_stmt = unallocated_stmt.where(
+                CustomerPayment.organization_id == org_id
+            )
+        results["unallocated_payments"] = db.scalar(unallocated_stmt) or 0
 
     # Log summary
     logger.info("=== Data Health Check Results ===")

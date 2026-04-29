@@ -230,6 +230,22 @@ async def terminate_employee(
     )
 
 
+@router.post("/employees/{employee_id}/final-payroll")
+async def update_final_payroll(
+    request: Request,
+    employee_id: UUID,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Update final payroll settings for an exited employee."""
+    return await hr_web_service.update_final_payroll_response(
+        request=request,
+        employee_id=employee_id,
+        auth=auth,
+        db=db,
+    )
+
+
 @router.post("/employees/{employee_id}/credentials/{credential_id}/toggle")
 async def toggle_employee_credential(
     request: Request,

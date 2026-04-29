@@ -10,16 +10,34 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.finance.ap.supplier import Supplier
+from app.models.finance.ap.supplier_invoice import SupplierInvoice
+from app.models.finance.ar.customer import Customer
+from app.models.finance.ar.invoice import Invoice
 from app.models.finance.tax.tax_code import TaxCode, TaxType
-from app.models.finance.tax.tax_transaction import TaxTransaction, TaxTransactionType
+from app.models.finance.tax.tax_transaction import (
+    TaxRecognitionBasis,
+    TaxTransaction,
+    TaxTransactionType,
+)
 from app.services.common import coerce_uuid
 
 logger = logging.getLogger(__name__)
+
+# Reporting basis for tax aggregations.
+#
+# - "accrual": queries tax.tax_transaction (recognized at invoice time).
+#   Reflects the obligation as soon as a sale/purchase is recorded.
+# - "cash":    derives from AR receipts and AP payments via prorated
+#   invoice ratios. Reflects the obligation only on cash actually
+#   received/paid. Required for Nigerian VAT (FIRS pay-when-paid).
+TaxBasis = Literal["accrual", "cash"]
 
 
 @dataclass
@@ -115,6 +133,21 @@ class WHTReportData:
     transactions: list = field(default_factory=list)
 
 
+@dataclass
+class StampDutyReportData:
+    """Stamp duty report data."""
+
+    period_start: date
+    period_end: date
+    stamp_duty_on_sales: Decimal = field(default_factory=lambda: Decimal("0"))
+    sales_count: int = 0
+    stamp_duty_on_purchases: Decimal = field(default_factory=lambda: Decimal("0"))
+    purchase_count: int = 0
+    total_stamp_duty: Decimal = field(default_factory=lambda: Decimal("0"))
+    by_code: list = field(default_factory=list)
+    transactions: list = field(default_factory=list)
+
+
 class TaxReportService:
     """
     Service for generating tax reports.
@@ -132,6 +165,7 @@ class TaxReportService:
         organization_id: UUID,
         start_date: date,
         end_date: date,
+        basis: TaxBasis = "accrual",
     ) -> list[TaxSummaryByType]:
         """
         Get tax summary grouped by tax type.
@@ -141,13 +175,18 @@ class TaxReportService:
             organization_id: Organization scope
             start_date: Report period start
             end_date: Report period end
+            basis: ``"accrual"`` reads tax.tax_transaction (invoice time);
+                ``"cash"`` derives from AR/AP payment allocations.
 
         Returns:
             List of TaxSummaryByType objects
         """
         org_id = coerce_uuid(organization_id)
 
-        # Query tax transactions grouped by tax type
+        if basis == "cash":
+            return _tax_summary_by_type_cash(db, org_id, start_date, end_date)
+
+        # Query tax transactions grouped by tax type (accrual basis)
         results = list(
             db.execute(
                 select(
@@ -164,6 +203,7 @@ class TaxReportService:
                     TaxTransaction.organization_id == org_id,
                     TaxTransaction.transaction_date >= start_date,
                     TaxTransaction.transaction_date <= end_date,
+                    TaxTransaction.recognition_basis == TaxRecognitionBasis.ACCRUAL,
                 )
                 .group_by(TaxCode.tax_type, TaxTransaction.transaction_type)
             )
@@ -233,6 +273,7 @@ class TaxReportService:
         start_date: date,
         end_date: date,
         tax_type: TaxType | None = None,
+        basis: TaxBasis = "accrual",
     ) -> list[TaxCodeSummary]:
         """
         Get tax summary grouped by tax code.
@@ -243,10 +284,18 @@ class TaxReportService:
             start_date: Report period start
             end_date: Report period end
             tax_type: Optional filter by tax type
+            basis: Cash basis is only meaningful for VAT — for other tax
+                types the cash branch falls through to accrual since
+                tax_transaction is the only source of per-code detail.
 
         Returns:
             List of TaxCodeSummary objects
         """
+        # Per-code breakdown is hard to derive on cash basis without
+        # tax_code linkage on payments, so we keep the existing accrual
+        # query. Caller should use get_vat_return_data() for cash-basis
+        # VAT totals; this method remains accrual.
+        del basis
         org_id = coerce_uuid(organization_id)
 
         query = (
@@ -303,6 +352,7 @@ class TaxReportService:
         organization_id: UUID,
         start_date: date,
         end_date: date,
+        basis: TaxBasis = "accrual",
     ) -> VATReturnData:
         """
         Get data for VAT return filing (Nigerian FIRS format).
@@ -312,13 +362,20 @@ class TaxReportService:
             organization_id: Organization scope
             start_date: Return period start
             end_date: Return period end
+            basis: ``"accrual"`` recognizes VAT at invoice time (the
+                tax.tax_transaction subledger). ``"cash"`` recognizes only
+                on cash actually received/paid — required for Nigerian
+                FIRS treatment.
 
         Returns:
             VATReturnData with all boxes populated
         """
         org_id = coerce_uuid(organization_id)
 
-        # Query VAT transactions only
+        if basis == "cash":
+            return _vat_return_data_cash(db, org_id, start_date, end_date)
+
+        # Query VAT transactions only (accrual basis)
         results = list(
             db.execute(
                 select(
@@ -333,6 +390,7 @@ class TaxReportService:
                     TaxTransaction.transaction_date >= start_date,
                     TaxTransaction.transaction_date <= end_date,
                     TaxCode.tax_type == TaxType.VAT,
+                    TaxTransaction.recognition_basis == TaxRecognitionBasis.ACCRUAL,
                 )
                 .group_by(TaxCode.tax_rate, TaxTransaction.transaction_type)
             )
@@ -382,6 +440,7 @@ class TaxReportService:
         start_date: date,
         end_date: date,
         include_transactions: bool = False,
+        basis: TaxBasis = "accrual",
     ) -> WHTReportData:
         """
         Get withholding tax report.
@@ -392,11 +451,20 @@ class TaxReportService:
             start_date: Report period start
             end_date: Report period end
             include_transactions: Include transaction details
+            basis: ``"cash"`` reads WHT amounts from customer/supplier
+                payment headers (when the cash actually moved).
+                ``"accrual"`` reads from tax.tax_transaction (recognized
+                at invoice time).
 
         Returns:
             WHTReportData with summary and optional details
         """
         org_id = coerce_uuid(organization_id)
+
+        if basis == "cash":
+            return _wht_report_cash(
+                db, org_id, start_date, end_date, include_transactions
+            )
 
         def _source_module(source_document_type: str | None) -> str:
             if not source_document_type:
@@ -422,6 +490,7 @@ class TaxReportService:
                     TaxTransaction.transaction_date >= start_date,
                     TaxTransaction.transaction_date <= end_date,
                     TaxCode.tax_type == TaxType.WITHHOLDING,
+                    TaxTransaction.recognition_basis == TaxRecognitionBasis.ACCRUAL,
                 )
                 .group_by(
                     TaxCode.tax_code,
@@ -530,6 +599,245 @@ class TaxReportService:
         return report
 
     @staticmethod
+    def get_stamp_duty_report(
+        db: Session,
+        organization_id: UUID,
+        start_date: date,
+        end_date: date,
+        include_transactions: bool = False,
+    ) -> StampDutyReportData:
+        """
+        Get stamp duty report.
+
+        Historical stamp duty is sourced from AR/AP invoice headers and
+        linked tax codes rather than tax.tax_transaction, because stamp
+        duty has not historically been recorded in that subledger.
+        """
+        org_id = coerce_uuid(organization_id)
+
+        report = StampDutyReportData(
+            period_start=start_date,
+            period_end=end_date,
+        )
+
+        ar_results = list(
+            db.execute(
+                select(
+                    TaxCode.tax_code,
+                    TaxCode.tax_name,
+                    TaxCode.tax_rate,
+                    func.sum(Invoice.stamp_duty_amount).label("total_stamp_duty"),
+                    func.count(Invoice.invoice_id).label("count"),
+                )
+                .join(TaxCode, TaxCode.tax_code_id == Invoice.stamp_duty_code_id)
+                .where(
+                    Invoice.organization_id == org_id,
+                    Invoice.invoice_date >= start_date,
+                    Invoice.invoice_date <= end_date,
+                    Invoice.stamp_duty_amount > Decimal("0"),
+                    TaxCode.tax_type == TaxType.STAMP_DUTY,
+                )
+                .group_by(
+                    TaxCode.tax_code,
+                    TaxCode.tax_name,
+                    TaxCode.tax_rate,
+                )
+            )
+        )
+
+        ap_results = list(
+            db.execute(
+                select(
+                    TaxCode.tax_code,
+                    TaxCode.tax_name,
+                    TaxCode.tax_rate,
+                    func.sum(SupplierInvoice.stamp_duty_amount).label(
+                        "total_stamp_duty"
+                    ),
+                    func.count(SupplierInvoice.invoice_id).label("count"),
+                )
+                .join(
+                    TaxCode,
+                    TaxCode.tax_code_id == SupplierInvoice.stamp_duty_code_id,
+                )
+                .where(
+                    SupplierInvoice.organization_id == org_id,
+                    SupplierInvoice.invoice_date >= start_date,
+                    SupplierInvoice.invoice_date <= end_date,
+                    SupplierInvoice.stamp_duty_amount > Decimal("0"),
+                    TaxCode.tax_type == TaxType.STAMP_DUTY,
+                )
+                .group_by(
+                    TaxCode.tax_code,
+                    TaxCode.tax_name,
+                    TaxCode.tax_rate,
+                )
+            )
+        )
+
+        by_code: list[dict[str, object]] = []
+
+        for tax_code, tax_name, rate, total_stamp_duty, count in ar_results:
+            stamp_duty_amount = total_stamp_duty or Decimal("0")
+            invoice_count = int(count or 0)
+            report.stamp_duty_on_sales += stamp_duty_amount
+            report.sales_count += invoice_count
+            by_code.append(
+                {
+                    "tax_code": tax_code,
+                    "tax_name": tax_name,
+                    "rate": rate * 100 if rate is not None else Decimal("0"),
+                    "source_module": "AR",
+                    "stamp_duty_amount": stamp_duty_amount,
+                    "count": invoice_count,
+                }
+            )
+
+        for tax_code, tax_name, rate, total_stamp_duty, count in ap_results:
+            stamp_duty_amount = total_stamp_duty or Decimal("0")
+            invoice_count = int(count or 0)
+            report.stamp_duty_on_purchases += stamp_duty_amount
+            report.purchase_count += invoice_count
+            by_code.append(
+                {
+                    "tax_code": tax_code,
+                    "tax_name": tax_name,
+                    "rate": rate * 100 if rate is not None else Decimal("0"),
+                    "source_module": "AP",
+                    "stamp_duty_amount": stamp_duty_amount,
+                    "count": invoice_count,
+                }
+            )
+
+        report.total_stamp_duty = (
+            report.stamp_duty_on_sales + report.stamp_duty_on_purchases
+        )
+        report.by_code = sorted(
+            by_code,
+            key=lambda item: (
+                str(item["tax_code"]),
+                str(item["source_module"]),
+            ),
+        )
+
+        if include_transactions:
+            ar_transactions = list(
+                db.execute(
+                    select(
+                        Invoice.invoice_date,
+                        Invoice.invoice_number,
+                        Customer.legal_name,
+                        Customer.tax_identification_number,
+                        TaxCode.tax_code,
+                        TaxCode.tax_name,
+                        TaxCode.tax_rate,
+                        Invoice.stamp_duty_amount,
+                        Invoice.stamp_duty_treatment,
+                    )
+                    .join(TaxCode, TaxCode.tax_code_id == Invoice.stamp_duty_code_id)
+                    .outerjoin(Customer, Customer.customer_id == Invoice.customer_id)
+                    .where(
+                        Invoice.organization_id == org_id,
+                        Invoice.invoice_date >= start_date,
+                        Invoice.invoice_date <= end_date,
+                        Invoice.stamp_duty_amount > Decimal("0"),
+                        TaxCode.tax_type == TaxType.STAMP_DUTY,
+                    )
+                    .order_by(
+                        Invoice.invoice_date.desc(), Invoice.invoice_number.desc()
+                    )
+                )
+            )
+            ap_transactions = list(
+                db.execute(
+                    select(
+                        SupplierInvoice.invoice_date,
+                        SupplierInvoice.invoice_number,
+                        Supplier.legal_name,
+                        Supplier.tax_identification_number,
+                        TaxCode.tax_code,
+                        TaxCode.tax_name,
+                        TaxCode.tax_rate,
+                        SupplierInvoice.stamp_duty_amount,
+                    )
+                    .join(
+                        TaxCode,
+                        TaxCode.tax_code_id == SupplierInvoice.stamp_duty_code_id,
+                    )
+                    .outerjoin(
+                        Supplier,
+                        Supplier.supplier_id == SupplierInvoice.supplier_id,
+                    )
+                    .where(
+                        SupplierInvoice.organization_id == org_id,
+                        SupplierInvoice.invoice_date >= start_date,
+                        SupplierInvoice.invoice_date <= end_date,
+                        SupplierInvoice.stamp_duty_amount > Decimal("0"),
+                        TaxCode.tax_type == TaxType.STAMP_DUTY,
+                    )
+                    .order_by(
+                        SupplierInvoice.invoice_date.desc(),
+                        SupplierInvoice.invoice_number.desc(),
+                    )
+                )
+            )
+
+            report.transactions = [
+                {
+                    "transaction_date": invoice_date,
+                    "reference": invoice_number,
+                    "counterparty_name": counterparty_name,
+                    "counterparty_tax_id": counterparty_tax_id,
+                    "tax_code": tax_code,
+                    "tax_name": tax_name,
+                    "rate": tax_rate * 100 if tax_rate is not None else Decimal("0"),
+                    "stamp_duty_amount": stamp_duty_amount,
+                    "source_module": "AR",
+                    "treatment": stamp_duty_treatment,
+                }
+                for (
+                    invoice_date,
+                    invoice_number,
+                    counterparty_name,
+                    counterparty_tax_id,
+                    tax_code,
+                    tax_name,
+                    tax_rate,
+                    stamp_duty_amount,
+                    stamp_duty_treatment,
+                ) in ar_transactions
+            ] + [
+                {
+                    "transaction_date": invoice_date,
+                    "reference": invoice_number,
+                    "counterparty_name": counterparty_name,
+                    "counterparty_tax_id": counterparty_tax_id,
+                    "tax_code": tax_code,
+                    "tax_name": tax_name,
+                    "rate": tax_rate * 100 if tax_rate is not None else Decimal("0"),
+                    "stamp_duty_amount": stamp_duty_amount,
+                    "source_module": "AP",
+                    "treatment": None,
+                }
+                for (
+                    invoice_date,
+                    invoice_number,
+                    counterparty_name,
+                    counterparty_tax_id,
+                    tax_code,
+                    tax_name,
+                    tax_rate,
+                    stamp_duty_amount,
+                ) in ap_transactions
+            ]
+            report.transactions.sort(
+                key=lambda item: (item["transaction_date"], item["reference"] or ""),
+                reverse=True,
+            )
+
+        return report
+
+    @staticmethod
     def get_tax_register(
         db: Session,
         organization_id: UUID,
@@ -539,9 +847,15 @@ class TaxReportService:
         transaction_type: TaxTransactionType | None = None,
         limit: int = 1000,
         offset: int = 0,
+        basis: TaxBasis = "accrual",
     ) -> list[TaxTransactionDetail]:
         """
         Get detailed tax register for export.
+
+        Note:
+            ``basis`` is accepted for API symmetry but the register reads
+            tax.tax_transaction directly (per-row detail). Cash-basis
+            totals come from get_vat_return_data() / get_wht_report().
 
         Args:
             db: Database session
@@ -556,6 +870,7 @@ class TaxReportService:
         Returns:
             List of TaxTransactionDetail objects
         """
+        del basis
         org_id = coerce_uuid(organization_id)
 
         query = (
@@ -565,6 +880,7 @@ class TaxReportService:
                 TaxTransaction.organization_id == org_id,
                 TaxTransaction.transaction_date >= start_date,
                 TaxTransaction.transaction_date <= end_date,
+                TaxTransaction.recognition_basis == TaxRecognitionBasis.ACCRUAL,
             )
         )
 
@@ -598,6 +914,273 @@ class TaxReportService:
             )
             for txn, code in results
         ]
+
+
+# ---------------------------------------------------------------------------
+# Cash-basis branches
+# ---------------------------------------------------------------------------
+#
+# These are private helpers split out from the static methods to keep each
+# branch readable. They consume the prorate helpers in rpt/common which
+# walk AR/AP payment_allocation × invoice ratios.
+
+
+def _vat_return_data_cash(
+    db: Session,
+    org_id: UUID,
+    start_date: date,
+    end_date: date,
+) -> VATReturnData:
+    """Build VATReturnData from cash-basis tax transactions."""
+    results = list(
+        db.execute(
+            select(
+                TaxCode.tax_rate,
+                TaxTransaction.transaction_type,
+                func.sum(TaxTransaction.base_amount).label("total_base"),
+                func.sum(TaxTransaction.tax_amount).label("total_tax"),
+            )
+            .join(TaxCode, TaxTransaction.tax_code_id == TaxCode.tax_code_id)
+            .where(
+                TaxTransaction.organization_id == org_id,
+                TaxTransaction.transaction_date >= start_date,
+                TaxTransaction.transaction_date <= end_date,
+                TaxCode.tax_type == TaxType.VAT,
+                TaxTransaction.recognition_basis == TaxRecognitionBasis.CASH,
+            )
+            .group_by(TaxCode.tax_rate, TaxTransaction.transaction_type)
+        )
+    )
+
+    if not results:
+        from app.services.finance.rpt.common import _cash_basis_vat_totals
+
+        totals = _cash_basis_vat_totals(db, org_id, start_date, end_date)
+        return VATReturnData(
+            period_start=start_date,
+            period_end=end_date,
+            box1_taxable_supplies=totals["net_output_base"],
+            box2_output_vat=totals["net_output_vat"],
+            box3_taxable_purchases=totals["input_base"],
+            box4_input_vat=totals["input_vat"],
+            box5_net_vat=totals["net_vat_payable"],
+            box6_zero_rated=totals["output_zero_rated"],
+            box7_exempt=Decimal("0"),
+            rate_breakdown=totals["rate_breakdown"],
+        )
+
+    return_data = VATReturnData(period_start=start_date, period_end=end_date)
+    rate_breakdown = []
+    for rate, txn_type, total_base, total_tax in results:
+        base = total_base or Decimal("0")
+        tax = total_tax or Decimal("0")
+        if txn_type == TaxTransactionType.OUTPUT:
+            if rate == Decimal("0"):
+                return_data.box6_zero_rated += base
+            else:
+                return_data.box1_taxable_supplies += base
+                return_data.box2_output_vat += tax
+        elif txn_type == TaxTransactionType.INPUT:
+            return_data.box3_taxable_purchases += base
+            return_data.box4_input_vat += tax
+
+        rate_breakdown.append(
+            {
+                "rate": float(rate),
+                "transaction_type": txn_type.value,
+                "base_amount": float(base),
+                "tax_amount": float(tax),
+            }
+        )
+
+    return_data.box5_net_vat = return_data.box2_output_vat - return_data.box4_input_vat
+    return_data.rate_breakdown = rate_breakdown
+    return return_data
+
+
+def _tax_summary_by_type_cash(
+    db: Session,
+    org_id: UUID,
+    start_date: date,
+    end_date: date,
+) -> list[TaxSummaryByType]:
+    """Build TaxSummaryByType list on cash basis.
+
+    Currently only emits a VAT row (the cash-basis concept has no clean
+    application to income tax / excise / customs) plus a WHT row from
+    payment headers.
+    """
+    from app.services.finance.rpt.common import (
+        _cash_basis_vat_totals,
+        _cash_basis_wht_totals,
+    )
+
+    cash_vat_summary = db.execute(
+        select(
+            TaxTransaction.transaction_type,
+            func.sum(TaxTransaction.tax_amount).label("total_tax"),
+        )
+        .join(TaxCode, TaxTransaction.tax_code_id == TaxCode.tax_code_id)
+        .where(
+            TaxTransaction.organization_id == org_id,
+            TaxTransaction.transaction_date >= start_date,
+            TaxTransaction.transaction_date <= end_date,
+            TaxCode.tax_type == TaxType.VAT,
+            TaxTransaction.recognition_basis == TaxRecognitionBasis.CASH,
+        )
+        .group_by(TaxTransaction.transaction_type)
+    ).all()
+    if cash_vat_summary:
+        vat_output = Decimal("0")
+        vat_input = Decimal("0")
+        for txn_type, total_tax in cash_vat_summary:
+            if txn_type == TaxTransactionType.OUTPUT:
+                vat_output += total_tax or Decimal("0")
+            elif txn_type == TaxTransactionType.INPUT:
+                vat_input += total_tax or Decimal("0")
+        vat = {
+            "net_output_vat": vat_output,
+            "input_vat": vat_input,
+            "net_vat_payable": vat_output - vat_input,
+        }
+    else:
+        vat = _cash_basis_vat_totals(db, org_id, start_date, end_date)
+    wht = _cash_basis_wht_totals(db, org_id, start_date, end_date)
+
+    summaries: list[TaxSummaryByType] = []
+
+    # VAT
+    summaries.append(
+        TaxSummaryByType(
+            tax_type=TaxType.VAT.value,
+            tax_type_display="Value Added Tax (VAT)",
+            total_output=vat["net_output_vat"],
+            total_input=vat["input_vat"],
+            total_wht_collected=Decimal("0"),
+            total_wht_deducted=Decimal("0"),
+            net_payable=vat["net_vat_payable"],
+            transaction_count=0,
+        )
+    )
+
+    # Withholding
+    summaries.append(
+        TaxSummaryByType(
+            tax_type=TaxType.WITHHOLDING.value,
+            tax_type_display="Withholding Tax (WHT)",
+            total_output=Decimal("0"),
+            total_input=Decimal("0"),
+            total_wht_collected=wht["wht_withheld_from_suppliers"],
+            total_wht_deducted=wht["wht_deducted_by_customers"],
+            net_payable=wht["net_wht_payable"],
+            transaction_count=0,
+        )
+    )
+
+    return summaries
+
+
+def _wht_report_cash(
+    db: Session,
+    org_id: UUID,
+    start_date: date,
+    end_date: date,
+    include_transactions: bool,
+) -> WHTReportData:
+    """Build WHTReportData from payment header WHT amounts.
+
+    AR side: customer_payment.wht_amount (deducted by customers)
+    AP side: supplier_payment.withholding_tax_amount (we withheld)
+    """
+    from app.models.finance.ap.supplier_payment import (
+        APPaymentStatus,
+        SupplierPayment,
+    )
+    from app.models.finance.ar.customer_payment import (
+        CustomerPayment,
+        PaymentStatus,
+    )
+    from app.services.finance.rpt.common import _cash_basis_wht_totals
+
+    totals = _cash_basis_wht_totals(db, org_id, start_date, end_date)
+
+    report = WHTReportData(
+        period_start=start_date,
+        period_end=end_date,
+        wht_withheld_from_suppliers=totals["wht_withheld_from_suppliers"],
+        wht_deducted_by_customers=totals["wht_deducted_by_customers"],
+        net_wht_payable=totals["net_wht_payable"],
+    )
+
+    if not include_transactions:
+        return report
+
+    excluded_ar = {PaymentStatus.VOID, PaymentStatus.BOUNCED, PaymentStatus.REVERSED}
+    excluded_ap = {
+        APPaymentStatus.VOID,
+        APPaymentStatus.REJECTED,
+        APPaymentStatus.DRAFT,
+    }
+
+    ar_rows = list(
+        db.execute(
+            select(CustomerPayment)
+            .where(
+                CustomerPayment.organization_id == org_id,
+                CustomerPayment.payment_date >= start_date,
+                CustomerPayment.payment_date <= end_date,
+                CustomerPayment.wht_amount > 0,
+                CustomerPayment.status.notin_(excluded_ar),
+            )
+            .order_by(CustomerPayment.payment_date.desc())
+        ).scalars()
+    )
+    ap_rows = list(
+        db.execute(
+            select(SupplierPayment)
+            .where(
+                SupplierPayment.organization_id == org_id,
+                SupplierPayment.payment_date >= start_date,
+                SupplierPayment.payment_date <= end_date,
+                SupplierPayment.withholding_tax_amount > 0,
+                SupplierPayment.status.notin_(excluded_ap),
+            )
+            .order_by(SupplierPayment.payment_date.desc())
+        ).scalars()
+    )
+
+    transactions: list[dict] = []
+    report.wht_deducted_count = len(ar_rows)
+    for cp in ar_rows:
+        transactions.append(
+            {
+                "transaction_id": str(cp.payment_id),
+                "transaction_date": cp.payment_date.isoformat(),
+                "source_module": "AR",
+                "source_document_type": "CUSTOMER_PAYMENT",
+                "base_amount": float(cp.gross_amount or 0),
+                "tax_amount": float(cp.wht_amount or 0),
+                "reference": cp.reference,
+                "certificate_number": cp.wht_certificate_number,
+            }
+        )
+
+    report.wht_withheld_count = len(ap_rows)
+    for sp in ap_rows:
+        transactions.append(
+            {
+                "transaction_id": str(sp.payment_id),
+                "transaction_date": sp.payment_date.isoformat(),
+                "source_module": "AP",
+                "source_document_type": "SUPPLIER_PAYMENT",
+                "base_amount": float(sp.gross_amount or 0),
+                "tax_amount": float(sp.withholding_tax_amount or 0),
+                "reference": sp.reference,
+            }
+        )
+
+    report.transactions = transactions
+    return report
 
 
 # Module-level singleton instance

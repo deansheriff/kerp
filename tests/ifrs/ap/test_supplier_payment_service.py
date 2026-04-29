@@ -249,6 +249,33 @@ class TestVoidSupplierPayment:
         assert result.status == APPaymentStatus.VOID
         mock_db.commit.assert_called()
 
+    def test_void_sent_payment_reverses_vat_cash_basis(self, mock_db, org_id, user_id):
+        from app.models.finance.ap.supplier_payment import APPaymentStatus
+        from app.services.finance.ap.supplier_payment import SupplierPaymentService
+
+        payment = MockSupplierPayment(
+            organization_id=org_id,
+            status=APPaymentStatus.SENT,
+        )
+        payment.journal_entry_id = uuid4()
+        payment.allocations = []
+        mock_db.get.return_value = payment
+        mock_db.scalars.return_value.all.return_value = []
+
+        with patch(
+            "app.services.finance.ap.supplier_payment._reverse_vat_cash_basis_for_payment"
+        ) as mock_reverse_vat:
+            with patch(
+                "app.services.finance.gl.reversal.ReversalService.create_reversal"
+            ) as mock_reverse:
+                mock_reverse.return_value = MagicMock(success=True)
+                result = SupplierPaymentService.void_payment(
+                    mock_db, org_id, payment.payment_id, user_id, "Duplicate"
+                )
+
+        assert result.status == APPaymentStatus.VOID
+        mock_reverse_vat.assert_called_once()
+
     def test_void_cleared_payment_fails(self, mock_db, org_id, user_id):
         """Test that voiding cleared payment fails."""
         from app.models.finance.ap.supplier_payment import APPaymentStatus

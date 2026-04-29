@@ -22,7 +22,7 @@ from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.people.hr.employee import Employee, EmployeeStatus
+from app.models.people.hr.employee import Employee
 from app.models.people.hr.employment_type import EmploymentType
 from app.models.people.payroll.salary_assignment import SalaryStructureAssignment
 from app.models.people.payroll.salary_component import (
@@ -37,6 +37,9 @@ from app.models.people.payroll.salary_slip import (
 )
 from app.models.people.payroll.salary_structure import SalaryStructure
 from app.services.common import coerce_uuid
+from app.services.people.payroll.eligibility import (
+    is_employee_payroll_eligible_for_period,
+)
 from app.services.people.payroll.paye_calculator import PAYEBreakdown, PAYECalculator
 
 logger = logging.getLogger(__name__)
@@ -375,7 +378,11 @@ class SalarySlipService:
         if not employee or employee.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Employee not found")
 
-        if employee.status not in {EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE}:
+        if not is_employee_payroll_eligible_for_period(
+            employee,
+            period_start=input.start_date,
+            period_end=input.end_date,
+        ):
             raise HTTPException(
                 status_code=400,
                 detail=f"Cannot generate slip for employee with status: {employee.status.value}",
@@ -398,10 +405,15 @@ class SalarySlipService:
                 detail=f"Salary slip already exists for this period: {existing.slip_number}",
             )
 
-        # Get active salary structure assignment
-        # Use end_date so mid-month joiners are included
+        # Get the assignment effective on the employee's payable end date.
+        # For final-pay exits, the assignment may end on the leaving date and
+        # should still be used for the prorated slip.
+        assignment_lookup_date = min(
+            input.end_date,
+            employee.date_of_leaving or input.end_date,
+        )
         assignment = SalarySlipService.get_active_assignment(
-            db, org_id, emp_id, input.end_date
+            db, org_id, emp_id, assignment_lookup_date
         )
 
         if not assignment:
@@ -817,7 +829,11 @@ class SalarySlipService:
         if not employee or employee.organization_id != org_id:
             raise HTTPException(status_code=404, detail="Employee not found")
 
-        if employee.status not in {EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE}:
+        if not is_employee_payroll_eligible_for_period(
+            employee,
+            period_start=input.start_date,
+            period_end=input.end_date,
+        ):
             raise HTTPException(
                 status_code=400,
                 detail=f"Cannot generate slip for employee with status: {employee.status.value}",
@@ -840,8 +856,12 @@ class SalarySlipService:
             )
 
         # Use end_date so mid-month joiners are included (matches create path)
+        assignment_lookup_date = min(
+            input.end_date,
+            employee.date_of_leaving or input.end_date,
+        )
         assignment = SalarySlipService.get_active_assignment(
-            db, org_id, emp_id, input.end_date
+            db, org_id, emp_id, assignment_lookup_date
         )
         if not assignment:
             raise HTTPException(

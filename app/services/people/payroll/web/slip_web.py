@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.people.hr.employee import Employee, EmployeeStatus
+from app.models.people.hr.employee import Employee
 from app.models.people.hr.employment_type import EmploymentType
 from app.models.people.payroll.employee_tax_profile import EmployeeTaxProfile
 from app.models.people.payroll.salary_slip import (
@@ -32,6 +32,7 @@ from app.services.people.payroll import (
     SalarySlipInput,
     salary_slip_service,
 )
+from app.services.people.payroll.eligibility import payroll_employee_eligibility_clause
 from app.services.people.payroll.paye_calculator import PAYECalculator
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
@@ -361,7 +362,10 @@ class SlipWebService:
             select(Employee)
             .where(
                 Employee.organization_id == org_id,
-                Employee.status.in_([EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]),
+                payroll_employee_eligibility_clause(
+                    period_start=date.today(),
+                    period_end=date.today(),
+                ),
             )
             .order_by(Employee.employee_code)
         ).all()
@@ -413,7 +417,10 @@ class SlipWebService:
             select(Employee)
             .where(
                 Employee.organization_id == org_id,
-                Employee.status.in_([EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]),
+                payroll_employee_eligibility_clause(
+                    period_start=slip.start_date,
+                    period_end=slip.end_date,
+                ),
             )
             .order_by(Employee.employee_code)
         ).all()
@@ -469,8 +476,9 @@ class SlipWebService:
                 select(Employee)
                 .where(
                     Employee.organization_id == org_id,
-                    Employee.status.in_(
-                        [EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]
+                    payroll_employee_eligibility_clause(
+                        period_start=parse_date(start_date) or date.today(),
+                        period_end=parse_date(end_date) or date.today(),
                     ),
                 )
                 .order_by(Employee.employee_code)
@@ -524,12 +532,15 @@ class SlipWebService:
 
         except Exception as e:
             db.rollback()
+            fallback_start = parse_date(start_date) or date.today()
+            fallback_end = parse_date(end_date) or fallback_start
             employees = db.scalars(
                 select(Employee)
                 .where(
                     Employee.organization_id == org_id,
-                    Employee.status.in_(
-                        [EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]
+                    payroll_employee_eligibility_clause(
+                        period_start=fallback_start,
+                        period_end=fallback_end,
                     ),
                 )
                 .order_by(Employee.employee_code)
@@ -586,8 +597,9 @@ class SlipWebService:
                 select(Employee)
                 .where(
                     Employee.organization_id == org_id,
-                    Employee.status.in_(
-                        [EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]
+                    payroll_employee_eligibility_clause(
+                        period_start=parse_date(start_date) or date.today(),
+                        period_end=parse_date(end_date) or date.today(),
                     ),
                 )
                 .order_by(Employee.employee_code)
@@ -648,12 +660,15 @@ class SlipWebService:
 
         except Exception as e:
             db.rollback()
+            fallback_start = parse_date(start_date) or date.today()
+            fallback_end = parse_date(end_date) or fallback_start
             employees = db.scalars(
                 select(Employee)
                 .where(
                     Employee.organization_id == org_id,
-                    Employee.status.in_(
-                        [EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]
+                    payroll_employee_eligibility_clause(
+                        period_start=fallback_start,
+                        period_end=fallback_end,
                     ),
                 )
                 .order_by(Employee.employee_code)
@@ -858,15 +873,33 @@ class SlipWebService:
         user_id = coerce_uuid(auth.user_id)
 
         post_date = parse_date(posting_date) or date.today()
+        s_id = coerce_uuid(slip_id)
 
         try:
             PayrollGLAdapter.post_salary_slip(
                 db=db,
                 organization_id=org_id,
-                slip_id=coerce_uuid(slip_id),
+                slip_id=s_id,
                 posting_date=post_date,
                 posted_by_user_id=user_id,
             )
+
+            posted_slip = db.get(SalarySlip, s_id)
+            if (
+                posted_slip
+                and posted_slip.organization_id == org_id
+                and posted_slip.employee
+            ):
+                from app.services.people.payroll.payroll_notifications import (
+                    PayrollNotificationService,
+                )
+
+                PayrollNotificationService(db).notify_payslip_posted(
+                    posted_slip,
+                    posted_slip.employee,
+                    queue_email=True,
+                )
+
             db.commit()
         except Exception as e:
             db.rollback()

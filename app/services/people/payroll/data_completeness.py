@@ -24,6 +24,7 @@ from app.models.people.payroll.salary_assignment import (
 )
 from app.models.person import Person
 from app.services.finance.banking.bank_directory import BankDirectoryService
+from app.services.people.payroll.eligibility import payroll_employee_eligibility_clause
 
 logger = logging.getLogger(__name__)
 
@@ -763,7 +764,10 @@ class PayrollReadinessService:
             )
             .where(
                 Employee.organization_id == organization_id,
-                Employee.status.in_([EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE]),
+                payroll_employee_eligibility_clause(
+                    period_start=period_start,
+                    period_end=period_end,
+                ),
                 or_(
                     Employee.is_deleted.is_(None),
                     Employee.is_deleted == False,

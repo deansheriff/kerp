@@ -168,23 +168,28 @@ class TestPostPayment:
             return_value=uuid4(),
         ):
             with patch(
-                "app.services.finance.gl.journal.JournalService"
-            ) as mock_journal_cls:
+                "app.services.finance.ar.customer_payment.post_vat_reclass_for_payment",
+                return_value=None,
+            ) as mock_vat_reclass:
                 with patch(
-                    "app.services.finance.gl.ledger_posting.LedgerPostingService"
-                ) as mock_posting_cls:
-                    mock_journal = MagicMock(journal_entry_id=uuid4())
-                    mock_journal_cls.create_journal.return_value = mock_journal
-                    mock_journal_cls.submit_journal.return_value = None
-                    mock_journal_cls.approve_journal.return_value = None
-                    mock_posting_cls.post_journal_entry.return_value = MagicMock(
-                        success=True, posting_batch_id=uuid4()
-                    )
-                    result = CustomerPaymentService.post_payment(
-                        mock_db, org_id, payment.payment_id, user_id
-                    )
+                    "app.services.finance.gl.journal.JournalService"
+                ) as mock_journal_cls:
+                    with patch(
+                        "app.services.finance.gl.ledger_posting.LedgerPostingService"
+                    ) as mock_posting_cls:
+                        mock_journal = MagicMock(journal_entry_id=uuid4())
+                        mock_journal_cls.create_journal.return_value = mock_journal
+                        mock_journal_cls.submit_journal.return_value = None
+                        mock_journal_cls.approve_journal.return_value = None
+                        mock_posting_cls.post_journal_entry.return_value = MagicMock(
+                            success=True, posting_batch_id=uuid4()
+                        )
+                        result = CustomerPaymentService.post_payment(
+                            mock_db, org_id, payment.payment_id, user_id
+                        )
 
         assert result.status == PaymentStatus.CLEARED
+        mock_vat_reclass.assert_called_once()
         mock_db.flush.assert_called()
 
 
@@ -249,11 +254,15 @@ class TestMarkBouncedPayment:
         # Mock scalars().all() for allocation query
         mock_db.scalars.return_value.all.return_value = payment.allocations
 
-        result = CustomerPaymentService.mark_bounced(
-            mock_db, org_id, payment.payment_id, "NSF"
-        )
+        with patch(
+            "app.services.finance.ar.customer_payment._reverse_vat_cash_basis_for_payment"
+        ) as mock_reverse_vat:
+            result = CustomerPaymentService.mark_bounced(
+                mock_db, org_id, payment.payment_id, "NSF"
+            )
 
         assert result.status == PaymentStatus.BOUNCED
+        mock_reverse_vat.assert_not_called()
         mock_db.flush.assert_called()
 
 
@@ -277,6 +286,35 @@ class TestVoidCustomerPayment:
 
         assert result.status == PaymentStatus.VOID
         mock_db.flush.assert_called()
+
+    def test_void_cleared_payment_reverses_vat_cash_basis(
+        self, mock_db, org_id, user_id
+    ):
+        from app.models.finance.ar.customer_payment import PaymentStatus
+        from app.services.finance.ar.customer_payment import CustomerPaymentService
+
+        payment = MockCustomerPayment(
+            organization_id=org_id,
+            status=PaymentStatus.CLEARED,
+        )
+        payment.journal_entry_id = uuid4()
+        payment.allocations = []
+        mock_db.get.return_value = payment
+        mock_db.scalars.return_value.all.return_value = []
+
+        with patch(
+            "app.services.finance.ar.customer_payment._reverse_vat_cash_basis_for_payment"
+        ) as mock_reverse_vat:
+            with patch(
+                "app.services.finance.gl.reversal.ReversalService.create_reversal"
+            ) as mock_reverse:
+                mock_reverse.return_value = MagicMock(success=True)
+                result = CustomerPaymentService.void_payment(
+                    mock_db, org_id, payment.payment_id, user_id, "Duplicate"
+                )
+
+        assert result.status == PaymentStatus.VOID
+        mock_reverse_vat.assert_called_once()
 
     def test_void_already_void_fails(self, mock_db, org_id, user_id):
         """Test that voiding already voided payment fails."""

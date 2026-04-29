@@ -41,11 +41,14 @@ def ifrs_dashboard(
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db),
     year: str | None = Query(default=None),
+    basis: str = Query(default="accrual"),
 ):
     """IFRS Dashboard page."""
     context = base_context(request, auth, "Finance Dashboard", "dashboard", db=db)
     context.update(
-        dashboard_web_service.dashboard_context(db, auth.organization_id, year=year)
+        dashboard_web_service.dashboard_context(
+            db, auth.organization_id, year=year, basis=basis
+        )
     )
 
     # Coach insight cards for finance dashboards

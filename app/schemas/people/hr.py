@@ -254,6 +254,7 @@ class EmployeeUpdate(BaseModel):
     default_shift_type_id: UUID | None = None
     date_of_joining: date | None = None
     date_of_leaving: date | None = None
+    final_payroll_cutoff_date: date | None = None
     probation_end_date: date | None = None
     confirmation_date: date | None = None
     nysc_start_date: date | None = None
@@ -267,6 +268,7 @@ class EmployeeUpdate(BaseModel):
     bank_account_name: str | None = Field(default=None, max_length=100)
     bank_branch_code: str | None = Field(default=None, max_length=20)
     notes: str | None = None
+    eligible_for_final_payroll: bool | None = None
 
 
 class PersonBrief(BaseModel):
@@ -319,6 +321,7 @@ class EmployeeRead(BaseModel):
     default_shift_type_id: UUID | None = None
     date_of_joining: date
     date_of_leaving: date | None = None
+    final_payroll_cutoff_date: date | None = None
     probation_end_date: date | None = None
     confirmation_date: date | None = None
     nysc_start_date: date | None = None
@@ -332,6 +335,8 @@ class EmployeeRead(BaseModel):
     bank_account_name: str | None = None
     bank_branch_code: str | None = None
     notes: str | None = None
+    eligible_for_final_payroll: bool
+    final_payroll_processed_at: datetime | None = None
     version: int
     created_at: datetime
     updated_at: datetime | None = None
@@ -468,12 +473,16 @@ class TerminationRequest(BaseModel):
     date_of_leaving: date
     reason: str | None = None
     exit_interview_notes: str | None = None
+    eligible_for_final_payroll: bool = False
+    final_payroll_cutoff_date: date | None = None
 
 
 class ResignationRequest(BaseModel):
     """Employee resignation request."""
 
     date_of_leaving: date
+    eligible_for_final_payroll: bool = False
+    final_payroll_cutoff_date: date | None = None
 
 
 class RehireRequest(BaseModel):
