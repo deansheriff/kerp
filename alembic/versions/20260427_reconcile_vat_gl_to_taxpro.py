@@ -64,9 +64,20 @@ def upgrade() -> None:
         SELECT
             gen_random_uuid(),
             '{ORG_ID}'::uuid,
-            (SELECT category_id FROM gl.account_category
-             WHERE organization_id = '{ORG_ID}'::uuid
-               AND category_code = 'TAX-L'),
+            (
+                SELECT category_id
+                FROM gl.account_category
+                WHERE organization_id = '{ORG_ID}'::uuid
+                  AND is_active = true
+                  AND (
+                      category_code = 'TAX-L'
+                      OR ifrs_category = 'LIABILITIES'
+                  )
+                ORDER BY CASE WHEN category_code = 'TAX-L' THEN 0 ELSE 1 END,
+                         display_order,
+                         created_at
+                LIMIT 1
+            ),
             '2125',
             'Deferred Output VAT',
             'Output VAT on accrual basis revenue not yet collected from '
@@ -83,6 +94,16 @@ def upgrade() -> None:
             SELECT 1 FROM gl.account
             WHERE organization_id = '{ORG_ID}'::uuid
               AND account_code = '2125'
+        )
+          AND EXISTS (
+            SELECT 1
+            FROM gl.account_category
+            WHERE organization_id = '{ORG_ID}'::uuid
+              AND is_active = true
+              AND (
+                  category_code = 'TAX-L'
+                  OR ifrs_category = 'LIABILITIES'
+              )
         )
         """
     )

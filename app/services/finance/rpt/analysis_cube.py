@@ -79,7 +79,7 @@ class AnalysisCubeService:
         measure_map = {m["field"]: m for m in (cube.measures or []) if m.get("field")}
 
         group_parts: list[str] = []
-        params: dict[str, object] = {"org_id": str(organization_id)}
+        params: dict[str, object] = {"org_id": str(organization_id), "limit": limit}
         referenced_fields: set[str] = {"organization_id"}
 
         for dim in row_dimensions:
@@ -137,7 +137,7 @@ class AnalysisCubeService:
             .where(source.c.organization_id == bindparam("org_id"))
             .group_by(*(source.c[field] for field in group_parts))
             .order_by(*(source.c[field] for field in group_parts))
-            .limit(limit)
+            .limit(bindparam("limit"))
         )
 
         for idx, filter_item in enumerate(filter_items):
