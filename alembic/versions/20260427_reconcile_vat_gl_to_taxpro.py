@@ -149,6 +149,18 @@ def upgrade() -> None:
             SELECT account_id INTO v_acc_1200 FROM gl.account
             WHERE organization_id = v_org AND account_code = '1200';
 
+            -- This is a tenant-specific reconciliation for an already-live
+            -- chart of accounts. Fresh CI databases can legitimately lack one
+            -- or more of these production account codes, in which case this
+            -- migration should no-op rather than fail global schema setup.
+            IF v_acc_2120 IS NULL
+               OR v_acc_2125 IS NULL
+               OR v_acc_1440 IS NULL
+               OR v_acc_4031 IS NULL
+               OR v_acc_1200 IS NULL THEN
+                RETURN;
+            END IF;
+
             -- Use the fiscal period that contains the reconciliation date.
             -- If none exists yet, provision a dedicated adjustment period so
             -- the posting stays attached to a valid 2026 GL period.
