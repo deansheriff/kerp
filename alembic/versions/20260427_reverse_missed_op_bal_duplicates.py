@@ -56,10 +56,12 @@ def upgrade() -> None:
             v_org UUID := '{ORG_ID}'::uuid;
             v_journal UUID := gen_random_uuid();
             v_batch UUID := gen_random_uuid();
+            v_year UUID;
             v_period UUID;
             v_acc_1202 UUID;
             v_acc_1211 UUID;
             v_acc_3100 UUID;
+            v_recon_date DATE := DATE '2026-04-27';
             v_now TIMESTAMPTZ := now();
         BEGIN
             IF EXISTS (
@@ -77,8 +79,96 @@ def upgrade() -> None:
             SELECT account_id INTO v_acc_3100 FROM gl.account
             WHERE organization_id = v_org AND account_code = '3100';
 
-            SELECT fiscal_period_id INTO v_period FROM gl.fiscal_period
-            WHERE organization_id = v_org AND start_date = '2026-04-01';
+            -- Tenant-specific reconciliation: skip on blank CI/demo databases
+            -- that do not have the production chart of accounts.
+            IF v_acc_1202 IS NULL
+               OR v_acc_1211 IS NULL
+               OR v_acc_3100 IS NULL THEN
+                RETURN;
+            END IF;
+
+            -- Use the fiscal period that contains the reversal date. If none
+            -- exists yet, provision a dedicated adjustment period under FY2026
+            -- so this targeted data-fix remains runnable on fresh databases.
+            SELECT fiscal_period_id, fiscal_year_id
+              INTO v_period, v_year
+            FROM gl.fiscal_period
+            WHERE organization_id = v_org
+              AND start_date <= v_recon_date
+              AND end_date >= v_recon_date
+            ORDER BY
+                CASE WHEN status IN ('OPEN', 'REOPENED') THEN 0 ELSE 1 END,
+                start_date DESC
+            LIMIT 1;
+
+            IF v_year IS NULL THEN
+                SELECT fiscal_year_id
+                  INTO v_year
+                FROM gl.fiscal_year
+                WHERE organization_id = v_org
+                  AND start_date <= v_recon_date
+                  AND end_date >= v_recon_date
+                ORDER BY start_date DESC
+                LIMIT 1;
+            END IF;
+
+            IF v_year IS NULL THEN
+                INSERT INTO gl.fiscal_year (
+                    fiscal_year_id, organization_id, year_code, year_name,
+                    start_date, end_date, is_adjustment_year, is_closed, created_at
+                )
+                VALUES (
+                    gen_random_uuid(), v_org, 'FY2026', 'FY 2026',
+                    DATE '2026-01-01', DATE '2026-12-31', false, false, v_now
+                )
+                ON CONFLICT (organization_id, year_code) DO NOTHING;
+
+                SELECT fiscal_year_id
+                  INTO v_year
+                FROM gl.fiscal_year
+                WHERE organization_id = v_org
+                  AND year_code = 'FY2026';
+            END IF;
+
+            IF v_period IS NULL THEN
+                INSERT INTO gl.fiscal_period (
+                    fiscal_period_id, organization_id, fiscal_year_id,
+                    period_number, period_name,
+                    start_date, end_date,
+                    is_adjustment_period, is_closing_period,
+                    status, reopen_count, created_at
+                )
+                VALUES (
+                    gen_random_uuid(), v_org, v_year,
+                    (
+                        SELECT COALESCE(MAX(period_number), 0) + 1
+                        FROM gl.fiscal_period
+                        WHERE fiscal_year_id = v_year
+                    ),
+                    'Reverse Missed OB Duplicates Apr 2026',
+                    v_recon_date, v_recon_date,
+                    true, false,
+                    'OPEN'::period_status, 0, v_now
+                );
+
+                SELECT fiscal_period_id
+                  INTO v_period
+                FROM gl.fiscal_period
+                WHERE organization_id = v_org
+                  AND fiscal_year_id = v_year
+                  AND start_date = v_recon_date
+                  AND end_date = v_recon_date
+                  AND is_adjustment_period = true
+                ORDER BY created_at DESC
+                LIMIT 1;
+            END IF;
+
+            IF v_period IS NULL THEN
+                RAISE EXCEPTION
+                    'Unable to resolve or create fiscal period for missed opening-balance reversal on % (org=%)',
+                    v_recon_date,
+                    v_org;
+            END IF;
 
             INSERT INTO gl.posting_batch (
                 batch_id, organization_id, fiscal_period_id,
