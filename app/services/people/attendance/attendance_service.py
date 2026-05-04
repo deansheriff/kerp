@@ -1781,8 +1781,8 @@ class AttendanceService:
         from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         today = self.get_org_today(org_id)
-        end_date = today.replace(day=1)
-        start_date = end_date - relativedelta(months=months - 1)
+        end_month = today.replace(day=1) - relativedelta(months=1)
+        start_date = end_month - relativedelta(months=months - 1)
 
         # Query monthly aggregates
         month_bucket = func.date_trunc(
@@ -1813,7 +1813,7 @@ class AttendanceService:
             .where(
                 Attendance.organization_id == org_id,
                 Attendance.attendance_date >= start_date,
-                Attendance.attendance_date <= today,
+                Attendance.attendance_date < end_month + relativedelta(months=1),
             )
             .group_by(month_bucket)
             .order_by(month_bucket)
@@ -1858,7 +1858,7 @@ class AttendanceService:
         total_records = 0
         total_present = 0
 
-        while current <= today:
+        while current <= end_month:
             month_key = current.strftime("%Y-%m")
             if month_key in monthly_data:
                 months_list.append(monthly_data[month_key])

@@ -55,7 +55,9 @@ def test_validate_return_image_uploads_rejects_non_images() -> None:
 
 
 @pytest.mark.asyncio
-async def test_bulk_record_count_lines_response_uses_checked_lines_only(monkeypatch) -> None:
+async def test_bulk_record_count_lines_response_uses_checked_lines_only(
+    monkeypatch,
+) -> None:
     service = OperationsInventoryWebService()
     request = MagicMock()
     request.form = AsyncMock(

@@ -487,10 +487,7 @@ class InventoryCountService(ListResponseMixin):
         updated_lines: builtins.list[InventoryCountLine] = []
         for entry in inputs:
             line = db.get(InventoryCountLine, coerce_uuid(entry.line_id))
-            if (
-                not line
-                or line.count_id != cnt_id
-            ):
+            if not line or line.count_id != cnt_id:
                 raise HTTPException(status_code=404, detail="Count line not found")
 
             InventoryCountService._apply_count_to_line(

@@ -314,9 +314,7 @@ class TestStartCount:
 
         assert exc.value.status_code == 404
 
-    def test_raises_error_when_not_draft(
-        self, mock_db, org_id, mock_count, user_id
-    ):
+    def test_raises_error_when_not_draft(self, mock_db, org_id, mock_count, user_id):
         """Should raise HTTPException when count is not DRAFT."""
         mock_count.status = CountStatus.IN_PROGRESS
         mock_db.get.return_value = mock_count
@@ -621,7 +619,11 @@ class TestRecordCountBulk:
                 mock_db,
                 org_id,
                 mock_count.count_id,
-                [BulkCountLineInput(line_id=uuid.uuid4(), counted_quantity=Decimal("4"))],
+                [
+                    BulkCountLineInput(
+                        line_id=uuid.uuid4(), counted_quantity=Decimal("4")
+                    )
+                ],
                 user_id,
             )
 
@@ -706,9 +708,7 @@ class TestCompleteCount:
 
         assert exc.value.status_code == 400
 
-    def test_raises_error_when_not_all_lines_counted(
-        self, mock_db, org_id, mock_count
-    ):
+    def test_raises_error_when_not_all_lines_counted(self, mock_db, org_id, mock_count):
         """Should block completion until all lines have counted quantities."""
         mock_count.status = CountStatus.IN_PROGRESS
         mock_db.get.return_value = mock_count
