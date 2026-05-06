@@ -256,6 +256,7 @@ class ReportsWebService:
         end_date: str | None,
         db: Session,
     ) -> HTMLResponse:
+        from app.services.common_filters import build_active_filters
         from app.web.deps import base_context
 
         context = base_context(request, auth, "General Ledger", "reports")
@@ -267,6 +268,28 @@ class ReportsWebService:
                 start_date=start_date,
                 end_date=end_date,
             )
+        )
+        context["active_filters"] = build_active_filters(
+            params={
+                "account_id": account_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            labels={
+                "account_id": "Account",
+                "start_date": "From",
+                "end_date": "To",
+            },
+            options={
+                "account_id": {
+                    account["account_id"]: (
+                        f"{account['account_code']} - {account['account_name']}"
+                        if account["account_code"]
+                        else account["account_name"]
+                    )
+                    for account in context["accounts"]
+                },
+            },
         )
         return templates.TemplateResponse(
             request, "finance/reports/general_ledger.html", context

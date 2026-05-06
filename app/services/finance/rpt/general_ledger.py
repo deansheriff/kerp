@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -32,10 +31,8 @@ def general_ledger_context(
     """Get context for general ledger detail report."""
     org_id = coerce_uuid(organization_id)
 
-    # Default to current month
-    today = date.today()
-    from_date = _parse_date(start_date) or today.replace(day=1)
-    to_date = _parse_date(end_date) or today
+    from_date = _parse_date(start_date)
+    to_date = _parse_date(end_date)
 
     # Get accounts for dropdown
     accounts = db.scalars(
@@ -65,8 +62,7 @@ def general_ledger_context(
         selected_account = db.get(Account, acct_id)
 
         if selected_account and selected_account.organization_id == org_id:
-            # Get journal lines for this account
-            lines = db.execute(
+            stmt = (
                 select(JournalEntryLine, JournalEntry)
                 .join(
                     JournalEntry,
@@ -76,11 +72,15 @@ def general_ledger_context(
                     JournalEntryLine.account_id == acct_id,
                     JournalEntry.organization_id == org_id,
                     JournalEntry.status == JournalStatus.POSTED,
-                    JournalEntry.posting_date >= from_date,
-                    JournalEntry.posting_date <= to_date,
                 )
                 .order_by(JournalEntry.posting_date, JournalEntry.journal_entry_id)
-            ).all()
+            )
+            if from_date:
+                stmt = stmt.where(JournalEntry.posting_date >= from_date)
+            if to_date:
+                stmt = stmt.where(JournalEntry.posting_date <= to_date)
+
+            lines = db.execute(stmt).all()
 
             for line, entry in lines:
                 debit = line.debit_amount_functional or Decimal("0")
@@ -105,10 +105,19 @@ def general_ledger_context(
                 )
 
     return {
-        "start_date": _format_date(from_date),
-        "start_date_iso": _iso_date(from_date),
-        "end_date": _format_date(to_date),
-        "end_date_iso": _iso_date(to_date),
+        "start_date": _format_date(from_date) if from_date else "",
+        "start_date_iso": _iso_date(from_date) if from_date else "",
+        "end_date": _format_date(to_date) if to_date else "",
+        "end_date_iso": _iso_date(to_date) if to_date else "",
+        "period_label": (
+            f"{_format_date(from_date)} to {_format_date(to_date)}"
+            if from_date and to_date
+            else f"From {_format_date(from_date)}"
+            if from_date
+            else f"Through {_format_date(to_date)}"
+            if to_date
+            else "All dates"
+        ),
         "account_id": account_id,
         "accounts": account_options,
         "selected_account": {

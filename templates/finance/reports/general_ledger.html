@@ -15,16 +15,6 @@
 {% endblock %}
 
 {% block header_actions %}
-{% if selected_account %}
-<a href="/finance/reports/general-ledger/export?account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}" class="btn btn-secondary h-9 px-3">
-    {{ icon_svg("download", "h-4 w-4 mr-1.5") }}
-    Export CSV
-</a>
-<a href="/finance/reports/general-ledger/export?format=pdf&account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}" class="btn btn-secondary h-9 px-3">
-    {{ icon_svg("download", "h-4 w-4 mr-1.5") }}
-    Export PDF
-</a>
-{% endif %}
 <button onclick="window.print()" class="btn btn-secondary h-9 px-3">
     {{ icon_svg("printer", "h-4 w-4 mr-1.5") }}
     Print
@@ -60,11 +50,20 @@
     {{ period_shortcuts(mode="range") }}
     {% endcall %}
 
+    <div id="results-container">
     <!-- Report -->
     {% if selected_account %}
-    <div id="results-container">
-
     <div class="card p-6 print:shadow-none print:border-0">
+        <div class="mb-5 flex flex-wrap items-center justify-end gap-2 print:hidden">
+            <a href="/finance/reports/general-ledger/export?account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}" class="btn btn-secondary h-9 px-3">
+                {{ icon_svg("download", "h-4 w-4 mr-1.5") }}
+                Export CSV
+            </a>
+            <a href="/finance/reports/general-ledger/export?format=pdf&account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}" class="btn btn-secondary h-9 px-3">
+                {{ icon_svg("download", "h-4 w-4 mr-1.5") }}
+                Export PDF
+            </a>
+        </div>
                 {% set doc_title = "General ledger detail" %}
         {% set doc_number = selected_account.account_code %}
         {% include "partials/_document_header.html" %}
@@ -72,7 +71,7 @@
             <p class="text-lg text-slate-700 dark:text-slate-300 mt-2">
                 <span class="font-mono">{{ selected_account.account_code }}</span> - {{ selected_account.account_name }}
             </p>
-            <p class="text-slate-500 dark:text-slate-400 mt-1">{{ start_date }} to {{ end_date }}</p>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">{{ period_label }}</p>
         </div>
 
         {% if transactions %}
@@ -122,7 +121,6 @@
         </div>
         {% endif %}
     </div>
-    </div>
 
     {% else %}
     <!-- No Account Selected -->
@@ -136,5 +134,6 @@
         </div>
     </div>
     {% endif %}
+    </div>
 </div>
 {% endblock %}
