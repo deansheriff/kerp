@@ -55,7 +55,7 @@ def general_ledger_context(
     ]
 
     transactions: list[dict[str, Any]] = []
-    selected_account = None
+    selected_account_info: dict[str, Any] | None = None
     running_balance = Decimal("0")
     all_accounts_selected = account_id == "all"
     all_accounts_requires_date_range = all_accounts_selected and not (
@@ -66,7 +66,7 @@ def general_ledger_context(
     all_accounts_truncated = False
 
     if all_accounts_selected:
-        selected_account = {
+        selected_account_info = {
             "account_code": "All",
             "account_name": "accounts",
             "is_all_accounts": True,
@@ -98,13 +98,16 @@ def general_ledger_context(
             if all_accounts_limit is not None:
                 stmt = stmt.limit(all_accounts_limit + 1)
 
-            lines = db.execute(stmt).all()
-            if all_accounts_limit is not None and len(lines) > all_accounts_limit:
+            all_account_lines = db.execute(stmt).all()
+            if (
+                all_accounts_limit is not None
+                and len(all_account_lines) > all_accounts_limit
+            ):
                 all_accounts_truncated = True
-                lines = lines[:all_accounts_limit]
+                all_account_lines = all_account_lines[:all_accounts_limit]
 
             balances: dict[str, Decimal] = {}
-            for line, entry, account in lines:
+            for line, entry, account in all_account_lines:
                 debit = line.debit_amount_functional or Decimal("0")
                 credit = line.credit_amount_functional or Decimal("0")
                 total_debits += debit
@@ -133,13 +136,18 @@ def general_ledger_context(
 
     elif account_id:
         acct_id = coerce_uuid(account_id)
-        selected_account = db.get(Account, acct_id)
+        account = db.get(Account, acct_id)
 
-        if selected_account and selected_account.organization_id != org_id:
-            selected_account = None
+        if account and account.organization_id != org_id:
+            account = None
 
-        if selected_account:
-            stmt = (
+        if account:
+            selected_account_info = {
+                "account_code": account.account_code,
+                "account_name": account.account_name,
+                "is_all_accounts": False,
+            }
+            account_stmt = (
                 select(JournalEntryLine, JournalEntry)
                 .join(
                     JournalEntry,
@@ -153,20 +161,22 @@ def general_ledger_context(
                 .order_by(JournalEntry.posting_date, JournalEntry.journal_entry_id)
             )
             if from_date:
-                stmt = stmt.where(JournalEntry.posting_date >= from_date)
+                account_stmt = account_stmt.where(
+                    JournalEntry.posting_date >= from_date
+                )
             if to_date:
-                stmt = stmt.where(JournalEntry.posting_date <= to_date)
+                account_stmt = account_stmt.where(JournalEntry.posting_date <= to_date)
 
-            lines = db.execute(stmt).all()
+            account_lines = db.execute(account_stmt).all()
 
-            for line, entry in lines:
+            for line, entry in account_lines:
                 debit = line.debit_amount_functional or Decimal("0")
                 credit = line.credit_amount_functional or Decimal("0")
                 total_debits += debit
                 total_credits += credit
 
                 # Calculate running balance based on normal balance
-                if selected_account.normal_balance.value == "DEBIT":
+                if account.normal_balance.value == "DEBIT":
                     running_balance += debit - credit
                 else:
                     running_balance += credit - debit
@@ -199,17 +209,7 @@ def general_ledger_context(
         ),
         "account_id": account_id,
         "accounts": account_options,
-        "selected_account": (
-            selected_account
-            if isinstance(selected_account, dict)
-            else {
-                "account_code": selected_account.account_code,
-                "account_name": selected_account.account_name,
-                "is_all_accounts": False,
-            }
-            if selected_account
-            else None
-        ),
+        "selected_account": selected_account_info,
         "transactions": transactions,
         "ending_balance": _format_currency(running_balance),
         "total_debits": _format_currency(total_debits),

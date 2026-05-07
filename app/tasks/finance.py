@@ -9,8 +9,8 @@ Handles:
 - Subledger reconciliation discrepancy alerts
 """
 
-import html
 import asyncio
+import html
 import logging
 from typing import Any
 from uuid import UUID
@@ -101,8 +101,9 @@ def process_general_ledger_export(
 
             from app.services.finance.rpt.web import reports_web_service
 
+            data: bytes
             if fmt == "PDF":
-                content = reports_web_service.export_general_ledger_pdf(
+                data = reports_web_service.export_general_ledger_pdf(
                     str(instance.organization_id),
                     db,
                     params.get("account_id"),
@@ -110,9 +111,8 @@ def process_general_ledger_export(
                     params.get("end_date"),
                 )
                 suffix = "pdf"
-                data = content
             else:
-                content = reports_web_service.export_general_ledger_csv(
+                csv_content = reports_web_service.export_general_ledger_csv(
                     str(instance.organization_id),
                     db,
                     params.get("account_id"),
@@ -120,7 +120,7 @@ def process_general_ledger_export(
                     params.get("end_date"),
                 )
                 suffix = "csv"
-                data = content.encode("utf-8")
+                data = csv_content.encode("utf-8")
 
             storage_key = (
                 f"generated_reports/{instance.organization_id}/"
@@ -222,22 +222,22 @@ async def _build_list_export_response(
     if report_code == "GL_JOURNALS":
         from app.services.finance.gl.bulk import get_journal_bulk_service
 
-        service = get_journal_bulk_service(
+        journal_service = get_journal_bulk_service(
             db,
             instance.organization_id,
             instance.generated_by_user_id,
         )
-        return await service.export_all(search, status, start_date, end_date)
+        return await journal_service.export_all(search, status, start_date, end_date)
 
     if report_code == "AR_INVOICES":
         from app.services.finance.ar.invoice_bulk import get_ar_invoice_bulk_service
 
-        service = get_ar_invoice_bulk_service(
+        invoice_service = get_ar_invoice_bulk_service(
             db,
             instance.organization_id,
             instance.generated_by_user_id,
         )
-        return await service.export_all(
+        return await invoice_service.export_all(
             search,
             status,
             start_date,
@@ -248,12 +248,12 @@ async def _build_list_export_response(
     if report_code == "AR_RECEIPTS":
         from app.services.finance.ar.receipt_bulk import get_ar_receipt_bulk_service
 
-        service = get_ar_receipt_bulk_service(
+        receipt_service = get_ar_receipt_bulk_service(
             db,
             instance.organization_id,
             instance.generated_by_user_id,
         )
-        return await service.export_all(
+        return await receipt_service.export_all(
             search,
             status,
             start_date,
