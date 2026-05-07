@@ -53,6 +53,10 @@ from app.tasks.expense import (
 )
 from app.tasks.feature_flags import archive_expired_feature_flags
 from app.tasks.finance import (
+    process_ar_invoices_export,
+    process_ar_receipts_export,
+    process_gl_journals_export,
+    process_general_ledger_export,
     refresh_analysis_cubes,
     refresh_stale_balances,
     release_expired_stock_reservations,
@@ -168,6 +172,10 @@ __all__ = [
     "process_recurring_templates",
     "process_scheduled_workflow_rules",
     # Finance tasks
+    "process_ar_invoices_export",
+    "process_ar_receipts_export",
+    "process_gl_journals_export",
+    "process_general_ledger_export",
     "sync_paystack_transactions",
     "sync_mono_transactions",
     "refresh_analysis_cubes",

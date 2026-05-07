@@ -5,10 +5,22 @@ HTML template routes for Chart of Accounts, Journal Entries, and Fiscal Periods.
 """
 
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from sqlalchemy.orm import Session
 
 from app.services.finance.gl.web import gl_web_service
+from app.services.finance.rpt.async_exports import (
+    get_completed_export_for_download,
+    get_export_status,
+    queue_background_export,
+)
 from app.web.deps import WebAuthContext, get_db, require_finance_access
 
 router = APIRouter(prefix="/gl", tags=["gl-web"])
@@ -362,6 +374,80 @@ async def export_all_journals(
     """Export all journal entries matching filters to CSV."""
     return await gl_web_service.export_all_journals_response(
         auth, db, search, status, start_date, end_date
+    )
+
+
+@router.post("/journals/export")
+def queue_journals_export(
+    search: str = "",
+    status: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Queue all journal entries matching filters for CSV export."""
+    instance = queue_background_export(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        report_code="GL_JOURNALS",
+        parameters={
+            "search": search,
+            "status": status,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        output_format="CSV",
+    )
+    return JSONResponse(
+        {
+            "message": "GL Journals export is processing. You will be notified when it is ready.",
+            "instance_id": str(instance.instance_id),
+            "status_url": f"/finance/gl/journals/exports/{instance.instance_id}/status",
+        },
+        status_code=202,
+    )
+
+
+@router.get("/journals/exports/{instance_id}/download")
+def download_journals_export(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Download a completed queued GL Journals export."""
+    body, filename, media_type, content_length = get_completed_export_for_download(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        instance_id,
+        report_code="GL_JOURNALS",
+    )
+    if hasattr(body, "__fspath__"):
+        return FileResponse(body, filename=filename, media_type=media_type)
+
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    return StreamingResponse(body, media_type=media_type, headers=headers)
+
+
+@router.get("/journals/exports/{instance_id}/status")
+def journals_export_status(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Return the status of a queued GL Journals export."""
+    return JSONResponse(
+        get_export_status(
+            db,
+            auth.organization_id,
+            auth.user_id,
+            instance_id,
+            report_code="GL_JOURNALS",
+        )
     )
 
 

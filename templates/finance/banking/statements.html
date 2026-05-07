@@ -24,6 +24,10 @@
     </button>
 </form>
 {% endif %}
+<button onclick="exportAll('/finance/banking/statements/export')" class="btn btn-secondary">
+    {{ icon_svg("document-download", "h-4 w-4 mr-1.5") }}
+    Export
+</button>
 <a href="/finance/banking/statements/import" data-testid="bank-statements-import" class="btn btn-primary">
     {{ icon_svg("upload", "h-4 w-4 mr-1.5") }}
     Import Statement

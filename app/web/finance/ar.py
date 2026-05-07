@@ -5,10 +5,21 @@ HTML template routes for Customers, Invoices, and Receipts.
 """
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    Response,
+    StreamingResponse,
+)
 from sqlalchemy.orm import Session
 
 from app.services.finance.ar.web import ar_web_service
+from app.services.finance.rpt.async_exports import (
+    get_completed_export_for_download,
+    get_export_status,
+    queue_background_export,
+)
 from app.web.deps import WebAuthContext, get_db, require_finance_access
 
 router = APIRouter(prefix="/ar", tags=["ar-web"])
@@ -246,6 +257,82 @@ async def export_all_invoices(
     )
 
 
+@router.post("/invoices/export")
+def queue_invoices_export(
+    search: str = "",
+    status: str = "",
+    customer_id: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Queue all AR invoices matching filters for CSV export."""
+    instance = queue_background_export(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        report_code="AR_INVOICES",
+        parameters={
+            "search": search,
+            "status": status,
+            "customer_id": customer_id,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        output_format="CSV",
+    )
+    return JSONResponse(
+        {
+            "message": "AR Invoices export is processing. You will be notified when it is ready.",
+            "instance_id": str(instance.instance_id),
+            "status_url": f"/finance/ar/invoices/exports/{instance.instance_id}/status",
+        },
+        status_code=202,
+    )
+
+
+@router.get("/invoices/exports/{instance_id}/download")
+def download_invoices_export(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Download a completed queued AR Invoices export."""
+    body, filename, media_type, content_length = get_completed_export_for_download(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        instance_id,
+        report_code="AR_INVOICES",
+    )
+    if hasattr(body, "__fspath__"):
+        return FileResponse(body, filename=filename, media_type=media_type)
+
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    return StreamingResponse(body, media_type=media_type, headers=headers)
+
+
+@router.get("/invoices/exports/{instance_id}/status")
+def invoices_export_status(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Return the status of a queued AR Invoices export."""
+    return JSONResponse(
+        get_export_status(
+            db,
+            auth.organization_id,
+            auth.user_id,
+            instance_id,
+            report_code="AR_INVOICES",
+        )
+    )
+
+
 @router.get("/invoices/{invoice_id}", response_class=HTMLResponse)
 def view_invoice(
     request: Request,
@@ -454,6 +541,82 @@ async def export_all_receipts(
     """Export all receipts matching filters to CSV."""
     return await ar_web_service.export_all_receipts_response(
         auth, db, search, status, start_date, end_date, customer_id
+    )
+
+
+@router.post("/receipts/export")
+def queue_receipts_export(
+    search: str = "",
+    status: str = "",
+    customer_id: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Queue all AR receipts matching filters for CSV export."""
+    instance = queue_background_export(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        report_code="AR_RECEIPTS",
+        parameters={
+            "search": search,
+            "status": status,
+            "customer_id": customer_id,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        output_format="CSV",
+    )
+    return JSONResponse(
+        {
+            "message": "AR Receipts export is processing. You will be notified when it is ready.",
+            "instance_id": str(instance.instance_id),
+            "status_url": f"/finance/ar/receipts/exports/{instance.instance_id}/status",
+        },
+        status_code=202,
+    )
+
+
+@router.get("/receipts/exports/{instance_id}/download")
+def download_receipts_export(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Download a completed queued AR Receipts export."""
+    body, filename, media_type, content_length = get_completed_export_for_download(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        instance_id,
+        report_code="AR_RECEIPTS",
+    )
+    if hasattr(body, "__fspath__"):
+        return FileResponse(body, filename=filename, media_type=media_type)
+
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    return StreamingResponse(body, media_type=media_type, headers=headers)
+
+
+@router.get("/receipts/exports/{instance_id}/status")
+def receipts_export_status(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Return the status of a queued AR Receipts export."""
+    return JSONResponse(
+        get_export_status(
+            db,
+            auth.organization_id,
+            auth.user_id,
+            instance_id,
+            report_code="AR_RECEIPTS",
+        )
     )
 
 

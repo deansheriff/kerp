@@ -9,9 +9,20 @@ from __future__ import annotations
 import io
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    Response,
+    StreamingResponse,
+)
 from sqlalchemy.orm import Session
 
+from app.services.finance.rpt.async_exports import (
+    get_completed_export_for_download,
+    get_export_status,
+    queue_general_ledger_export,
+)
 from app.services.finance.rpt.web import reports_web_service
 from app.templates import templates
 from app.web.deps import (
@@ -253,6 +264,89 @@ def export_general_ledger(
         org_id, db, account_id, start_date, end_date
     )
     return _csv_response(csv, "general_ledger.csv")
+
+
+@router.post("/general-ledger/export")
+def queue_general_ledger_export_route(
+    account_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    fmt: str = Query("csv", alias="format"),
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Queue general ledger export for background processing."""
+    if not auth.organization_id or not auth.user_id:
+        return JSONResponse(
+            {"detail": "Authentication required"},
+            status_code=401,
+        )
+
+    instance = queue_general_ledger_export(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        account_id=account_id,
+        start_date=start_date,
+        end_date=end_date,
+        output_format=fmt,
+    )
+    return JSONResponse(
+        {
+            "message": (
+                "General Ledger export is processing. "
+                "You will be notified when it is ready."
+            ),
+            "instance_id": str(instance.instance_id),
+        },
+        status_code=202,
+    )
+
+
+@router.get("/general-ledger/exports/{instance_id}/download")
+def download_general_ledger_export(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Download a completed queued General Ledger export."""
+    if not auth.organization_id or not auth.user_id:
+        return JSONResponse(
+            {"detail": "Authentication required"},
+            status_code=401,
+        )
+
+    body, filename, media_type, content_length = get_completed_export_for_download(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        instance_id,
+    )
+    if hasattr(body, "__fspath__"):
+        return FileResponse(body, filename=filename, media_type=media_type)
+
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    return StreamingResponse(body, media_type=media_type, headers=headers)
+
+
+@router.get("/general-ledger/exports/{instance_id}/status")
+def general_ledger_export_status(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Return the status of a queued General Ledger export."""
+    if not auth.organization_id or not auth.user_id:
+        return JSONResponse(
+            {"detail": "Authentication required"},
+            status_code=401,
+        )
+
+    return JSONResponse(
+        get_export_status(db, auth.organization_id, auth.user_id, instance_id)
+    )
 
 
 @router.get("/tax-summary", response_class=HTMLResponse)

@@ -767,6 +767,7 @@ class ReportsWebService:
             account_id=account_id,
             start_date=start_date,
             end_date=end_date,
+            all_accounts_limit=None,
         )
         return self._render_pdf("general_ledger", organization_id, db, ctx)
 

@@ -486,6 +486,27 @@ class ReportInstanceService(ListResponseMixin):
                 "data_source_type": "GL",
                 "category": "operational",
             },
+            "GL_JOURNALS": {
+                "report_code": "GL_JOURNALS",
+                "report_name": "GL Journals Export",
+                "report_type": ReportType.CUSTOM,
+                "data_source_type": "GL",
+                "category": "operational",
+            },
+            "AR_INVOICES": {
+                "report_code": "AR_INVOICES",
+                "report_name": "AR Invoices Export",
+                "report_type": ReportType.CUSTOM,
+                "data_source_type": "AR",
+                "category": "operational",
+            },
+            "AR_RECEIPTS": {
+                "report_code": "AR_RECEIPTS",
+                "report_name": "AR Receipts Export",
+                "report_type": ReportType.CUSTOM,
+                "data_source_type": "AR",
+                "category": "operational",
+            },
             "EXPENSE_SUMMARY": {
                 "report_code": "EXPENSE_SUMMARY",
                 "report_name": "Expense Summary",

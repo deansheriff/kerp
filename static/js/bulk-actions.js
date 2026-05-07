@@ -286,40 +286,99 @@ function bulkActions(config = {}) {
 // Make it available globally for Alpine
 window.bulkActions = bulkActions;
 
-/**
- * Export All - downloads CSV of all records matching current search/filters.
- * Works independently of the bulkActions component (no selection needed).
- *
- * Uses native browser download (window.location) instead of fetch+blob,
- * which is more reliable across browsers (no popup blocker issues,
- * no blob URL failures, no silent redirect-following).
- *
- * @param {string} baseUrl - GET endpoint path (e.g. "/finance/ar/invoices/export")
- */
-function exportAll(baseUrl) {
-    // Gather current search/filter params from the URL
-    const params = new URLSearchParams(window.location.search);
-    const exportParams = new URLSearchParams();
-
-    // Forward known filter params (matches all list page filter names)
-    for (const key of ['search', 'status', 'category', 'type', 'start_date', 'end_date', 'customer_id', 'supplier_id', 'date_from', 'date_to']) {
-        const val = params.get(key);
-        if (val) {
-            exportParams.set(key, val);
-        }
+const BACKGROUND_EXPORTS = {
+    '/finance/gl/journals/export': {
+        label: 'GL Journals',
+        statusBase: '/finance/gl/journals/exports'
+    },
+    '/finance/ar/invoices/export': {
+        label: 'AR Invoices',
+        statusBase: '/finance/ar/invoices/exports'
+    },
+    '/finance/ar/receipts/export': {
+        label: 'AR Receipts',
+        statusBase: '/finance/ar/receipts/exports'
     }
+};
 
-    const url = exportParams.toString()
-        ? `${baseUrl}?${exportParams.toString()}`
-        : baseUrl;
-
-    // Show immediate feedback
+function exportToast(message, type) {
     window.dispatchEvent(new CustomEvent('show-toast', {
-        detail: { message: 'Preparing export...', type: 'info' }
+        detail: { message, type }
     }));
+}
 
-    // Use fetch for download so we can provide success/error feedback,
-    // then fall back to iframe if blob download fails.
+function startExportDownload(downloadUrl) {
+    var iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = downloadUrl;
+    document.body.appendChild(iframe);
+    setTimeout(function() {
+        if (iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+        }
+    }, 30000);
+}
+
+function pollBackgroundExport(statusUrl, label, attempt) {
+    var currentAttempt = attempt || 0;
+    fetch(statusUrl, { method: 'GET', credentials: 'same-origin' })
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('Status check failed (HTTP ' + response.status + ')');
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'COMPLETED' && data.download_url) {
+                exportToast(label + ' export is ready. Starting download...', 'success');
+                startExportDownload(data.download_url);
+                return;
+            }
+            if (data.status === 'FAILED') {
+                exportToast(data.error || (label + ' export failed.'), 'error');
+                return;
+            }
+            if (currentAttempt >= 180) {
+                exportToast(label + ' export is still processing. You will be notified when it is ready.', 'info');
+                return;
+            }
+            var delay = currentAttempt < 2 ? 1500 : 3000;
+            setTimeout(function() {
+                pollBackgroundExport(statusUrl, label, currentAttempt + 1);
+            }, delay);
+        })
+        .catch(function(error) {
+            console.warn('Background export status check failed:', error);
+            exportToast(label + ' export is processing. You will be notified when it is ready.', 'info');
+        });
+}
+
+function queueBackgroundExport(baseUrl, url) {
+    var config = BACKGROUND_EXPORTS[baseUrl];
+    exportToast(config.label + ' export is processing...', 'info');
+
+    fetch(url, { method: 'POST', credentials: 'same-origin' })
+        .then(function(response) {
+            return response.json().then(function(data) {
+                if (!response.ok) {
+                    throw new Error(data.detail || data.message || 'Export failed');
+                }
+                return data;
+            });
+        })
+        .then(function(data) {
+            exportToast(data.message || (config.label + ' export is processing. You will be notified when it is ready.'), 'info');
+            var statusUrl = data.status_url || (config.statusBase + '/' + data.instance_id + '/status');
+            pollBackgroundExport(statusUrl, config.label, 0);
+        })
+        .catch(function(error) {
+            console.warn('Background export failed, falling back to immediate export:', error);
+            exportToast(error.message || 'Export failed. Trying immediate download...', 'warning');
+            downloadExportNow(url);
+        });
+}
+
+function downloadExportNow(url) {
     fetch(url, { method: 'GET', credentials: 'same-origin' })
         .then(function(response) {
             if (!response.ok) {
@@ -345,26 +404,54 @@ function exportAll(baseUrl) {
                 window.URL.revokeObjectURL(a.href);
                 document.body.removeChild(a);
 
-                window.dispatchEvent(new CustomEvent('show-toast', {
-                    detail: { message: 'Export downloaded successfully', type: 'success' }
-                }));
+                exportToast('Export downloaded successfully', 'success');
             });
         })
         .catch(function(error) {
             console.warn('Fetch export failed, falling back to iframe:', error);
             // Fallback: use hidden iframe for browsers where fetch+blob fails
-            var iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = url;
-            document.body.appendChild(iframe);
-            setTimeout(function() {
-                document.body.removeChild(iframe);
-            }, 30000);
-
-            window.dispatchEvent(new CustomEvent('show-toast', {
-                detail: { message: 'Export started — check your downloads', type: 'success' }
-            }));
+            startExportDownload(url);
+            exportToast('Export started - check your downloads', 'success');
         });
+}
+
+/**
+ * Export All - downloads CSV of all records matching current search/filters.
+ * Works independently of the bulkActions component (no selection needed).
+ *
+ * Uses native browser download (window.location) instead of fetch+blob,
+ * which is more reliable across browsers (no popup blocker issues,
+ * no blob URL failures, no silent redirect-following).
+ *
+ * @param {string} baseUrl - GET endpoint path (e.g. "/finance/ar/invoices/export")
+ */
+function exportAll(baseUrl) {
+    // Gather current search/filter params from the URL
+    const params = new URLSearchParams(window.location.search);
+    const exportParams = new URLSearchParams();
+
+    // Forward known filter params (matches all list page filter names)
+    for (const key of ['search', 'status', 'category', 'type', 'start_date', 'end_date', 'customer_id', 'supplier_id', 'account_id', 'match_status', 'date_from', 'date_to']) {
+        const val = params.get(key);
+        if (val) {
+            exportParams.set(key, val);
+        }
+    }
+
+    const url = exportParams.toString()
+        ? `${baseUrl}?${exportParams.toString()}`
+        : baseUrl;
+
+    if (BACKGROUND_EXPORTS[baseUrl]) {
+        queueBackgroundExport(baseUrl, url);
+        return;
+    }
+
+    exportToast('Preparing export...', 'info');
+
+    // Use fetch for download so we can provide success/error feedback,
+    // then fall back to iframe if blob download fails.
+    downloadExportNow(url);
 }
 
 window.exportAll = exportAll;

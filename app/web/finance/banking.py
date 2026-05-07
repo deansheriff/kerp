@@ -242,6 +242,30 @@ def list_statements(
     )
 
 
+@router.get("/statements/export")
+def export_statement_lines(
+    account_id: str | None = None,
+    status: str | None = None,
+    match_status: str | None = None,
+    search: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Export bank transaction lines matching filters to CSV."""
+    return banking_web_service.export_statement_lines_response(
+        auth,
+        db,
+        account_id,
+        status,
+        start_date,
+        end_date,
+        match_status=match_status,
+        search=search,
+    )
+
+
 @router.get("/statements/imports", response_class=HTMLResponse)
 def list_statement_imports(
     request: Request,

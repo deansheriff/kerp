@@ -39,6 +39,7 @@
                 <label class="form-label text-xs">Account</label>
                 <select name="account_id" class="form-select w-full" {{ filter_attrs }}>
                     <option value="">Select an account...</option>
+                    <option value="all" {% if account_id == 'all' %}selected{% endif %}>All accounts</option>
                     {% for acct in accounts %}
                     <option value="{{ acct.account_id }}" {% if acct.account_id == account_id %}selected{% endif %}>
                         {{ acct.account_code }} - {{ acct.account_name }}
@@ -54,25 +55,51 @@
     <!-- Report -->
     {% if selected_account %}
     <div class="card p-6 print:shadow-none print:border-0">
+        {% set can_export = not (all_accounts_selected and all_accounts_requires_date_range) %}
         <div class="mb-5 flex flex-wrap items-center justify-end gap-2 print:hidden">
-            <a href="/finance/reports/general-ledger/export?account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}" class="btn btn-secondary h-9 px-3">
+            {% if can_export %}
+            <a href="/finance/reports/general-ledger/export?account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}"
+               class="btn btn-secondary h-9 px-3"
+               data-general-ledger-export>
                 {{ icon_svg("download", "h-4 w-4 mr-1.5") }}
                 Export CSV
             </a>
-            <a href="/finance/reports/general-ledger/export?format=pdf&account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}" class="btn btn-secondary h-9 px-3">
+            <a href="/finance/reports/general-ledger/export?format=pdf&account_id={{ account_id }}&start_date={{ start_date_iso }}&end_date={{ end_date_iso }}"
+               class="btn btn-secondary h-9 px-3"
+               data-general-ledger-export>
                 {{ icon_svg("download", "h-4 w-4 mr-1.5") }}
                 Export PDF
             </a>
+            {% endif %}
         </div>
-                {% set doc_title = "General ledger detail" %}
-        {% set doc_number = selected_account.account_code %}
+        {% set doc_title = "General ledger detail" %}
+        {% set doc_number = selected_account.account_code if not selected_account.is_all_accounts else "All accounts" %}
         {% include "partials/_document_header.html" %}
         <div class="text-center mb-6 print:mb-4">
             <p class="text-lg text-slate-700 dark:text-slate-300 mt-2">
+                {% if selected_account.is_all_accounts %}
+                All accounts
+                {% else %}
                 <span class="font-mono">{{ selected_account.account_code }}</span> - {{ selected_account.account_name }}
+                {% endif %}
             </p>
             <p class="text-slate-500 dark:text-slate-400 mt-1">{{ period_label }}</p>
         </div>
+
+        {% if all_accounts_selected and all_accounts_requires_date_range %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                {{ icon_svg("calendar", "h-8 w-8") }}
+            </div>
+            <h3 class="empty-state-title">Choose a date range</h3>
+            <p class="empty-state-description">All accounts can include a very large ledger. Select a start date or end date to load the report.</p>
+        </div>
+        {% else %}
+        {% if all_accounts_selected and all_accounts_truncated %}
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            Showing the first {{ all_accounts_row_limit }} ledger lines for this period. Use export for the full filtered report.
+        </div>
+        {% endif %}
 
         {% if transactions %}
         <div class="table-container">
@@ -81,6 +108,9 @@
                     <tr class="border-b-2 border-slate-300 dark:border-slate-600">
                         <th scope="col" class="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Date</th>
                         <th scope="col" class="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Journal #</th>
+                        {% if all_accounts_selected %}
+                        <th scope="col" class="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Account</th>
+                        {% endif %}
                         <th scope="col" class="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Description</th>
                         <th scope="col" class="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Reference</th>
                         <th scope="col" class="text-right py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Debit</th>
@@ -95,6 +125,9 @@
                         <td class="py-2 px-2 font-mono text-xs text-teal-600 dark:text-teal-400">
                             <a href="/finance/gl/journals/{{ txn.journal_number }}" class="hover:underline">{{ txn.journal_number }}</a>
                         </td>
+                        {% if all_accounts_selected %}
+                        <td class="py-2 px-2 text-slate-700 dark:text-slate-300">{{ txn.account }}</td>
+                        {% endif %}
                         <td class="py-2 px-2 text-slate-900 dark:text-white">{{ txn.description }}</td>
                         <td class="py-2 px-2 text-slate-500 dark:text-slate-400">{{ txn.reference }}</td>
                         <td class="py-2 px-2 text-right font-mono tabular-nums {% if txn.debit %}text-slate-900 dark:text-white{% else %}text-slate-400 dark:text-slate-500{% endif %}">{{ txn.debit or '-' }}</td>
@@ -105,8 +138,17 @@
                 </tbody>
                 <tfoot>
                     <tr class="border-t-2 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800">
+                        {% if all_accounts_selected %}
+                        <td colspan="5" class="py-3 px-2 font-bold text-slate-900 dark:text-white">
+                            {{ "Preview totals" if all_accounts_truncated else "Totals" }}
+                        </td>
+                        <td class="py-3 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">{{ total_debits }}</td>
+                        <td class="py-3 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">{{ total_credits }}</td>
+                        <td class="py-3 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">-</td>
+                        {% else %}
                         <td colspan="6" class="py-3 px-2 font-bold text-slate-900 dark:text-white">Ending Balance</td>
                         <td class="py-3 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">{{ ending_balance }}</td>
+                        {% endif %}
                     </tr>
                 </tfoot>
             </table>
@@ -117,8 +159,9 @@
                 {{ icon_svg("document", "h-8 w-8") }}
             </div>
             <h3 class="empty-state-title">No transactions</h3>
-            <p class="empty-state-description">No posted journal entries found for this account in the selected period.</p>
+            <p class="empty-state-description">No posted journal entries found for the selected account scope and period.</p>
         </div>
+        {% endif %}
         {% endif %}
     </div>
 
@@ -136,4 +179,101 @@
     {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var exportInProgress = false;
+
+    function notify(message, type, duration) {
+        window.dispatchEvent(new CustomEvent('show-toast', {
+            detail: { message: message, type: type, duration: duration || 5000 }
+        }));
+    }
+
+    function startDownload(url) {
+        var iframe = document.createElement('iframe');
+        iframe.className = 'hidden';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        window.setTimeout(function() {
+            if (iframe.parentNode) {
+                iframe.parentNode.removeChild(iframe);
+            }
+        }, 30000);
+    }
+
+    function pollExportStatus(instanceId, attempt) {
+        var maxAttempts = 180;
+        var statusUrl = '/finance/reports/general-ledger/exports/' + instanceId + '/status';
+
+        if (attempt > maxAttempts) {
+            notify('Export is still processing. You will get a notification and email when it is ready.', 'info', 7000);
+            return;
+        }
+
+        window.setTimeout(function() {
+            fetch(statusUrl, { method: 'GET', credentials: 'same-origin' })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Unable to check export status.');
+                        }
+                        return data;
+                    });
+                })
+                .then(function(data) {
+                    if (data.status === 'COMPLETED' && data.download_url) {
+                        notify('General Ledger export is ready. Download starting...', 'success', 6000);
+                        startDownload(data.download_url);
+                        return;
+                    }
+                    if (data.status === 'FAILED') {
+                        notify(data.error || 'General Ledger export failed.', 'error', 7000);
+                        return;
+                    }
+                    pollExportStatus(instanceId, attempt + 1);
+                })
+                .catch(function() {
+                    pollExportStatus(instanceId, attempt + 1);
+                });
+        }, attempt <= 2 ? 1500 : 3000);
+    }
+
+    document.addEventListener('click', function(event) {
+        var link = event.target.closest('[data-general-ledger-export]');
+        if (!link) return;
+
+        event.preventDefault();
+        if (exportInProgress) return;
+
+        exportInProgress = true;
+        notify('General Ledger export is processing. We will notify you when it is ready.', 'info', 7000);
+
+        fetch(link.href, { method: 'POST', credentials: 'same-origin' })
+            .then(function(response) {
+                return response.json().then(function(data) {
+                    if (!response.ok) {
+                        throw new Error(data.detail || 'Unable to queue export.');
+                    }
+                    return data;
+                });
+            })
+            .then(function(data) {
+                notify(data.message || 'Export queued. You can continue working.', 'success', 6000);
+                if (data.instance_id) {
+                    pollExportStatus(data.instance_id, 1);
+                }
+            })
+            .catch(function(error) {
+                notify(error.message || 'Unable to queue export.', 'error', 7000);
+            })
+            .finally(function() {
+                exportInProgress = false;
+            });
+    });
+});
+</script>
 {% endblock %}

@@ -700,6 +700,130 @@ class BankingStatementWebService:
             request, "finance/banking/statements.html", context
         )
 
+    def export_statement_lines_response(
+        self,
+        auth: WebAuthContext,
+        db: Session,
+        account_id: str | None,
+        status: str | None,
+        start_date: str | None,
+        end_date: str | None,
+        match_status: str | None = None,
+        search: str | None = None,
+    ) -> Response:
+        """Export bank transaction lines matching the list-page filters."""
+        from app.models.finance.banking.bank_statement import CategorizationStatus
+
+        org_id = coerce_uuid(auth.organization_id)
+        from_date = _parse_date(start_date)
+        to_date = _parse_date(end_date)
+
+        conditions: list[Any] = [BankStatement.organization_id == org_id]
+        if account_id:
+            conditions.append(BankStatement.bank_account_id == coerce_uuid(account_id))
+        if from_date:
+            conditions.append(BankStatementLine.transaction_date >= from_date)
+        if to_date:
+            conditions.append(BankStatementLine.transaction_date <= to_date)
+        if status:
+            try:
+                conditions.append(
+                    BankStatementLine.categorization_status
+                    == CategorizationStatus(status)
+                )
+            except ValueError:
+                pass
+        if match_status == "matched":
+            conditions.append(BankStatementLine.is_matched.is_(True))
+        elif match_status == "unmatched":
+            conditions.append(BankStatementLine.is_matched.is_(False))
+
+        search_term = (search or "").strip()
+        if search_term:
+            like_pat = f"%{search_term}%"
+            conditions.append(
+                or_(
+                    BankStatementLine.description.ilike(like_pat),
+                    BankStatementLine.reference.ilike(like_pat),
+                    BankStatementLine.payee_payer.ilike(like_pat),
+                    BankStatementLine.bank_reference.ilike(like_pat),
+                )
+            )
+
+        rows = db.execute(
+            select(BankStatementLine, BankStatement, BankAccount)
+            .join(
+                BankStatement,
+                BankStatementLine.statement_id == BankStatement.statement_id,
+            )
+            .join(
+                BankAccount,
+                BankStatement.bank_account_id == BankAccount.bank_account_id,
+            )
+            .where(*conditions)
+            .order_by(
+                BankStatementLine.transaction_date.desc(),
+                BankStatementLine.line_number.desc(),
+            )
+        ).all()
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                "Transaction Date",
+                "Value Date",
+                "Bank",
+                "Account Name",
+                "Account Number",
+                "Statement #",
+                "Line #",
+                "Type",
+                "Amount",
+                "Running Balance",
+                "Description",
+                "Reference",
+                "Bank Reference",
+                "Payee/Payer",
+                "Category Status",
+                "Matched",
+            ]
+        )
+        for line, statement, account in rows:
+            writer.writerow(
+                [
+                    line.transaction_date.isoformat() if line.transaction_date else "",
+                    line.value_date.isoformat() if line.value_date else "",
+                    account.bank_name,
+                    account.account_name,
+                    account.account_number,
+                    statement.statement_number or "",
+                    line.line_number,
+                    line.transaction_type.value if line.transaction_type else "",
+                    str(line.amount or ""),
+                    str(line.running_balance or ""),
+                    line.description or "",
+                    line.reference or "",
+                    line.bank_reference or "",
+                    line.payee_payer or "",
+                    line.categorization_status.value
+                    if line.categorization_status
+                    else "",
+                    "Yes" if line.is_matched else "No",
+                ]
+            )
+
+        timestamp = _datetime.now().strftime("%Y%m%d_%H%M%S")
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="bank_transactions_export_{timestamp}.csv"'
+                )
+            },
+        )
+
     @staticmethod
     def list_statement_imports_context(
         db: Session,

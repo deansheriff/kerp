@@ -9,6 +9,8 @@ Handles:
 - Subledger reconciliation discrepancy alerts
 """
 
+import html
+import asyncio
 import logging
 from typing import Any
 from uuid import UUID
@@ -17,12 +19,331 @@ from celery import shared_task
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import SessionLocal
+from app.models.email_profile import EmailModule
 from app.models.finance.core_org.organization import Organization
+from app.models.finance.rpt.report_instance import ReportInstance, ReportStatus
+from app.models.notification import EntityType, NotificationType
 from app.models.person import Person
 from app.models.rbac import PersonRole, Role
+from app.services.email import send_email
+from app.services.finance.rpt.report_instance import ReportInstanceService
+from app.services.notification import NotificationService
+from app.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
+
+
+def _notify_export_result(
+    db: Session,
+    instance: ReportInstance,
+    *,
+    title: str,
+    message: str,
+    action_url: str | None = None,
+) -> None:
+    """Create an in-app notification and send a direct email for an export."""
+    NotificationService().create(
+        db,
+        organization_id=instance.organization_id,
+        recipient_id=instance.generated_by_user_id,
+        entity_type=EntityType.SYSTEM,
+        entity_id=instance.instance_id,
+        notification_type=NotificationType.INFO,
+        title=title,
+        message=message,
+        action_url=action_url,
+    )
+    db.commit()
+
+    recipient = db.get(Person, instance.generated_by_user_id)
+    if not recipient or not recipient.email:
+        return
+
+    safe_message = html.escape(message)
+    body_html = f"<p>{safe_message}</p>"
+    body_text = message
+    if action_url:
+        download_url = f"{settings.app_url.rstrip('/')}{action_url}"
+        safe_url = html.escape(download_url)
+        body_html += f'<p><a href="{safe_url}">Download export</a></p>'
+        body_text = f"{message}\n\nDownload export: {download_url}"
+
+    send_email(
+        db=db,
+        to_email=recipient.email,
+        subject=title,
+        body_html=body_html,
+        body_text=body_text,
+        module=EmailModule.FINANCE,
+        organization_id=instance.organization_id,
+    )
+
+
+@shared_task
+def process_general_ledger_export(
+    instance_id: str,
+) -> dict[str, Any]:
+    """Generate a queued General Ledger export and notify the requester."""
+    with SessionLocal() as db:
+        instance = db.get(ReportInstance, UUID(instance_id))
+        if not instance:
+            return {"success": False, "error": "Report instance not found"}
+
+        if instance.status not in {ReportStatus.QUEUED, ReportStatus.FAILED}:
+            return {"success": False, "status": instance.status.value}
+
+        try:
+            instance = ReportInstanceService.start_generation(db, instance.instance_id)
+            params = instance.parameters_used or {}
+            fmt = (instance.output_format or "CSV").upper()
+
+            from app.services.finance.rpt.web import reports_web_service
+
+            if fmt == "PDF":
+                content = reports_web_service.export_general_ledger_pdf(
+                    str(instance.organization_id),
+                    db,
+                    params.get("account_id"),
+                    params.get("start_date"),
+                    params.get("end_date"),
+                )
+                suffix = "pdf"
+                data = content
+            else:
+                content = reports_web_service.export_general_ledger_csv(
+                    str(instance.organization_id),
+                    db,
+                    params.get("account_id"),
+                    params.get("start_date"),
+                    params.get("end_date"),
+                )
+                suffix = "csv"
+                data = content.encode("utf-8")
+
+            storage_key = (
+                f"generated_reports/{instance.organization_id}/"
+                f"general_ledger_{instance.instance_id}.{suffix}"
+            )
+            media_type = "application/pdf" if fmt == "PDF" else "text/csv"
+            get_storage().upload(storage_key, data, media_type)
+
+            instance = ReportInstanceService.complete_generation(
+                db=db,
+                instance_id=instance.instance_id,
+                output_file_path=f"s3://{storage_key}",
+                output_size_bytes=len(data),
+            )
+
+            action_url = (
+                f"/finance/reports/general-ledger/exports/"
+                f"{instance.instance_id}/download"
+            )
+            _notify_export_result(
+                db,
+                instance,
+                title="General Ledger export ready",
+                message="Your General Ledger export is ready to download.",
+                action_url=action_url,
+            )
+            return {
+                "success": True,
+                "instance_id": str(instance.instance_id),
+                "output_size_bytes": len(data),
+            }
+        except Exception as exc:
+            logger.exception("General Ledger export failed for %s", instance_id)
+            try:
+                instance = ReportInstanceService.fail_generation(
+                    db=db,
+                    instance_id=instance.instance_id,
+                    error_message=str(exc),
+                )
+                _notify_export_result(
+                    db,
+                    instance,
+                    title="General Ledger export failed",
+                    message=(
+                        "Your General Ledger export could not be generated. "
+                        "Please narrow the filters and try again."
+                    ),
+                )
+            except Exception:
+                logger.exception("Failed to record General Ledger export failure")
+            return {"success": False, "instance_id": instance_id, "error": str(exc)}
+
+
+def _response_body_bytes(response: Any) -> bytes:
+    body = getattr(response, "body", b"")
+    if isinstance(body, bytes):
+        return body
+    if isinstance(body, str):
+        return body.encode("utf-8")
+    return bytes(body)
+
+
+def _export_action_url(report_code: str, instance_id: UUID) -> str:
+    bases = {
+        "GL_JOURNALS": "/finance/gl/journals/exports",
+        "AR_INVOICES": "/finance/ar/invoices/exports",
+        "AR_RECEIPTS": "/finance/ar/receipts/exports",
+    }
+    return f"{bases[report_code]}/{instance_id}/download"
+
+
+def _export_label(report_code: str) -> str:
+    return {
+        "GL_JOURNALS": "GL Journals",
+        "AR_INVOICES": "AR Invoices",
+        "AR_RECEIPTS": "AR Receipts",
+    }[report_code]
+
+
+def _export_filename_prefix(report_code: str) -> str:
+    return {
+        "GL_JOURNALS": "gl_journals",
+        "AR_INVOICES": "ar_invoices",
+        "AR_RECEIPTS": "ar_receipts",
+    }[report_code]
+
+
+async def _build_list_export_response(
+    db: Session,
+    instance: ReportInstance,
+    report_code: str,
+) -> Any:
+    params = instance.parameters_used or {}
+    search = str(params.get("search") or "")
+    status = str(params.get("status") or "")
+    start_date = str(params.get("start_date") or "")
+    end_date = str(params.get("end_date") or "")
+
+    if report_code == "GL_JOURNALS":
+        from app.services.finance.gl.bulk import get_journal_bulk_service
+
+        service = get_journal_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await service.export_all(search, status, start_date, end_date)
+
+    if report_code == "AR_INVOICES":
+        from app.services.finance.ar.invoice_bulk import get_ar_invoice_bulk_service
+
+        service = get_ar_invoice_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await service.export_all(
+            search,
+            status,
+            start_date,
+            end_date,
+            {"customer_id": params.get("customer_id") or ""},
+        )
+
+    if report_code == "AR_RECEIPTS":
+        from app.services.finance.ar.receipt_bulk import get_ar_receipt_bulk_service
+
+        service = get_ar_receipt_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await service.export_all(
+            search,
+            status,
+            start_date,
+            end_date,
+            {"customer_id": params.get("customer_id") or ""},
+        )
+
+    raise ValueError(f"Unsupported export report code: {report_code}")
+
+
+def _process_list_export(instance_id: str, report_code: str) -> dict[str, Any]:
+    label = _export_label(report_code)
+    with SessionLocal() as db:
+        instance = db.get(ReportInstance, UUID(instance_id))
+        if not instance:
+            return {"success": False, "error": "Report instance not found"}
+
+        if instance.status not in {ReportStatus.QUEUED, ReportStatus.FAILED}:
+            return {"success": False, "status": instance.status.value}
+
+        try:
+            instance = ReportInstanceService.start_generation(db, instance.instance_id)
+            response = asyncio.run(
+                _build_list_export_response(db, instance, report_code)
+            )
+            data = _response_body_bytes(response)
+            storage_key = (
+                f"generated_reports/{instance.organization_id}/"
+                f"{_export_filename_prefix(report_code)}_{instance.instance_id}.csv"
+            )
+            get_storage().upload(storage_key, data, "text/csv")
+
+            instance = ReportInstanceService.complete_generation(
+                db=db,
+                instance_id=instance.instance_id,
+                output_file_path=f"s3://{storage_key}",
+                output_size_bytes=len(data),
+            )
+
+            action_url = _export_action_url(report_code, instance.instance_id)
+            _notify_export_result(
+                db,
+                instance,
+                title=f"{label} export ready",
+                message=f"Your {label} export is ready to download.",
+                action_url=action_url,
+            )
+            return {
+                "success": True,
+                "instance_id": str(instance.instance_id),
+                "output_size_bytes": len(data),
+            }
+        except Exception as exc:
+            logger.exception("%s export failed for %s", label, instance_id)
+            try:
+                instance = ReportInstanceService.fail_generation(
+                    db=db,
+                    instance_id=instance.instance_id,
+                    error_message=str(exc),
+                )
+                _notify_export_result(
+                    db,
+                    instance,
+                    title=f"{label} export failed",
+                    message=(
+                        f"Your {label} export could not be generated. "
+                        "Please narrow the filters and try again."
+                    ),
+                )
+            except Exception:
+                logger.exception("Failed to record %s export failure", label)
+            return {"success": False, "instance_id": instance_id, "error": str(exc)}
+
+
+@shared_task
+def process_gl_journals_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued GL Journals export and notify the requester."""
+    return _process_list_export(instance_id, "GL_JOURNALS")
+
+
+@shared_task
+def process_ar_invoices_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued AR Invoices export and notify the requester."""
+    return _process_list_export(instance_id, "AR_INVOICES")
+
+
+@shared_task
+def process_ar_receipts_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued AR Receipts export and notify the requester."""
+    return _process_list_export(instance_id, "AR_RECEIPTS")
 
 
 def _get_finance_recipients(
