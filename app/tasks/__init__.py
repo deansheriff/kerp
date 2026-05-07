@@ -53,6 +53,7 @@ from app.tasks.expense import (
 )
 from app.tasks.feature_flags import archive_expired_feature_flags
 from app.tasks.finance import (
+    process_monthly_depreciation_runs,
     refresh_analysis_cubes,
     refresh_stale_balances,
     release_expired_stock_reservations,
@@ -173,6 +174,7 @@ __all__ = [
     "refresh_analysis_cubes",
     "refresh_stale_balances",
     "release_expired_stock_reservations",
+    "process_monthly_depreciation_runs",
     # Banking tasks
     "auto_match_unreconciled_statements",
     # Analytics tasks
