@@ -204,6 +204,30 @@ def download_attachment(
 
 
 # ---------------------------------------------------------------------------
+# Dynamic form attachment downloads
+# ---------------------------------------------------------------------------
+
+
+@router.get("/form_attachments/{org_id}/{filename}")
+def download_form_attachment(
+    org_id: UUID,
+    filename: str,
+    organization_id: UUID = Depends(require_organization_id),
+):
+    """Download a dynamic form attachment (authenticated)."""
+    if org_id != organization_id:
+        raise HTTPException(status_code=404, detail="File not found")
+    if Path(filename).name != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    return _stream_s3_file(
+        f"form_attachments/{org_id}/{filename}",
+        filename=filename,
+        disposition="auto",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Avatar downloads (public to authenticated users)
 # ---------------------------------------------------------------------------
 
