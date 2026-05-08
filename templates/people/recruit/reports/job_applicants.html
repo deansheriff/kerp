@@ -1,0 +1,207 @@
+{% extends "people/base_people.html" %}
+{% from "components/macros.html" import compact_filters, empty_state, icon_svg, pagination, status_badge %}
+
+{% block page_title %}{{ opening.job_title }} Applicants{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <ol class="flex">
+        <li><a href="/dashboard" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Dashboard</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/recruit/jobs" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Recruitment</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <a href="/people/recruit/jobs/{{ opening.job_opening_id }}" class="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">{{ opening.job_code }}</a></li>
+        <li class="flex items-center"><span class="mx-2">/</span> <span class="text-slate-900 dark:text-white" aria-current="page">Applicant Report</span></li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">{{ opening.job_title }}</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">{{ opening.job_code }} · {{ opening.department.department_name if opening.department else 'No department' }}</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a href="/people/recruit/jobs/{{ opening.job_opening_id }}" class="btn btn-secondary">
+                {{ icon_svg("arrow-left", "h-4 w-4 mr-1") }}
+                Job Detail
+            </a>
+            <a href="/people/recruit/applicants?job_opening_id={{ opening.job_opening_id }}" class="btn btn-secondary">
+                Applicants List
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-6">
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Total</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{{ pipeline.total }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">New</p>
+            <p class="mt-1 text-2xl font-semibold text-blue-600 dark:text-blue-400">{{ pipeline.new }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Screening</p>
+            <p class="mt-1 text-2xl font-semibold text-purple-600 dark:text-purple-400">{{ pipeline.screening }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Shortlisted</p>
+            <p class="mt-1 text-2xl font-semibold text-amber-600 dark:text-amber-400">{{ pipeline.shortlisted }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Selected</p>
+            <p class="mt-1 text-2xl font-semibold text-green-600 dark:text-green-400">{{ pipeline.selected }}</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Hired</p>
+            <p class="mt-1 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{{ pipeline.hired }}</p>
+        </div>
+    </div>
+
+    {% set report_url = "/people/recruit/jobs/" ~ opening.job_opening_id ~ "/report" %}
+    {% call(filter_attrs) compact_filters(
+        base_url=report_url,
+        active_filters=active_filters | default([]),
+        show_search=true,
+        search=search,
+        search_placeholder="Search applicants...",
+        default_open=true
+    ) %}
+        <div>
+            <label class="form-label text-xs">Status</label>
+            <select name="status" class="form-select w-full" {{ filter_attrs }}>
+                <option value="">All Statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s | replace('_', ' ') | title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label text-xs">Source</label>
+            <input type="text" name="source" value="{{ source if source else '' }}" placeholder="e.g. Website" class="form-input w-full" {{ filter_attrs }}>
+        </div>
+        <div>
+            <label class="form-label text-xs">Sort</label>
+            <select name="sort" class="form-select w-full" {{ filter_attrs }}>
+                <option value="applied_on" {{ 'selected' if sort == 'applied_on' else '' }}>Applied Date</option>
+                <option value="applicant" {{ 'selected' if sort == 'applicant' else '' }}>Applicant</option>
+                <option value="status" {{ 'selected' if sort == 'status' else '' }}>Status</option>
+                <option value="source" {{ 'selected' if sort == 'source' else '' }}>Source</option>
+                {% for field in dynamic_columns %}
+                <option value="field:{{ field.field_key }}" {{ 'selected' if sort == 'field:' ~ field.field_key else '' }}>{{ field.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label text-xs">Direction</label>
+            <select name="direction" class="form-select w-full" {{ filter_attrs }}>
+                <option value="desc" {{ 'selected' if direction == 'desc' else '' }}>Descending</option>
+                <option value="asc" {{ 'selected' if direction == 'asc' else '' }}>Ascending</option>
+            </select>
+        </div>
+        {% for field in filterable_fields %}
+        {% set field_value = request_params.get('df_' ~ field.field_key) or '' %}
+        {% set field_operator = request_params.get('op_' ~ field.field_key) or 'contains' %}
+        <div>
+            <label class="form-label text-xs">{{ field.label }}</label>
+            {% if field.field_type.value in ['NUMBER', 'RATING', 'DATE'] %}
+            <div class="grid grid-cols-2 gap-2">
+                <select name="op_{{ field.field_key }}" class="form-select w-full" {{ filter_attrs }}>
+                    <option value="equals" {{ 'selected' if field_operator == 'equals' else '' }}>Equals</option>
+                    <option value="gte" {{ 'selected' if field_operator == 'gte' else '' }}>From</option>
+                    <option value="lte" {{ 'selected' if field_operator == 'lte' else '' }}>To</option>
+                </select>
+                <input type="{{ 'date' if field.field_type.value == 'DATE' else 'number' }}" name="df_{{ field.field_key }}" value="{{ field_value }}" class="form-input w-full" {{ filter_attrs }}>
+            </div>
+            {% elif field.field_type.value in ['SINGLE_CHOICE', 'DROPDOWN', 'MULTI_CHOICE'] and field.options %}
+            <select name="df_{{ field.field_key }}" class="form-select w-full" {{ filter_attrs }}>
+                <option value="">Any</option>
+                {% for option in field.options if option.is_active %}
+                <option value="{{ option.label }}" {{ 'selected' if field_value == option.label else '' }}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="op_{{ field.field_key }}" value="contains">
+            {% elif field.field_type.value in ['CHECKBOX', 'YES_NO', 'CONSENT'] %}
+            <select name="df_{{ field.field_key }}" class="form-select w-full" {{ filter_attrs }}>
+                <option value="">Any</option>
+                <option value="yes" {{ 'selected' if field_value == 'yes' else '' }}>Yes</option>
+                <option value="no" {{ 'selected' if field_value == 'no' else '' }}>No</option>
+            </select>
+            <input type="hidden" name="op_{{ field.field_key }}" value="equals">
+            {% elif field.field_type.value in ['FILE', 'IMAGE', 'PDF'] %}
+            <select name="op_{{ field.field_key }}" class="form-select w-full" {{ filter_attrs }}>
+                <option value="">Any</option>
+                <option value="has_value" {{ 'selected' if field_operator == 'has_value' else '' }}>Has File</option>
+                <option value="is_empty" {{ 'selected' if field_operator == 'is_empty' else '' }}>No File</option>
+            </select>
+            {% else %}
+            <input type="text" name="df_{{ field.field_key }}" value="{{ field_value }}" class="form-input w-full" {{ filter_attrs }}>
+            <input type="hidden" name="op_{{ field.field_key }}" value="contains">
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% endcall %}
+
+    <div id="results-container">
+        {% if applicants %}
+        <div class="card overflow-hidden">
+            <div class="table-container">
+                <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-slate-800/50">
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600 dark:text-slate-300">Application #</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600 dark:text-slate-300">Applicant</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600 dark:text-slate-300">Applied</th>
+                            {% for field in dynamic_columns %}
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600 dark:text-slate-300">{{ field.label }}</th>
+                            {% endfor %}
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600 dark:text-slate-300">Status</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600 dark:text-slate-300">Source</th>
+                            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-600 dark:text-slate-300">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                        {% for applicant in applicants %}
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td class="px-4 py-3 text-sm font-mono">
+                                <a href="/people/recruit/applicants/{{ applicant.applicant_id }}" class="text-teal-600 hover:underline dark:text-teal-400">{{ applicant.application_number }}</a>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="text-sm font-medium text-slate-900 dark:text-white">{{ applicant.full_name }}</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ applicant.email }}</div>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ applicant.applied_on }}</td>
+                            {% for field in dynamic_columns %}
+                            <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                                {{ dynamic_values.get(applicant.applicant_id, {}).get(field.field_key, '-') }}
+                            </td>
+                            {% endfor %}
+                            <td class="px-4 py-3">{{ status_badge(applicant.status.value, size="sm") }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{{ applicant.source or '-' }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <a href="/people/recruit/applicants/{{ applicant.applicant_id }}" class="text-sm text-teal-600 hover:underline dark:text-teal-400">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {{ pagination(
+                page=page,
+                total_pages=total_pages,
+                total_count=total_count,
+                limit=limit,
+                search=search,
+                filters=pagination_filters,
+                show_size_selector=false
+            ) }}
+        </div>
+        {% else %}
+        <div class="card p-0">
+            {{ empty_state("No applicants found", "No applicants match the current report filters.") }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

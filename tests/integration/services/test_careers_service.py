@@ -16,6 +16,7 @@ from app.services.careers.careers_service import (
     JobNotFoundError,
 )
 from app.services.forms import FormEngineService
+from app.services.people.recruit import RecruitmentService
 
 
 @pytest.fixture
@@ -288,6 +289,123 @@ class TestCareersService:
         assert applicant.last_name == "-"
         assert applicant.email == "ada@example.com"
         assert applicant.form_submission_id is not None
+
+    def test_job_applicant_report_filters_dynamic_fields(
+        self, db: Session, org_with_slug: Organization, open_job: JobOpening
+    ):
+        """Test job-scoped applicant report filters by form-builder answers."""
+        form_version = FormEngineService(db).upsert_job_form_version(
+            org_with_slug.organization_id,
+            open_job.job_opening_id,
+            open_job.job_title,
+            {
+                "sections": [
+                    {
+                        "title": "Application",
+                        "fields": [
+                            {
+                                "label": "Full name",
+                                "field_key": "full_name",
+                                "field_type": "TEXT",
+                                "is_required": True,
+                                "system_mapping": "display_name",
+                            },
+                            {
+                                "label": "Email",
+                                "field_key": "email",
+                                "field_type": "EMAIL",
+                                "is_required": True,
+                                "system_mapping": "email",
+                            },
+                            {
+                                "label": "Primary Skill",
+                                "field_key": "primary_skill",
+                                "field_type": "TEXT",
+                                "show_in_list": True,
+                                "is_filterable": True,
+                            },
+                        ],
+                    }
+                ]
+            },
+        )
+        open_job.application_form_version_id = form_version.form_version_id
+        db.flush()
+
+        CareersService(db).submit_dynamic_application(
+            org_with_slug.organization_id,
+            open_job.job_opening_id,
+            {
+                "full_name": "Ada Lovelace",
+                "email": "ada-report@example.com",
+                "primary_skill": "Python",
+            },
+        )
+        CareersService(db).submit_dynamic_application(
+            org_with_slug.organization_id,
+            open_job.job_opening_id,
+            {
+                "full_name": "Grace Hopper",
+                "email": "grace-report@example.com",
+                "primary_skill": "COBOL",
+            },
+        )
+
+        result = RecruitmentService(db).list_job_applicant_report(
+            org_with_slug.organization_id,
+            open_job.job_opening_id,
+            dynamic_filters=[
+                {
+                    "field_key": "primary_skill",
+                    "field_type": form_version.sections[0].fields[2].field_type,
+                    "operator": "contains",
+                    "value": "Python",
+                }
+            ],
+        )
+
+        assert result.total == 1
+        assert result.items[0].email == "ada-report@example.com"
+
+    def test_job_applicant_report_is_scoped_to_job_opening(
+        self, db: Session, org_with_slug: Organization, open_job: JobOpening
+    ):
+        """Test applicant report does not leak applicants from another opening."""
+        other_job = JobOpening(
+            organization_id=org_with_slug.organization_id,
+            job_code="JOB-2024-002",
+            job_title="Data Analyst",
+            number_of_positions=1,
+            positions_filled=0,
+            employment_type="FULL_TIME",
+            status=JobOpeningStatus.OPEN,
+            posted_on=date.today(),
+        )
+        db.add(other_job)
+        db.flush()
+
+        CareersService(db).submit_application(
+            org_with_slug.organization_id,
+            open_job.job_opening_id,
+            first_name="Ada",
+            last_name="Lovelace",
+            email="ada-scoped@example.com",
+        )
+        CareersService(db).submit_application(
+            org_with_slug.organization_id,
+            other_job.job_opening_id,
+            first_name="Grace",
+            last_name="Hopper",
+            email="grace-scoped@example.com",
+        )
+
+        result = RecruitmentService(db).list_job_applicant_report(
+            org_with_slug.organization_id,
+            open_job.job_opening_id,
+        )
+
+        assert result.total == 1
+        assert result.items[0].email == "ada-scoped@example.com"
 
     def test_submit_dynamic_application_rejects_invalid_choice(
         self, db: Session, org_with_slug: Organization, open_job: JobOpening

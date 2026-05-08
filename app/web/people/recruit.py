@@ -102,6 +102,20 @@ def job_opening_detail(
     )
 
 
+@router.get("/jobs/{job_opening_id}/report", response_class=HTMLResponse)
+def job_applicant_report(
+    request: Request,
+    job_opening_id: str,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Job-scoped applicant report with dynamic form filters."""
+    return recruit_web_service.job_applicant_report_response(
+        request, auth, db, job_opening_id, page
+    )
+
+
 @router.get("/jobs/{job_opening_id}/edit", response_class=HTMLResponse)
 def edit_job_opening_form(
     request: Request,

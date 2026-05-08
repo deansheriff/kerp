@@ -15,15 +15,33 @@ try:
 except ImportError:  # pragma: no cover
     UTC = timezone.utc
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import Integer, delete, func, or_, select, update
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import Date as SQLDate
+from sqlalchemy import (
+    Integer,
+    Numeric,
+    and_,
+    cast,
+    delete,
+    false,
+    func,
+    or_,
+    select,
+    update,
+)
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from app.config import settings
 from app.models.finance.audit.audit_log import AuditAction
+from app.models.forms import (
+    DynamicFormAnswer,
+    DynamicFormField,
+    DynamicFormSubmission,
+    FormFieldType,
+)
 from app.models.finance.core_org.organization import Organization
 from app.models.people.hr import EmployeeOnboarding
 from app.models.people.recruit import (
@@ -47,6 +65,18 @@ from app.services.people.recruit.notifications import send_new_applicant_notific
 from app.services.state_machine import StateMachine
 
 logger = logging.getLogger(__name__)
+
+NUMERIC_DYNAMIC_FIELD_TYPES = {FormFieldType.NUMBER, FormFieldType.RATING}
+BOOLEAN_DYNAMIC_FIELD_TYPES = {
+    FormFieldType.CHECKBOX,
+    FormFieldType.YES_NO,
+    FormFieldType.CONSENT,
+}
+FILE_DYNAMIC_FIELD_TYPES = {
+    FormFieldType.FILE,
+    FormFieldType.IMAGE,
+    FormFieldType.PDF,
+}
 
 if TYPE_CHECKING:
     from app.web.deps import WebAuthContext
@@ -480,6 +510,228 @@ class RecruitmentService:
             offset=pagination.offset if pagination else 0,
             limit=pagination.limit if pagination else len(items),
         )
+
+    def list_job_applicant_report_fields(
+        self,
+        org_id: UUID,
+        job_opening_id: UUID,
+    ) -> list[DynamicFormField]:
+        """List current report-capable dynamic fields for a job opening."""
+        opening = self.get_job_opening(org_id, job_opening_id)
+        if not opening.application_form_version_id:
+            return []
+
+        return list(
+            self.db.scalars(
+                select(DynamicFormField)
+                .options(joinedload(DynamicFormField.options))
+                .where(
+                    DynamicFormField.form_version_id
+                    == opening.application_form_version_id,
+                    or_(
+                        DynamicFormField.show_in_list.is_(True),
+                        DynamicFormField.is_filterable.is_(True),
+                    ),
+                )
+                .order_by(DynamicFormField.sort_order)
+            )
+            .unique()
+            .all()
+        )
+
+    def list_job_applicant_report(
+        self,
+        org_id: UUID,
+        job_opening_id: UUID,
+        *,
+        status: ApplicantStatus | None = None,
+        search: str | None = None,
+        source: str | None = None,
+        dynamic_filters: list[dict[str, Any]] | None = None,
+        sort_by: str = "applied_on",
+        sort_dir: str = "desc",
+        pagination: PaginationParams | None = None,
+    ) -> PaginatedResult[JobApplicant]:
+        """List applicants for a single job report with dynamic answer filters."""
+        self.get_job_opening(org_id, job_opening_id)
+        query = select(JobApplicant).where(
+            JobApplicant.organization_id == org_id,
+            JobApplicant.job_opening_id == job_opening_id,
+        )
+
+        if status:
+            query = query.where(JobApplicant.status == status)
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.where(
+                or_(
+                    JobApplicant.first_name.ilike(search_term),
+                    JobApplicant.last_name.ilike(search_term),
+                    JobApplicant.email.ilike(search_term),
+                    JobApplicant.application_number.ilike(search_term),
+                )
+            )
+
+        if source:
+            query = query.where(JobApplicant.source == source)
+
+        for index, dynamic_filter in enumerate(dynamic_filters or []):
+            filter_value = str(dynamic_filter.get("value") or "").strip()
+            operator = str(dynamic_filter.get("operator") or "contains")
+            field_key = str(dynamic_filter.get("field_key") or "").strip()
+            field_type = dynamic_filter.get("field_type")
+            if not field_key or (
+                not filter_value and operator not in {"has_value", "is_empty"}
+            ):
+                continue
+
+            submission_alias = aliased(
+                DynamicFormSubmission, name=f"filter_submission_{index}"
+            )
+            answer_alias = aliased(DynamicFormAnswer, name=f"filter_answer_{index}")
+            query = query.join(
+                submission_alias,
+                and_(
+                    submission_alias.organization_id == org_id,
+                    submission_alias.subject_type == "JOB_APPLICANT",
+                    submission_alias.subject_id == JobApplicant.applicant_id,
+                ),
+            ).join(
+                answer_alias,
+                and_(
+                    answer_alias.submission_id == submission_alias.submission_id,
+                    answer_alias.field_key_snapshot == field_key,
+                ),
+            )
+            query = query.where(
+                self._dynamic_answer_filter_clause(
+                    answer_alias, field_type, operator, filter_value
+                )
+            )
+
+        query = self._apply_applicant_report_sort(
+            query, org_id, sort_by=sort_by, sort_dir=sort_dir
+        )
+
+        count_query = select(func.count()).select_from(query.order_by(None).subquery())
+        total = self.db.scalar(count_query) or 0
+
+        if pagination:
+            query = query.offset(pagination.offset).limit(pagination.limit)
+
+        items = list(self.db.scalars(query).all())
+        return PaginatedResult(
+            items=items,
+            total=total,
+            offset=pagination.offset if pagination else 0,
+            limit=pagination.limit if pagination else len(items),
+        )
+
+    def _dynamic_answer_filter_clause(
+        self,
+        answer_alias,
+        field_type: FormFieldType | None,
+        operator: str,
+        value: str,
+    ):
+        """Build a safe WHERE clause for a report dynamic field filter."""
+        if field_type in FILE_DYNAMIC_FIELD_TYPES:
+            if operator == "is_empty":
+                return answer_alias.file_url.is_(None)
+            return answer_alias.file_url.is_not(None)
+
+        if operator == "is_empty":
+            return or_(
+                answer_alias.display_value.is_(None),
+                answer_alias.display_value == "",
+            )
+        if operator == "has_value":
+            return and_(
+                answer_alias.display_value.is_not(None),
+                answer_alias.display_value != "",
+            )
+
+        if field_type in NUMERIC_DYNAMIC_FIELD_TYPES:
+            try:
+                numeric_value = Decimal(value)
+            except (InvalidOperation, ValueError):
+                return false()
+            numeric_expr = cast(answer_alias.value_json.astext, Numeric)
+            if operator == "gte":
+                return numeric_expr >= numeric_value
+            if operator == "lte":
+                return numeric_expr <= numeric_value
+            return numeric_expr == numeric_value
+
+        if field_type == FormFieldType.DATE:
+            try:
+                date_value = date.fromisoformat(value)
+            except ValueError:
+                return false()
+            date_expr = cast(answer_alias.value_json.astext, SQLDate)
+            if operator == "gte":
+                return date_expr >= date_value
+            if operator == "lte":
+                return date_expr <= date_value
+            return date_expr == date_value
+
+        if field_type in BOOLEAN_DYNAMIC_FIELD_TYPES:
+            normalized = value.lower()
+            expected = "Yes" if normalized in {"true", "1", "yes", "on"} else "No"
+            return answer_alias.display_value == expected
+
+        if operator == "equals":
+            return func.lower(answer_alias.display_value) == value.lower()
+        return answer_alias.display_value.ilike(f"%{value}%")
+
+    def _apply_applicant_report_sort(
+        self,
+        query,
+        org_id: UUID,
+        *,
+        sort_by: str,
+        sort_dir: str,
+    ):
+        """Apply system or dynamic-field sorting to a job applicant report query."""
+        descending = sort_dir.lower() == "desc"
+        system_sort_map = {
+            "application_number": JobApplicant.application_number,
+            "applicant": JobApplicant.last_name,
+            "applied_on": JobApplicant.applied_on,
+            "source": JobApplicant.source,
+            "status": JobApplicant.status,
+        }
+
+        sort_expr = system_sort_map.get(sort_by)
+        if sort_expr is None and sort_by.startswith("field:"):
+            field_key = sort_by.removeprefix("field:").strip()
+            if field_key:
+                submission_alias = aliased(
+                    DynamicFormSubmission, name="sort_submission"
+                )
+                answer_alias = aliased(DynamicFormAnswer, name="sort_answer")
+                query = query.outerjoin(
+                    submission_alias,
+                    and_(
+                        submission_alias.organization_id == org_id,
+                        submission_alias.subject_type == "JOB_APPLICANT",
+                        submission_alias.subject_id == JobApplicant.applicant_id,
+                    ),
+                ).outerjoin(
+                    answer_alias,
+                    and_(
+                        answer_alias.submission_id == submission_alias.submission_id,
+                        answer_alias.field_key_snapshot == field_key,
+                    ),
+                )
+                sort_expr = func.lower(answer_alias.display_value)
+
+        if sort_expr is None:
+            sort_expr = JobApplicant.applied_on
+
+        ordering = sort_expr.desc() if descending else sort_expr.asc()
+        return query.order_by(ordering.nullslast(), JobApplicant.created_at.desc())
 
     def get_applicant(self, org_id: UUID, applicant_id: UUID) -> JobApplicant:
         """Get an applicant by ID."""

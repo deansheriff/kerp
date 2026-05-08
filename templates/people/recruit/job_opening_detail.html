@@ -102,6 +102,9 @@
                 <a href="/people/recruit/applicants?job_opening_id={{ opening.job_opening_id }}" class="btn btn-secondary">
                     View Applicants
                 </a>
+                <a href="/people/recruit/jobs/{{ opening.job_opening_id }}/report" class="btn btn-secondary">
+                    Applicant Report
+                </a>
                 <form method="post" action="/people/recruit/jobs/{{ opening.job_opening_id }}/delete" onsubmit="return confirm('Delete this job opening? This cannot be undone.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-danger" {% if applicants_count and applicants_count > 0 %}disabled title="Cannot delete job opening with applicants"{% endif %}>
@@ -235,6 +238,9 @@
         <div class="card-body px-6 pb-6">
             <p class="text-3xl font-bold text-slate-900 dark:text-white">{{ applicants_count }}</p>
             <p class="text-sm text-slate-500 dark:text-slate-400">Total applicants</p>
+            <a href="/people/recruit/jobs/{{ opening.job_opening_id }}/report" class="mt-4 inline-flex text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400">
+                Open detailed report
+            </a>
         </div>
     </div>
     {% endif %}
