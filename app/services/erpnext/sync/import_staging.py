@@ -222,15 +222,60 @@ class StagingImportService:
             if se.target_id is None:
                 continue
             if se.source_doctype == "Department":
-                self._dept_cache[se.source_name] = se.target_id
+                department = self.db.get(Department, se.target_id)
+                if department:
+                    self._dept_cache[se.source_name] = se.target_id
+                else:
+                    logger.warning(
+                        "Ignoring stale Department sync mapping %s -> %s; "
+                        "target hr.department row is missing",
+                        se.source_name,
+                        se.target_id,
+                    )
             elif se.source_doctype == "Designation":
-                self._desg_cache[se.source_name] = se.target_id
+                designation = self.db.get(Designation, se.target_id)
+                if designation:
+                    self._desg_cache[se.source_name] = se.target_id
+                else:
+                    logger.warning(
+                        "Ignoring stale Designation sync mapping %s -> %s; "
+                        "target hr.designation row is missing",
+                        se.source_name,
+                        se.target_id,
+                    )
             elif se.source_doctype == "Employment Type":
-                self._emptype_cache[se.source_name] = se.target_id
+                employment_type = self.db.get(EmploymentType, se.target_id)
+                if employment_type:
+                    self._emptype_cache[se.source_name] = se.target_id
+                else:
+                    logger.warning(
+                        "Ignoring stale Employment Type sync mapping %s -> %s; "
+                        "target hr.employment_type row is missing",
+                        se.source_name,
+                        se.target_id,
+                    )
             elif se.source_doctype == "Employee Grade":
-                self._grade_cache[se.source_name] = se.target_id
+                grade = self.db.get(EmployeeGrade, se.target_id)
+                if grade:
+                    self._grade_cache[se.source_name] = se.target_id
+                else:
+                    logger.warning(
+                        "Ignoring stale Employee Grade sync mapping %s -> %s; "
+                        "target hr.employee_grade row is missing",
+                        se.source_name,
+                        se.target_id,
+                    )
             elif se.source_doctype == "Employee":
-                self._emp_cache[se.source_name] = se.target_id
+                employee = self.db.get(Employee, se.target_id)
+                if employee:
+                    self._emp_cache[se.source_name] = se.target_id
+                else:
+                    logger.warning(
+                        "Ignoring stale Employee sync mapping %s -> %s; "
+                        "target hr.employee row is missing",
+                        se.source_name,
+                        se.target_id,
+                    )
 
     def _create_sync_entity(
         self,
@@ -296,7 +341,14 @@ class StagingImportService:
                     result.skipped += 1
                     continue
 
+                desired_department_id = None
+                if staging.imported_department_id and not self.db.get(
+                    Department, staging.imported_department_id
+                ):
+                    desired_department_id = staging.imported_department_id
+
                 dept = Department(
+                    department_id=desired_department_id or uuid.uuid4(),
                     organization_id=self.organization_id,
                     department_code=staging.department_code[:20],
                     department_name=staging.department_name[:100],
@@ -368,7 +420,14 @@ class StagingImportService:
                     result.skipped += 1
                     continue
 
+                desired_designation_id = None
+                if staging.imported_designation_id and not self.db.get(
+                    Designation, staging.imported_designation_id
+                ):
+                    desired_designation_id = staging.imported_designation_id
+
                 desg = Designation(
+                    designation_id=desired_designation_id or uuid.uuid4(),
                     organization_id=self.organization_id,
                     designation_code=staging.designation_code[:20],
                     designation_name=staging.designation_name[:100],
@@ -427,7 +486,14 @@ class StagingImportService:
                     result.skipped += 1
                     continue
 
+                desired_employment_type_id = None
+                if staging.imported_employment_type_id and not self.db.get(
+                    EmploymentType, staging.imported_employment_type_id
+                ):
+                    desired_employment_type_id = staging.imported_employment_type_id
+
                 emptype = EmploymentType(
+                    employment_type_id=desired_employment_type_id or uuid.uuid4(),
                     organization_id=self.organization_id,
                     type_code=staging.type_code[:20],
                     type_name=staging.type_name[:100],
@@ -486,7 +552,14 @@ class StagingImportService:
                     result.skipped += 1
                     continue
 
+                desired_grade_id = None
+                if staging.imported_grade_id and not self.db.get(
+                    EmployeeGrade, staging.imported_grade_id
+                ):
+                    desired_grade_id = staging.imported_grade_id
+
                 grade = EmployeeGrade(
+                    grade_id=desired_grade_id or uuid.uuid4(),
                     organization_id=self.organization_id,
                     grade_code=staging.grade_code[:20],
                     grade_name=staging.grade_name[:100],
@@ -655,7 +728,14 @@ class StagingImportService:
                     except ValueError:
                         pass
 
+                desired_employee_id = None
+                if staging.imported_employee_id and not self.db.get(
+                    Employee, staging.imported_employee_id
+                ):
+                    desired_employee_id = staging.imported_employee_id
+
                 employee = Employee(
+                    employee_id=desired_employee_id or uuid.uuid4(),
                     organization_id=self.organization_id,
                     person_id=person_id,
                     employee_code=staging.employee_code[:20],
@@ -745,11 +825,18 @@ class StagingImportService:
                 first_name = name_parts[0]
                 last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
 
+        desired_person_id = None
+        if staging.imported_person_id and not self.db.get(
+            Person, staging.imported_person_id
+        ):
+            desired_person_id = staging.imported_person_id
+
         # Create new Person
         person = Person(
+            id=desired_person_id or uuid.uuid4(),
             organization_id=self.organization_id,
             first_name=first_name[:100],
-            last_name=last_name[:100] if last_name else None,
+            last_name=last_name[:100] if last_name else "",
             email=email,
             phone=staging.cell_number,
         )
