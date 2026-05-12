@@ -411,6 +411,44 @@ class FormEngineService:
         sorted_fields = sorted(fields.values(), key=lambda field: field.sort_order)
         return sorted_fields[:8], values
 
+    def list_subject_answer_values(
+        self,
+        organization_id: uuid.UUID,
+        subject_type: str,
+        subject_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, dict[str, str]]:
+        """Return dynamic answer display values keyed by subject and field key."""
+        if not subject_ids:
+            return {}
+        submissions = self.db.scalars(
+            select(DynamicFormSubmission).where(
+                DynamicFormSubmission.organization_id == organization_id,
+                DynamicFormSubmission.subject_type == subject_type,
+                DynamicFormSubmission.subject_id.in_(subject_ids),
+            )
+        ).all()
+        submission_by_id = {item.submission_id: item for item in submissions}
+        if not submission_by_id:
+            return {}
+
+        answers = self.db.scalars(
+            select(DynamicFormAnswer).where(
+                DynamicFormAnswer.submission_id.in_(list(submission_by_id))
+            )
+        ).all()
+        values: dict[uuid.UUID, dict[str, str]] = {}
+        for answer in answers:
+            submission = submission_by_id[answer.submission_id]
+            if not submission.subject_id:
+                continue
+            display = answer.display_value
+            if not display and answer.file_name:
+                display = answer.file_name
+            values.setdefault(submission.subject_id, {})[answer.field_key_snapshot] = (
+                display or ""
+            )
+        return values
+
     def detail_answers(
         self, organization_id: uuid.UUID, applicant_id: uuid.UUID
     ) -> list[DynamicFormAnswer]:

@@ -6,7 +6,7 @@ All business logic is delegated to the recruit_web_service.
 """
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.services.people.recruit.web import recruit_web_service
@@ -113,6 +113,20 @@ def job_applicant_report(
     """Job-scoped applicant report with dynamic form filters."""
     return recruit_web_service.job_applicant_report_response(
         request, auth, db, job_opening_id, page
+    )
+
+
+@router.get("/jobs/{job_opening_id}/report/export", response_class=Response)
+def export_job_applicant_report(
+    request: Request,
+    job_opening_id: str,
+    fields: list[str] | None = Query(default=None),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Export job-scoped applicant report rows to CSV."""
+    return recruit_web_service.export_job_applicant_report_csv_response(
+        request, auth, db, job_opening_id, fields
     )
 
 

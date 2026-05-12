@@ -6,10 +6,14 @@ Provides view-focused data and operations for recruitment report web routes.
 
 from __future__ import annotations
 
+import csv
+import re
+from datetime import datetime
+from io import StringIO
 from uuid import UUID
 
 from fastapi import Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from app.models.people.recruit import ApplicantStatus
@@ -25,6 +29,16 @@ from .base import parse_date_only, parse_status, parse_uuid
 
 class ReportWebService:
     """Web service methods for recruitment reports."""
+
+    JOB_APPLICANT_EXPORT_FIELDS = {
+        "application_number": "Application #",
+        "applicant_name": "Applicant Name",
+        "email": "Email",
+        "phone": "Phone",
+        "applied_on": "Applied Date",
+        "status": "Status",
+        "source": "Source",
+    }
 
     # ─────────────────────────────────────────────────────────────────────────
     # Context Builders
@@ -130,6 +144,9 @@ class ReportWebService:
         """Build context for a job-scoped applicant report."""
         svc = RecruitmentService(db)
         opening = svc.get_job_opening(organization_id, coerce_uuid(job_opening_id))
+        export_fields = svc.list_job_applicant_form_fields(
+            organization_id, opening.job_opening_id
+        )
         report_fields = svc.list_job_applicant_report_fields(
             organization_id, opening.job_opening_id
         )
@@ -219,6 +236,8 @@ class ReportWebService:
             "filterable_fields": [
                 field for field in report_fields if field.is_filterable
             ],
+            "export_system_fields": ReportWebService.JOB_APPLICANT_EXPORT_FIELDS,
+            "export_fields": export_fields,
             "pipeline": svc.get_pipeline_summary(
                 organization_id, job_opening_id=opening.job_opening_id
             ),
@@ -241,6 +260,177 @@ class ReportWebService:
             "pagination_filters": pagination_filters,
             "request_params": params,
         }
+
+    def export_job_applicant_report_csv_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        job_opening_id: str,
+        fields: list[str] | None = None,
+    ) -> Response:
+        """Export a job-scoped applicant report to CSV."""
+        org_id = coerce_uuid(auth.organization_id)
+        svc = RecruitmentService(db)
+        opening = svc.get_job_opening(org_id, coerce_uuid(job_opening_id))
+        form_fields = svc.list_job_applicant_form_fields(org_id, opening.job_opening_id)
+        form_field_by_key = {field.field_key: field for field in form_fields}
+        report_fields = svc.list_job_applicant_report_fields(
+            org_id, opening.job_opening_id
+        )
+        filterable_field_by_key = {
+            field.field_key: field for field in report_fields if field.is_filterable
+        }
+
+        params = request.query_params
+        status = params.get("status") or None
+        search = params.get("search") or None
+        source = params.get("source") or None
+        sort_by = params.get("sort") or "applied_on"
+        sort_dir = params.get("direction") or "desc"
+        allowed_sorts = {
+            "application_number",
+            "applicant",
+            "applied_on",
+            "source",
+            "status",
+        }
+        dynamic_sort_key = sort_by.removeprefix("field:") if sort_by else ""
+        if sort_by not in allowed_sorts and dynamic_sort_key not in form_field_by_key:
+            sort_by = "applied_on"
+        if sort_dir not in {"asc", "desc"}:
+            sort_dir = "desc"
+
+        dynamic_filters: list[dict] = []
+        for field_key, field in filterable_field_by_key.items():
+            value = params.get(f"df_{field_key}") or ""
+            operator = params.get(f"op_{field_key}") or "contains"
+            if value or operator in {"has_value", "is_empty"}:
+                dynamic_filters.append(
+                    {
+                        "field_key": field.field_key,
+                        "field_type": field.field_type,
+                        "operator": operator,
+                        "value": value,
+                    }
+                )
+
+        requested_fields = fields or params.getlist("fields")
+        columns = self._job_applicant_export_columns(
+            requested_fields=requested_fields,
+            form_field_by_key=form_field_by_key,
+        )
+        result = svc.list_job_applicant_report(
+            org_id,
+            opening.job_opening_id,
+            status=parse_status(status, ApplicantStatus),
+            search=search,
+            source=source,
+            dynamic_filters=dynamic_filters,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            pagination=None,
+        )
+        dynamic_values = FormEngineService(db).list_subject_answer_values(
+            org_id,
+            "JOB_APPLICANT",
+            [applicant.applicant_id for applicant in result.items],
+        )
+
+        buffer = StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow([label for _, label in columns])
+        for applicant in result.items:
+            writer.writerow(
+                [
+                    self._csv_safe_cell(
+                        self._job_applicant_export_value(
+                            applicant, column_key, dynamic_values
+                        )
+                    )
+                    for column_key, _ in columns
+                ]
+            )
+
+        safe_code = re.sub(r"[^A-Za-z0-9_-]+", "_", opening.job_code or "job")
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"job_applicants_{safe_code}_{timestamp}.csv"
+        return Response(
+            buffer.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    def _job_applicant_export_columns(
+        self,
+        *,
+        requested_fields: list[str],
+        form_field_by_key: dict,
+    ) -> list[tuple[str, str]]:
+        columns: list[tuple[str, str]] = []
+        if not requested_fields:
+            requested_fields = [
+                "system:application_number",
+                "system:applicant_name",
+                "system:email",
+                "system:applied_on",
+                "system:status",
+                *[f"field:{field_key}" for field_key in form_field_by_key],
+            ]
+
+        seen: set[str] = set()
+        for requested in requested_fields:
+            if requested in seen:
+                continue
+            seen.add(requested)
+            if requested.startswith("system:"):
+                field_key = requested.removeprefix("system:")
+                label = self.JOB_APPLICANT_EXPORT_FIELDS.get(field_key)
+                if label:
+                    columns.append((requested, label))
+            elif requested.startswith("field:"):
+                field_key = requested.removeprefix("field:")
+                field = form_field_by_key.get(field_key)
+                if field:
+                    columns.append((requested, field.label))
+
+        if columns:
+            return columns
+        return [
+            ("system:application_number", "Application #"),
+            ("system:applicant_name", "Applicant Name"),
+            ("system:email", "Email"),
+        ]
+
+    @staticmethod
+    def _job_applicant_export_value(applicant, column_key: str, dynamic_values: dict):
+        if column_key.startswith("field:"):
+            field_key = column_key.removeprefix("field:")
+            return dynamic_values.get(applicant.applicant_id, {}).get(field_key, "")
+
+        field_key = column_key.removeprefix("system:")
+        if field_key == "application_number":
+            return applicant.application_number
+        if field_key == "applicant_name":
+            return applicant.full_name
+        if field_key == "email":
+            return applicant.email
+        if field_key == "phone":
+            return applicant.phone
+        if field_key == "applied_on":
+            return applicant.applied_on.isoformat() if applicant.applied_on else ""
+        if field_key == "status":
+            return applicant.status.value if applicant.status else ""
+        if field_key == "source":
+            return applicant.source
+        return ""
+
+    @staticmethod
+    def _csv_safe_cell(value) -> str:
+        text = "" if value is None else str(value)
+        if text.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return f"'{text}"
+        return text
 
     # ─────────────────────────────────────────────────────────────────────────
     # Response Methods

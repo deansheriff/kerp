@@ -539,6 +539,30 @@ class RecruitmentService:
             .all()
         )
 
+    def list_job_applicant_form_fields(
+        self,
+        org_id: UUID,
+        job_opening_id: UUID,
+    ) -> list[DynamicFormField]:
+        """List all current dynamic application fields for a job opening."""
+        opening = self.get_job_opening(org_id, job_opening_id)
+        if not opening.application_form_version_id:
+            return []
+
+        return list(
+            self.db.scalars(
+                select(DynamicFormField)
+                .options(joinedload(DynamicFormField.options))
+                .where(
+                    DynamicFormField.form_version_id
+                    == opening.application_form_version_id,
+                )
+                .order_by(DynamicFormField.sort_order)
+            )
+            .unique()
+            .all()
+        )
+
     def list_job_applicant_report(
         self,
         org_id: UUID,
