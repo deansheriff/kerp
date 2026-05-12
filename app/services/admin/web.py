@@ -3337,7 +3337,7 @@ class AdminWebService:
         )
 
         if error:
-            context = self.user_form_context(db, user_id)
+            context = self.user_form_context(db)
             context["user_data"] = self.user_data_from_payload(
                 {
                     "first_name": first_name,
