@@ -644,7 +644,7 @@
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
 
-      <input type="text" name="search"
+      <input type="text" name="search" aria-label="Search"
              x-model="query"
              x-ref="searchInput"
              @input.debounce.{{ debounce_ms }}ms="fetchSuggestions()"
@@ -866,7 +866,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
       </svg>
       <input type="text" name="search" value="{{ search if search else '' }}"
-             placeholder="{{ placeholder }}"
+             placeholder="{{ placeholder }}" aria-label="{{ placeholder }}"
              class="form-input pl-10 w-full">
     </div>
 
@@ -985,7 +985,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
       </svg>
 
       <input type="text" name="search" value="{{ search if search else '' }}"
-             placeholder="{{ placeholder }}"
+             placeholder="{{ placeholder }}" aria-label="{{ placeholder }}"
              autocomplete="off"
              class="form-input pl-10 w-full"
              hx-get="{{ base_url }}"
@@ -1244,7 +1244,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
         <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
-        <input type="text" name="{{ search_name }}" value="{{ search if search else '' }}"
+        <input type="text" name="{{ search_name }}" aria-label="{{ search_placeholder }}" value="{{ search if search else '' }}"
                placeholder="{{ search_placeholder }}"
                autocomplete="off"
                class="form-input pl-10 w-full"
@@ -1272,7 +1272,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
         {% if date_range %}
         <div>
           <label class="form-label text-xs">From</label>
-          <input type="date" name="start_date" value="{{ start_date if start_date else '' }}"
+          <input type="date" name="start_date" aria-label="From date" value="{{ start_date if start_date else '' }}"
                  class="form-input w-full"
                  {% if auto_submit %}
                  hx-get="{{ base_url }}"
@@ -1285,7 +1285,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
         </div>
         <div>
           <label class="form-label text-xs">To</label>
-          <input type="date" name="end_date" value="{{ end_date if end_date else '' }}"
+          <input type="date" name="end_date" aria-label="To date" value="{{ end_date if end_date else '' }}"
                  class="form-input w-full"
                  {% if auto_submit %}
                  hx-get="{{ base_url }}"
@@ -1390,7 +1390,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
 {% macro filter_date_field(name, label, value="", attrs="") %}
 <div>
   <label class="form-label text-xs">{{ label }}</label>
-  <input type="date" name="{{ name }}" value="{{ value if value else '' }}" class="form-input w-full" {{ attrs | safe }}>
+  <input type="date" name="{{ name }}" aria-label="{{ label }}" value="{{ value if value else '' }}" class="form-input w-full" {{ attrs | safe }}>
 </div>
 {% endmacro %}
 
@@ -1454,7 +1454,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
       {% if show_size_selector %}
       <div class="ml-auto flex items-center gap-2">
         <label class="text-sm text-slate-500 dark:text-slate-400">Show:</label>
-        <select onchange="window.location.href=this.value" class="form-select py-1 text-sm">
+        <select onchange="window.location.href=this.value" aria-label="Items per page" class="form-select py-1 text-sm">
           {% for size in [10, 25, 50, 100, 200] %}
           {% set ns = namespace(params="page=1" ~ ("&search=" ~ encoded_search if search_term else "")) %}
           {% for key, val in active_filters.items() if val %}
@@ -1472,14 +1472,16 @@ if (typeof window.searchAutosuggest === 'undefined') {
 
     {# Page Navigation #}
     {% if show_navigation and page_count > 1 %}
-    <nav class="flex items-center gap-1">
+    <nav class="flex items-center gap-1" aria-label="Pagination">
       {# Previous Button #}
       {% if current_page > 1 %}
       {% set prev_ns = namespace(params="page=" ~ (current_page - 1) ~ ("&search=" ~ encoded_search if search_term else "") ~ "&limit=" ~ page_limit) %}
       {% for key, val in active_filters.items() if val %}{% set prev_ns.params = prev_ns.params ~ "&" ~ (key|string|urlencode) ~ "=" ~ (val|string|urlencode) %}{% endfor %}
       <a href="?{{ prev_ns.params }}"
+         rel="prev"
+         aria-label="Previous page"
          class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors">
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </a>
@@ -1488,14 +1490,15 @@ if (typeof window.searchAutosuggest === 'undefined') {
       {# Page Numbers #}
       {% for p in range(1, page_count + 1) %}
         {% if p == current_page %}
-        <span class="rounded-lg bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">{{ p }}</span>
+        <span aria-current="page" aria-label="Page {{ p }}, current page" class="rounded-lg bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">{{ p }}</span>
         {% elif p == 1 or p == page_count or (p >= current_page - 1 and p <= current_page + 1) %}
         {% set page_ns = namespace(params="page=" ~ p ~ ("&search=" ~ encoded_search if search_term else "") ~ "&limit=" ~ page_limit) %}
         {% for key, val in active_filters.items() if val %}{% set page_ns.params = page_ns.params ~ "&" ~ (key|string|urlencode) ~ "=" ~ (val|string|urlencode) %}{% endfor %}
         <a href="?{{ page_ns.params }}"
+           aria-label="Page {{ p }}"
            class="rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">{{ p }}</a>
         {% elif p == current_page - 2 or p == current_page + 2 %}
-        <span class="px-1 text-slate-400">...</span>
+        <span aria-hidden="true" class="px-1 text-slate-400">...</span>
         {% endif %}
       {% endfor %}
 
@@ -1504,8 +1507,10 @@ if (typeof window.searchAutosuggest === 'undefined') {
       {% set next_ns = namespace(params="page=" ~ (current_page + 1) ~ ("&search=" ~ encoded_search if search_term else "") ~ "&limit=" ~ page_limit) %}
       {% for key, val in active_filters.items() if val %}{% set next_ns.params = next_ns.params ~ "&" ~ (key|string|urlencode) ~ "=" ~ (val|string|urlencode) %}{% endfor %}
       <a href="?{{ next_ns.params }}"
+         rel="next"
+         aria-label="Next page"
          class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors">
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
       </a>
@@ -2181,7 +2186,7 @@ if (typeof window.searchAutosuggest === 'undefined') {
      }'
      x-init="$watch('selected', () => apply())">
     <label class="form-label">Period</label>
-    <select x-model="selected" class="form-select">
+    <select x-model="selected" aria-label="Period" class="form-select">
         <option value="">Quick select&hellip;</option>
         <option value="this_month">This month</option>
         <option value="last_month">Last month</option>
