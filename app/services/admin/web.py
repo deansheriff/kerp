@@ -3336,8 +3336,8 @@ class AdminWebService:
             role_ids=roles,
         )
 
-        context = self.user_form_context(db, user_id)
         if error:
+            context = self.user_form_context(db, user_id)
             context["user_data"] = self.user_data_from_payload(
                 {
                     "first_name": first_name,
@@ -3367,17 +3367,7 @@ class AdminWebService:
                 status_code=400,
             )
 
-        context.update({"error": None, "success": "User updated successfully"})
-        return self._render_admin_template(
-            request,
-            db,
-            "admin/user_form.html",
-            auth_or_redirect,
-            f"Edit User - {first_name} {last_name}",
-            "Edit User",
-            "users",
-            context,
-        )
+        return RedirectResponse(url="/admin/users?updated=1", status_code=303)
 
     def users_delete_response(
         self,
