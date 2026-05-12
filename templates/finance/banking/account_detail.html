@@ -271,7 +271,7 @@
                 </template>
             </button>
             <button
-                @click="refreshing = true; fetch('/api/v1/banking/accounts/{{ account.bank_account_id }}/refresh-mono', { method: 'POST', credentials: 'same-origin' }).then(r => r.json()).then(data => { refreshing = false; window.showToast(data.message || data.detail || 'Refresh requested', data.status === 'success' ? 'success' : (data.status === 'warning' ? 'warning' : 'error')); }).catch(() => { refreshing = false; window.showToast('Refresh request failed', 'error'); })"
+                @click="refreshing = true; fetch('/api/v1/banking/accounts/{{ account.bank_account_id }}/refresh-mono', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': document.querySelector('meta[name=&quot;csrf-token&quot;]')?.content || '' } }).then(r => r.json()).then(data => { refreshing = false; window.showToast(data.message || data.detail || 'Refresh requested', data.status === 'success' ? 'success' : (data.status === 'warning' ? 'warning' : 'error')); }).catch(() => { refreshing = false; window.showToast('Refresh request failed', 'error'); })"
                 :disabled="refreshing || syncing"
                 class="btn btn-secondary btn-sm"
                 title="Ask the bank for the latest transactions via Mono. Rate-limited to once every 5 minutes per account.">
@@ -298,6 +298,15 @@
                     Disconnect
                 </button>
             </form>
+            <!-- Mono Connect SDK v2 via jsDelivr CDN -->
+            <script src="https://cdn.jsdelivr.net/npm/@mono.co/connect.js@2.2.0/index.min.js"></script>
+            <button
+                :disabled="linkingMono || syncing || refreshing"
+                id="mono-connect-btn"
+                class="btn btn-primary btn-sm">
+                {{ icon_svg("external-link", "h-4 w-4") }}
+                Reauthorise
+            </button>
         </div>
         {% else %}
         <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
@@ -313,6 +322,7 @@
             {{ icon_svg("external-link", "h-4 w-4") }}
             Connect via Mono
         </button>
+        {% endif %}
 
         <script>
             (function() {
@@ -347,13 +357,16 @@
                             window.showToast('Linking account...', 'info');
                             fetch('/api/v1/banking/accounts/' + accountId + '/link-mono', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                                },
                                 body: JSON.stringify({ code: code })
                             })
                             .then(function(r) { return r.json(); })
                             .then(function(data) {
                                 if (data.status === 'success') {
-                                    window.showToast('Bank account connected successfully!', 'success');
+                                    window.showToast('{{ "Bank account reauthorised successfully!" if account.mono_account_id else "Bank account connected successfully!" }}', 'success');
                                     setTimeout(function() { location.reload(); }, 1500);
                                 } else {
                                     window.showToast(data.detail || 'Failed to link account', 'error');
@@ -372,7 +385,6 @@
                 });
             })();
         </script>
-        {% endif %}
     </div>
     {% endif %}
 
