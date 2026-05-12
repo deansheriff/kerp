@@ -1926,9 +1926,15 @@ class SelfServiceWebService:
             recipient_name=recipient_name,
             requested_approver_id=resolved_approver_id,
             items=resolved_items,
+            created_by_id=person_id,
         )
         if submit_now:
-            svc.submit_claim(org_id, claim.claim_id, skip_receipt_validation=True)
+            svc.submit_claim(
+                org_id,
+                claim.claim_id,
+                skip_receipt_validation=True,
+                actor_id=person_id,
+            )
         db.commit()
         return RedirectResponse(url="/people/self/expenses", status_code=303)
 
@@ -2046,7 +2052,12 @@ class SelfServiceWebService:
                 status_code=400, detail="Only draft claims can be submitted"
             )
 
-        svc.submit_claim(org_id, claim_id, skip_receipt_validation=True)
+        svc.submit_claim(
+            org_id,
+            claim_id,
+            skip_receipt_validation=True,
+            actor_id=person_id,
+        )
         db.commit()
         return RedirectResponse(url="/people/self/expenses", status_code=302)
 
@@ -2122,6 +2133,7 @@ class SelfServiceWebService:
             svc.update_claim(
                 org_id,
                 claim_id,
+                updated_by_id=person_id,
                 recipient_bank_code=recipient_bank_code,
                 recipient_bank_name=recipient_bank_name,
                 recipient_account_number=recipient_account_number,
@@ -2463,6 +2475,7 @@ class SelfServiceWebService:
                 org_id=org_id,
                 claim_id=claim_id,
                 approver_id=manager_employee_id,
+                actor_id=person_id,
             )
             db.commit()
         except (ApproverAuthorityError, ExpenseLimitServiceError) as exc:
@@ -2538,6 +2551,7 @@ class SelfServiceWebService:
             claim_id=claim_id,
             approver_id=manager_employee_id,
             reason=reason or "Rejected",
+            actor_id=person_id,
         )
         db.commit()
         return RedirectResponse(url="/people/self/my-approvals", status_code=302)

@@ -878,9 +878,10 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
 
         org_id = coerce_uuid(auth.organization_id)
         claim_uuid = coerce_uuid(claim_id)
+        actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         svc = ExpenseService(db)
         try:
-            result = svc.submit_claim(org_id, claim_uuid)
+            result = svc.submit_claim(org_id, claim_uuid, actor_id=actor_id)
             if not result.success:
                 return RedirectResponse(
                     f"/expense/claims/{claim_id}?error=submit_in_progress",
@@ -923,6 +924,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
 
         org_id = coerce_uuid(auth.organization_id)
         claim_uuid = coerce_uuid(claim_id)
+        actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         approver = db.scalars(
             select(Employee)
             .where(Employee.organization_id == org_id)
@@ -981,6 +983,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 corrections=corrections,
                 notes=approval_notes,
                 create_supplier_invoice=route_to_ap,
+                actor_id=actor_id,
             )
             if claim.status not in {
                 ExpenseClaimStatus.APPROVED,
@@ -1054,6 +1057,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
 
         org_id = coerce_uuid(auth.organization_id)
         claim_uuid = coerce_uuid(claim_id)
+        actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         approver = db.scalars(
             select(Employee)
             .where(Employee.organization_id == org_id)
@@ -1068,6 +1072,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 claim_uuid,
                 approver_id=approver_id,
                 reason=(reason or "").strip() or "Rejected",
+                actor_id=actor_id,
             )
             if claim.status != ExpenseClaimStatus.REJECTED:
                 db.rollback()
@@ -1113,10 +1118,14 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         claim_id: str, reason: str | None, auth, db
     ) -> RedirectResponse:
         org_id = coerce_uuid(auth.organization_id)
+        actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         svc = ExpenseService(db)
         try:
             claim = svc.cancel_claim(
-                org_id, coerce_uuid(claim_id), reason=(reason or "").strip() or None
+                org_id,
+                coerce_uuid(claim_id),
+                reason=(reason or "").strip() or None,
+                actor_id=actor_id,
             )
             if claim.status != ExpenseClaimStatus.CANCELLED:
                 db.rollback()
@@ -1145,9 +1154,10 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
     @staticmethod
     def resubmit_claim_response(claim_id: str, auth, db) -> RedirectResponse:
         org_id = coerce_uuid(auth.organization_id)
+        actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         svc = ExpenseService(db)
         try:
-            claim = svc.resubmit_claim(org_id, coerce_uuid(claim_id))
+            claim = svc.resubmit_claim(org_id, coerce_uuid(claim_id), actor_id=actor_id)
             if claim.status != ExpenseClaimStatus.DRAFT:
                 db.rollback()
                 return RedirectResponse(

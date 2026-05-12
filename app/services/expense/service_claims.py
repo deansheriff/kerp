@@ -43,6 +43,28 @@ except ImportError:  # pragma: no cover
 
 
 class ExpenseClaimMixin(ExpenseServiceBase):
+    @staticmethod
+    def _stamp_created(claim: ExpenseClaim, actor_id: UUID | None) -> None:
+        if actor_id is None:
+            return
+        claim.set_created_by(actor_id)
+        claim.set_updated_by(actor_id)
+        claim.status_changed_by_id = actor_id
+        claim.status_changed_at = datetime.now(UTC)
+
+    @staticmethod
+    def _stamp_updated(claim: ExpenseClaim, actor_id: UUID | None) -> None:
+        if actor_id is None:
+            return
+        claim.set_updated_by(actor_id)
+
+    @staticmethod
+    def _stamp_status_change(claim: ExpenseClaim, actor_id: UUID | None) -> None:
+        claim.status_changed_at = datetime.now(UTC)
+        if actor_id is not None:
+            claim.status_changed_by_id = actor_id
+            claim.set_updated_by(actor_id)
+
     def list_claims(
         self,
         org_id: UUID,
@@ -124,6 +146,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         requested_approver_id: UUID | None = None,
         notes: str | None = None,
         items: list[dict] | None = None,
+        created_by_id: UUID | None = None,
     ) -> ExpenseClaim:
         resolved_currency_code = self._resolve_currency_code(org_id, currency_code)
 
@@ -164,6 +187,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             total_claimed_amount=Decimal("0"),
             advance_adjusted=Decimal("0"),
         )
+        self._stamp_created(claim, created_by_id)
         self.db.add(claim)
         self.db.flush()
 
@@ -322,6 +346,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         skip_limit_check: bool = False,
         skip_receipt_validation: bool = False,
         notify_approvers: bool = True,
+        actor_id: UUID | None = None,
     ) -> SubmitClaimResult:
         from app.models.expense import LimitResultType
         from app.services.expense.approval_service import ExpenseApprovalService
@@ -383,6 +408,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                         eligible_approvers=evaluation_result.eligible_approvers,
                         notify_approvers=notify_approvers,
                         requires_approval=True,
+                        actor_id=actor_id,
                     )
                 if evaluation_result.result == LimitResultType.WARNING:
                     result = self._finalize_submitted_claim(
@@ -392,6 +418,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                         evaluation_result=evaluation_result,
                         notify_approvers=notify_approvers,
                         requires_approval=False,
+                        actor_id=actor_id,
                     )
                     result.requires_approval = (
                         result.claim.status == ExpenseClaimStatus.PENDING_APPROVAL
@@ -405,6 +432,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                 evaluation_result=evaluation_result,
                 notify_approvers=notify_approvers,
                 requires_approval=False,
+                actor_id=actor_id,
             )
         except Exception:
             self._set_action_status(
@@ -425,6 +453,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         eligible_approvers=None,
         notify_approvers: bool,
         requires_approval: bool,
+        actor_id: UUID | None = None,
     ) -> SubmitClaimResult:
         from app.services.expense.approval_service import ExpenseApprovalService
 
@@ -435,6 +464,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             if chain.steps
             else ExpenseClaimStatus.SUBMITTED
         )
+        self._stamp_status_change(claim, actor_id)
         self.db.flush()
 
         fire_audit_event(
@@ -465,7 +495,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                 event="ON_STATUS_CHANGE",
                 old_values={"status": "DRAFT"},
                 new_values={"status": claim.status.value},
-                user_id=claim.employee_id,
+                user_id=actor_id or claim.employee_id,
             )
         except Exception as exc:
             logger.exception(
@@ -569,6 +599,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         auto_post_gl: bool = False,
         create_supplier_invoice: bool = False,
         send_notification: bool = True,
+        actor_id: UUID | None = None,
     ) -> ExpenseClaim:
         from app.models.people.hr.employee import Employee
         from app.services.expense.approval_service import ExpenseApprovalService
@@ -626,6 +657,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                 )
                 if not chain.is_complete:
                     claim.status = ExpenseClaimStatus.PENDING_APPROVAL
+                    self._stamp_status_change(claim, actor_id)
                     self.db.flush()
                     return claim
             if not self._begin_action(org_id, claim_id, ExpenseClaimActionType.APPROVE):
@@ -634,6 +666,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             claim.status = ExpenseClaimStatus.APPROVED
             claim.approver_id = approver_id
             claim.approved_on = date.today()
+            self._stamp_status_change(claim, actor_id)
             if notes:
                 claim.approval_notes = notes
 
@@ -775,7 +808,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                         "status": "APPROVED",
                         "total_approved_amount": str(claim.total_approved_amount),
                     },
-                    user_id=approver_id,
+                    user_id=actor_id or approver_id,
                 )
             except Exception as exc:
                 logger.exception(
@@ -956,6 +989,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         approver_id: UUID | None = None,
         reason: str,
         send_notification: bool = True,
+        actor_id: UUID | None = None,
     ) -> ExpenseClaim:
         from app.models.people.hr.employee import Employee
         from app.services.expense.approval_service import ExpenseApprovalService
@@ -996,6 +1030,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             claim.status = ExpenseClaimStatus.REJECTED
             claim.approver_id = approver_id
             claim.rejection_reason = reason
+            self._stamp_status_change(claim, actor_id)
 
             if send_notification:
                 self._notify_claim_rejected(claim, org_id, approver, reason)
@@ -1027,7 +1062,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
                     event="ON_REJECTION",
                     old_values={"status": old_status},
                     new_values={"status": "REJECTED", "rejection_reason": reason},
-                    user_id=approver_id,
+                    user_id=actor_id or approver_id,
                 )
             except Exception as exc:
                 logger.exception(
@@ -1091,13 +1126,21 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             except Exception as exc:
                 logger.exception("In-app rejection notification failed: %s", exc)
 
-    def update_claim(self, org_id: UUID, claim_id: UUID, **kwargs) -> ExpenseClaim:
+    def update_claim(
+        self,
+        org_id: UUID,
+        claim_id: UUID,
+        *,
+        updated_by_id: UUID | None = None,
+        **kwargs,
+    ) -> ExpenseClaim:
         claim = self.get_claim(org_id, claim_id)
         if claim.status != ExpenseClaimStatus.DRAFT:
             raise ExpenseClaimStatusError(claim.status.value, "update")
         for key, value in kwargs.items():
             if value is not None and hasattr(claim, key):
                 setattr(claim, key, value)
+        self._stamp_updated(claim, updated_by_id)
         self.db.flush()
         return claim
 
@@ -1156,6 +1199,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         payment_date: date | None = None,
         send_notification: bool = True,
         skip_budget_check: bool = False,
+        actor_id: UUID | None = None,
     ) -> ExpenseClaim:
         claim = self.get_claim(org_id, claim_id)
         if claim.status == ExpenseClaimStatus.PAID:
@@ -1203,6 +1247,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             claim.status = ExpenseClaimStatus.PAID
             claim.paid_on = payment_date or date.today()
             claim.payment_reference = payment_reference
+            self._stamp_status_change(claim, actor_id)
             if send_notification and claim.employee and claim.employee.work_email:
                 from app.services.expense.expense_notifications import (
                     ExpenseNotificationService,
@@ -1236,6 +1281,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         claim_id: UUID,
         *,
         reason: str | None = None,
+        actor_id: UUID | None = None,
     ) -> ExpenseClaim:
         claim = self.get_claim(org_id, claim_id)
         if claim.status == ExpenseClaimStatus.CANCELLED:
@@ -1253,6 +1299,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
         try:
             old_status = claim.status.value
             claim.status = ExpenseClaimStatus.CANCELLED
+            self._stamp_status_change(claim, actor_id)
             if reason:
                 claim.notes = (
                     f"{claim.notes}\n\nCancelled: {reason}"
@@ -1287,7 +1334,9 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             )
             raise
 
-    def resubmit_claim(self, org_id: UUID, claim_id: UUID) -> ExpenseClaim:
+    def resubmit_claim(
+        self, org_id: UUID, claim_id: UUID, *, actor_id: UUID | None = None
+    ) -> ExpenseClaim:
         claim = self.get_claim(org_id, claim_id)
         if claim.status != ExpenseClaimStatus.REJECTED:
             raise ExpenseClaimStatusError(
@@ -1295,6 +1344,7 @@ class ExpenseClaimMixin(ExpenseServiceBase):
             )
         old_status = claim.status.value
         claim.status = ExpenseClaimStatus.DRAFT
+        self._stamp_status_change(claim, actor_id)
         claim.rejection_reason = None
         claim.approver_id = None
         claim.approved_on = None
