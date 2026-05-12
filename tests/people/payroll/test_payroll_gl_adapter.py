@@ -4,10 +4,95 @@ from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 from app.models.people.payroll.payroll_entry import PayrollEntryStatus
 from app.models.people.payroll.salary_slip import SalarySlipStatus
 from app.services.people.payroll.payroll_gl_adapter import PayrollGLAdapter
+
+
+def _slip(cost_center_id=None, employee_id=None) -> SimpleNamespace:
+    """Minimal slip-like object for _shared_cost_center_id testing."""
+    return SimpleNamespace(
+        cost_center_id=cost_center_id,
+        employee_id=employee_id,
+    )
+
+
+def _mock_db_employees(emp_cc_pairs: list[tuple]) -> MagicMock:
+    """Build a MagicMock Session whose execute().all() returns emp_cc_pairs."""
+    db = MagicMock()
+    db.execute.return_value.all.return_value = emp_cc_pairs
+    return db
+
+
+# ── _shared_cost_center_id ──────────────────────────────────────────────────
+
+
+def test_shared_cc_empty_list_returns_none():
+    assert PayrollGLAdapter._shared_cost_center_id(MagicMock(), []) is None
+
+
+def test_shared_cc_all_slips_have_same_slip_level_cc():
+    cc = uuid4()
+    slips = [_slip(cost_center_id=cc) for _ in range(3)]
+    db = _mock_db_employees([])  # no employee lookup needed
+    assert PayrollGLAdapter._shared_cost_center_id(db, slips) == cc
+    db.execute.assert_not_called()  # no employee query when slips carry CC
+
+
+def test_shared_cc_falls_back_to_employee_when_slip_cc_none():
+    cc = uuid4()
+    emp_a, emp_b = uuid4(), uuid4()
+    slips = [_slip(employee_id=emp_a), _slip(employee_id=emp_b)]
+    db = _mock_db_employees([(emp_a, cc), (emp_b, cc)])
+    assert PayrollGLAdapter._shared_cost_center_id(db, slips) == cc
+    db.execute.assert_called_once()  # batched, not per-slip
+
+
+def test_shared_cc_slip_level_overrides_employee_level():
+    slip_cc = uuid4()
+    emp_cc = uuid4()
+    emp_id = uuid4()
+    slips = [_slip(cost_center_id=slip_cc, employee_id=emp_id)]
+    db = _mock_db_employees([(emp_id, emp_cc)])  # would never be called
+    assert PayrollGLAdapter._shared_cost_center_id(db, slips) == slip_cc
+
+
+def test_shared_cc_disagreement_returns_none():
+    cc_a, cc_b = uuid4(), uuid4()
+    slips = [_slip(cost_center_id=cc_a), _slip(cost_center_id=cc_b)]
+    db = _mock_db_employees([])
+    assert PayrollGLAdapter._shared_cost_center_id(db, slips) is None
+
+
+def test_shared_cc_any_unresolved_slip_returns_none():
+    cc = uuid4()
+    emp_id = uuid4()
+    slips = [
+        _slip(cost_center_id=cc),
+        _slip(employee_id=emp_id),  # employee has no CC in DB
+    ]
+    db = _mock_db_employees([(emp_id, None)])
+    assert PayrollGLAdapter._shared_cost_center_id(db, slips) is None
+
+
+def test_shared_cc_employee_not_found_returns_none():
+    emp_id = uuid4()
+    slips = [_slip(employee_id=emp_id)]
+    db = _mock_db_employees([])  # employee row missing entirely
+    assert PayrollGLAdapter._shared_cost_center_id(db, slips) is None
+
+
+def test_shared_cc_mixed_slip_and_employee_sources_agreeing():
+    cc = uuid4()
+    emp_id = uuid4()
+    slips = [
+        _slip(cost_center_id=cc),  # via slip
+        _slip(employee_id=emp_id),  # via employee fallback
+    ]
+    db = _mock_db_employees([(emp_id, cc)])
+    assert PayrollGLAdapter._shared_cost_center_id(db, slips) == cc
 
 
 def _make_component(
