@@ -26,3 +26,10 @@ def test_people_web_applicant_list_route_is_not_shadowed_by_api():
 
     assert len(routes) == 1
     assert routes[0].response_class is HTMLResponse
+
+
+def test_people_web_job_applicant_report_route_is_registered():
+    routes = _matching_routes("/people/recruit/jobs/{job_opening_id}/report")
+
+    assert len(routes) == 1
+    assert routes[0].response_class is HTMLResponse
