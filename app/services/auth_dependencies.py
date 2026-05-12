@@ -135,7 +135,7 @@ def _set_default_org_context(db: Session) -> UUID | None:
     """Set default org RLS context before loading org-scoped records."""
     if not app_settings.default_organization_id:
         return None
-    organization_id = coerce_uuid(app_settings.default_organization_id)
+    organization_id = UUID(str(app_settings.default_organization_id))
     set_current_organization_sync(db, organization_id)
     return organization_id
 
