@@ -2,14 +2,14 @@
 {% from "components/macros.html" import compact_filters, icon_svg, period_shortcuts %}
 
 
-{% block page_title %}General ledger{% endblock %}
+{% block page_title %}Account Ledger Report{% endblock %}
 
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 mt-1" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
         <li><a href="/dashboard" class="hover:text-slate-700 dark:hover:text-slate-300">Dashboard</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/finance/reports" class="hover:text-slate-700 dark:hover:text-slate-300">Reports</a></li>
-        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="text-slate-700 dark:text-slate-300" aria-current="page">General ledger</span></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="text-slate-700 dark:text-slate-300" aria-current="page">Account Ledger Report</span></li>
     </ol>
 </nav>
 {% endblock %}
@@ -205,6 +205,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 30000);
     }
 
+    function readJsonResponse(response, fallbackMessage) {
+        return response.text().then(function(text) {
+            var data = {};
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch (error) {
+                    throw new Error(fallbackMessage);
+                }
+            }
+            if (!response.ok) {
+                throw new Error(data.detail || data.message || fallbackMessage);
+            }
+            return data;
+        });
+    }
+
     function pollExportStatus(instanceId, attempt) {
         var maxAttempts = 180;
         var statusUrl = '/finance/reports/general-ledger/exports/' + instanceId + '/status';
@@ -217,12 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.setTimeout(function() {
             fetch(statusUrl, { method: 'GET', credentials: 'same-origin' })
                 .then(function(response) {
-                    return response.json().then(function(data) {
-                        if (!response.ok) {
-                            throw new Error(data.detail || 'Unable to check export status.');
-                        }
-                        return data;
-                    });
+                    return readJsonResponse(response, 'Unable to check export status.');
                 })
                 .then(function(data) {
                     if (data.status === 'COMPLETED' && data.download_url) {
@@ -254,12 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         fetch(link.href, { method: 'POST', credentials: 'same-origin' })
             .then(function(response) {
-                return response.json().then(function(data) {
-                    if (!response.ok) {
-                        throw new Error(data.detail || 'Unable to queue export.');
-                    }
-                    return data;
-                });
+                return readJsonResponse(response, 'Unable to queue export.');
             })
             .then(function(data) {
                 notify(data.message || 'Export queued. You can continue working.', 'success', 6000);

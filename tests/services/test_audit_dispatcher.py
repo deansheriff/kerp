@@ -8,6 +8,8 @@ data changes to the audit trail.
 import uuid
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy import text
+
 from app.models.finance.audit.audit_log import AuditAction
 from app.services.audit_dispatcher import fire_audit_event
 
@@ -110,6 +112,28 @@ class TestFireAuditEvent:
             str(uuid.uuid4()),
             AuditAction.INSERT,
         )
+
+    @patch(_SVC_PATCH)
+    def test_audit_failure_does_not_poison_session(
+        self, mock_service_cls: MagicMock, db_session
+    ) -> None:
+        """A failed audit flush should not leave the caller's session unusable."""
+
+        def fail_with_database_error(*, db, **_: object) -> None:
+            db.execute(text("SELECT * FROM definitely_missing_audit_table"))
+
+        mock_service_cls.log_change = MagicMock(side_effect=fail_with_database_error)
+
+        fire_audit_event(
+            db_session,
+            self.org_id,
+            "auth",
+            "session",
+            str(uuid.uuid4()),
+            AuditAction.INSERT,
+        )
+
+        assert db_session.execute(text("SELECT 1")).scalar_one() == 1
 
     @patch(_SVC_PATCH)
     def test_reason_passed_through(self, mock_service_cls: MagicMock) -> None:

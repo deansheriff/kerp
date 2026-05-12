@@ -111,6 +111,11 @@ def parse_enum(value: str | None, enum_type, field_name: str):
         ) from exc
 
 
+def auth_person_id(auth: dict) -> UUID | None:
+    person_id = auth.get("person_id")
+    return UUID(str(person_id)) if person_id else None
+
+
 # =============================================================================
 # Expense Categories
 # =============================================================================
@@ -254,7 +259,7 @@ def create_expense_claim(
     payload: ExpenseClaimCreate,
     request: Request,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:create")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:create")),
     db: Session = Depends(get_db),
     idempotency_key: str = Header(None, alias="Idempotency-Key"),
 ):
@@ -299,6 +304,7 @@ def create_expense_claim(
             requested_approver_id=payload.requested_approver_id,
             notes=payload.notes,
             items=items_data,
+            created_by_id=auth_person_id(auth),
         )
         response = ExpenseClaimRead.model_validate(claim)
         IdempotencyService.update_response(
@@ -349,13 +355,18 @@ def update_expense_claim(
     claim_id: UUID,
     payload: ExpenseClaimUpdate,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:update")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:update")),
     db: Session = Depends(get_db),
 ):
     """Update an expense claim (only in draft status)."""
     svc = ExpenseService(db)
     update_data = payload.model_dump(exclude_unset=True)
-    claim = svc.update_claim(organization_id, claim_id, **update_data)
+    claim = svc.update_claim(
+        organization_id,
+        claim_id,
+        updated_by_id=auth_person_id(auth),
+        **update_data,
+    )
     return ExpenseClaimRead.model_validate(claim)
 
 
@@ -419,7 +430,7 @@ def submit_claim(
     claim_id: UUID,
     request: Request,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:submit")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:submit")),
     db: Session = Depends(get_db),
     idempotency_key: str = Header(None, alias="Idempotency-Key"),
 ):
@@ -441,7 +452,11 @@ def submit_claim(
         return build_cached_response(replay)
 
     try:
-        result = svc.submit_claim(organization_id, claim_id)
+        result = svc.submit_claim(
+            organization_id,
+            claim_id,
+            actor_id=auth_person_id(auth),
+        )
         claim = result.claim if hasattr(result, "claim") else result
         response = ExpenseClaimRead.model_validate(claim)
         IdempotencyService.update_response(
@@ -481,7 +496,7 @@ def approve_claim(
     payload: ExpenseClaimApprovalRequest,
     request: Request,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:approve:tier1")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:approve:tier1")),
     db: Session = Depends(get_db),
     idempotency_key: str = Header(None, alias="Idempotency-Key"),
 ):
@@ -514,6 +529,7 @@ def approve_claim(
             approver_id=payload.approver_id,
             approved_amounts=approved_amounts,
             notes=payload.notes,
+            actor_id=auth_person_id(auth),
         )
         response = ExpenseClaimRead.model_validate(claim)
         IdempotencyService.update_response(
@@ -575,7 +591,7 @@ def reject_claim(
     payload: ExpenseClaimRejectRequest,
     request: Request,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:reject")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:reject")),
     db: Session = Depends(get_db),
     idempotency_key: str = Header(None, alias="Idempotency-Key"),
 ):
@@ -602,6 +618,7 @@ def reject_claim(
             claim_id=claim_id,
             approver_id=payload.approver_id,
             reason=payload.reason,
+            actor_id=auth_person_id(auth),
         )
         response = ExpenseClaimRead.model_validate(claim)
         IdempotencyService.update_response(
@@ -641,7 +658,7 @@ def mark_claim_paid(
     payload: MarkPaidRequest,
     request: Request,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:reimburse")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:reimburse")),
     db: Session = Depends(get_db),
     idempotency_key: str = Header(None, alias="Idempotency-Key"),
 ):
@@ -668,6 +685,7 @@ def mark_claim_paid(
             claim_id=claim_id,
             payment_reference=payload.payment_reference,
             payment_date=payload.payment_date,
+            actor_id=auth_person_id(auth),
         )
         response = ExpenseClaimRead.model_validate(claim)
         IdempotencyService.update_response(
@@ -705,7 +723,7 @@ def mark_claim_paid(
 def cancel_claim(
     claim_id: UUID,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:update")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:update")),
     db: Session = Depends(get_db),
     reason: str | None = None,
 ):
@@ -716,6 +734,7 @@ def cancel_claim(
             org_id=organization_id,
             claim_id=claim_id,
             reason=reason,
+            actor_id=auth_person_id(auth),
         )
         return ExpenseClaimRead.model_validate(claim)
     except ExpenseClaimStatusError as exc:
@@ -729,7 +748,7 @@ def cancel_claim(
 def resubmit_claim(
     claim_id: UUID,
     organization_id: UUID = Depends(require_organization_id),
-    _auth: dict = Depends(require_tenant_permission("expense:claims:update")),
+    auth: dict = Depends(require_tenant_permission("expense:claims:update")),
     db: Session = Depends(get_db),
 ):
     """Resubmit a rejected expense claim (resets to DRAFT)."""
@@ -738,6 +757,7 @@ def resubmit_claim(
         claim = svc.resubmit_claim(
             org_id=organization_id,
             claim_id=claim_id,
+            actor_id=auth_person_id(auth),
         )
         return ExpenseClaimRead.model_validate(claim)
     except ExpenseClaimStatusError as exc:

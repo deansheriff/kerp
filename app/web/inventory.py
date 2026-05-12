@@ -59,13 +59,14 @@ def list_items(
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
+    item_type: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
     db: Session = Depends(get_db),
 ):
     """Items list page."""
     return inv_web_service.list_items_response(
-        request, auth, search, category, status, page, limit, db
+        request, auth, search, category, status, item_type, page, limit, db
     )
 
 
@@ -144,6 +145,7 @@ async def export_all_items(
     search: str = "",
     status: str = "",
     category: str = "",
+    item_type: str = "",
     auth: WebAuthContext = Depends(require_inventory_access),
     db: Session = Depends(get_db),
 ):
@@ -151,7 +153,7 @@ async def export_all_items(
     from app.services.inventory.bulk import get_item_bulk_service
 
     service = get_item_bulk_service(db, auth.organization_id, auth.user_id)
-    extra = {"category_id": category} if category else None
+    extra = {"category_id": category, "item_type": item_type}
     return await service.export_all(search=search, status=status, extra_filters=extra)
 
 
@@ -1704,6 +1706,174 @@ def serial_stock_report(
         request=request,
         auth=auth,
         db=db,
+        warehouse=warehouse,
+        item=item,
+        search=search,
+        page=page,
+    )
+
+
+@router.get("/reports/valuation", response_class=HTMLResponse)
+def inventory_valuation_report(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Inventory valuation report."""
+    return operations_inv_web_service.inventory_valuation_report_response(
+        request=request,
+        auth=auth,
+        db=db,
+    )
+
+
+@router.get("/reports/valuation/export")
+def export_inventory_valuation_report(
+    format: str = Query(default="csv", pattern="^(csv|pdf)$"),
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Export inventory valuation summary rows as CSV or PDF."""
+    if format == "pdf":
+        return operations_inv_web_service.export_inventory_valuation_pdf_response(
+            auth=auth,
+            db=db,
+        )
+    return operations_inv_web_service.export_inventory_valuation_csv_response(
+        auth=auth,
+        db=db,
+    )
+
+
+@router.get("/reports/valuation/wac-breakdown", response_class=HTMLResponse)
+def inventory_valuation_wac_breakdown_report(
+    request: Request,
+    item_id: str,
+    warehouse_id: str,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Inventory valuation WAC breakdown report."""
+    return operations_inv_web_service.wac_breakdown_report_response(
+        request=request,
+        auth=auth,
+        db=db,
+        item_id=item_id,
+        warehouse_id=warehouse_id,
+    )
+
+
+@router.get("/reports/valuation/wac-breakdown/export")
+def export_inventory_valuation_wac_breakdown(
+    item_id: str | None = None,
+    warehouse_id: str | None = None,
+    format: str = Query(default="csv", pattern="^(csv|pdf)$"),
+    auth: WebAuthContext = Depends(require_inventory_access),
+    db: Session = Depends(get_db),
+):
+    """Export WAC breakdown rows as CSV or PDF."""
+    if format == "pdf":
+        return operations_inv_web_service.export_wac_breakdown_pdf_response(
+            auth=auth,
+            db=db,
+            item_id=item_id,
+            warehouse_id=warehouse_id,
+        )
+    return operations_inv_web_service.export_wac_breakdown_csv_response(
+        auth=auth,
+        db=db,
+        item_id=item_id,
+        warehouse_id=warehouse_id,
+    )
+
+
+@router.get("/reports/fifo-layers", response_class=HTMLResponse)
+def fifo_layers_report(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    warehouse: str | None = None,
+    item: str | None = None,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """FIFO layers report."""
+    return operations_inv_web_service.fifo_layers_report_response(
+        request=request,
+        auth=auth,
+        db=db,
+        warehouse=warehouse,
+        item=item,
+        search=search,
+        page=page,
+    )
+
+
+@router.get("/reports/aging", response_class=HTMLResponse)
+def stock_aging_report(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    warehouse: str | None = None,
+    item: str | None = None,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """Stock aging report."""
+    return operations_inv_web_service.stock_aging_report_response(
+        request=request,
+        auth=auth,
+        db=db,
+        warehouse=warehouse,
+        item=item,
+        search=search,
+        page=page,
+    )
+
+
+@router.get("/reports/movement", response_class=HTMLResponse)
+def stock_movement_report(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    warehouse: str | None = None,
+    item: str | None = None,
+    transaction_type: str | None = None,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """Stock movement report."""
+    return operations_inv_web_service.stock_movement_report_response(
+        request=request,
+        auth=auth,
+        db=db,
+        warehouse=warehouse,
+        item=item,
+        transaction_type=transaction_type,
+        search=search,
+        page=page,
+    )
+
+
+@router.get("/reports/yearly-movement", response_class=HTMLResponse)
+def yearly_stock_movement_report(
+    request: Request,
+    auth: WebAuthContext = Depends(require_inventory_access),
+    year: str | None = None,
+    month: str | None = None,
+    warehouse: str | None = None,
+    item: str | None = None,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """Yearly stock movement summary report."""
+    return operations_inv_web_service.yearly_stock_movement_report_response(
+        request=request,
+        auth=auth,
+        db=db,
+        year=year,
+        month=month,
         warehouse=warehouse,
         item=item,
         search=search,

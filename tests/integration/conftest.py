@@ -96,7 +96,7 @@ os.environ.setdefault(
 os.environ.setdefault("TOTP_ISSUER", "TestApp")
 
 import pytest  # noqa: E402
-from sqlalchemy import create_engine, event  # noqa: E402
+from sqlalchemy import create_engine, event, text  # noqa: E402
 from sqlalchemy.exc import OperationalError  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
@@ -172,6 +172,7 @@ def db(engine) -> Generator[Session, None, None]:
     except OperationalError as exc:
         pytest.skip(f"Integration database unavailable: {exc}")
     transaction = connection.begin()
+    connection.execute(text("SET LOCAL app.bypass_rls = 'true'"))
 
     # Create session bound to this connection
     TestSession = sessionmaker(bind=connection)

@@ -59,6 +59,21 @@ def _set_actor_context(request: Request, actor_id: UUID | str) -> None:
     actor_id_var.set(actor)
 
 
+def _set_default_org_context(db: Session) -> UUID | None:
+    """Set default org RLS context before loading org-scoped records."""
+    if not settings.default_organization_id:
+        return None
+    organization_id = UUID(str(settings.default_organization_id))
+    set_current_organization_sync(db, organization_id)
+    return organization_id
+
+
+def _get_person_for_web_session(db: Session, person_id: UUID) -> Person | None:
+    """Load a web-session person with the default org context in single-org mode."""
+    _set_default_org_context(db)
+    return db.get(Person, person_id)
+
+
 def _get_auth_db_for_sso() -> Session | None:
     """Get auth database session for SSO validation in web routes.
 
@@ -1427,7 +1442,7 @@ def require_web_auth(
         scopes = _load_web_permission_scopes(db, person_uuid, scopes)
 
     # Get person details
-    person = db.get(Person, person_uuid)
+    person = _get_person_for_web_session(db, person_uuid)
     if not person:
         raise HTTPException(status_code=401, detail="User not found")
 
@@ -1612,7 +1627,7 @@ def optional_web_auth(
         scopes = _load_web_permission_scopes(db, person_uuid, scopes)
 
     # Get person details
-    person = db.get(Person, person_uuid)
+    person = _get_person_for_web_session(db, person_uuid)
     if not person:
         return WebAuthContext(is_authenticated=False)
 

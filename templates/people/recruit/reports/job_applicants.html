@@ -143,6 +143,58 @@
         {% endfor %}
     {% endcall %}
 
+    <div class="card">
+        <div class="card-header flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+                <h3 class="font-medium text-slate-900 dark:text-white">CSV Export</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Export the current filtered report with selected columns.</p>
+            </div>
+            <button type="submit" form="applicant-report-export-form" class="btn btn-primary">
+                {{ icon_svg("download", "h-4 w-4 mr-1") }}
+                Export CSV
+            </button>
+        </div>
+        <div class="card-body">
+            <form id="applicant-report-export-form" method="get" action="/people/recruit/jobs/{{ opening.job_opening_id }}/report/export" class="space-y-4">
+                <input type="hidden" name="search" value="{{ search }}">
+                <input type="hidden" name="status" value="{{ status }}">
+                <input type="hidden" name="source" value="{{ source }}">
+                <input type="hidden" name="sort" value="{{ sort }}">
+                <input type="hidden" name="direction" value="{{ direction }}">
+                {% for field in filterable_fields %}
+                <input type="hidden" name="df_{{ field.field_key }}" value="{{ request_params.get('df_' ~ field.field_key) or '' }}">
+                <input type="hidden" name="op_{{ field.field_key }}" value="{{ request_params.get('op_' ~ field.field_key) or 'contains' }}">
+                {% endfor %}
+
+                <div>
+                    <p class="mb-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Applicant Columns</p>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {% for field_key, label in export_system_fields.items() %}
+                        <label class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                            <input type="checkbox" name="fields" value="system:{{ field_key }}" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500" checked>
+                            <span>{{ label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if export_fields %}
+                <div>
+                    <p class="mb-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Form Response Columns</p>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {% for field in export_fields %}
+                        <label class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                            <input type="checkbox" name="fields" value="field:{{ field.field_key }}" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500" checked>
+                            <span>{{ field.label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
     <div id="results-container">
         {% if applicants %}
         <div class="card overflow-hidden">

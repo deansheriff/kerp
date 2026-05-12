@@ -670,6 +670,9 @@ app.include_router(admin_web_router)
 app.include_router(profile_web_router)
 app.include_router(notifications_web_router)
 app.include_router(workflow_tasks_web_router)
+app.include_router(careers_api_router, prefix="/api/v1")
+app.include_router(careers_web_router)
+app.include_router(careers_short_web_router)
 # ---------------------------------------------------------------------------
 # People/HR module
 # ---------------------------------------------------------------------------
@@ -686,10 +689,6 @@ if is_module_enabled("people"):
     )
     app.include_router(people_web_router)
     app.include_router(payroll_alias_web_router)
-    # Careers portal (tied to people/recruitment)
-    app.include_router(careers_api_router, prefix="/api/v1")
-    app.include_router(careers_web_router)
-    app.include_router(careers_short_web_router)
     app.include_router(onboarding_portal_router)
 
 # ---------------------------------------------------------------------------

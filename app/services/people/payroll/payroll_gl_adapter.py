@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from collections.abc import Sequence
 from typing import cast
 from uuid import UUID
 
@@ -82,6 +83,58 @@ class PayrollGLAdapter:
     │         (Employee's net salary owed)                        │
     └─────────────────────────────────────────────────────────────┘
     """
+
+    @staticmethod
+    def _shared_cost_center_id(db: Session, slips: Sequence[object]) -> UUID | None:
+        """Return a single cost_center_id if all slips share one, else None.
+
+        Source of truth: slip.cost_center_id wins when set (it's more specific
+        than employee.cost_center_id — generation may have stamped a slip-level
+        override). Falls back to employee.cost_center_id otherwise. If any slip
+        resolves to None, or slips disagree, returns None so the consolidated
+        journal stays cost-centre-agnostic and we don't tag the wrong CC.
+
+        Employee lookups are batched into one query rather than per-slip.
+        """
+        if not slips:
+            return None
+
+        # Pass 1: collect slip-level CCs; record employee_ids that need lookup.
+        slip_cc_ids: list[UUID | None] = []
+        employee_ids_to_resolve: set[UUID] = set()
+        for slip in slips:
+            cc = getattr(slip, "cost_center_id", None)
+            slip_cc_ids.append(cc)
+            if cc is None:
+                emp_id = getattr(slip, "employee_id", None)
+                if emp_id is not None:
+                    employee_ids_to_resolve.add(emp_id)
+
+        # Batched employee lookup (one query, not N).
+        emp_cc_map: dict[UUID, UUID | None] = {}
+        if employee_ids_to_resolve:
+            from sqlalchemy import select as _select  # local to keep import minimal
+
+            rows = db.execute(
+                _select(Employee.employee_id, Employee.cost_center_id).where(
+                    Employee.employee_id.in_(employee_ids_to_resolve)
+                )
+            ).all()
+            emp_cc_map = {row[0]: row[1] for row in rows}
+
+        # Pass 2: resolve final CC per slip; bail out on first disagreement.
+        cc_ids: set[UUID] = set()
+        for slip, slip_cc in zip(slips, slip_cc_ids, strict=True):
+            cc = slip_cc
+            if cc is None:
+                emp_id = getattr(slip, "employee_id", None)
+                cc = emp_cc_map.get(emp_id) if emp_id is not None else None
+            if cc is None:
+                return None
+            cc_ids.add(cc)  # type: ignore[arg-type]
+            if len(cc_ids) > 1:
+                return None
+        return next(iter(cc_ids)) if cc_ids else None
 
     @staticmethod
     def post_salary_slip(
@@ -697,6 +750,9 @@ class PayrollGLAdapter:
 
         period_ref = f"{getattr(entry, 'payroll_month', 1)}/{getattr(entry, 'payroll_year', 2026)}"
 
+        # Resolve a shared cost_center_id (None when slips span multiple CCs).
+        shared_cc = PayrollGLAdapter._shared_cost_center_id(db, slips)
+
         # Debit: Total Gross to Salaries Expense
         journal_lines.append(
             JournalLineInput(
@@ -706,6 +762,7 @@ class PayrollGLAdapter:
                 debit_amount_functional=total_gross * exchange_rate,
                 credit_amount_functional=Decimal("0"),
                 description=f"Payroll {period_ref} - Salaries Expense",
+                cost_center_id=shared_cc,
             )
         )
 
@@ -725,6 +782,7 @@ class PayrollGLAdapter:
                         debit_amount_functional=amount * exchange_rate,
                         credit_amount_functional=Decimal("0"),
                         description=f"Payroll {period_ref} - Employer Pension",
+                        cost_center_id=shared_cc,
                     )
                 )
 
@@ -740,6 +798,7 @@ class PayrollGLAdapter:
                     debit_amount_functional=Decimal("0"),
                     credit_amount_functional=amount * exchange_rate,
                     description=f"Payroll {period_ref} - {comp_name}",
+                    cost_center_id=shared_cc,
                 )
             )
 
@@ -752,6 +811,7 @@ class PayrollGLAdapter:
                 debit_amount_functional=Decimal("0"),
                 credit_amount_functional=total_net * exchange_rate,
                 description=f"Payroll {period_ref} - Net Pay",
+                cost_center_id=shared_cc,
             )
         )
 
@@ -954,6 +1014,9 @@ class PayrollGLAdapter:
         # Period reference for descriptions
         period_ref = f"{entry.payroll_month or entry.start_date.month}/{entry.payroll_year or entry.start_date.year}"
 
+        # Resolve a shared cost_center_id (None when slips span multiple CCs).
+        shared_cc = PayrollGLAdapter._shared_cost_center_id(db, slips)
+
         # Debit: Total Gross to Salaries Expense (entry-level or org default)
         journal_lines.append(
             JournalLineInput(
@@ -963,6 +1026,7 @@ class PayrollGLAdapter:
                 debit_amount_functional=total_gross * exchange_rate,
                 credit_amount_functional=Decimal("0"),
                 description=f"Payroll {period_ref} - Salaries Expense",
+                cost_center_id=shared_cc,
             )
         )
 
@@ -982,6 +1046,7 @@ class PayrollGLAdapter:
                     debit_amount_functional=Decimal("0"),
                     credit_amount_functional=amount * exchange_rate,
                     description=f"Payroll {period_ref} - {comp_name}",
+                    cost_center_id=shared_cc,
                 )
             )
 
@@ -994,6 +1059,7 @@ class PayrollGLAdapter:
                 debit_amount_functional=Decimal("0"),
                 credit_amount_functional=total_net * exchange_rate,
                 description=f"Payroll {period_ref} - Net Pay",
+                cost_center_id=shared_cc,
             )
         )
 
