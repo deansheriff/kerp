@@ -81,6 +81,7 @@ def fire_audit_event(
         )
         from app.services.common import coerce_uuid
         from app.services.finance.platform.audit_log import AuditLogService
+        from app.rls import set_current_organization_sync
 
         # Resolve actor from explicit arg or ContextVar
         resolved_user_id: UUID | None = user_id
@@ -96,22 +97,26 @@ def fire_audit_event(
         ip_address = ip_address_var.get() or None
         user_agent = user_agent_var.get() or None
 
-        AuditLogService.log_change(
-            db=db,
-            organization_id=organization_id,
-            table_schema=table_schema,
-            table_name=table_name,
-            record_id=str(record_id),
-            action=action,
-            old_values=old_values,
-            new_values=new_values,
-            user_id=resolved_user_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            correlation_id=correlation_id,
-            reason=reason,
-        )
+        with db.begin_nested():
+            set_current_organization_sync(db, organization_id)
+            AuditLogService.log_change(
+                db=db,
+                organization_id=organization_id,
+                table_schema=table_schema,
+                table_name=table_name,
+                record_id=str(record_id),
+                action=action,
+                old_values=old_values,
+                new_values=new_values,
+                user_id=resolved_user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                correlation_id=correlation_id,
+                reason=reason,
+            )
     except Exception:
+        if not db.is_active:
+            db.rollback()
         logger.warning(
             "Audit event failed: %s.%s %s %s",
             table_schema,
