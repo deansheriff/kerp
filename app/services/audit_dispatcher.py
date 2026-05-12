@@ -115,7 +115,7 @@ def fire_audit_event(
                 reason=reason,
             )
     except Exception:
-        if not db.is_active:
+        if getattr(db, "is_active", True) is False:
             db.rollback()
         logger.warning(
             "Audit event failed: %s.%s %s %s",
