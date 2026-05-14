@@ -5,7 +5,7 @@ services:
     container_name: dotmac_erp_app
     restart: unless-stopped
     ports:
-    - 127.0.0.1:8003:8002
+    - "8003:8002"
     env_file:
     - .env
     environment:

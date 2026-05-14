@@ -17,6 +17,7 @@ from app.models.people.hr.department import Department
 from app.models.people.hr.employee import Employee, EmployeeStatus, Gender
 from app.services.erpnext.client import ERPNextClient
 from app.services.formatters import format_date as _base_format_date
+from app.services.people.hr.org_resolver import OrgResolver
 
 from .base import BaseExportService
 
@@ -166,8 +167,12 @@ class EmployeeExportService(BaseExportService[Employee]):
             data["grade"] = entity.grade.erpnext_id
 
         # Reporting manager
-        if entity.manager and entity.manager.erpnext_id:
-            data["reports_to"] = entity.manager.erpnext_id
+        manager = OrgResolver(self.db).get_manager(
+            entity.employee_id,
+            self.organization_id,
+        )
+        if manager and manager.erpnext_id:
+            data["reports_to"] = manager.erpnext_id
 
         # Bank details
         if entity.bank_name:

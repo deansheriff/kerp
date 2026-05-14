@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import Request
@@ -23,7 +24,9 @@ from app.services.people.hr import (
     DesignationFilters,
     OrganizationService,
 )
+from app.services.people.hr.org_resolver import OrgResolver
 from app.services.people.recruit import RecruitmentService
+from app.services.people.recruit.recruit_service import RecruitmentServiceError
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
 
@@ -175,8 +178,20 @@ class OfferWebService:
         except Exception:
             return {"offer": None}
 
+        linked_position = offer.job_opening.position if offer.job_opening else None
+        linked_position_incumbent = (
+            OrgResolver(db).get_position_incumbent(
+                linked_position.position_id,
+                organization_id,
+            )
+            if linked_position
+            else None
+        )
+
         return {
             "offer": offer,
+            "linked_position": linked_position,
+            "linked_position_incumbent": linked_position_incumbent,
             "statuses": [s.value for s in OfferStatus],
             "today": date.today(),
         }
@@ -283,6 +298,12 @@ class OfferWebService:
             request, auth, f"Offer {ctx['offer'].offer_number}", "recruit", db=db
         )
         context["request"] = request
+        if request.query_params.get("error"):
+            context["error"] = request.query_params["error"]
+        if request.query_params.get("success"):
+            context["success"] = request.query_params["success"]
+        elif request.query_params.get("saved"):
+            context["success"] = "Record saved successfully"
         context.update(ctx)
         return templates.TemplateResponse(
             request, "people/recruit/offer_detail.html", context
@@ -399,6 +420,49 @@ class OfferWebService:
         return RedirectResponse(
             url=f"/people/recruit/offers/{offer_id}?saved=1", status_code=303
         )
+
+    def convert_offer_response(
+        self,
+        auth: WebAuthContext,
+        db: Session,
+        offer_id: str,
+    ) -> RedirectResponse:
+        """Convert an accepted offer to an employee."""
+        org_id = coerce_uuid(auth.organization_id)
+        svc = RecruitmentService(db)
+
+        try:
+            offer = svc.get_job_offer(org_id, coerce_uuid(offer_id))
+            employee_id = svc.convert_to_employee(
+                org_id,
+                offer.offer_id,
+                date_of_joining=offer.expected_joining_date,
+            )
+            db.commit()
+            return RedirectResponse(
+                url=(
+                    f"/people/hr/employees/{employee_id}"
+                    "?success=Offer+converted+to+employee"
+                ),
+                status_code=303,
+            )
+        except RecruitmentServiceError as exc:
+            db.rollback()
+            message = quote(str(exc))
+            return RedirectResponse(
+                url=f"/people/recruit/offers/{offer_id}?error={message}",
+                status_code=303,
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("convert_offer_response: failed")
+            return RedirectResponse(
+                url=(
+                    f"/people/recruit/offers/{offer_id}"
+                    "?error=Could+not+convert+offer+to+employee"
+                ),
+                status_code=303,
+            )
 
     def accept_offer_response(
         self,

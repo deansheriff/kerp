@@ -61,6 +61,7 @@ from app.services.people.hr import (
     EmployeeUpdateData,
     EmploymentTypeFilters,
     OrganizationService,
+    PositionService,
     TerminationData,
 )
 from app.services.people.hr.employee_filter_engine import (
@@ -211,6 +212,37 @@ class HRWebService:
             for emp_id in position_to_employees.get(desig_row.position_id, ()):
                 titles[emp_id] = desig_row.designation_name
         return titles
+
+    @staticmethod
+    def _employee_position_context(
+        db: Session,
+        org_id: UUID,
+        employee_id: UUID,
+    ) -> dict[str, Any]:
+        """Return current position/reporting-line display data for an employee."""
+        resolver = OrgResolver(db)
+        assignment = resolver.get_active_assignment(employee_id, org_id)
+        position = None
+        parent_position = None
+        if assignment:
+            position = assignment.position or db.get(Position, assignment.position_id)
+            if position and position.parent_position_id:
+                parent_position = db.get(Position, position.parent_position_id)
+
+        manager = resolver.get_manager(employee_id, org_id)
+        return {
+            "position": position,
+            "parent_position": parent_position,
+            "manager": manager,
+        }
+
+    @staticmethod
+    def _list_vacant_position_options(db: Session, org_id: UUID) -> list[Any]:
+        """Return vacant positions that can receive a new employee assignment."""
+        summaries = PositionService(db, org_id).list_position_summaries(
+            pagination=PaginationParams(limit=DROPDOWN_LIMIT)
+        )
+        return [summary for summary in summaries.items if summary.incumbent is None]
 
     @staticmethod
     def _designation_is_nysc(designation_name: str | None) -> bool:
@@ -638,6 +670,7 @@ class HRWebService:
         designation_id = self._form_str(form, "designation_id")
         employment_type_id = self._form_str(form, "employment_type_id")
         grade_id = self._form_str(form, "grade_id")
+        position_id = self._form_str(form, "position_id")
         reports_to_id = self._form_str(form, "reports_to_id")
         expense_approver_id = self._form_str(form, "expense_approver_id")
         assigned_location_id = self._form_str(form, "assigned_location_id")
@@ -734,6 +767,7 @@ class HRWebService:
                     "designation_id": designation_id,
                     "employment_type_id": employment_type_id,
                     "grade_id": grade_id,
+                    "position_id": position_id,
                     "reports_to_id": reports_to_id,
                     "expense_approver_id": expense_approver_id,
                     "assigned_location_id": assigned_location_id,
@@ -796,6 +830,7 @@ class HRWebService:
                     "designation_id": designation_id,
                     "employment_type_id": employment_type_id,
                     "grade_id": grade_id,
+                    "position_id": position_id,
                     "reports_to_id": reports_to_id,
                     "expense_approver_id": expense_approver_id,
                     "assigned_location_id": assigned_location_id,
@@ -919,6 +954,7 @@ class HRWebService:
                             "designation_id": designation_id,
                             "employment_type_id": employment_type_id,
                             "grade_id": grade_id,
+                            "position_id": position_id,
                             "reports_to_id": reports_to_id,
                             "expense_approver_id": expense_approver_id,
                             "assigned_location_id": assigned_location_id,
@@ -976,6 +1012,7 @@ class HRWebService:
             if employment_type_id
             else None,
             grade_id=coerce_uuid(grade_id) if grade_id else None,
+            position_id=coerce_uuid(position_id) if position_id else None,
             reports_to_id=coerce_uuid(reports_to_id) if reports_to_id else None,
             expense_approver_id=coerce_uuid(expense_approver_id)
             if expense_approver_id
@@ -1040,6 +1077,7 @@ class HRWebService:
         designation_id = self._form_str(form, "designation_id")
         employment_type_id = self._form_str(form, "employment_type_id")
         grade_id = self._form_str(form, "grade_id")
+        position_id = self._form_str(form, "position_id")
         reports_to_id = self._form_str(form, "reports_to_id")
         expense_approver_id = self._form_str(form, "expense_approver_id")
         assigned_location_id = self._form_str(form, "assigned_location_id")
@@ -1107,6 +1145,7 @@ class HRWebService:
                 "designation_id": designation_id,
                 "employment_type_id": employment_type_id,
                 "grade_id": grade_id,
+                "position_id": position_id,
                 "reports_to_id": reports_to_id,
                 "expense_approver_id": expense_approver_id,
                 "assigned_location_id": assigned_location_id,
@@ -1182,7 +1221,6 @@ class HRWebService:
             "designation_id",
             "employment_type_id",
             "grade_id",
-            "reports_to_id",
             "expense_approver_id",
             "cost_center_id",
             "assigned_location_id",
@@ -1205,6 +1243,8 @@ class HRWebService:
             "salary_mode",
             "notes",
         }
+        if "reports_to_id" in form:
+            provided_fields.add("reports_to_id")
 
         data = EmployeeUpdateData(
             employee_number=employee_code if employee_code else None,
@@ -1934,6 +1974,7 @@ class HRWebService:
                 db, org_id, [m.employee_id for m in managers]
             ).items()
         }
+        position_options = self._list_vacant_position_options(db, org_id)
         current_manager_id: UUID | None = None
         cost_centers = db.scalars(
             select(CostCenter)
@@ -1988,7 +2029,11 @@ class HRWebService:
             "grades": grades,
             "managers": managers,
             "manager_position_titles": manager_position_titles,
+            "position_options": position_options,
             "current_manager_id": current_manager_id,
+            "employee_position": None,
+            "employee_parent_position": None,
+            "employee_position_manager": None,
             "cost_centers": cost_centers,
             "locations": locations,
             "shift_types": shift_types,
@@ -2114,9 +2159,15 @@ class HRWebService:
                 db, org_id, [m.employee_id for m in managers]
             ).items()
         }
+        position_options = self._list_vacant_position_options(db, org_id)
         current_manager_emp = OrgResolver(db).get_manager(employee.employee_id, org_id)
         current_manager_id: UUID | None = (
             current_manager_emp.employee_id if current_manager_emp else None
+        )
+        position_context = self._employee_position_context(
+            db,
+            org_id,
+            employee.employee_id,
         )
         cost_centers = db.scalars(
             select(CostCenter)
@@ -2189,7 +2240,11 @@ class HRWebService:
             "grades": grades,
             "managers": managers,
             "manager_position_titles": manager_position_titles,
+            "position_options": position_options,
             "current_manager_id": current_manager_id,
+            "employee_position": position_context["position"],
+            "employee_parent_position": position_context["parent_position"],
+            "employee_position_manager": position_context["manager"],
             "cost_centers": cost_centers,
             "locations": locations,
             "shift_types": shift_types,

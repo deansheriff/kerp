@@ -14,7 +14,7 @@ from uuid import UUID
 
 from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.models.people.hr.employee import Employee, EmployeeStatus
 from app.models.people.perf.appraisal import Appraisal, AppraisalStatus
@@ -228,15 +228,11 @@ class PerformanceAutomationService:
         tenure_cutoff = today - relativedelta(months=cycle.min_tenure_months)
 
         # Base query for active employees
-        query = (
-            select(Employee)
-            .options(joinedload(Employee.manager))
-            .where(
-                Employee.organization_id == cycle.organization_id,
-                Employee.status == EmployeeStatus.ACTIVE,
-                Employee.date_of_joining.isnot(None),
-                Employee.date_of_joining <= tenure_cutoff,
-            )
+        query = select(Employee).where(
+            Employee.organization_id == cycle.organization_id,
+            Employee.status == EmployeeStatus.ACTIVE,
+            Employee.date_of_joining.isnot(None),
+            Employee.date_of_joining <= tenure_cutoff,
         )
 
         # Exclude probation employees if not included
@@ -316,6 +312,7 @@ class PerformanceAutomationService:
             )
 
         self.db.flush()
+        org_resolver.notify_hr_for_vacancy_routing_alerts(cycle.organization_id)
 
         logger.info(
             "Generated %d appraisals for cycle %s",

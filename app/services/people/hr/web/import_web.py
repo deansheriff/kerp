@@ -7,6 +7,8 @@ Provides web-facing helpers for HR CSV import workflows.
 from __future__ import annotations
 
 import logging
+from csv import writer
+from io import StringIO
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
@@ -105,10 +107,70 @@ class HrImportWebService:
                     "Department Code",
                     "Designation Code",
                     "Employment Type Code",
+                    "Position Code",
+                    "Reports To Code",
+                    "Expense Approver Code",
+                    "Cost Center Code",
                 ],
             },
         }
         return columns.get(entity_type, {"required": [], "optional": []})
+
+    @classmethod
+    def get_template_headers(cls, entity_type: str) -> list[str]:
+        columns = cls.get_entity_columns(entity_type)
+        return [*columns.get("required", []), *columns.get("optional", [])]
+
+    @staticmethod
+    def get_template_sample_row(entity_type: str) -> list[str]:
+        samples = {
+            "departments": [
+                "ENG",
+                "Engineering",
+                "",
+                "CC-ENG",
+            ],
+            "designations": [
+                "SWE",
+                "Software Engineer",
+                "Builds and maintains application services",
+            ],
+            "employment_types": [
+                "FULLTIME",
+                "Full Time",
+                "Permanent full-time employment",
+            ],
+            "employees": [
+                "EMP-001",
+                "Ada",
+                "Lovelace",
+                "ada@example.com",
+                "2026-01-15",
+                "ACTIVE",
+                "ENG",
+                "SWE",
+                "FULLTIME",
+                "ENG-SWE-001",
+                "EMP-000",
+                "EMP-000",
+                "CC-ENG",
+            ],
+        }
+        return samples.get(entity_type, [])
+
+    @classmethod
+    def build_csv_template(cls, entity_type: str) -> str:
+        headers = cls.get_template_headers(entity_type)
+        if not headers:
+            raise ValueError(f"Unsupported entity type: {entity_type}")
+
+        output = StringIO()
+        csv_writer = writer(output)
+        csv_writer.writerow(headers)
+        sample = cls.get_template_sample_row(entity_type)
+        if sample:
+            csv_writer.writerow(sample)
+        return output.getvalue()
 
     @staticmethod
     def _get_importer(entity_type: str, db: Session, config: ImportConfig):

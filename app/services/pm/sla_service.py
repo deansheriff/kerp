@@ -419,10 +419,12 @@ class ProjectSLAService:
             )
             if assigned_employee:
                 candidate_ids.add(assigned_employee.person_id)
-                manager = OrgResolver(self.db).get_manager(
+                resolver = OrgResolver(self.db)
+                manager = resolver.get_manager(
                     assigned_employee.employee_id,
                     self.organization_id,
                 )
+                resolver.notify_hr_for_vacancy_routing_alerts(self.organization_id)
                 if manager:
                     candidate_ids.add(manager.person_id)
 

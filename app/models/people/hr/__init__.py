@@ -33,7 +33,7 @@ from app.models.people.hr.employee_extended import (
 )
 from app.models.people.hr.employee_grade import EmployeeGrade
 from app.models.people.hr.employment_type import EmploymentType
-from app.models.people.hr.position import Position
+from app.models.people.hr.position import Position, PositionVacancyRoutingPolicy
 from app.models.people.hr.position_assignment import (
     PositionAssignment,
     PositionAssignmentType,
@@ -116,6 +116,7 @@ __all__ = [
     "EmploymentType",
     "Gender",
     "Position",
+    "PositionVacancyRoutingPolicy",
     "PositionAssignment",
     "PositionAssignmentType",
     # Lifecycle enums and models

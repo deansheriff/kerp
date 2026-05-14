@@ -540,6 +540,16 @@ def accept_offer(
     return recruit_web_service.accept_offer_response(auth, db, offer_id)
 
 
+@router.post("/offers/{offer_id}/convert")
+def convert_offer(
+    offer_id: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db),
+):
+    """Convert accepted offer to employee."""
+    return recruit_web_service.convert_offer_response(auth, db, offer_id)
+
+
 @router.post("/offers/{offer_id}/decline")
 async def decline_offer(
     request: Request,

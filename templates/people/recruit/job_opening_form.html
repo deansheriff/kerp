@@ -26,7 +26,7 @@
     {% endif %}
 
     <form method="post" action="/people/recruit/jobs/{% if opening %}{{ opening.job_opening_id }}/edit{% else %}new{% endif %}" class="space-y-6">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {{ request.state.csrf_form | safe }}
 
         {# Basic Information #}
         <div class="card">
@@ -131,9 +131,24 @@
                 </div>
 
                 <div>
-                    <label for="reports_to_id" class="form-label">Reports To</label>
+                    <label for="position_id" class="form-label">Position</label>
+                    <select name="position_id" id="position_id" class="form-input w-full">
+                        <option value="">Select Position</option>
+                        {% for item in positions %}
+                        {% set pos = item.position %}
+                        <option value="{{ pos.position_id }}"
+                            {{ 'selected' if (opening and opening.position_id == pos.position_id) or (form_data and form_data.position_id == pos.position_id | string) }}>
+                            {{ pos.position_code }} - {{ pos.position_name }}{% if position_parent_labels and position_parent_labels.get(pos.position_id | string) %} → {{ position_parent_labels[pos.position_id | string] }}{% endif %}{% if item.incumbent %} (currently {{ item.incumbent.full_name }}){% elif pos.is_vacant %} (vacant){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p class="form-hint mt-1 text-sm text-slate-500">Use the planned or vacant seat this opening will fill; reporting follows the selected position.</p>
+                </div>
+
+                <div>
+                    <label for="reports_to_id" class="form-label">Recruiting Owner</label>
                     <select name="reports_to_id" id="reports_to_id" class="form-input w-full">
-                        <option value="">Select Manager</option>
+                        <option value="">Select owner</option>
                         {% for mgr in managers %}
                         <option value="{{ mgr.employee_id }}"
                             {{ 'selected' if (opening and opening.reports_to_id == mgr.employee_id) or (form_data and form_data.reports_to_id == mgr.employee_id | string) }}>
@@ -141,6 +156,7 @@
                         </option>
                         {% endfor %}
                     </select>
+                    <p class="form-hint mt-1 text-sm text-slate-500">Optional recruiter-facing owner. The employee reporting line should come from the selected position.</p>
                 </div>
             </div>
         </div>

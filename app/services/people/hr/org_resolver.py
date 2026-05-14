@@ -35,7 +35,8 @@ The ``as_of`` parameter on every method enables historical resolution
 
 from __future__ import annotations
 
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from typing import Any
@@ -49,7 +50,18 @@ from app.models.people.hr import (
     Position,
     PositionAssignment,
     PositionAssignmentType,
+    PositionVacancyRoutingPolicy,
 )
+
+
+@dataclass(frozen=True)
+class VacancyRoutingAlert:
+    """Vacant position crossed while resolving with NOTIFY_HR_THEN_SKIP."""
+
+    organization_id: UUID
+    position_id: UUID
+    position_code: str
+    position_name: str
 
 
 class OrgResolver:
@@ -57,6 +69,7 @@ class OrgResolver:
 
     def __init__(self, db: Session) -> None:
         self.db = db
+        self._vacancy_routing_alerts: list[VacancyRoutingAlert] = []
 
     def get_manager(
         self,
@@ -121,15 +134,16 @@ class OrgResolver:
             if not position:
                 break
 
-            incumbent = None
-            if not position.is_vacant:
-                incumbent = self.get_position_incumbent(
-                    position.position_id,
-                    organization_id,
-                    as_of=as_of,
-                )
+            incumbent = self.get_position_incumbent(
+                position.position_id,
+                organization_id,
+                as_of=as_of,
+            )
             if incumbent:
                 chain.append(incumbent)
+
+            if not self._handle_vacant_position(position, organization_id):
+                break
 
             next_position_id = position.parent_position_id
 
@@ -235,15 +249,16 @@ class OrgResolver:
                 continue
             visited_position_ids.add(position.position_id)
 
-            incumbent = None
-            if not position.is_vacant:
-                incumbent = self.get_position_incumbent(
-                    position.position_id,
-                    organization_id,
-                    as_of=as_of,
-                )
+            incumbent = self.get_position_incumbent(
+                position.position_id,
+                organization_id,
+                as_of=as_of,
+            )
             if incumbent:
                 reports.append(incumbent)
+                continue
+
+            if not self._handle_vacant_position(position, organization_id):
                 continue
 
             positions_to_check.extend(
@@ -331,18 +346,116 @@ class OrgResolver:
             if not position:
                 return None
 
-            if not position.is_vacant:
-                incumbent = self.get_position_incumbent(
-                    position.position_id,
-                    organization_id,
-                    as_of=as_of,
-                )
-                if incumbent:
-                    return incumbent
+            incumbent = self.get_position_incumbent(
+                position.position_id,
+                organization_id,
+                as_of=as_of,
+            )
+            if incumbent:
+                return incumbent
+
+            if not self._handle_vacant_position(position, organization_id):
+                return None
 
             next_position_id = position.parent_position_id
 
         return None
+
+    def drain_vacancy_routing_alerts(self) -> list[VacancyRoutingAlert]:
+        """Return and clear accumulated NOTIFY_HR_THEN_SKIP vacancy events."""
+        alerts = self._vacancy_routing_alerts
+        self._vacancy_routing_alerts = []
+        return alerts
+
+    def notify_hr_for_vacancy_routing_alerts(
+        self,
+        organization_id: UUID,
+        *,
+        actor_id: UUID | None = None,
+    ) -> int:
+        """Create in-app HR alerts for accumulated vacancy routing events."""
+        alerts = self.drain_vacancy_routing_alerts()
+        if not alerts:
+            return 0
+
+        from app.models.notification import (
+            EntityType,
+            NotificationChannel,
+            NotificationType,
+        )
+        from app.models.person import Person
+        from app.models.rbac import PersonRole, Role
+        from app.services.notification import NotificationService
+
+        recipients = list(
+            self.db.scalars(
+                select(Person.id)
+                .join(PersonRole, PersonRole.person_id == Person.id)
+                .join(Role, Role.id == PersonRole.role_id)
+                .where(
+                    Person.organization_id == organization_id,
+                    Person.is_active.is_(True),
+                    Role.is_active.is_(True),
+                    Role.name.in_(["hr_manager", "hr_director", "admin"]),
+                )
+                .distinct()
+            ).all()
+        )
+        if not recipients:
+            return 0
+
+        unique_alerts = {alert.position_id: alert for alert in alerts}.values()
+        notification_service = NotificationService()
+        since = datetime.utcnow() - timedelta(hours=24)
+        created_count = 0
+        for alert in unique_alerts:
+            for recipient_id in recipients:
+                created = notification_service.create_if_not_sent_since(
+                    self.db,
+                    organization_id=organization_id,
+                    recipient_id=recipient_id,
+                    entity_type=EntityType.SYSTEM,
+                    entity_id=alert.position_id,
+                    notification_type=NotificationType.ALERT,
+                    title="Vacant position used in approval routing",
+                    message=(
+                        f"Position {alert.position_code} - {alert.position_name} "
+                        "is vacant and was skipped during approval routing."
+                    ),
+                    since=since,
+                    channel=NotificationChannel.IN_APP,
+                    action_url=f"/people/hr/positions/{alert.position_id}/edit",
+                    actor_id=actor_id,
+                )
+                if created is not None:
+                    created_count += 1
+        return created_count
+
+    def _handle_vacant_position(
+        self,
+        position: Position,
+        organization_id: UUID,
+    ) -> bool:
+        policy = getattr(
+            position,
+            "vacancy_routing_policy",
+            PositionVacancyRoutingPolicy.SKIP_UP,
+        )
+        if isinstance(policy, str):
+            try:
+                policy = PositionVacancyRoutingPolicy(policy)
+            except ValueError:
+                return True
+        if policy == PositionVacancyRoutingPolicy.NOTIFY_HR_THEN_SKIP:
+            self._vacancy_routing_alerts.append(
+                VacancyRoutingAlert(
+                    organization_id=organization_id,
+                    position_id=position.position_id,
+                    position_code=position.position_code,
+                    position_name=position.position_name,
+                )
+            )
+        return policy != PositionVacancyRoutingPolicy.BLOCK
 
     def _get_position(
         self,

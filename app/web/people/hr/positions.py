@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.models.people.hr import PositionAssignmentType
+from app.models.people.hr import PositionAssignmentType, PositionVacancyRoutingPolicy
 from app.services.common import PaginationParams, ServiceError, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.people.hr import (
@@ -24,8 +24,6 @@ from app.services.people.hr import (
 from app.services.people.hr.web.employee_web import DEFAULT_PAGE_SIZE, DROPDOWN_LIMIT
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
-
-from ._common import _parse_bool
 
 router = APIRouter(tags=["positions"])
 
@@ -55,16 +53,29 @@ def _form_uuid(form: Any, key: str) -> UUID | None:
 
 
 def _position_payload(form: Any) -> PositionCreateData:
+    position_code = _form_str(form, "position_code")
+    position_name = _form_str(form, "position_name")
     designation_id = _form_str(form, "designation_id")
     department_id = _form_str(form, "department_id")
     parent_position_id = _form_str(form, "parent_position_id")
+    vacancy_policy_raw = _form_str(form, "vacancy_routing_policy")
+    try:
+        vacancy_routing_policy = (
+            PositionVacancyRoutingPolicy(vacancy_policy_raw)
+            if vacancy_policy_raw
+            else PositionVacancyRoutingPolicy.SKIP_UP
+        )
+    except ValueError:
+        vacancy_routing_policy = PositionVacancyRoutingPolicy.SKIP_UP
     return PositionCreateData(
+        position_code=position_code or None,
+        position_name=position_name or None,
         designation_id=coerce_uuid(designation_id) if designation_id else None,
         department_id=coerce_uuid(department_id) if department_id else None,
         parent_position_id=coerce_uuid(parent_position_id)
         if parent_position_id
         else None,
-        is_vacant=_parse_bool(form.get("is_vacant")),
+        vacancy_routing_policy=vacancy_routing_policy,
     )
 
 
@@ -101,6 +112,7 @@ def _position_form_context(
         "assignments": position_svc.list_assignments(position_id) if is_edit else [],
         "employee_options": position_svc.list_employee_options() if is_edit else [],
         "assignment_types": list(PositionAssignmentType),
+        "vacancy_routing_policies": list(PositionVacancyRoutingPolicy),
         "errors": errors or {},
         "success": success,
         "error": error,
@@ -186,19 +198,24 @@ async def create_position(
         form = await request.form()
 
     payload = _position_payload(form)
-    if not payload.designation_id and not payload.department_id:
+    if not payload.position_name or (
+        not payload.designation_id and not payload.department_id
+    ):
         position = SimpleNamespace(**payload.__dict__)
+        errors = {}
+        if not payload.position_name:
+            errors["position_name"] = "Enter a position name"
+        if not payload.designation_id and not payload.department_id:
+            errors["designation_id"] = "Select a designation or department"
+            errors["department_id"] = "Select a designation or department"
         context = _position_form_context(
             request,
             auth,
             db,
             title="New Position",
             position=position,
-            errors={
-                "designation_id": "Select a designation or department",
-                "department_id": "Select a designation or department",
-            },
-            error="Select at least a designation or department.",
+            errors=errors,
+            error="Enter a position name and select at least a designation or department.",
         )
         return templates.TemplateResponse(
             request,
@@ -277,19 +294,24 @@ async def update_position(
 
     create_payload = _position_payload(form)
     payload = PositionUpdateData(**create_payload.__dict__)
-    if not payload.designation_id and not payload.department_id:
+    if not payload.position_name or (
+        not payload.designation_id and not payload.department_id
+    ):
         position = SimpleNamespace(position_id=position_id, **payload.__dict__)
+        errors = {}
+        if not payload.position_name:
+            errors["position_name"] = "Enter a position name"
+        if not payload.designation_id and not payload.department_id:
+            errors["designation_id"] = "Select a designation or department"
+            errors["department_id"] = "Select a designation or department"
         context = _position_form_context(
             request,
             auth,
             db,
             title="Edit Position",
             position=position,
-            errors={
-                "designation_id": "Select a designation or department",
-                "department_id": "Select a designation or department",
-            },
-            error="Select at least a designation or department.",
+            errors=errors,
+            error="Enter a position name and select at least a designation or department.",
         )
         return templates.TemplateResponse(
             request,

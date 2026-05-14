@@ -43,7 +43,12 @@ from app.models.forms import (
     FormFieldType,
 )
 from app.models.finance.core_org.organization import Organization
-from app.models.people.hr import EmployeeOnboarding
+from app.models.people.hr import (
+    EmployeeOnboarding,
+    Position,
+    PositionAssignment,
+    PositionAssignmentType,
+)
 from app.models.people.recruit import (
     ApplicantStatus,
     Interview,
@@ -214,6 +219,51 @@ class RecruitmentService:
             return currency_code
         return org_context_service.get_functional_currency(self.db, org_id)
 
+    def _position_primary_incumbent_id(
+        self,
+        org_id: UUID,
+        position_id: UUID,
+    ) -> UUID | None:
+        return self.db.scalar(
+            select(PositionAssignment.employee_id)
+            .where(
+                PositionAssignment.organization_id == org_id,
+                PositionAssignment.position_id == position_id,
+                PositionAssignment.assignment_type == PositionAssignmentType.PRIMARY,
+                PositionAssignment.end_date.is_(None),
+            )
+            .limit(1)
+        )
+
+    def _validate_job_opening_position_available(
+        self,
+        org_id: UUID,
+        position_id: UUID | None,
+    ) -> None:
+        if not position_id:
+            return
+
+        position_exists = self.db.scalar(
+            select(Position.position_id).where(
+                Position.organization_id == org_id,
+                Position.position_id == position_id,
+                Position.is_active.is_(True),
+            )
+        )
+        if not position_exists:
+            raise RecruitmentServiceError("Linked position was not found")
+
+        if self._position_primary_incumbent_id(org_id, position_id):
+            raise RecruitmentServiceError(
+                "Linked position is already filled; choose a vacant position "
+                "for this job opening"
+            )
+
+    @staticmethod
+    def _sync_job_opening_fill_status(opening: JobOpening) -> None:
+        if opening.positions_filled >= opening.number_of_positions:
+            opening.status = JobOpeningStatus.FILLED
+
     def _validate_pipeline_transition(
         self,
         current_status: ApplicantStatus,
@@ -306,6 +356,7 @@ class RecruitmentService:
         job_title: str,
         department_id: UUID | None = None,
         designation_id: UUID | None = None,
+        position_id: UUID | None = None,
         reports_to_id: UUID | None = None,
         number_of_positions: int = 1,
         posted_on: date | None = None,
@@ -324,6 +375,7 @@ class RecruitmentService:
         status: JobOpeningStatus = JobOpeningStatus.DRAFT,
     ) -> JobOpening:
         """Create a new job opening."""
+        self._validate_job_opening_position_available(org_id, position_id)
         resolved_currency_code = self._resolve_currency_code(org_id, currency_code)
         opening = JobOpening(
             organization_id=org_id,
@@ -331,6 +383,7 @@ class RecruitmentService:
             job_title=job_title,
             department_id=department_id,
             designation_id=designation_id,
+            position_id=position_id,
             reports_to_id=reports_to_id,
             number_of_positions=number_of_positions,
             posted_on=posted_on,
@@ -375,6 +428,12 @@ class RecruitmentService:
     ) -> JobOpening:
         """Update a job opening."""
         opening = self.get_job_opening(org_id, job_opening_id)
+        if (
+            "position_id" in kwargs
+            and kwargs["position_id"] is not None
+            and kwargs["position_id"] != opening.position_id
+        ):
+            self._validate_job_opening_position_available(org_id, kwargs["position_id"])
 
         for key, value in kwargs.items():
             if value is not None and hasattr(opening, key):
@@ -1535,6 +1594,17 @@ class RecruitmentService:
             )
 
         applicant = self.get_applicant(org_id, offer.applicant_id)
+        opening = (
+            self.db.get(JobOpening, offer.job_opening_id)
+            if offer.job_opening_id
+            else None
+        )
+        if opening and opening.position_id:
+            if self._position_primary_incumbent_id(org_id, opening.position_id):
+                raise RecruitmentServiceError(
+                    "Linked position is already filled; choose a vacant position "
+                    "before converting this offer"
+                )
 
         # Ensure a Person exists for the applicant
         person = self.db.scalar(select(Person).where(Person.email == applicant.email))
@@ -1572,6 +1642,7 @@ class RecruitmentService:
         employee_data = EmployeeCreateData(
             department_id=offer.department_id,
             designation_id=offer.designation_id,
+            position_id=opening.position_id if opening else None,
             date_of_joining=date_of_joining,
         )
         employee = employee_service.create_employee(person.id, employee_data)
@@ -1582,10 +1653,9 @@ class RecruitmentService:
         applicant.status = ApplicantStatus.HIRED
 
         # Increment positions filled on job opening
-        if offer.job_opening_id:
-            opening = self.db.get(JobOpening, offer.job_opening_id)
-            if opening:
-                opening.positions_filled += 1
+        if opening:
+            opening.positions_filled += 1
+            self._sync_job_opening_fill_status(opening)
 
         self.db.flush()
         fire_audit_event(
@@ -1610,11 +1680,11 @@ class RecruitmentService:
             onboarding_service = OnboardingService(self.db)
 
             # Use explicit manager, otherwise resolve through position hierarchy.
-            resolved_manager = (
-                OrgResolver(self.db).get_manager(employee.employee_id, org_id)
-                if not manager_id
-                else None
-            )
+            resolved_manager = None
+            if not manager_id:
+                resolver = OrgResolver(self.db)
+                resolved_manager = resolver.get_manager(employee.employee_id, org_id)
+                resolver.notify_hr_for_vacancy_routing_alerts(org_id)
             effective_manager_id = manager_id or (
                 resolved_manager.employee_id if resolved_manager else None
             )

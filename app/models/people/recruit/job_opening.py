@@ -34,6 +34,8 @@ from app.models.people.base import AuditMixin, ERPNextSyncMixin
 if TYPE_CHECKING:
     from app.models.people.hr.department import Department
     from app.models.people.hr.designation import Designation
+    from app.models.people.hr.employee import Employee
+    from app.models.people.hr.position import Position
     from app.models.people.recruit.job_applicant import JobApplicant
 
 
@@ -106,11 +108,18 @@ class JobOpening(Base, AuditMixin, ERPNextSyncMixin):
         ForeignKey("hr.designation.designation_id"),
         nullable=True,
     )
+    position_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("hr.position.position_id"),
+        nullable=True,
+        index=True,
+        comment="Planned or vacant position this opening fills",
+    )
     reports_to_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("hr.employee.employee_id"),
         nullable=True,
-        comment="Hiring manager",
+        comment="Compatibility hiring manager; prefer position.reporting line",
     )
 
     # Headcount
@@ -200,6 +209,11 @@ class JobOpening(Base, AuditMixin, ERPNextSyncMixin):
     # Relationships
     department: Mapped[Optional["Department"]] = relationship("Department")
     designation: Mapped[Optional["Designation"]] = relationship("Designation")
+    position: Mapped[Optional["Position"]] = relationship("Position")
+    reports_to: Mapped[Optional["Employee"]] = relationship(
+        "Employee",
+        foreign_keys=[reports_to_id],
+    )
     applicants: Mapped[list["JobApplicant"]] = relationship(
         "JobApplicant",
         back_populates="job_opening",

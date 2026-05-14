@@ -65,7 +65,7 @@ def _make_employee(
     return employee
 
 
-def test_generate_appraisals_uses_position_manager_when_legacy_manager_is_empty(
+def test_generate_appraisals_uses_position_manager_when_legacy_manager_is_stale(
     db_session,
 ):
     _ensure_position_appraisal_tables(db_session.bind)
@@ -82,15 +82,26 @@ def test_generate_appraisals_uses_position_manager_when_legacy_manager_is_empty(
         "EMP-001",
         date_of_joining=date(2025, 1, 1),
     )
+    legacy_manager = _make_employee(
+        db_session,
+        org_id,
+        "MGR-LEGACY",
+        date_of_joining=date(2025, 1, 1),
+    )
+    employee.reports_to_id = legacy_manager.employee_id
     manager_position = Position(
         position_id=uuid.uuid4(),
         organization_id=org_id,
+        position_code="MGR-POS",
+        position_name="Manager Position",
         is_vacant=False,
         is_active=True,
     )
     employee_position = Position(
         position_id=uuid.uuid4(),
         organization_id=org_id,
+        position_code="EMP-POS",
+        position_name="Employee Position",
         parent_position_id=manager_position.position_id,
         is_vacant=False,
         is_active=True,

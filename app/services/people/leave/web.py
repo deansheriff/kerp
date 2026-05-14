@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Any, cast
@@ -33,6 +34,17 @@ from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LeaveEmployeeOption:
+    """Employee dropdown option with position-resolved approver metadata."""
+
+    employee_id: UUID
+    employee_number: str
+    full_name: str
+    resolved_manager_id: UUID | None
+    resolved_manager_name: str
 
 
 class LeaveWebService:
@@ -89,15 +101,12 @@ class LeaveWebService:
         return str(value).strip()
 
     @staticmethod
-    def _get_employees(db: Session, org_id: UUID) -> list:
-        """Get active employees for dropdowns."""
-        return list(
+    def _get_employees(db: Session, org_id: UUID) -> list[LeaveEmployeeOption]:
+        """Get active employees for dropdowns with position-resolved managers."""
+        employees = list(
             db.scalars(
                 select(Employee)
-                .options(
-                    joinedload(Employee.person),
-                    joinedload(Employee.manager).joinedload(Employee.person),
-                )
+                .options(joinedload(Employee.person))
                 .where(
                     Employee.organization_id == org_id,
                     Employee.status == EmployeeStatus.ACTIVE,
@@ -105,6 +114,22 @@ class LeaveWebService:
                 .order_by(Employee.employee_code)
             ).all()
         )
+        resolver = OrgResolver(db)
+        options: list[LeaveEmployeeOption] = []
+        for employee in employees:
+            manager = resolver.get_manager(employee.employee_id, org_id)
+            options.append(
+                LeaveEmployeeOption(
+                    employee_id=employee.employee_id,
+                    employee_number=employee.employee_code,
+                    full_name=employee.full_name,
+                    resolved_manager_id=manager.employee_id if manager else None,
+                    resolved_manager_name=(
+                        manager.full_name if manager else "Not assigned"
+                    ),
+                )
+            )
+        return options
 
     @staticmethod
     def _resolve_employee_filter(
@@ -1051,11 +1076,11 @@ class LeaveWebService:
             half_day_date_str = LeaveWebService._get_form_str(form, "half_day_date")
 
             employee = db.get(Employee, coerce_uuid(employee_id))
+            resolver = OrgResolver(db)
             manager = (
-                OrgResolver(db).get_manager(employee.employee_id, org_id)
-                if employee
-                else None
+                resolver.get_manager(employee.employee_id, org_id) if employee else None
             )
+            resolver.notify_hr_for_vacancy_routing_alerts(org_id)
             leave_approver_id = manager.employee_id if manager else None
 
             application = svc.create_application(

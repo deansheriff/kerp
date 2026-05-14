@@ -181,10 +181,11 @@ class EmployeeService:
         Update an employee's manager through the canonical chokepoint.
 
         Updates the parent of the employee's active position so position
-        reads (OrgResolver) reflect the new manager. Direct writers (forms,
-        API, lifecycle transitions, recruit, import) call this instead of
-        touching the legacy ``reports_to_id`` column, which is no longer
-        read for any business logic.
+        reads (OrgResolver) reflect the new manager, and mirrors the value
+        into the legacy ``reports_to_id`` cache for older response shapes and
+        integrations. Direct writers (forms, API, lifecycle transitions,
+        recruit, import) call this instead of touching the legacy column
+        directly whenever they are changing one employee at a time.
 
         Skips ``validate_cycle`` for callers that have already validated, such
         as ``update_employee`` which checks before writing.
@@ -222,6 +223,7 @@ class EmployeeService:
             ):
                 raise InvalidManagerError()
 
+        employee.reports_to_id = manager_employee_id
         self._set_manager_position(employee_id, manager_employee_id)
 
     def _set_manager_position(
@@ -325,7 +327,10 @@ class EmployeeService:
 
         # Advanced filters are always additive to base tenant/deletion constraints.
         stmt, joined_person = apply_employee_filter_expression(
-            stmt, advanced_filter_expression
+            stmt,
+            advanced_filter_expression,
+            db=self.db,
+            organization_id=self.organization_id,
         )
 
         if filters.is_active is not None and not filters.status:
@@ -344,29 +349,17 @@ class EmployeeService:
             stmt = stmt.where(Employee.designation_id == filters.designation_id)
 
         if filters.reports_to_id:
-            manager_position_subq = (
-                select(PositionAssignment.position_id)
-                .where(
-                    PositionAssignment.organization_id == self.organization_id,
-                    PositionAssignment.employee_id == filters.reports_to_id,
-                    PositionAssignment.assignment_type
-                    == PositionAssignmentType.PRIMARY,
-                    PositionAssignment.end_date.is_(None),
+            report_ids = [
+                employee.employee_id
+                for employee in OrgResolver(self.db).get_direct_reports(
+                    filters.reports_to_id,
+                    self.organization_id,
                 )
-                .scalar_subquery()
-            )
-            direct_report_subq = (
-                select(PositionAssignment.employee_id)
-                .join(Position, Position.position_id == PositionAssignment.position_id)
-                .where(
-                    PositionAssignment.organization_id == self.organization_id,
-                    Position.parent_position_id == manager_position_subq,
-                    PositionAssignment.assignment_type
-                    == PositionAssignmentType.PRIMARY,
-                    PositionAssignment.end_date.is_(None),
-                )
-            )
-            stmt = stmt.where(Employee.employee_id.in_(direct_report_subq))
+            ]
+            if report_ids:
+                stmt = stmt.where(Employee.employee_id.in_(report_ids))
+            else:
+                stmt = stmt.where(Employee.employee_id.is_(None))
 
         if filters.expense_approver_id:
             stmt = stmt.where(
@@ -800,7 +793,9 @@ class EmployeeService:
 
         self.db.add(employee)
         self.db.flush()
-        if data.reports_to_id:
+        if data.position_id:
+            self._assign_initial_position(employee, data.position_id)
+        elif data.reports_to_id:
             self.set_manager(
                 employee.employee_id,
                 data.reports_to_id,
@@ -829,6 +824,56 @@ class EmployeeService:
         )
 
         return employee
+
+    def _assign_initial_position(
+        self,
+        employee: Employee,
+        position_id: uuid.UUID,
+    ) -> None:
+        """Assign a new employee to an existing position without auto-provisioning."""
+        position = self.db.scalar(
+            select(Position).where(
+                Position.position_id == position_id,
+                Position.organization_id == self.organization_id,
+                Position.is_active.is_(True),
+            )
+        )
+        if not position:
+            raise ValidationError(f"Position with ID {position_id} not found")
+
+        existing_position_assignment = self.db.scalar(
+            select(PositionAssignment.position_assignment_id).where(
+                PositionAssignment.organization_id == self.organization_id,
+                PositionAssignment.position_id == position_id,
+                PositionAssignment.assignment_type == PositionAssignmentType.PRIMARY,
+                PositionAssignment.end_date.is_(None),
+            )
+        )
+        if existing_position_assignment:
+            raise ValidationError("Position already has an active primary assignment")
+
+        existing_employee_assignment = self.db.scalar(
+            select(PositionAssignment.position_assignment_id).where(
+                PositionAssignment.organization_id == self.organization_id,
+                PositionAssignment.employee_id == employee.employee_id,
+                PositionAssignment.assignment_type == PositionAssignmentType.PRIMARY,
+                PositionAssignment.end_date.is_(None),
+            )
+        )
+        if existing_employee_assignment:
+            raise ValidationError("Employee already has an active primary position")
+
+        self.db.add(
+            PositionAssignment(
+                organization_id=self.organization_id,
+                employee_id=employee.employee_id,
+                position_id=position_id,
+                assignment_type=PositionAssignmentType.PRIMARY,
+                start_date=employee.date_of_joining or date.today(),
+            )
+        )
+        position.is_vacant = False
+        self.db.flush()
 
     def ensure_local_user_credentials_for_employee(
         self,
@@ -961,10 +1006,7 @@ class EmployeeService:
                 )
             employee.employee_code = data.employee_number
 
-        if (
-            data.reports_to_id is not None
-            and data.reports_to_id != employee.reports_to_id
-        ):
+        if data.reports_to_id is not None:
             self.set_manager(employee_id, data.reports_to_id)
         elif use_provided_fields and "reports_to_id" in provided_fields:
             self.set_manager(employee_id, None)

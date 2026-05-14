@@ -56,16 +56,22 @@
                         <tr class="group">
                             <td>
                                 <div class="font-medium text-slate-900 dark:text-white">
-                                    {{ position.designation.designation_name if position.designation else 'Unspecified position' }}
+                                    {{ position.position_name }}
                                 </div>
-                                <div class="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">{{ position.position_id }}</div>
+                                <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                    <span class="font-mono">{{ position.position_code }}</span>
+                                    {% if position.designation %}
+                                    <span>{{ position.designation.designation_name }}</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td class="text-slate-600 dark:text-slate-300">
                                 {{ position.department.department_name if position.department else '-' }}
                             </td>
                             <td class="text-slate-600 dark:text-slate-300">
                                 {% if parent %}
-                                    {{ parent.designation.designation_name if parent.designation else 'Unspecified position' }}
+                                    {{ parent.position_name }}
+                                    <span class="block font-mono text-xs text-slate-500 dark:text-slate-400">{{ parent.position_code }}</span>
                                     {% if parent.department %}
                                     <span class="block text-xs text-slate-500 dark:text-slate-400">{{ parent.department.department_name }}</span>
                                     {% endif %}
@@ -84,7 +90,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                {% if position.is_vacant %}
+                                {% if not row.incumbent %}
                                 <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Vacant</span>
                                 {% else %}
                                 <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Filled</span>

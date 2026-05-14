@@ -137,11 +137,15 @@ def _wire_manager_via_position(
     manager_position = Position(
         position_id=uuid4(),
         organization_id=org_id,
+        position_code=f"MGR-{uuid4().hex[:8].upper()}",
+        position_name="Manager Position",
         is_vacant=False,
     )
     employee_position = Position(
         position_id=uuid4(),
         organization_id=org_id,
+        position_code=f"EMP-{uuid4().hex[:8].upper()}",
+        position_name="Employee Position",
         parent_position_id=manager_position.position_id,
         is_vacant=False,
     )

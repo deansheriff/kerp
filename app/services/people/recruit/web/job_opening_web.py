@@ -23,6 +23,7 @@ from app.services.people.hr import (
     EmployeeFilters,
     EmployeeService,
     OrganizationService,
+    PositionService,
 )
 from app.services.people.recruit import RecruitmentService
 from app.templates import templates
@@ -111,6 +112,31 @@ class JobOpeningWebService:
             EmployeeFilters(status=EmployeeStatus.ACTIVE),
             PaginationParams(limit=500),
         ).items
+        positions = (
+            PositionService(db, organization_id)
+            .list_position_summaries(
+                pagination=PaginationParams(limit=500),
+            )
+            .items
+        )
+        positions_by_id = {
+            item.position.position_id: item.position for item in positions
+        }
+        position_parent_labels = {}
+        for item in positions:
+            parent_id = item.position.parent_position_id
+            if parent_id and parent_id in positions_by_id:
+                parent = positions_by_id[parent_id]
+                position_parent_labels[str(item.position.position_id)] = (
+                    f"{parent.position_code} - {parent.position_name}"
+                )
+        positions.sort(
+            key=lambda item: (
+                item.incumbent is not None,
+                item.position.position_code or "",
+                item.position.position_name or "",
+            )
+        )
 
         opening = None
         application_form = None
@@ -136,6 +162,8 @@ class JobOpeningWebService:
             "departments": departments,
             "designations": designations,
             "managers": managers,
+            "positions": positions,
+            "position_parent_labels": position_parent_labels,
             "application_form": application_form
             or FormEngineService(db).serialize_version(None),
             "form_data": {},
@@ -160,10 +188,25 @@ class JobOpeningWebService:
             job_opening_id=coerce_uuid(job_opening_id),
             pagination=PaginationParams(limit=1),
         )
+        parent_position = None
+        position_incumbent = None
+        if opening.position:
+            if opening.position.parent_position_id:
+                parent_position = PositionService(db, organization_id).get_position(
+                    opening.position.parent_position_id
+                )
+            position_incumbent = PositionService(
+                db, organization_id
+            ).resolver.get_position_incumbent(
+                opening.position.position_id,
+                organization_id,
+            )
 
         return {
             "opening": opening,
             "applicants_count": applicants.total,
+            "parent_position": parent_position,
+            "position_incumbent": position_incumbent,
         }
 
     @staticmethod
@@ -177,6 +220,9 @@ class JobOpeningWebService:
             else None,
             "designation_id": coerce_uuid(form_data["designation_id"])
             if form_data.get("designation_id")
+            else None,
+            "position_id": coerce_uuid(form_data["position_id"])
+            if form_data.get("position_id")
             else None,
             "reports_to_id": coerce_uuid(form_data["reports_to_id"])
             if form_data.get("reports_to_id")

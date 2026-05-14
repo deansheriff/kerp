@@ -19,6 +19,9 @@ from app.models.people.hr import (
     Employee,
     EmployeeStatus,
     EmploymentType,
+    Position,
+    PositionAssignment,
+    PositionAssignmentType,
 )
 from app.models.person import Person
 from app.services.finance.import_export.base import BaseImporter, FieldMapping
@@ -309,6 +312,7 @@ class EmployeeImporter(BaseImporter[Employee]):
             FieldMapping(
                 "Employment Type Code", "employment_type_code", required=False
             ),
+            FieldMapping("Position Code", "position_code", required=False),
             FieldMapping("Reports To Code", "reports_to_code", required=False),
             FieldMapping(
                 "Expense Approver Code", "expense_approver_code", required=False
@@ -420,6 +424,24 @@ class EmployeeImporter(BaseImporter[Employee]):
             return employee.employee_id
         return None
 
+    def _resolve_position_id(self, code: str | None) -> UUID | None:
+        if not code:
+            return None
+        cache_key = f"position:{code}"
+        if cache_key in self._id_cache:
+            return self._id_cache[cache_key]
+        position = self.db.scalar(
+            select(Position).where(
+                Position.organization_id == self.config.organization_id,
+                Position.position_code == code,
+                Position.is_active.is_(True),
+            )
+        )
+        if position:
+            self._id_cache[cache_key] = position.position_id
+            return position.position_id
+        return None
+
     def _resolve_cost_center_id(self, code: str | None) -> UUID | None:
         if not code:
             return None
@@ -481,6 +503,7 @@ class EmployeeImporter(BaseImporter[Employee]):
         employment_type_id = self._resolve_employment_type_id(
             row.get("employment_type_code")
         )
+        position_id = self._resolve_position_id(row.get("position_code"))
         reports_to_id = self._resolve_employee_id(row.get("reports_to_code"))
         expense_approver_id = self._resolve_employee_id(
             row.get("expense_approver_code")
@@ -495,6 +518,8 @@ class EmployeeImporter(BaseImporter[Employee]):
             raise ValueError(
                 f"Employment Type not found: {row.get('employment_type_code')}"
             )
+        if row.get("position_code") and not position_id:
+            raise ValueError(f"Position not found: {row.get('position_code')}")
         if row.get("reports_to_code") and not reports_to_id:
             raise ValueError(f"Manager not found: {row.get('reports_to_code')}")
         if row.get("expense_approver_code") and not expense_approver_id:
@@ -520,8 +545,33 @@ class EmployeeImporter(BaseImporter[Employee]):
             personal_phone=row.get("phone"),
             personal_email=None,
         )
+        if position_id:
+            self._assign_position(employee, position_id)
         self._imported_employee_ids.append(employee.employee_id)
         return employee
+
+    def _assign_position(self, employee: Employee, position_id: UUID) -> None:
+        existing_position_assignment = self.db.scalar(
+            select(PositionAssignment.position_assignment_id).where(
+                PositionAssignment.organization_id == self.config.organization_id,
+                PositionAssignment.position_id == position_id,
+                PositionAssignment.assignment_type == PositionAssignmentType.PRIMARY,
+                PositionAssignment.end_date.is_(None),
+            )
+        )
+        if existing_position_assignment:
+            raise ValueError("Position already has an active primary assignment")
+
+        self.db.add(
+            PositionAssignment(
+                position_assignment_id=uuid4(),
+                organization_id=self.config.organization_id,
+                employee_id=employee.employee_id,
+                position_id=position_id,
+                assignment_type=PositionAssignmentType.PRIMARY,
+                start_date=employee.date_of_joining,
+            )
+        )
 
     def reconcile_positions(self):
         """

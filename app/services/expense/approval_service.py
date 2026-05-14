@@ -243,10 +243,12 @@ class ExpenseApprovalService:
         else:
             from app.services.people.hr.org_resolver import OrgResolver
 
-            initial_approver = OrgResolver(self.db).get_manager(
+            resolver = OrgResolver(self.db)
+            initial_approver = resolver.get_manager(
                 employee.employee_id,
                 org_id,
             )
+            resolver.notify_hr_for_vacancy_routing_alerts(org_id)
 
         if initial_approver:
             manager_limit = self._get_approver_max_amount(org_id, initial_approver)
@@ -508,10 +510,12 @@ class ExpenseApprovalService:
         if current_approver:
             from app.services.people.hr.org_resolver import OrgResolver
 
-            manager = OrgResolver(self.db).get_manager(
+            resolver = OrgResolver(self.db)
+            manager = resolver.get_manager(
                 current_approver.employee_id,
                 org_id,
             )
+            resolver.notify_hr_for_vacancy_routing_alerts(org_id)
             if manager:
                 return manager.employee_id
 
@@ -744,10 +748,12 @@ class ExpenseApprovalService:
             if base:
                 base_employee = base
 
-        chain = OrgResolver(self.db).get_approval_chain(
+        resolver = OrgResolver(self.db)
+        chain = resolver.get_approval_chain(
             base_employee.employee_id,
             organization_id,
         )
+        resolver.notify_hr_for_vacancy_routing_alerts(organization_id)
         for manager in chain[:5]:  # Max 5 levels of escalation
             if manager.employee_id in exclude_ids:
                 continue

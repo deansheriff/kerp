@@ -686,10 +686,12 @@ class InfoChangeService:
         employee_name = employee.full_name or employee.employee_code
 
         # Notify the employee's position manager if they have one.
-        manager = OrgResolver(self.db).get_manager(
+        resolver = OrgResolver(self.db)
+        manager = resolver.get_manager(
             employee.employee_id,
             request.organization_id,
         )
+        resolver.notify_hr_for_vacancy_routing_alerts(request.organization_id)
         if manager and manager.person_id:
             try:
                 self.notification_service.create(

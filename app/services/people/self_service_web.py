@@ -450,7 +450,9 @@ class SelfServiceWebService:
         if employee_id:
             employee = db.get(Employee, employee_id)
             if employee and default_approver_id is None:
-                manager = OrgResolver(db).get_manager(employee.employee_id, org_id)
+                resolver = OrgResolver(db)
+                manager = resolver.get_manager(employee.employee_id, org_id)
+                resolver.notify_hr_for_vacancy_routing_alerts(org_id)
                 default_approver_id = manager.employee_id if manager else None
 
         rows = db.execute(

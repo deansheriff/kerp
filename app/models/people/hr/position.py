@@ -7,10 +7,20 @@ First-class organizational positions independent of employee incumbents.
 from __future__ import annotations
 
 import uuid
+import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Index, func, text
+from sqlalchemy import (
+    Boolean,
+    Enum as SQLEnum,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +34,14 @@ if TYPE_CHECKING:
     from app.models.people.hr.position_assignment import PositionAssignment
 
 
+class PositionVacancyRoutingPolicy(str, enum.Enum):
+    """How routing behaves when this position is vacant."""
+
+    SKIP_UP = "SKIP_UP"
+    BLOCK = "BLOCK"
+    NOTIFY_HR_THEN_SKIP = "NOTIFY_HR_THEN_SKIP"
+
+
 class Position(Base, AuditMixin):
     """
     Organizational position.
@@ -34,6 +52,11 @@ class Position(Base, AuditMixin):
 
     __tablename__ = "position"
     __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "position_code",
+            name="uq_hr_position_org_code",
+        ),
         Index("idx_hr_position_org_parent", "organization_id", "parent_position_id"),
         Index("idx_hr_position_org_department", "organization_id", "department_id"),
         Index("idx_hr_position_org_designation", "organization_id", "designation_id"),
@@ -51,6 +74,14 @@ class Position(Base, AuditMixin):
         ForeignKey("core_org.organization.organization_id"),
         nullable=False,
         index=True,
+    )
+    position_code: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+    )
+    position_name: Mapped[str] = mapped_column(
+        String(160),
+        nullable=False,
     )
     designation_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -72,6 +103,17 @@ class Position(Base, AuditMixin):
         nullable=False,
         default=True,
         server_default=text("true"),
+    )
+    vacancy_routing_policy: Mapped[PositionVacancyRoutingPolicy] = mapped_column(
+        SQLEnum(
+            PositionVacancyRoutingPolicy,
+            name="position_vacancy_routing_policy",
+            native_enum=False,
+            length=32,
+        ),
+        nullable=False,
+        default=PositionVacancyRoutingPolicy.SKIP_UP,
+        server_default=text("'SKIP_UP'"),
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean,

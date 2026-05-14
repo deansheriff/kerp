@@ -616,6 +616,22 @@ COLUMN_ALIASES: dict[str, list[str]] = {
         "Employment Type",
         "Employment Type Name",
     ],
+    "position_code": [
+        "Position Code",
+        "Position ID",
+        "Seat Code",
+    ],
+    "reports_to_code": [
+        "Reports To Code",
+        "Manager Code",
+        "Line Manager Code",
+        "Supervisor Code",
+    ],
+    "expense_approver_code": [
+        "Expense Approver Code",
+        "Approver Code",
+        "Expense Manager Code",
+    ],
     "employee_code": [
         "Employee Code",
         "Employee ID",

@@ -37,17 +37,27 @@
             <div class="flex items-center gap-2 flex-wrap">
                 <a href="/people/hr/positions/{{ node.position_id }}/edit"
                    class="text-sm font-medium text-slate-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
-                    {{ node.designation_name if node.designation_name else 'Untitled Position' }}
+                    {{ node.position_name if node.position_name else 'Untitled Position' }}
                 </a>
+                <span class="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    {{ node.position_code }}
+                </span>
                 {% if node.is_vacant %}
                 <span class="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                     Vacant
                 </span>
                 {% endif %}
+                {% if node.covering_assignments %}
+                <span class="text-xs font-medium px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                    Covered
+                </span>
+                {% endif %}
             </div>
-            {% if node.department_name %}
+            {% if node.designation_name or node.department_name %}
             <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {{ node.department_name }}
+                {% if node.designation_name %}{{ node.designation_name }}{% endif %}
+                {% if node.designation_name and node.department_name %} / {% endif %}
+                {% if node.department_name %}{{ node.department_name }}{% endif %}
             </div>
             {% endif %}
             <div class="text-sm mt-1">
@@ -62,6 +72,18 @@
                 <span class="text-slate-500 dark:text-slate-400">—</span>
                 {% endif %}
             </div>
+            {% if node.covering_assignments %}
+            <div class="mt-2 flex flex-wrap gap-2">
+                {% for assignment in node.covering_assignments %}
+                <a href="/people/hr/employees/{{ assignment.employee_id }}"
+                   class="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:border-sky-300 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/40">
+                    <span>{{ assignment.assignment_type.value | title }}</span>
+                    <span aria-hidden="true">•</span>
+                    <span>{{ assignment.employee_name if assignment.employee_name else 'Unnamed' }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
     </div>
     {% if node.children %}

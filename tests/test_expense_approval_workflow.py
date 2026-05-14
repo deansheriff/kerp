@@ -10,6 +10,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse
 
 from app.models.expense import (
+    ExpenseApproverLimit,
     ExpenseCategory,
     ExpenseClaim,
     ExpenseClaimAction,
@@ -18,11 +19,18 @@ from app.models.expense import (
     ExpenseClaimApprovalStep,
     ExpenseClaimItem,
     ExpenseClaimStatus,
+    ExpenseLimitRule,
 )
 from app.models.people.hr.department import Department
 from app.models.people.hr.employee import Employee, EmployeeStatus
+from app.models.people.hr.position import Position
+from app.models.people.hr.position_assignment import (
+    PositionAssignment,
+    PositionAssignmentType,
+)
 from app.models.person import Person
 from app.services.expense import (
+    ExpenseApprovalService,
     ExpenseClaimsWebService,
     ExpenseService,
     ExpenseServiceError,
@@ -31,7 +39,14 @@ from app.web.deps import WebAuthContext
 
 
 def _ensure_hr_tables(engine) -> None:
-    for table in (Department.__table__, Employee.__table__):
+    for table in (
+        Department.__table__,
+        Employee.__table__,
+        Position.__table__,
+        PositionAssignment.__table__,
+        ExpenseApproverLimit.__table__,
+        ExpenseLimitRule.__table__,
+    ):
         for column in table.columns:
             default = column.server_default
             if default is None:
@@ -40,6 +55,71 @@ def _ensure_hr_tables(engine) -> None:
             if "gen_random_uuid" in default_text or "uuid_generate" in default_text:
                 column.server_default = None
         table.create(engine, checkfirst=True)
+
+
+def _wire_manager_via_position(
+    db_session,
+    org_id: uuid.UUID,
+    *,
+    employee: Employee,
+    manager: Employee,
+) -> None:
+    short_id = uuid.uuid4().hex[:8].upper()
+    manager_position = Position(
+        position_id=uuid.uuid4(),
+        organization_id=org_id,
+        position_code=f"MGR-{short_id}",
+        position_name=f"Manager Position {short_id}",
+        is_vacant=False,
+    )
+    employee_position = Position(
+        position_id=uuid.uuid4(),
+        organization_id=org_id,
+        position_code=f"EMP-{short_id}",
+        position_name=f"Employee Position {short_id}",
+        parent_position_id=manager_position.position_id,
+        is_vacant=False,
+    )
+    db_session.add_all([manager_position, employee_position])
+    db_session.flush()
+    db_session.add_all(
+        [
+            PositionAssignment(
+                position_assignment_id=uuid.uuid4(),
+                organization_id=org_id,
+                employee_id=manager.employee_id,
+                position_id=manager_position.position_id,
+                assignment_type=PositionAssignmentType.PRIMARY,
+                start_date=date.today(),
+            ),
+            PositionAssignment(
+                position_assignment_id=uuid.uuid4(),
+                organization_id=org_id,
+                employee_id=employee.employee_id,
+                position_id=employee_position.position_id,
+                assignment_type=PositionAssignmentType.PRIMARY,
+                start_date=date.today(),
+            ),
+        ]
+    )
+    db_session.flush()
+
+
+def _make_approver_limit(
+    org_id: uuid.UUID,
+    employee_id: uuid.UUID,
+    amount: Decimal,
+) -> ExpenseApproverLimit:
+    return ExpenseApproverLimit(
+        approver_limit_id=uuid.uuid4(),
+        organization_id=org_id,
+        scope_type="EMPLOYEE",
+        scope_id=employee_id,
+        max_approval_amount=amount,
+        currency_code="NGN",
+        dimension_filters="{}",
+        is_active=True,
+    )
 
 
 def _make_person(org_id: uuid.UUID, email: str) -> Person:
@@ -247,6 +327,151 @@ def test_multi_approval_claim_remains_pending_until_all_steps_complete(
         ).all()
     )
     assert [step.decision for step in steps] == ["APPROVED", "APPROVED"]
+
+
+def test_expense_approval_chain_uses_position_manager_when_legacy_manager_empty(
+    db_session,
+    engine,
+):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant-position@example.com")
+    manager_person = _make_person(org_id, "manager-position@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-POS-001")
+    manager = _make_employee(org_id, manager_person, "MGR-POS-001")
+    claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-POS-001",
+        amount=Decimal("250.00"),
+    )
+
+    db_session.add_all([claimant_person, manager_person, claimant, manager, claim])
+    db_session.flush()
+    _wire_manager_via_position(
+        db_session,
+        org_id,
+        employee=claimant,
+        manager=manager,
+    )
+    db_session.add(_make_approver_limit(org_id, manager.employee_id, Decimal("500.00")))
+    db_session.commit()
+
+    chain = ExpenseApprovalService(db_session).get_approval_chain(
+        claim,
+        force_rebuild=True,
+    )
+
+    assert chain.total_steps == 1
+    assert chain.steps[0].approver_id == manager.employee_id
+    assert chain.steps[0].is_escalation is False
+
+
+def test_expense_approval_chain_escalates_via_expense_approver_position_manager(
+    db_session,
+    engine,
+):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant-escalation@example.com")
+    approver_person = _make_person(org_id, "approver-escalation@example.com")
+    director_person = _make_person(org_id, "director-escalation@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-ESC-001")
+    approver = _make_employee(org_id, approver_person, "APR-ESC-001")
+    director = _make_employee(org_id, director_person, "DIR-ESC-001")
+    claimant.expense_approver_id = approver.employee_id
+    claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-ESC-001",
+        amount=Decimal("750.00"),
+    )
+
+    db_session.add_all(
+        [
+            claimant_person,
+            approver_person,
+            director_person,
+            claimant,
+            approver,
+            director,
+            claim,
+        ]
+    )
+    db_session.flush()
+    _wire_manager_via_position(
+        db_session,
+        org_id,
+        employee=approver,
+        manager=director,
+    )
+    db_session.add_all(
+        [
+            _make_approver_limit(org_id, approver.employee_id, Decimal("100.00")),
+            _make_approver_limit(org_id, director.employee_id, Decimal("1000.00")),
+        ]
+    )
+    db_session.commit()
+
+    chain = ExpenseApprovalService(db_session).get_approval_chain(
+        claim,
+        force_rebuild=True,
+    )
+
+    assert chain.total_steps == 1
+    assert chain.steps[0].approver_id == director.employee_id
+    assert chain.steps[0].is_escalation is True
+
+
+def test_manual_expense_escalation_uses_current_approver_position_manager(
+    db_session,
+    engine,
+):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    approver_person = _make_person(org_id, "manual-approver@example.com")
+    manager_person = _make_person(org_id, "manual-manager@example.com")
+    claimant_person = _make_person(org_id, "manual-claimant@example.com")
+    approver = _make_employee(org_id, approver_person, "APR-MAN-001")
+    manager = _make_employee(org_id, manager_person, "MGR-MAN-001")
+    claimant = _make_employee(org_id, claimant_person, "EMP-MAN-001")
+    claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-MAN-001",
+        amount=Decimal("900.00"),
+    )
+
+    db_session.add_all(
+        [
+            approver_person,
+            manager_person,
+            claimant_person,
+            approver,
+            manager,
+            claimant,
+            claim,
+            _make_approver_limit(org_id, approver.employee_id, Decimal("100.00")),
+        ]
+    )
+    db_session.flush()
+    _wire_manager_via_position(
+        db_session,
+        org_id,
+        employee=approver,
+        manager=manager,
+    )
+    db_session.commit()
+
+    escalated_to = ExpenseApprovalService(db_session).escalate_approval(
+        claim,
+        approver.employee_id,
+    )
+
+    assert escalated_to == manager.employee_id
 
 
 def test_resubmit_preserves_prior_approval_round_and_submit_creates_new_round(

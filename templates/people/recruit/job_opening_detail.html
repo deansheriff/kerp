@@ -85,21 +85,21 @@
             <div class="flex flex-wrap gap-3">
                 {% if opening.status.value == 'DRAFT' %}
                 <form method="post" action="/people/recruit/jobs/{{ opening.job_opening_id }}/publish">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    {{ request.state.csrf_form | safe }}
                     <button type="submit" class="btn btn-primary">Publish Job</button>
                 </form>
                 {% elif opening.status.value == 'OPEN' %}
                 <form method="post" action="/people/recruit/jobs/{{ opening.job_opening_id }}/hold">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    {{ request.state.csrf_form | safe }}
                     <button type="submit" class="btn btn-secondary">Put On Hold</button>
                 </form>
                 <form method="post" action="/people/recruit/jobs/{{ opening.job_opening_id }}/close">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    {{ request.state.csrf_form | safe }}
                     <button type="submit" class="btn btn-secondary">Close Job</button>
                 </form>
                 {% elif opening.status.value == 'ON_HOLD' %}
                 <form method="post" action="/people/recruit/jobs/{{ opening.job_opening_id }}/reopen">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    {{ request.state.csrf_form | safe }}
                     <button type="submit" class="btn btn-primary">Reopen Job</button>
                 </form>
                 {% endif %}
@@ -110,7 +110,7 @@
                     Applicant Report
                 </a>
                 <form method="post" action="/people/recruit/jobs/{{ opening.job_opening_id }}/delete" onsubmit="return confirm('Delete this job opening? This cannot be undone.');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    {{ request.state.csrf_form | safe }}
                     <button type="submit" class="btn btn-danger" {% if applicants_count and applicants_count > 0 %}disabled title="Cannot delete job opening with applicants"{% endif %}>
                         Delete
                     </button>
@@ -142,7 +142,31 @@
                         <dd class="text-slate-900 dark:text-white">{{ opening.designation.designation_name if opening.designation else '-' }}</dd>
                     </div>
                     <div class="flex justify-between">
-                        <dt class="text-slate-500 dark:text-slate-400">Reports To</dt>
+                        <dt class="text-slate-500 dark:text-slate-400">Position</dt>
+                        <dd class="text-slate-900 dark:text-white">
+                            {% if opening.position %}
+                            {{ opening.position.position_code }} - {{ opening.position.position_name }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500 dark:text-slate-400">Reports To Position</dt>
+                        <dd class="text-slate-900 dark:text-white">
+                            {% if parent_position %}
+                            {{ parent_position.position_code }} - {{ parent_position.position_name }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500 dark:text-slate-400">Current Incumbent</dt>
+                        <dd class="text-slate-900 dark:text-white">{{ position_incumbent.full_name if position_incumbent else '-' }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500 dark:text-slate-400">Recruiting Owner</dt>
                         <dd class="text-slate-900 dark:text-white">{{ opening.reports_to.full_name if opening.reports_to else '-' }}</dd>
                     </div>
                     {% if opening.min_experience_years %}

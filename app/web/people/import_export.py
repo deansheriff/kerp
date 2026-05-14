@@ -7,7 +7,7 @@ HTML template routes for HR data import functionality.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web.import_web import hr_import_web_service
@@ -69,12 +69,32 @@ def hr_import_form(
     # Wizard context
     context["preview_url"] = f"/people/import/{entity_type}/preview"
     context["import_url"] = f"/people/import/{entity_type}"
+    context["template_url"] = f"/people/import/{entity_type}/template"
     context["cancel_url"] = "/people/import"
     context["alias_map"] = build_alias_map()
     context["target_fields"] = _build_target_fields(columns)
     context["accent_color"] = "blue"
     return templates.TemplateResponse(
         request, "people/import_export/import_form.html", context
+    )
+
+
+@router.get("/{entity_type}/template")
+def hr_import_template(
+    entity_type: str,
+    auth: WebAuthContext = Depends(require_hr_access),
+):
+    """Download a CSV template for a specific HR import type."""
+    try:
+        content = hr_import_web_service.build_csv_template(entity_type)
+    except ValueError as exc:
+        return JSONResponse(content={"detail": str(exc)}, status_code=404)
+
+    filename = f"hr_{entity_type}_template.csv"
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

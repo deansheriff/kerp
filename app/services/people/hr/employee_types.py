@@ -173,6 +173,7 @@ class EmployeeCreateData:
     # Organization structure (UUIDs)
     department_id: uuid.UUID | None = None
     designation_id: uuid.UUID | None = None
+    position_id: uuid.UUID | None = None
     employment_type_id: uuid.UUID | None = None
     grade_id: uuid.UUID | None = None
     reports_to_id: uuid.UUID | None = None

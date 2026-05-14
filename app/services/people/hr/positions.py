@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -17,6 +17,7 @@ from app.models.people.hr import (
     Position,
     PositionAssignment,
     PositionAssignmentType,
+    PositionVacancyRoutingPolicy,
 )
 from app.models.person import Person
 from app.services.common import (
@@ -34,20 +35,28 @@ from app.services.people.hr.org_resolver import OrgResolver
 class PositionCreateData:
     """Data for creating a position."""
 
+    position_code: str | None = None
+    position_name: str | None = None
     designation_id: UUID | None = None
     department_id: UUID | None = None
     parent_position_id: UUID | None = None
-    is_vacant: bool = True
+    vacancy_routing_policy: PositionVacancyRoutingPolicy = (
+        PositionVacancyRoutingPolicy.SKIP_UP
+    )
 
 
 @dataclass
 class PositionUpdateData:
     """Data for updating a position."""
 
+    position_code: str | None = None
+    position_name: str | None = None
     designation_id: UUID | None = None
     department_id: UUID | None = None
     parent_position_id: UUID | None = None
-    is_vacant: bool | None = None
+    vacancy_routing_policy: PositionVacancyRoutingPolicy = (
+        PositionVacancyRoutingPolicy.SKIP_UP
+    )
 
 
 @dataclass
@@ -78,15 +87,28 @@ class ReconcileResult:
 
 
 @dataclass
+class OrgChartAssignment:
+    """Display data for non-primary coverage on the position org chart."""
+
+    employee_id: UUID
+    employee_name: str
+    assignment_type: PositionAssignmentType
+    start_date: date
+
+
+@dataclass
 class OrgChartNode:
     """A single node in the position org chart with display data and children."""
 
     position_id: UUID
+    position_code: str
+    position_name: str
     designation_name: str
     department_name: str
     incumbent_employee_id: UUID | None
     incumbent_name: str
     is_vacant: bool
+    covering_assignments: list[OrgChartAssignment]
     children: list[OrgChartNode]
 
 
@@ -144,6 +166,8 @@ class PositionService:
                         Designation.designation_code.ilike(like),
                         Department.department_name.ilike(like),
                         Department.department_code.ilike(like),
+                        Position.position_code.ilike(like),
+                        Position.position_name.ilike(like),
                     )
                 )
             )
@@ -204,10 +228,12 @@ class PositionService:
             return []
 
         position_ids = [p.position_id for p in positions]
-        incumbent_rows = self.db.execute(
+        assignment_rows = self.db.execute(
             select(
                 PositionAssignment.position_id,
                 Employee.employee_id,
+                PositionAssignment.assignment_type,
+                PositionAssignment.start_date,
                 Person.first_name,
                 Person.last_name,
                 Person.display_name,
@@ -217,23 +243,40 @@ class PositionService:
             .where(
                 PositionAssignment.organization_id == self.organization_id,
                 PositionAssignment.position_id.in_(position_ids),
-                PositionAssignment.assignment_type == PositionAssignmentType.PRIMARY,
                 PositionAssignment.end_date.is_(None),
                 Employee.status == EmployeeStatus.ACTIVE,
             )
+            .order_by(
+                PositionAssignment.position_id.asc(),
+                PositionAssignment.assignment_type.asc(),
+                PositionAssignment.start_date.desc(),
+            )
         ).all()
         incumbents_by_position: dict[UUID, tuple[UUID, str]] = {}
-        for row in incumbent_rows:
+        covering_by_position: dict[UUID, list[OrgChartAssignment]] = {}
+        for row in assignment_rows:
             name = (
                 row.display_name
                 or f"{row.first_name or ''} {row.last_name or ''}".strip()
                 or ""
             )
-            incumbents_by_position[row.position_id] = (row.employee_id, name)
+            if row.assignment_type == PositionAssignmentType.PRIMARY:
+                incumbents_by_position[row.position_id] = (row.employee_id, name)
+                continue
+            covering_by_position.setdefault(row.position_id, []).append(
+                OrgChartAssignment(
+                    employee_id=row.employee_id,
+                    employee_name=name,
+                    assignment_type=row.assignment_type,
+                    start_date=row.start_date,
+                )
+            )
 
         nodes_by_id: dict[UUID, OrgChartNode] = {
             p.position_id: OrgChartNode(
                 position_id=p.position_id,
+                position_code=p.position_code,
+                position_name=p.position_name,
                 designation_name=(
                     p.designation.designation_name if p.designation else ""
                 ),
@@ -243,6 +286,7 @@ class PositionService:
                 )[0],
                 incumbent_name=incumbents_by_position.get(p.position_id, (None, ""))[1],
                 is_vacant=p.position_id not in incumbents_by_position,
+                covering_assignments=covering_by_position.get(p.position_id, []),
                 children=[],
             )
             for p in positions
@@ -291,12 +335,18 @@ class PositionService:
     def create_position(self, data: PositionCreateData) -> Position:
         """Create a new position."""
         self._validate_references(data)
+        position_code = self._normalize_position_code(data.position_code)
+        position_name = self._resolve_position_name(data)
+        self._validate_position_code_available(position_code)
         position = Position(
             organization_id=self.organization_id,
+            position_code=position_code,
+            position_name=position_name,
             designation_id=data.designation_id,
             department_id=data.department_id,
             parent_position_id=data.parent_position_id,
-            is_vacant=data.is_vacant,
+            vacancy_routing_policy=data.vacancy_routing_policy,
+            is_vacant=True,
         )
         self.db.add(position)
         self.db.flush()
@@ -306,12 +356,25 @@ class PositionService:
         """Update a position."""
         position = self.get_position(position_id)
         self._validate_references(data, position_id=position.position_id)
+        position_code = (
+            self._normalize_position_code(data.position_code)
+            if data.position_code is not None
+            else position.position_code
+        )
+        position_name = (
+            self._resolve_position_name(data)
+            if data.position_name is not None
+            else position.position_name
+        )
+        self._validate_position_code_available(position_code, position_id=position_id)
 
+        position.position_code = position_code
+        position.position_name = position_name
         position.designation_id = data.designation_id
         position.department_id = data.department_id
         position.parent_position_id = data.parent_position_id
-        if data.is_vacant is not None:
-            position.is_vacant = data.is_vacant
+        position.vacancy_routing_policy = data.vacancy_routing_policy
+        self._refresh_vacancy(position)
 
         self.db.flush()
         return position
@@ -378,11 +441,9 @@ class PositionService:
             end_date=data.end_date,
         )
         self.db.add(assignment)
-
-        if not data.end_date or data.end_date >= date.today():
-            position.is_vacant = False
-
         self.db.flush()
+        self._refresh_vacancy(position)
+
         if data.assignment_type == PositionAssignmentType.PRIMARY:
             employee = self.db.get(Employee, data.employee_id)
             if employee and employee.reports_to_id:
@@ -415,10 +476,7 @@ class PositionService:
 
         assignment.end_date = end_date
         self.db.flush()
-
-        if not self._has_active_assignment(position.position_id):
-            position.is_vacant = True
-            self.db.flush()
+        self._refresh_vacancy(position)
 
         return assignment
 
@@ -455,10 +513,12 @@ class PositionService:
             parent_position_id = manager_assignment.position_id
 
         update = PositionUpdateData(
+            position_code=employee_position.position_code,
+            position_name=employee_position.position_name,
             designation_id=employee_position.designation_id,
             department_id=employee_position.department_id,
             parent_position_id=parent_position_id,
-            is_vacant=employee_position.is_vacant,
+            vacancy_routing_policy=employee_position.vacancy_routing_policy,
         )
         return self.update_position(employee_position.position_id, update)
 
@@ -622,9 +682,11 @@ class PositionService:
         for emp in missing:
             position = Position(
                 organization_id=self.organization_id,
+                position_code=self._generate_position_code(),
+                position_name=self._position_name_from_employee(emp),
                 designation_id=emp.designation_id,
                 department_id=emp.department_id,
-                is_vacant=False,
+                is_vacant=True,
             )
             new_positions_by_employee[emp.employee_id] = position
             self.db.add(position)
@@ -641,6 +703,8 @@ class PositionService:
             )
             self.db.add(assignment)
         self.db.flush()
+        for position in new_positions_by_employee.values():
+            self._refresh_vacancy(position)
         return len(missing)
 
     def list_parent_options(
@@ -659,7 +723,7 @@ class PositionService:
             .options(
                 selectinload(Position.designation), selectinload(Position.department)
             )
-            .order_by(Position.created_at.desc())
+            .order_by(Position.position_name.asc(), Position.position_code.asc())
             .limit(limit)
         )
         if exclude_position_id:
@@ -710,6 +774,89 @@ class PositionService:
 
             if position_id and self._would_create_cycle(position_id, parent):
                 raise ValidationError("Parent position would create a reporting cycle")
+
+    def _normalize_position_code(self, value: str | None) -> str:
+        code = (value or "").strip().upper()
+        if not code:
+            code = self._generate_position_code()
+        if len(code) > 40:
+            raise ValidationError("Position code must be 40 characters or fewer")
+        return code
+
+    def _resolve_position_name(
+        self, data: PositionCreateData | PositionUpdateData
+    ) -> str:
+        name = (data.position_name or "").strip()
+        if not name:
+            name = self._position_name_from_references(
+                designation_id=data.designation_id,
+                department_id=data.department_id,
+            )
+        if not name:
+            raise ValidationError("Position name is required")
+        if len(name) > 160:
+            raise ValidationError("Position name must be 160 characters or fewer")
+        return name
+
+    def _position_name_from_references(
+        self,
+        *,
+        designation_id: UUID | None,
+        department_id: UUID | None,
+    ) -> str:
+        if designation_id:
+            designation = self.db.scalar(
+                select(Designation).where(
+                    Designation.designation_id == designation_id,
+                    Designation.organization_id == self.organization_id,
+                )
+            )
+            if designation:
+                return designation.designation_name
+        if department_id:
+            department = self.db.scalar(
+                select(Department).where(
+                    Department.department_id == department_id,
+                    Department.organization_id == self.organization_id,
+                )
+            )
+            if department:
+                return department.department_name
+        return "Position"
+
+    def _position_name_from_employee(self, employee: Employee) -> str:
+        if employee.designation and employee.designation.designation_name:
+            return employee.designation.designation_name
+        if employee.department and employee.department.department_name:
+            return employee.department.department_name
+        return "Position"
+
+    def _generate_position_code(self) -> str:
+        while True:
+            code = f"POS-{uuid4().hex[:8].upper()}"
+            exists = self.db.scalar(
+                select(Position.position_id).where(
+                    Position.organization_id == self.organization_id,
+                    Position.position_code == code,
+                )
+            )
+            if not exists:
+                return code
+
+    def _validate_position_code_available(
+        self,
+        position_code: str,
+        *,
+        position_id: UUID | None = None,
+    ) -> None:
+        stmt = select(Position.position_id).where(
+            Position.organization_id == self.organization_id,
+            Position.position_code == position_code,
+        )
+        if position_id:
+            stmt = stmt.where(Position.position_id != position_id)
+        if self.db.scalar(stmt):
+            raise ConflictError("Position code already exists")
 
     def _would_create_cycle(self, position_id: UUID, parent: Position) -> bool:
         visited = {position_id}
@@ -803,3 +950,7 @@ class PositionService:
                 .limit(1)
             )
         )
+
+    def _refresh_vacancy(self, position: Position) -> None:
+        position.is_vacant = not self._has_active_assignment(position.position_id)
+        self.db.flush()

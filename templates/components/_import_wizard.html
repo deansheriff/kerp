@@ -7,6 +7,7 @@
     columns        — { required: [...], optional: [...] }
     preview_url    — POST endpoint for preview (e.g. "/import/accounts/preview")
     import_url     — POST endpoint for execute (e.g. "/import/accounts")
+    template_url   — optional GET endpoint for CSV template download
     cancel_url     — back link (e.g. "/import")
     alias_map      — dict for client-side header matching
     target_fields  — list of { source_field, target_field, required }
@@ -68,9 +69,19 @@
     <div x-show="step === 1" x-transition>
         <!-- Column Requirements -->
         <div class="card p-6 mb-6">
-            <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-                Column Requirements for <span x-text="config.entityName"></span>
-            </h3>
+            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
+                    Column Requirements for <span x-text="config.entityName"></span>
+                </h3>
+                {% if template_url %}
+                <a href="{{ template_url }}" class="btn btn-secondary inline-flex items-center justify-center gap-2 text-sm">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/>
+                    </svg>
+                    Download CSV template
+                </a>
+                {% endif %}
+            </div>
             <div class="grid gap-4 grid-cols-1 sm:grid-cols-2">
                 <div>
                     <h4 class="text-sm font-medium text-rose-600 dark:text-rose-400 mb-2">Required Columns</h4>

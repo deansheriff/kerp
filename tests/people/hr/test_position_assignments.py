@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import select
@@ -14,18 +15,24 @@ from app.models.people.hr import (
     Position,
     PositionAssignment,
     PositionAssignmentType,
+    PositionVacancyRoutingPolicy,
 )
 from app.models.person import Person
-from app.services.common import ConflictError
-from app.services.people.hr import EmployeeService, EmployeeUpdateData
+from app.services.common import ConflictError, PaginationParams
+from app.services.erpnext.export.hr import EmployeeExportService
+from app.services.people.hr import EmployeeFilters, EmployeeService, EmployeeUpdateData
 from app.services.people.hr.errors import InvalidManagerError
+from app.services.people.hr.employee_filter_contract import FilterExpression
 from app.services.people.hr.org_resolver import OrgResolver
 from app.services.people.hr.positions import (
     OrgChartNode,
     PositionAssignmentCreateData,
+    PositionCreateData,
+    PositionUpdateData,
     PositionService,
     ReconcileResult,
 )
+from app.services.people.leave.web import LeaveWebService
 
 
 def _ensure_hr_position_tables(engine) -> None:
@@ -72,13 +79,22 @@ def _make_position(
     db_session,
     org_id: uuid.UUID,
     *,
+    position_code: str | None = None,
+    position_name: str | None = None,
     parent_position_id: uuid.UUID | None = None,
     is_vacant: bool = True,
+    vacancy_routing_policy: PositionVacancyRoutingPolicy = (
+        PositionVacancyRoutingPolicy.SKIP_UP
+    ),
 ) -> Position:
+    short_id = uuid.uuid4().hex[:8].upper()
     position = Position(
         position_id=uuid.uuid4(),
         organization_id=org_id,
+        position_code=position_code or f"POS-{short_id}",
+        position_name=position_name or f"Position {short_id}",
         parent_position_id=parent_position_id,
+        vacancy_routing_policy=vacancy_routing_policy,
         is_vacant=is_vacant,
     )
     db_session.add(position)
@@ -115,6 +131,69 @@ def test_create_primary_assignment_marks_position_not_vacant(db_session):
     assert assignment.position_id == position.position_id
     assert assignment.employee_id == employee.employee_id
     assert position.is_vacant is False
+
+
+def test_future_assignment_keeps_position_vacant_until_start_date(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    position = _make_position(db_session, org_id)
+
+    PositionService(db_session, org_id).create_assignment(
+        position.position_id,
+        _assignment_data(employee, start_date=date(2099, 1, 1)),
+    )
+
+    assert position.is_vacant is True
+
+
+def test_position_update_recalculates_vacancy_from_assignments(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    position = _make_position(db_session, org_id, is_vacant=False)
+
+    PositionService(db_session, org_id).update_position(
+        position.position_id,
+        PositionUpdateData(),
+    )
+
+    assert position.is_vacant is True
+
+
+def test_create_position_stores_position_identity(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+
+    position = PositionService(db_session, org_id).create_position(
+        PositionCreateData(
+            position_code="fin-mgr-01",
+            position_name="Finance Manager",
+        )
+    )
+
+    assert position.position_code == "FIN-MGR-01"
+    assert position.position_name == "Finance Manager"
+    assert position.is_vacant is True
+
+
+def test_create_position_rejects_duplicate_position_code(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    service = PositionService(db_session, org_id)
+    service.create_position(
+        PositionCreateData(
+            position_code="OPS-001",
+            position_name="Operations Lead",
+        )
+    )
+
+    with pytest.raises(ConflictError, match="Position code already exists"):
+        service.create_position(
+            PositionCreateData(
+                position_code="ops-001",
+                position_name="Operations Lead Backup",
+            )
+        )
 
 
 def test_primary_assignment_rejects_active_primary_for_same_position(db_session):
@@ -230,6 +309,100 @@ def test_org_resolver_direct_reports_rolls_up_vacant_positions(db_session):
     assert [report.employee_id for report in reports] == [employee.employee_id]
 
 
+def test_block_vacancy_policy_stops_manager_rollup(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    director = _make_employee(db_session, org_id, "DIR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    director_position = _make_position(db_session, org_id, is_vacant=False)
+    vacant_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=director_position.position_id,
+        is_vacant=True,
+        vacancy_routing_policy=PositionVacancyRoutingPolicy.BLOCK,
+    )
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=vacant_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(director_position.position_id, _assignment_data(director))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+
+    manager = OrgResolver(db_session).get_manager(employee.employee_id, org_id)
+    chain = OrgResolver(db_session).get_approval_chain(employee.employee_id, org_id)
+
+    assert manager is None
+    assert chain == []
+
+
+def test_notify_hr_vacancy_policy_skips_and_records_alert(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    director = _make_employee(db_session, org_id, "DIR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    director_position = _make_position(db_session, org_id, is_vacant=False)
+    vacant_position = _make_position(
+        db_session,
+        org_id,
+        position_code="MGR-VACANT",
+        position_name="Vacant Manager",
+        parent_position_id=director_position.position_id,
+        is_vacant=True,
+        vacancy_routing_policy=PositionVacancyRoutingPolicy.NOTIFY_HR_THEN_SKIP,
+    )
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=vacant_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(director_position.position_id, _assignment_data(director))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+    resolver = OrgResolver(db_session)
+
+    manager = resolver.get_manager(employee.employee_id, org_id)
+    alerts = resolver.drain_vacancy_routing_alerts()
+
+    assert manager is not None
+    assert manager.employee_id == director.employee_id
+    assert len(alerts) == 1
+    assert alerts[0].position_id == vacant_position.position_id
+    assert alerts[0].position_code == "MGR-VACANT"
+
+
+def test_block_vacancy_policy_stops_direct_report_roll_down(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    director = _make_employee(db_session, org_id, "DIR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    director_position = _make_position(db_session, org_id, is_vacant=False)
+    vacant_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=director_position.position_id,
+        is_vacant=True,
+        vacancy_routing_policy=PositionVacancyRoutingPolicy.BLOCK,
+    )
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=vacant_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(director_position.position_id, _assignment_data(director))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+
+    reports = OrgResolver(db_session).get_direct_reports(director.employee_id, org_id)
+
+    assert reports == []
+
+
 def test_employee_service_direct_reports_uses_positions(db_session):
     _ensure_hr_position_tables(db_session.bind)
     org_id = uuid.uuid4()
@@ -256,6 +429,206 @@ def test_employee_service_direct_reports_uses_positions(db_session):
     assert legacy_report.employee_id not in {report.employee_id for report in reports}
 
 
+def test_employee_list_reports_to_filter_uses_positions_not_legacy_column(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    manager = _make_employee(db_session, org_id, "MGR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    legacy_report = _make_employee(db_session, org_id, "EMP-LEGACY")
+    legacy_report.reports_to_id = manager.employee_id
+    manager_position = _make_position(db_session, org_id, is_vacant=False)
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=manager_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(manager_position.position_id, _assignment_data(manager))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+
+    result = EmployeeService(db_session, org_id).list_employees(
+        EmployeeFilters(reports_to_id=manager.employee_id),
+        PaginationParams(limit=10),
+    )
+
+    assert [item.employee_id for item in result.items] == [employee.employee_id]
+    assert legacy_report.employee_id not in {item.employee_id for item in result.items}
+
+
+def test_employee_list_reports_to_filter_rolls_down_vacant_positions(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    manager = _make_employee(db_session, org_id, "MGR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    manager_position = _make_position(db_session, org_id, is_vacant=False)
+    vacant_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=manager_position.position_id,
+        is_vacant=True,
+    )
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=vacant_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(manager_position.position_id, _assignment_data(manager))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+
+    result = EmployeeService(db_session, org_id).list_employees(
+        EmployeeFilters(reports_to_id=manager.employee_id),
+        PaginationParams(limit=10),
+    )
+
+    assert [item.employee_id for item in result.items] == [employee.employee_id]
+
+
+def test_employee_advanced_reports_to_filter_uses_positions_not_legacy_column(
+    db_session,
+):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    manager = _make_employee(db_session, org_id, "MGR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    legacy_report = _make_employee(db_session, org_id, "EMP-LEGACY")
+    legacy_report.reports_to_id = manager.employee_id
+    manager_position = _make_position(db_session, org_id, is_vacant=False)
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=manager_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(manager_position.position_id, _assignment_data(manager))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+
+    expression = FilterExpression.parse_payload(
+        [["Employee", "reports_to_id", "=", str(manager.employee_id)]]
+    )
+    result = EmployeeService(db_session, org_id).list_employees(
+        advanced_filter_expression=expression,
+        pagination=PaginationParams(limit=10),
+    )
+
+    assert [item.employee_id for item in result.items] == [employee.employee_id]
+    assert legacy_report.employee_id not in {item.employee_id for item in result.items}
+
+
+def test_employee_advanced_reports_to_filter_rolls_down_vacant_positions(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    manager = _make_employee(db_session, org_id, "MGR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    manager_position = _make_position(db_session, org_id, is_vacant=False)
+    vacant_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=manager_position.position_id,
+        is_vacant=True,
+    )
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=vacant_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(manager_position.position_id, _assignment_data(manager))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+
+    expression = FilterExpression.parse_payload(
+        [["Employee", "reports_to_id", "=", str(manager.employee_id)]]
+    )
+    result = EmployeeService(db_session, org_id).list_employees(
+        advanced_filter_expression=expression,
+        pagination=PaginationParams(limit=10),
+    )
+
+    assert [item.employee_id for item in result.items] == [employee.employee_id]
+
+
+def test_leave_employee_options_use_position_manager_not_legacy_column(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    manager = _make_employee(db_session, org_id, "MGR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    legacy_manager = _make_employee(db_session, org_id, "MGR-LEGACY")
+    manager_position = _make_position(db_session, org_id, is_vacant=False)
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=manager_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(manager_position.position_id, _assignment_data(manager))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+    employee.reports_to_id = legacy_manager.employee_id
+    db_session.flush()
+
+    options = LeaveWebService._get_employees(db_session, org_id)
+    option = next(item for item in options if item.employee_id == employee.employee_id)
+
+    assert option.resolved_manager_id == manager.employee_id
+    assert option.resolved_manager_name == manager.full_name
+
+
+def test_erpnext_employee_export_uses_position_manager_not_legacy_column(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    manager = _make_employee(db_session, org_id, "MGR-001")
+    manager.erpnext_id = "HR-EMP-MGR"
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    legacy_manager = _make_employee(db_session, org_id, "MGR-LEGACY")
+    legacy_manager.erpnext_id = "HR-EMP-LEGACY"
+    manager_position = _make_position(db_session, org_id, is_vacant=False)
+    employee_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=manager_position.position_id,
+        is_vacant=False,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(manager_position.position_id, _assignment_data(manager))
+    service.create_assignment(employee_position.position_id, _assignment_data(employee))
+    employee.reports_to_id = legacy_manager.employee_id
+    db_session.flush()
+
+    payload = EmployeeExportService(
+        db_session,
+        MagicMock(),
+        org_id,
+        uuid.uuid4(),
+        "DotMac",
+    ).transform_for_export(employee)
+
+    assert payload["reports_to"] == "HR-EMP-MGR"
+
+
+def test_employee_initial_position_assignment_uses_existing_position(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    position = _make_position(db_session, org_id, is_vacant=True)
+
+    EmployeeService(db_session, org_id)._assign_initial_position(
+        employee,
+        position.position_id,
+    )
+
+    assignment = OrgResolver(db_session).get_active_assignment(
+        employee.employee_id,
+        org_id,
+    )
+    assert assignment is not None
+    assert assignment.position_id == position.position_id
+    assert position.is_vacant is False
+
+
 def test_employee_reports_to_update_syncs_position_parent(db_session):
     _ensure_hr_position_tables(db_session.bind)
     org_id = uuid.uuid4()
@@ -278,9 +651,39 @@ def test_employee_reports_to_update_syncs_position_parent(db_session):
         EmployeeUpdateData(reports_to_id=manager.employee_id),
     )
 
+    assert employee.reports_to_id == manager.employee_id
     assert employee_position.parent_position_id == manager_position.position_id
     resolved = OrgResolver(db_session).get_manager(employee.employee_id, org_id)
     assert resolved is not None and resolved.employee_id == manager.employee_id
+
+
+def test_employee_manager_clear_syncs_position_parent_and_legacy_cache(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    manager = _make_employee(db_session, org_id, "MGR-001")
+    employee = _make_employee(db_session, org_id, "EMP-001")
+    manager_position = _make_position(db_session, org_id, is_vacant=False)
+    employee_position = _make_position(db_session, org_id, is_vacant=False)
+    position_service = PositionService(db_session, org_id)
+    position_service.create_assignment(
+        manager_position.position_id,
+        _assignment_data(manager),
+    )
+    position_service.create_assignment(
+        employee_position.position_id,
+        _assignment_data(employee),
+    )
+    employee.reports_to_id = manager.employee_id
+    employee_position.parent_position_id = manager_position.position_id
+    db_session.flush()
+
+    data = EmployeeUpdateData(reports_to_id=None)
+    data.provided_fields = {"reports_to_id"}
+    EmployeeService(db_session, org_id).update_employee(employee.employee_id, data)
+
+    assert employee.reports_to_id is None
+    assert employee_position.parent_position_id is None
+    assert OrgResolver(db_session).get_manager(employee.employee_id, org_id) is None
 
 
 def test_primary_assignment_syncs_existing_legacy_manager_to_position_parent(
@@ -576,6 +979,40 @@ def test_build_org_chart_marks_vacant_positions(db_session):
     assert vacant_node.is_vacant is True
     assert vacant_node.incumbent_employee_id is None
     assert vacant_node.incumbent_name == ""
+
+
+def test_build_org_chart_includes_acting_coverage_for_vacant_position(db_session):
+    _ensure_hr_position_tables(db_session.bind)
+    org_id = uuid.uuid4()
+    ceo = _make_employee(db_session, org_id, "CEO-001")
+    acting_manager = _make_employee(db_session, org_id, "ACT-001")
+    ceo_position = _make_position(db_session, org_id, is_vacant=False)
+    vacant_position = _make_position(
+        db_session,
+        org_id,
+        parent_position_id=ceo_position.position_id,
+        is_vacant=True,
+    )
+    service = PositionService(db_session, org_id)
+    service.create_assignment(ceo_position.position_id, _assignment_data(ceo))
+    service.create_assignment(
+        vacant_position.position_id,
+        _assignment_data(
+            acting_manager,
+            assignment_type=PositionAssignmentType.ACTING,
+        ),
+    )
+
+    roots = service.build_org_chart()
+
+    vacant_node = roots[0].children[0]
+    assert vacant_node.is_vacant is True
+    assert vacant_node.incumbent_employee_id is None
+    assert len(vacant_node.covering_assignments) == 1
+    coverage = vacant_node.covering_assignments[0]
+    assert coverage.employee_id == acting_manager.employee_id
+    assert coverage.employee_name == "ACT-001 Employee"
+    assert coverage.assignment_type == PositionAssignmentType.ACTING
 
 
 def test_build_org_chart_empty_org_returns_empty(db_session):

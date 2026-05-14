@@ -200,12 +200,13 @@ class TestReadFxAccountIds:
         }
 
         def fake_scalar(stmt):
-            # Inspect the compiled SELECT's WHERE parameters to pick the
-            # right row. We stringify with literal_binds so UUID + string
-            # values appear in-line and we can match them.
-            compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            # Inspect the compiled SELECT parameters to pick the right row.
+            # This avoids dialect/order-dependent literal rendering while still
+            # proving the query carries organization_id and key predicates.
+            compiled = stmt.compile()
+            params = {str(value) for value in compiled.params.values()}
             for (org_id, key), row in rows_by_org_and_key.items():
-                if str(org_id) in compiled and key in compiled:
+                if str(org_id) in params and key in params:
                     return row
             return None
 

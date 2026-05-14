@@ -56,8 +56,8 @@
                             <option value="">Select Employee</option>
                             {% for emp in employees %}
                             <option value="{{ emp.employee_id }}"
-                                data-approver-id="{{ emp.reports_to_id if emp.reports_to_id else '' }}"
-                                data-approver-name="{{ emp.manager.full_name if emp.manager else 'Not assigned' }}"
+                                data-approver-id="{{ emp.resolved_manager_id if emp.resolved_manager_id else '' }}"
+                                data-approver-name="{{ emp.resolved_manager_name if emp.resolved_manager_name else 'Not assigned' }}"
                                 {% if (form_data and form_data.employee_id == emp.employee_id|string) or (application and application.employee_id == emp.employee_id) %}selected{% endif %}>
                                 {{ emp.full_name }} ({{ emp.employee_number }})
                             </option>
