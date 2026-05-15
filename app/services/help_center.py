@@ -1320,7 +1320,6 @@ ROLE_PLAYBOOKS: list[dict[str, Any]] = [
         "journeys": [
             {"label": "Configure module defaults", "href": "/settings"},
             {"label": "Review access and governance", "href": "/admin/roles"},
-            {"label": "Monitor integrations and sync", "href": "/admin/sync"},
         ],
     },
     {

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import select
@@ -19,7 +18,6 @@ from app.models.people.hr import (
 )
 from app.models.person import Person
 from app.services.common import ConflictError, PaginationParams
-from app.services.erpnext.export.hr import EmployeeExportService
 from app.services.people.hr import EmployeeFilters, EmployeeService, EmployeeUpdateData
 from app.services.people.hr.errors import InvalidManagerError
 from app.services.people.hr.employee_filter_contract import FilterExpression
@@ -575,38 +573,6 @@ def test_leave_employee_options_use_position_manager_not_legacy_column(db_sessio
 
     assert option.resolved_manager_id == manager.employee_id
     assert option.resolved_manager_name == manager.full_name
-
-
-def test_erpnext_employee_export_uses_position_manager_not_legacy_column(db_session):
-    _ensure_hr_position_tables(db_session.bind)
-    org_id = uuid.uuid4()
-    manager = _make_employee(db_session, org_id, "MGR-001")
-    manager.erpnext_id = "HR-EMP-MGR"
-    employee = _make_employee(db_session, org_id, "EMP-001")
-    legacy_manager = _make_employee(db_session, org_id, "MGR-LEGACY")
-    legacy_manager.erpnext_id = "HR-EMP-LEGACY"
-    manager_position = _make_position(db_session, org_id, is_vacant=False)
-    employee_position = _make_position(
-        db_session,
-        org_id,
-        parent_position_id=manager_position.position_id,
-        is_vacant=False,
-    )
-    service = PositionService(db_session, org_id)
-    service.create_assignment(manager_position.position_id, _assignment_data(manager))
-    service.create_assignment(employee_position.position_id, _assignment_data(employee))
-    employee.reports_to_id = legacy_manager.employee_id
-    db_session.flush()
-
-    payload = EmployeeExportService(
-        db_session,
-        MagicMock(),
-        org_id,
-        uuid.uuid4(),
-        "DotMac",
-    ).transform_for_export(employee)
-
-    assert payload["reports_to"] == "HR-EMP-MGR"
 
 
 def test_employee_initial_position_assignment_uses_existing_position(db_session):

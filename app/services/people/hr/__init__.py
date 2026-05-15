@@ -31,7 +31,6 @@ if TYPE_CHECKING:  # pragma: no cover
         EmployeeFilters,
         EmployeeSummary,
         EmployeeUpdateData,
-        OrgChartNode,
         TerminationData,
     )
     from .employees import EmployeeService  # noqa: F401
@@ -112,7 +111,6 @@ __all__ = [
     "EmployeeCreateData",
     "EmployeeUpdateData",
     "EmployeeSummary",
-    "OrgChartNode",
     "TerminationData",
     "BulkUpdateData",
     "BulkResult",
@@ -193,7 +191,6 @@ _NAME_TO_MODULE = {
     "EmployeeCreateData": "employee_types",
     "EmployeeUpdateData": "employee_types",
     "EmployeeSummary": "employee_types",
-    "OrgChartNode": "employee_types",
     "TerminationData": "employee_types",
     "BulkUpdateData": "employee_types",
     "BulkResult": "employee_types",

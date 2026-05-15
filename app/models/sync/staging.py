@@ -1,8 +1,8 @@
 """
-Staging Tables for ERPNext Data Migration.
+Staging tables — frozen historical data from the decommissioned ERPNext sync.
 
-Raw data is synced here first for validation and review before
-importing to production tables.
+Kept for ORM access to the pre-migration import data only. No active code
+path writes to these tables; ERPNext sync was decommissioned on 2026-05-12.
 """
 
 import uuid

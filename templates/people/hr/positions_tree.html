@@ -8,7 +8,6 @@
     <ol class="flex items-center gap-2">
         <li><a href="/people" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">People</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/hr" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Human Resources</a></li>
-        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/people/hr/positions" class="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Positions</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Organization Chart</span></li>
     </ol>
 </nav>
@@ -16,8 +15,8 @@
 
 {% block header_actions %}
 <a href="/people/hr/positions" class="btn btn-secondary">
-    {{ icon_svg("chevron-right", "h-4 w-4 mr-1.5 rotate-180") }}
-    Back to Positions
+    {{ icon_svg("chart", "h-4 w-4 mr-1.5") }}
+    View Positions
 </a>
 {% endblock %}
 

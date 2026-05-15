@@ -78,7 +78,6 @@ from app.telemetry import setup_otel
 from app.templates import templates
 from app.web.admin import router as admin_web_router
 from app.web.admin_crm_sync import router as admin_crm_sync_router
-from app.web.admin_sync import router as admin_sync_router
 from app.web.auth import router as auth_web_router
 from app.web.careers import router as careers_web_router
 from app.web.careers import short_router as careers_short_web_router
@@ -807,7 +806,6 @@ if is_module_enabled("crm"):
     _include_api_router(crm_router, dependencies=[Depends(require_tenant_auth)])
     _include_api_router(crm_webhook_router)
     _include_api_router(crm_sync_router)
-    app.include_router(admin_sync_router)
     app.include_router(admin_crm_sync_router)
 
 # ---------------------------------------------------------------------------

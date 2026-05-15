@@ -250,15 +250,7 @@ class IntegrationConfigService:
         if not creds:
             return False, "Integration not configured"
 
-        if integration_type == IntegrationType.ERPNEXT:
-            return self._verify_erpnext(creds)
-
         return False, f"Verification not implemented for {integration_type}"
-
-    def _verify_erpnext(self, creds: dict) -> tuple[bool, str | None]:
-        """Verify ERPNext connection."""
-        _ = creds
-        return False, "ERPNext API sync/verification is disabled. Use SQL-based sync."
 
     def mark_verified(
         self,

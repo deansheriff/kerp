@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web import hr_web_service
@@ -52,14 +52,9 @@ def list_employees(
     )
 
 
-@router.get("/employees/org-chart", response_class=HTMLResponse)
-def view_org_chart(
-    request: Request,
-    auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
-):
-    """Organization chart page."""
-    return hr_web_service.org_chart_response(request, auth, db)
+@router.get("/employees/org-chart", include_in_schema=False)
+def view_org_chart_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/people/hr/org-chart", status_code=301)
 
 
 @router.get("/employees/stats")
