@@ -321,9 +321,20 @@ class EmployeeService:
         )
         joined_person = False
 
-        # Handle soft delete
-        if not filters.include_deleted:
+        if filters.archive_only:
+            stmt = stmt.where(
+                Employee.status.in_(
+                    [EmployeeStatus.RESIGNED, EmployeeStatus.TERMINATED]
+                )
+            )
+        elif not filters.include_deleted:
             stmt = stmt.where(Employee.status != EmployeeStatus.TERMINATED)
+        if (
+            not filters.archive_only
+            and not filters.include_archived
+            and filters.status != EmployeeStatus.RESIGNED
+        ):
+            stmt = stmt.where(Employee.status != EmployeeStatus.RESIGNED)
 
         # Advanced filters are always additive to base tenant/deletion constraints.
         stmt, joined_person = apply_employee_filter_expression(
@@ -410,24 +421,32 @@ class EmployeeService:
         """Get employee count statistics by status.
 
         Returns:
-            Dict with total, active, on_leave, and inactive counts.
+            Dict with total and lifecycle status counts.
         """
         stmt = (
             select(Employee.status, func.count(Employee.employee_id))
             .where(
                 Employee.organization_id == self.organization_id,
-                Employee.status != EmployeeStatus.TERMINATED,
             )
             .group_by(Employee.status)
         )
         results = self.db.execute(stmt).all()
 
         status_counts = {status: count for status, count in results}
+        terminated = status_counts.get(EmployeeStatus.TERMINATED, 0)
+        resigned = status_counts.get(EmployeeStatus.RESIGNED, 0)
+        total = sum(status_counts.values())
 
         return {
-            "total": sum(status_counts.values()),
+            "total": total,
+            "current": total - terminated - resigned,
             "active": status_counts.get(EmployeeStatus.ACTIVE, 0),
             "on_leave": status_counts.get(EmployeeStatus.ON_LEAVE, 0),
+            "resigned": resigned,
+            "terminated": terminated,
+            "exit_archive": resigned + terminated,
+            "suspended": status_counts.get(EmployeeStatus.SUSPENDED, 0),
+            "retired": status_counts.get(EmployeeStatus.RETIRED, 0),
             "inactive": (
                 status_counts.get(EmployeeStatus.SUSPENDED, 0)
                 + status_counts.get(EmployeeStatus.TERMINATED, 0)

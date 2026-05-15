@@ -155,6 +155,8 @@ class EmployeeFilters:
     date_of_joining_to: date | None = None
     date_of_leaving_from: date | None = None
     date_of_leaving_to: date | None = None
+    include_archived: bool = False
+    archive_only: bool = False
     include_deleted: bool = False
     sort_key: str | None = None
     sort_dir: str | None = None

@@ -456,15 +456,23 @@ class HRWebService:
 
         # Parse status filter
         status_filter = None
+        archive_only = False
         if status:
-            try:
-                status_filter = EmployeeStatus(status.upper())
-            except ValueError:
-                pass
+            status_value = status.strip().lower()
+            if status_value in {"archive", "exit_archive"}:
+                archive_only = True
+            else:
+                try:
+                    status_filter = EmployeeStatus(status.upper())
+                except ValueError:
+                    pass
 
         employee_filters = EmployeeFilters(
             search=search,
             status=status_filter,
+            include_archived=archive_only or status_filter == EmployeeStatus.RESIGNED,
+            archive_only=archive_only,
+            include_deleted=archive_only or status_filter == EmployeeStatus.TERMINATED,
             department_id=coerce_uuid(department_id) if department_id else None,
             designation_id=coerce_uuid(designation_id) if designation_id else None,
             date_of_joining_from=self._parse_date(date_of_joining_from or ""),
