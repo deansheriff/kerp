@@ -110,23 +110,8 @@ from app.tasks.splynx import (
     run_splynx_full_reconciliation,
     run_splynx_incremental_sync,
 )
-from app.tasks.sync import (
-    push_expense_claim_to_erpnext,
-    run_full_erpnext_sync,
-    run_incremental_erpnext_sync,
-    scheduled_expense_sync,
-    scheduled_hr_sync,
-    sync_single_entity_type,
-)
 
 __all__ = [
-    # ERPNext sync tasks
-    "run_full_erpnext_sync",
-    "run_incremental_erpnext_sync",
-    "sync_single_entity_type",
-    "scheduled_hr_sync",
-    "scheduled_expense_sync",
-    "push_expense_claim_to_erpnext",
     "run_scheduled_splynx_sync",
     "run_splynx_incremental_sync",
     "run_splynx_daily_reconciliation",
