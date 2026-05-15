@@ -15,7 +15,7 @@ import app.models.pm as pm  # noqa: F401
 # Procurement Models - PPA 2007 compliance
 import app.models.procurement as procurement  # noqa: F401
 
-# Support Models - Tickets/Issues synced from ERPNext
+# Support Models - Tickets/Issues
 import app.models.support as support  # noqa: F401
 from app.models.audit import AuditActorType, AuditEvent  # noqa: F401
 from app.models.audit_field_tracking import FieldChangeLog  # noqa: F401
