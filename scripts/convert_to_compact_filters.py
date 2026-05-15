@@ -196,8 +196,6 @@ def detect_base_url(lines: list[str], start: int, end: int, filepath: str) -> st
         "expense/limits/usage": "/expense/limits/usage",
         "expense/reports/by_employee": "/expense/reports/by_employee",
         "expense/reports/trends": "/expense/reports/trends",
-        "admin/sync/entities": "/admin/sync/entities",
-        "admin/sync/history": "/admin/sync/history",
         "fleet/documents": "/fleet/documents",
         "fleet/fuel": "/fleet/fuel",
         "fleet/incidents": "/fleet/incidents",
