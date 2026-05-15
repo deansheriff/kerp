@@ -8,7 +8,7 @@ from app.models.people.hr import CompetencyCategory
 from app.services.common import coerce_uuid
 from app.services.people.hr import CompetencyService
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 from ._common import _parse_bool
 
@@ -29,7 +29,7 @@ def list_competencies(
     error: str | None = None,
     page: int = 1,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Competency catalog page."""
     from app.services.common import PaginationParams
@@ -67,7 +67,7 @@ def list_competencies(
 def new_competency_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New competency form."""
     context = base_context(request, auth, "Add Competency", "competencies", db=db)
@@ -95,7 +95,7 @@ def create_competency(
     level_4_description: str | None = Form(None),
     level_5_description: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new competency."""
     org_id = coerce_uuid(auth.organization_id)
@@ -145,7 +145,7 @@ def view_competency(
     request: Request,
     competency_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View competency detail."""
     org_id = coerce_uuid(auth.organization_id)
@@ -175,7 +175,7 @@ def edit_competency_form(
     request: Request,
     competency_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit competency form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -217,7 +217,7 @@ def update_competency(
     level_5_description: str | None = Form(None),
     is_active: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a competency."""
     org_id = coerce_uuid(auth.organization_id)

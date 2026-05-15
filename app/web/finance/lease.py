@@ -17,7 +17,12 @@ from app.services.finance.lease import (
 from app.services.finance.lease.web import lease_web_service
 from app.services.finance.platform.currency_context import get_currency_context
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_finance_access
+from app.web.deps import (
+    get_db_for_org,
+    WebAuthContext,
+    base_context,
+    require_finance_access,
+)
 
 router = APIRouter(prefix="/lease", tags=["lease-web"])
 
@@ -35,7 +40,7 @@ def list_contracts(
     status: str | None = None,
     lease_type: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Lease contracts list page."""
     context = base_context(request, auth, "Lease Contracts", "lease")
@@ -57,7 +62,7 @@ def list_contracts(
 def new_contract_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New lease contract form page."""
     context = base_context(request, auth, "New Lease Contract", "lease")
@@ -72,7 +77,7 @@ def view_contract(
     request: Request,
     lease_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Lease contract detail page."""
     context = base_context(request, auth, "Lease Details", "lease")
@@ -94,7 +99,7 @@ def view_schedule(
     request: Request,
     lease_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Lease payment schedule page."""
     context = base_context(request, auth, "Payment Schedule", "lease")
@@ -122,7 +127,7 @@ def list_modifications(
     lease_id: str | None = None,
     modification_type: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Lease modifications list page."""
     limit = 50
@@ -162,7 +167,7 @@ def list_variable_payments(
     auth: WebAuthContext = Depends(require_finance_access),
     lease_id: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Variable payments list page."""
     context = base_context(request, auth, "Variable Payments", "lease")
@@ -178,7 +183,7 @@ def overdue_payments(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
     as_of_date: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Overdue lease payments page."""
     check_date = date.fromisoformat(as_of_date) if as_of_date else None

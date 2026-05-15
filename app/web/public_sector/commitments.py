@@ -17,9 +17,9 @@ from app.services.finance.ipsas.web.ipsas_web import IPSASWebService
 from app.services.finance.platform.org_context import org_context_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_public_sector_access,
 )
 
@@ -31,7 +31,7 @@ router = APIRouter(tags=["public-sector-commitments"])
 def commitments_index(
     request: Request,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Commitments landing page."""
     context = base_context(request, auth, "Commitments", "ps_commitments", db=db)
@@ -47,7 +47,7 @@ def list_commitments(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Commitment register page."""
     context = base_context(
@@ -71,7 +71,7 @@ def list_commitments(
 def new_commitment_form(
     request: Request,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create commitment form page."""
     from sqlalchemy import select
@@ -143,7 +143,7 @@ def create_commitment(
     currency_code: str | None = Form(None),
     appropriation_id: str | None = Form(None),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create a commitment (form submission)."""
     from app.services.finance.ipsas.commitment_service import CommitmentService
@@ -173,7 +173,7 @@ def view_commitment(
     request: Request,
     commitment_id: str,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Commitment detail page."""
     context = base_context(request, auth, "Commitment Detail", "ps_commitments", db=db)

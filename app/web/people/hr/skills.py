@@ -8,7 +8,7 @@ from app.models.people.hr import SkillCategory
 from app.services.common import coerce_uuid
 from app.services.people.hr import SkillService
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 from ._common import _parse_bool
 
@@ -28,7 +28,7 @@ def list_skills(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Skills catalog page."""
     org_id = coerce_uuid(auth.organization_id)
@@ -55,7 +55,7 @@ def list_skills(
 def new_skill_catalog_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New skill form."""
     context = base_context(request, auth, "Add Skill", "skills", db=db)
@@ -79,7 +79,7 @@ def create_skill(
     description: str | None = Form(None),
     is_language: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new skill in the catalog."""
     org_id = coerce_uuid(auth.organization_id)
@@ -120,7 +120,7 @@ def edit_skill_catalog_form(
     request: Request,
     skill_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit skill form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -150,7 +150,7 @@ def update_skill(
     is_language: str | None = Form(None),
     is_active: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an existing skill in the catalog."""
     org_id = coerce_uuid(auth.organization_id)
@@ -195,7 +195,7 @@ def delete_skill(
     request: Request,
     skill_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a skill from the catalog."""
     org_id = coerce_uuid(auth.organization_id)

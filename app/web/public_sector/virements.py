@@ -17,9 +17,9 @@ from app.services.finance.ipsas.web.ipsas_web import IPSASWebService
 from app.services.finance.platform.org_context import org_context_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_public_sector_access,
 )
 
@@ -33,7 +33,7 @@ def list_virements(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Virement list page."""
     context = base_context(request, auth, "Virements", "ps_funds", db=db)
@@ -55,7 +55,7 @@ def list_virements(
 def new_virement_form(
     request: Request,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create virement form page."""
     from sqlalchemy import select
@@ -87,7 +87,7 @@ def create_virement(
     justification: str = Form(...),
     approval_authority: str | None = Form(None),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create a virement (form submission)."""
     from app.models.finance.ipsas.appropriation import Appropriation
@@ -129,7 +129,7 @@ def view_virement(
     request: Request,
     virement_id: str,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Virement detail page."""
     context = base_context(request, auth, "Virement Detail", "ps_funds", db=db)
@@ -147,7 +147,7 @@ def approve_virement(
     request: Request,
     virement_id: str,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Approve a virement (form submission)."""
     from app.services.finance.ipsas.virement_service import VirementService
@@ -163,7 +163,7 @@ def apply_virement(
     request: Request,
     virement_id: str,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Apply an approved virement (form submission)."""
     from app.services.finance.ipsas.virement_service import VirementService

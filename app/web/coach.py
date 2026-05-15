@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from app.services.coach.coach_service import CoachService
 from app.services.common import coerce_uuid
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_web_permission
+from app.web.deps import (
+    get_db_for_org,
+    WebAuthContext,
+    base_context,
+    require_web_permission,
+)
 
 router = APIRouter(prefix="/coach", tags=["coach-web"])
 
@@ -35,7 +40,7 @@ def _build_scope(svc: CoachService, auth: WebAuthContext):
 def dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("coach:insights:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     context = base_context(request, auth, "Coach Dashboard", "coach", db=db)
     svc = CoachService(db)
@@ -56,7 +61,7 @@ def dashboard(
 def insights_list(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("coach:insights:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     include_expired: bool = Query(False),
@@ -112,7 +117,7 @@ def insights_list(
 def reports_list(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("coach:reports:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
     page: int = Query(1, ge=1),
 ):
     context = base_context(request, auth, "Coach Reports", "coach", db=db)
@@ -132,7 +137,7 @@ def report_detail(
     request: Request,
     report_id: str,
     auth: WebAuthContext = Depends(require_web_permission("coach:reports:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     context = base_context(request, auth, "Coach Report", "coach", db=db)
     svc = CoachService(db)
@@ -157,7 +162,7 @@ def insight_feedback(
     insight_id: str,
     feedback: str = Form(...),
     auth: WebAuthContext = Depends(require_web_permission("coach:insights:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     svc = CoachService(db)
     if svc.is_enabled():

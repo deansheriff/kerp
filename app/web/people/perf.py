@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 from app.services.people.perf.web import perf_web_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_hr_access,
     require_private_performance_mode,
 )
@@ -35,7 +35,7 @@ router.include_router(pms_router)
 def perf_index(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Performance landing page."""
     context = base_context(request, auth, "Performance", "perf", db=db)
@@ -55,7 +55,7 @@ def pms_list_cycles_alias(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle list on the mounted performance router."""
     return perf_web_service.list_cycles_response(
@@ -73,7 +73,7 @@ def pms_list_cycles_alias(
 def pms_new_cycle_form_alias(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle form on the mounted performance router."""
     return perf_web_service.cycle_new_form_response(request, auth, db)
@@ -83,7 +83,7 @@ def pms_new_cycle_form_alias(
 async def pms_create_cycle_alias(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle create on the mounted performance router."""
     return await perf_web_service.create_cycle_response(request, auth, db)
@@ -96,7 +96,7 @@ def pms_cycle_detail_alias(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle detail on the mounted performance router."""
     return perf_web_service.cycle_detail_response(
@@ -109,7 +109,7 @@ def pms_edit_cycle_form_alias(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle edit form on the mounted performance router."""
     return perf_web_service.cycle_edit_form_response(request, auth, db, cycle_id)
@@ -120,7 +120,7 @@ async def pms_update_cycle_alias(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle update on the mounted performance router."""
     return await perf_web_service.update_cycle_response(request, auth, db, cycle_id)
@@ -131,7 +131,7 @@ def pms_activate_cycle_alias(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle activate on the mounted performance router."""
     return perf_web_service.activate_cycle_response(request, auth, db, cycle_id)
@@ -142,7 +142,7 @@ def pms_advance_cycle_alias(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle advance on the mounted performance router."""
     return perf_web_service.advance_cycle_response(request, auth, db, cycle_id)
@@ -153,7 +153,7 @@ def pms_cancel_cycle_alias(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle cancel on the mounted performance router."""
     return perf_web_service.cancel_cycle_response(request, auth, db, cycle_id)
@@ -164,7 +164,7 @@ def pms_delete_cycle_alias(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Alias PMS cycle delete on the mounted performance router."""
     return perf_web_service.delete_cycle_response(request, auth, db, cycle_id)
@@ -184,7 +184,7 @@ def list_appraisals(
     manager_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisals list page."""
     return perf_web_service.list_appraisals_response(
@@ -196,7 +196,7 @@ def list_appraisals(
 def new_appraisal_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New appraisal form."""
     return perf_web_service.appraisal_new_form_response(request, auth, db)
@@ -206,7 +206,7 @@ def new_appraisal_form(
 async def create_appraisal(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new appraisal."""
     return await perf_web_service.create_appraisal_response(request, auth, db)
@@ -219,7 +219,7 @@ def appraisal_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal detail page."""
     return perf_web_service.appraisal_detail_response(
@@ -232,7 +232,7 @@ def edit_appraisal_form(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit appraisal form."""
     return perf_web_service.appraisal_edit_form_response(
@@ -245,7 +245,7 @@ async def update_appraisal(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an appraisal."""
     return await perf_web_service.update_appraisal_response(
@@ -257,7 +257,7 @@ async def update_appraisal(
 def cancel_appraisal(
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel an appraisal."""
     return perf_web_service.cancel_appraisal_response(auth, db, appraisal_id)
@@ -272,7 +272,7 @@ def cancel_appraisal(
 def start_self_assessment(
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Start self-assessment phase (DRAFT -> SELF_ASSESSMENT)."""
     return perf_web_service.start_self_assessment_response(auth, db, appraisal_id)
@@ -283,7 +283,7 @@ def self_assessment_form(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Self-assessment form page."""
     return perf_web_service.self_assessment_form_response(
@@ -296,7 +296,7 @@ async def submit_self_assessment(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit self-assessment."""
     return await perf_web_service.submit_self_assessment_response(
@@ -309,7 +309,7 @@ def manager_review_form(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Manager review form page."""
     return perf_web_service.manager_review_form_response(
@@ -322,7 +322,7 @@ async def submit_manager_review(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit manager review."""
     return await perf_web_service.submit_manager_review_response(
@@ -335,7 +335,7 @@ def calibration_form(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Calibration form page."""
     return perf_web_service.calibration_form_response(request, auth, db, appraisal_id)
@@ -346,7 +346,7 @@ async def submit_calibration(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit calibration and complete appraisal."""
     return await perf_web_service.submit_calibration_response(
@@ -367,7 +367,7 @@ def list_feedback_requests(
     submitted: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Feedback requests list page."""
     return perf_web_service.list_feedback_response(
@@ -380,7 +380,7 @@ def request_feedback_form(
     request: Request,
     appraisal_id: str = Query(...),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Request feedback form."""
     return perf_web_service.request_feedback_form_response(
@@ -392,7 +392,7 @@ def request_feedback_form(
 async def create_feedback_request(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create feedback request."""
     return await perf_web_service.create_feedback_request_response(request, auth, db)
@@ -405,7 +405,7 @@ def feedback_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Feedback detail page."""
     return perf_web_service.feedback_detail_response(
@@ -418,7 +418,7 @@ def submit_feedback_form(
     request: Request,
     feedback_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit feedback form."""
     return perf_web_service.submit_feedback_form_response(
@@ -431,7 +431,7 @@ async def submit_feedback(
     request: Request,
     feedback_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit feedback."""
     return await perf_web_service.submit_feedback_response(
@@ -444,7 +444,7 @@ def delete_feedback(
     request: Request,
     feedback_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a feedback request."""
     return perf_web_service.delete_feedback_response(request, auth, db, feedback_id)
@@ -465,7 +465,7 @@ def list_kpis(
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KPIs list page."""
     return perf_web_service.list_goals_response(
@@ -478,7 +478,7 @@ def new_kpi_form(
     request: Request,
     employee_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New KPI form."""
     return perf_web_service.goal_new_form_response(request, auth, db, employee_id)
@@ -488,7 +488,7 @@ def new_kpi_form(
 async def create_kpi(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new KPI."""
     return await perf_web_service.create_goal_response(request, auth, db)
@@ -499,7 +499,7 @@ def kpi_detail(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KPI detail page."""
     return perf_web_service.goal_detail_response(request, auth, db, kpi_id)
@@ -510,7 +510,7 @@ def edit_kpi_form(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit KPI form."""
     return perf_web_service.goal_edit_form_response(request, auth, db, kpi_id)
@@ -521,7 +521,7 @@ async def update_kpi(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a KPI."""
     return await perf_web_service.update_goal_response(request, auth, db, kpi_id)
@@ -532,7 +532,7 @@ async def update_kpi_progress(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update KPI progress."""
     return await perf_web_service.update_goal_progress_response(
@@ -545,7 +545,7 @@ def delete_kpi(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a KPI."""
     return perf_web_service.delete_goal_response(request, auth, db, kpi_id)
@@ -564,7 +564,7 @@ def list_cycles(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal cycles list page."""
     return perf_web_service.list_cycles_response(
@@ -576,7 +576,7 @@ def list_cycles(
 def new_cycle_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New appraisal cycle form."""
     return perf_web_service.cycle_new_form_response(request, auth, db)
@@ -586,7 +586,7 @@ def new_cycle_form(
 async def create_cycle(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new appraisal cycle."""
     return await perf_web_service.create_cycle_response(request, auth, db)
@@ -599,7 +599,7 @@ def cycle_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal cycle detail page."""
     return perf_web_service.cycle_detail_response(
@@ -612,7 +612,7 @@ def edit_cycle_form(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit appraisal cycle form."""
     return perf_web_service.cycle_edit_form_response(request, auth, db, cycle_id)
@@ -623,7 +623,7 @@ async def update_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an appraisal cycle."""
     return await perf_web_service.update_cycle_response(request, auth, db, cycle_id)
@@ -634,7 +634,7 @@ def activate_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Activate an appraisal cycle."""
     return perf_web_service.activate_cycle_response(request, auth, db, cycle_id)
@@ -645,7 +645,7 @@ def advance_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Advance cycle to next phase."""
     return perf_web_service.advance_cycle_response(request, auth, db, cycle_id)
@@ -656,7 +656,7 @@ def cancel_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel an appraisal cycle."""
     return perf_web_service.cancel_cycle_response(request, auth, db, cycle_id)
@@ -667,7 +667,7 @@ def delete_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an appraisal cycle."""
     return perf_web_service.delete_cycle_response(request, auth, db, cycle_id)
@@ -686,7 +686,7 @@ def list_kras(
     department_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KRAs list page."""
     return perf_web_service.list_kras_response(
@@ -698,7 +698,7 @@ def list_kras(
 def new_kra_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New KRA form."""
     return perf_web_service.kra_new_form_response(request, auth, db)
@@ -708,7 +708,7 @@ def new_kra_form(
 async def create_kra(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new KRA."""
     return await perf_web_service.create_kra_response(request, auth, db)
@@ -720,7 +720,7 @@ def kra_detail(
     kra_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KRA detail page."""
     return perf_web_service.kra_detail_response(request, auth, db, kra_id, success)
@@ -731,7 +731,7 @@ def edit_kra_form(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit KRA form."""
     return perf_web_service.kra_edit_form_response(request, auth, db, kra_id)
@@ -742,7 +742,7 @@ async def update_kra(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a KRA."""
     return await perf_web_service.update_kra_response(request, auth, db, kra_id)
@@ -753,7 +753,7 @@ def toggle_kra_active(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle KRA active status."""
     return perf_web_service.toggle_kra_active_response(request, auth, db, kra_id)
@@ -764,7 +764,7 @@ def delete_kra(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a KRA."""
     return perf_web_service.delete_kra_response(request, auth, db, kra_id)
@@ -782,7 +782,7 @@ def list_templates(
     is_active: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal templates list page."""
     return perf_web_service.list_templates_response(
@@ -794,7 +794,7 @@ def list_templates(
 def new_template_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New template form."""
     return perf_web_service.template_new_form_response(request, auth, db)
@@ -804,7 +804,7 @@ def new_template_form(
 async def create_template(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new template."""
     return await perf_web_service.create_template_response(request, auth, db)
@@ -816,7 +816,7 @@ def template_detail(
     template_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Template detail page."""
     return perf_web_service.template_detail_response(
@@ -829,7 +829,7 @@ def edit_template_form(
     request: Request,
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit template form."""
     return perf_web_service.template_edit_form_response(request, auth, db, template_id)
@@ -840,7 +840,7 @@ async def update_template(
     request: Request,
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a template."""
     return await perf_web_service.update_template_response(
@@ -852,7 +852,7 @@ async def update_template(
 def toggle_template_active(
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle template active status."""
     return perf_web_service.toggle_template_active_response(auth, db, template_id)
@@ -862,7 +862,7 @@ def toggle_template_active(
 def delete_template(
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a template."""
     return perf_web_service.delete_template_response(auth, db, template_id)
@@ -881,7 +881,7 @@ def list_scorecards(
     is_finalized: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Scorecards list page."""
     return perf_web_service.list_scorecards_response(
@@ -894,7 +894,7 @@ def new_scorecard_form(
     request: Request,
     employee_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New scorecard form."""
     return perf_web_service.scorecard_new_form_response(request, auth, db)
@@ -904,7 +904,7 @@ def new_scorecard_form(
 async def create_scorecard(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new scorecard."""
     return await perf_web_service.create_scorecard_response(request, auth, db)
@@ -916,7 +916,7 @@ def scorecard_detail(
     scorecard_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Scorecard detail page."""
     return perf_web_service.scorecard_detail_response(
@@ -930,7 +930,7 @@ def scorecard_update_item_form(
     scorecard_id: str,
     item_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update scorecard item form."""
     return perf_web_service.scorecard_update_item_form_response(
@@ -944,7 +944,7 @@ async def update_scorecard_item(
     scorecard_id: str,
     item_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a scorecard item."""
     return await perf_web_service.update_scorecard_item_response(
@@ -957,7 +957,7 @@ def scorecard_finalize_form(
     request: Request,
     scorecard_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Finalize scorecard form."""
     return perf_web_service.scorecard_finalize_form_response(
@@ -970,7 +970,7 @@ async def finalize_scorecard(
     request: Request,
     scorecard_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Finalize a scorecard."""
     return await perf_web_service.finalize_scorecard_response(
@@ -988,7 +988,7 @@ def report_ratings(
     request: Request,
     cycle_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Ratings distribution report."""
     return perf_web_service.ratings_report_response(request, auth, db, cycle_id)
@@ -999,7 +999,7 @@ def report_by_department(
     request: Request,
     cycle_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Performance by department report."""
     return perf_web_service.by_department_report_response(request, auth, db, cycle_id)
@@ -1012,7 +1012,7 @@ def report_kpi_achievement(
     end_date: str | None = None,
     department_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KPI achievement report."""
     return perf_web_service.kpi_achievement_report_response(
@@ -1025,7 +1025,7 @@ def report_trends(
     request: Request,
     employee_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Performance trends report."""
     return perf_web_service.trends_report_response(request, auth, db, employee_id)

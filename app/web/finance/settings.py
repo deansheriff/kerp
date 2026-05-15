@@ -18,10 +18,10 @@ from sqlalchemy.orm import Session
 from app.services.finance.settings_web import settings_web_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
     get_async_db,
-    get_db,
     require_finance_access,
 )
 
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/settings", tags=["finance-settings"])
 async def settings_index(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Settings index page."""
     context = base_context(request, auth, "Settings", "settings", db=db)
@@ -88,7 +88,7 @@ async def numbering_sequences_list(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """List all numbering sequences for the organization."""
     result = await settings_web_service.get_numbering_list_context(
@@ -109,7 +109,7 @@ async def edit_numbering_sequence(
     sequence_id: uuid.UUID,
     auth: WebAuthContext = Depends(require_finance_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """Edit a numbering sequence configuration."""
     result, error = await settings_web_service.get_numbering_edit_context(
@@ -188,7 +188,7 @@ async def reset_numbering_sequence(
 async def automation_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Automation settings page."""
     result = settings_web_service.get_automation_settings_context(
@@ -208,7 +208,7 @@ async def automation_settings(
 async def update_automation_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update automation settings."""
     form_data = getattr(request.state, "csrf_form", None)
@@ -256,7 +256,7 @@ async def update_automation_settings(
 async def payroll_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Payroll settings page."""
     result = settings_web_service.get_payroll_settings_context(db, auth.organization_id)
@@ -271,7 +271,7 @@ async def payroll_settings(
 async def update_payroll_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update payroll settings."""
     form_data = getattr(request.state, "csrf_form", None)
@@ -304,7 +304,7 @@ async def update_payroll_settings(
 async def report_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Report settings page."""
     result = settings_web_service.get_reporting_context(db, auth.organization_id)
@@ -319,7 +319,7 @@ async def report_settings(
 async def update_report_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update report settings."""
     form_data = getattr(request.state, "csrf_form", None)
@@ -350,7 +350,7 @@ async def update_report_settings(
 async def exchange_rates_list(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List exchange rates."""
     from app.services.finance.platform.fx_settings_web import FXSettingsWebService
@@ -373,7 +373,7 @@ async def exchange_rates_list(
 async def create_exchange_rate(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a manual exchange rate."""
     from app.services.finance.platform.fx_settings_web import FXSettingsWebService
@@ -402,7 +402,7 @@ async def create_exchange_rate(
 async def fetch_exchange_rates(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Trigger exchange rate fetch from Currency API."""
     from app.services.finance.platform.fx_settings_web import FXSettingsWebService
@@ -424,7 +424,7 @@ async def delete_exchange_rate(
     request: Request,
     rate_id: uuid.UUID,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an exchange rate."""
     from app.services.finance.platform.fx_settings_web import FXSettingsWebService

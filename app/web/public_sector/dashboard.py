@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 from app.services.finance.ipsas.web.ipsas_web import IPSASWebService
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_public_sector_access,
 )
 
@@ -26,7 +26,7 @@ router = APIRouter(tags=["public-sector-dashboard"])
 def public_sector_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Public sector module dashboard."""
     context = base_context(request, auth, "Dashboard", "ps_dashboard", db=db)

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web import people_dashboard_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
 
 router = APIRouter(tags=["people-dashboard-web"])
 
@@ -19,7 +19,7 @@ router = APIRouter(tags=["people-dashboard-web"])
 def people_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """People module dashboard page."""
     return people_dashboard_service.dashboard_response(request, auth, db)

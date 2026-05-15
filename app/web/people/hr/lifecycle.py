@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web.lifecycle_web import lifecycle_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
 
 router = APIRouter(tags=["lifecycle"])
 
@@ -17,7 +17,7 @@ def new_onboarding_form(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Render form to create onboarding checklist for employee."""
     return lifecycle_web_service.new_onboarding_form_response(
@@ -33,7 +33,7 @@ async def create_onboarding(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create onboarding record for an employee."""
     return await lifecycle_web_service.create_onboarding_response(
@@ -49,7 +49,7 @@ async def start_onboarding(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Start the onboarding process for an employee."""
     return await lifecycle_web_service.start_onboarding_response(
@@ -65,7 +65,7 @@ async def toggle_onboarding_activity(
     employee_id: UUID,
     activity_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle an onboarding activity completion status."""
     return await lifecycle_web_service.toggle_onboarding_activity_response(
@@ -82,7 +82,7 @@ async def complete_onboarding(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark onboarding as complete."""
     return await lifecycle_web_service.complete_onboarding_response(
@@ -97,7 +97,7 @@ async def create_employee_user_credentials(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create user credentials for an employee."""
     return await lifecycle_web_service.create_employee_user_credentials_response(
@@ -113,7 +113,7 @@ async def link_employee_user(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Link an employee to an existing user (Person)."""
     return await lifecycle_web_service.link_employee_user_response(
@@ -128,7 +128,7 @@ async def link_employee_user(
 def search_people(
     query: str = Query("", min_length=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Search people by name or email for linking users."""
     return lifecycle_web_service.search_people_response(
@@ -142,7 +142,7 @@ def search_people(
 async def bulk_update_employees(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk update employees."""
     return await lifecycle_web_service.bulk_update_employees_response(
@@ -156,7 +156,7 @@ async def bulk_update_employees(
 async def bulk_delete_employees(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete employees."""
     return await lifecycle_web_service.bulk_delete_employees_response(
@@ -177,7 +177,7 @@ def list_promotions(
     employee_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List all promotions."""
     return lifecycle_web_service.list_promotions_response(
@@ -194,7 +194,7 @@ def new_promotion_form(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Render form to record a promotion for an employee."""
     return lifecycle_web_service.new_promotion_form_response(
@@ -210,7 +210,7 @@ async def create_promotion(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a promotion record for an employee."""
     return await lifecycle_web_service.create_promotion_response(
@@ -228,7 +228,7 @@ def promotion_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View promotion details."""
     return lifecycle_web_service.promotion_detail_response(
@@ -252,7 +252,7 @@ def list_transfers(
     employee_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List all transfers."""
     return lifecycle_web_service.list_transfers_response(
@@ -269,7 +269,7 @@ def new_transfer_form(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Render form to record a transfer for an employee."""
     return lifecycle_web_service.new_transfer_form_response(
@@ -285,7 +285,7 @@ async def create_transfer(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a transfer record for an employee."""
     return await lifecycle_web_service.create_transfer_response(
@@ -303,7 +303,7 @@ def transfer_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View transfer details."""
     return lifecycle_web_service.transfer_detail_response(

@@ -15,9 +15,9 @@ from app.services.remita.client import RemitaError
 from app.services.remita.web.remita_web import get_remita_web_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_finance_access,
 )
 
@@ -34,7 +34,7 @@ def remita_list(
     refresh_msg: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     RRR list page.
@@ -69,7 +69,7 @@ def remita_list(
 def generate_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     RRR generation form page.
@@ -122,7 +122,7 @@ def generate_rrr(
     source_type: str | None = Form(None),
     source_id: str | None = Form(None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Process RRR generation form.
@@ -221,7 +221,7 @@ def rrr_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     RRR detail page.
@@ -261,7 +261,7 @@ def refresh_status(
     request: Request,
     rrr_id: UUID,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Refresh RRR status from Remita API.
@@ -293,7 +293,7 @@ def mark_paid(
     payment_reference: str = Form(...),
     payment_channel: str = Form("Bank"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Manually mark RRR as paid.
@@ -326,7 +326,7 @@ def link_source(
     source_type: str = Form(...),
     source_id: str = Form(...),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Link an RRR to a source entity."""
     web_service = get_remita_web_service(db)
@@ -361,7 +361,7 @@ def source_search(
     date_to: str = Query(""),
     recent: bool = Query(False),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Search source entities for linking to an RRR."""
     web_service = get_remita_web_service(db)
@@ -385,7 +385,7 @@ def source_search(
 def refresh_all_pending(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Refresh status of all pending RRRs.
@@ -427,7 +427,7 @@ def cancel_rrr(
     request: Request,
     rrr_id: UUID,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Cancel a pending RRR.

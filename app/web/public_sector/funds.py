@@ -16,9 +16,9 @@ from sqlalchemy.orm import Session
 from app.services.finance.ipsas.web.ipsas_web import IPSASWebService
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_public_sector_access,
 )
 
@@ -30,7 +30,7 @@ router = APIRouter(tags=["public-sector-funds"])
 def funds_index(
     request: Request,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Funds landing page."""
     context = base_context(request, auth, "Funds", "ps_funds", db=db)
@@ -46,7 +46,7 @@ def list_funds(
     fund_type: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Fund list page."""
     context = base_context(request, auth, "Funds", "ps_funds", db=db)
@@ -61,7 +61,7 @@ def list_funds(
 def new_fund_form(
     request: Request,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create fund form page."""
     context = base_context(request, auth, "New Fund", "ps_funds", db=db)
@@ -75,7 +75,7 @@ def view_fund(
     request: Request,
     fund_id: str,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Fund detail page."""
     context = base_context(request, auth, "Fund Detail", "ps_funds", db=db)
@@ -98,7 +98,7 @@ def create_fund(
     donor_name: str | None = Form(None),
     donor_reference: str | None = Form(None),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create a fund (form submission)."""
     from app.schemas.finance.ipsas import FundCreate

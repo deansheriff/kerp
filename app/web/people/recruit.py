@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.services.people.recruit.web import recruit_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 router = APIRouter(prefix="/recruit", tags=["people-recruit-web"])
 
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/recruit", tags=["people-recruit-web"])
 def recruit_root(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Recruitment landing page."""
     context = base_context(request, auth, "Recruitment", "recruit", db=db)
@@ -61,7 +61,7 @@ def list_job_openings(
     department_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Job openings list page."""
     return recruit_web_service.list_job_openings_response(
@@ -73,7 +73,7 @@ def list_job_openings(
 def new_job_opening_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New job opening form."""
     return recruit_web_service.job_opening_new_form_response(request, auth, db)
@@ -83,7 +83,7 @@ def new_job_opening_form(
 async def create_job_opening(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new job opening."""
     return await recruit_web_service.create_job_opening_response(request, auth, db)
@@ -94,7 +94,7 @@ def job_opening_detail(
     request: Request,
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Job opening detail page."""
     return recruit_web_service.job_opening_detail_response(
@@ -108,7 +108,7 @@ def job_applicant_report(
     job_opening_id: str,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Job-scoped applicant report with dynamic form filters."""
     return recruit_web_service.job_applicant_report_response(
@@ -122,7 +122,7 @@ def export_job_applicant_report(
     job_opening_id: str,
     fields: list[str] | None = Query(default=None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export job-scoped applicant report rows to CSV."""
     return recruit_web_service.export_job_applicant_report_csv_response(
@@ -135,7 +135,7 @@ def edit_job_opening_form(
     request: Request,
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit job opening form."""
     return recruit_web_service.job_opening_edit_form_response(
@@ -148,7 +148,7 @@ async def update_job_opening(
     request: Request,
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a job opening."""
     return await recruit_web_service.update_job_opening_response(
@@ -160,7 +160,7 @@ async def update_job_opening(
 def publish_job_opening(
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Publish a job opening."""
     return recruit_web_service.publish_job_opening_response(auth, db, job_opening_id)
@@ -170,7 +170,7 @@ def publish_job_opening(
 def hold_job_opening(
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Put a job opening on hold."""
     return recruit_web_service.hold_job_opening_response(auth, db, job_opening_id)
@@ -180,7 +180,7 @@ def hold_job_opening(
 def reopen_job_opening(
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reopen a job opening."""
     return recruit_web_service.reopen_job_opening_response(auth, db, job_opening_id)
@@ -190,7 +190,7 @@ def reopen_job_opening(
 def close_job_opening(
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Close a job opening."""
     return recruit_web_service.close_job_opening_response(auth, db, job_opening_id)
@@ -200,7 +200,7 @@ def close_job_opening(
 def delete_job_opening(
     job_opening_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a job opening."""
     return recruit_web_service.delete_job_opening_response(auth, db, job_opening_id)
@@ -220,7 +220,7 @@ def list_applicants(
     source: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Job applicants list page."""
     return recruit_web_service.list_applicants_response(
@@ -233,7 +233,7 @@ def new_applicant_form(
     request: Request,
     job_opening_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New applicant form."""
     return recruit_web_service.applicant_new_form_response(
@@ -245,7 +245,7 @@ def new_applicant_form(
 async def create_applicant(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new applicant."""
     return await recruit_web_service.create_applicant_response(request, auth, db)
@@ -256,7 +256,7 @@ def applicant_detail(
     request: Request,
     applicant_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Applicant detail page."""
     return recruit_web_service.applicant_detail_response(
@@ -269,7 +269,7 @@ def edit_applicant_form(
     request: Request,
     applicant_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit applicant form."""
     return recruit_web_service.applicant_edit_form_response(
@@ -282,7 +282,7 @@ async def update_applicant(
     request: Request,
     applicant_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an applicant."""
     return await recruit_web_service.update_applicant_response(
@@ -295,7 +295,7 @@ async def advance_applicant_status(
     request: Request,
     applicant_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Advance applicant through pipeline."""
     return await recruit_web_service.advance_applicant_response(
@@ -308,7 +308,7 @@ async def reject_applicant(
     request: Request,
     applicant_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reject an applicant."""
     return await recruit_web_service.reject_applicant_response(
@@ -320,7 +320,7 @@ async def reject_applicant(
 def delete_applicant(
     applicant_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an applicant."""
     return recruit_web_service.delete_applicant_response(auth, db, applicant_id)
@@ -341,7 +341,7 @@ def list_interviews(
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Interviews list page."""
     return recruit_web_service.list_interviews_response(
@@ -362,7 +362,7 @@ def new_interview_form(
     request: Request,
     applicant_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New interview form."""
     return recruit_web_service.interview_new_form_response(
@@ -374,7 +374,7 @@ def new_interview_form(
 async def create_interview(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Schedule a new interview."""
     return await recruit_web_service.create_interview_response(request, auth, db)
@@ -385,7 +385,7 @@ def interview_detail(
     request: Request,
     interview_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Interview detail page."""
     return recruit_web_service.interview_detail_response(
@@ -398,7 +398,7 @@ def edit_interview_form(
     request: Request,
     interview_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit interview form."""
     return recruit_web_service.interview_edit_form_response(
@@ -411,7 +411,7 @@ async def update_interview(
     request: Request,
     interview_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an interview."""
     return await recruit_web_service.update_interview_response(
@@ -424,7 +424,7 @@ async def cancel_interview(
     request: Request,
     interview_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel an interview."""
     return await recruit_web_service.cancel_interview_response(
@@ -437,7 +437,7 @@ async def record_interview_feedback(
     request: Request,
     interview_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Record interview feedback."""
     return await recruit_web_service.record_interview_feedback_response(
@@ -458,7 +458,7 @@ def list_job_offers(
     applicant_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Job offers list page."""
     return recruit_web_service.list_offers_response(
@@ -471,7 +471,7 @@ def new_offer_form(
     request: Request,
     applicant_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New job offer form."""
     return recruit_web_service.offer_new_form_response(request, auth, db, applicant_id)
@@ -481,7 +481,7 @@ def new_offer_form(
 async def create_offer(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new job offer."""
     return await recruit_web_service.create_offer_response(request, auth, db)
@@ -492,7 +492,7 @@ def offer_detail(
     request: Request,
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Job offer detail page."""
     return recruit_web_service.offer_detail_response(request, auth, db, offer_id)
@@ -503,7 +503,7 @@ def edit_offer_form(
     request: Request,
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit job offer form."""
     return recruit_web_service.offer_edit_form_response(request, auth, db, offer_id)
@@ -514,7 +514,7 @@ async def update_offer(
     request: Request,
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a job offer."""
     return await recruit_web_service.update_offer_response(request, auth, db, offer_id)
@@ -524,7 +524,7 @@ async def update_offer(
 def extend_offer(
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Extend offer to candidate."""
     return recruit_web_service.extend_offer_response(auth, db, offer_id)
@@ -534,7 +534,7 @@ def extend_offer(
 def accept_offer(
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark offer as accepted."""
     return recruit_web_service.accept_offer_response(auth, db, offer_id)
@@ -544,7 +544,7 @@ def accept_offer(
 def convert_offer(
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Convert accepted offer to employee."""
     return recruit_web_service.convert_offer_response(auth, db, offer_id)
@@ -555,7 +555,7 @@ async def decline_offer(
     request: Request,
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark offer as declined."""
     return await recruit_web_service.decline_offer_response(request, auth, db, offer_id)
@@ -566,7 +566,7 @@ async def withdraw_offer(
     request: Request,
     offer_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Withdraw an offer."""
     return await recruit_web_service.withdraw_offer_response(
@@ -584,7 +584,7 @@ def report_pipeline(
     request: Request,
     job_opening_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Recruitment pipeline report."""
     return recruit_web_service.pipeline_report_response(
@@ -598,7 +598,7 @@ def report_time_to_hire(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Time to hire report."""
     return recruit_web_service.time_to_hire_report_response(
@@ -612,7 +612,7 @@ def report_sources(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Applicant source analysis report."""
     return recruit_web_service.source_analysis_report_response(
@@ -626,7 +626,7 @@ def report_overview(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Recruitment overview report."""
     return recruit_web_service.overview_report_response(

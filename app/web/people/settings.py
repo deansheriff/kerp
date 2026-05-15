@@ -13,10 +13,10 @@ from sqlalchemy.orm import Session
 from app.services.people.settings_web import people_settings_web_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
     get_async_db,
-    get_db,
     require_hr_access,
 )
 
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/settings", tags=["people-settings"])
 async def settings_index(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """People settings index page."""
     context = base_context(request, auth, "Settings", "settings", db=db)
@@ -70,7 +70,7 @@ async def hr_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """HR settings page - employee ID format, attendance mode, probation."""
     result = await people_settings_web_service.get_hr_settings_context(
@@ -88,7 +88,7 @@ async def update_hr_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """Update HR settings."""
     form_data = await request.form()
@@ -115,7 +115,7 @@ async def payroll_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """Payroll settings page - frequency and payment configuration."""
     result = await people_settings_web_service.get_hr_settings_context(
@@ -133,7 +133,7 @@ async def update_payroll_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """Update payroll settings."""
     form_data = await request.form()
@@ -164,7 +164,7 @@ async def leave_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """Leave settings page - leave year start and policies."""
     result = await people_settings_web_service.get_hr_settings_context(
@@ -182,7 +182,7 @@ async def update_leave_settings(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """Update leave settings."""
     form_data = await request.form()
@@ -211,7 +211,7 @@ async def organization_profile(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: AsyncSession = Depends(get_async_db),
-    sync_db: Session = Depends(get_db),
+    sync_db: Session = Depends(get_db_for_org),
 ):
     """Organization profile page (read-only for HR users)."""
     result = await people_settings_web_service.get_organization_context(

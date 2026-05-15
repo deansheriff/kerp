@@ -23,7 +23,7 @@ from app.services.people.hr import (
 )
 from app.services.people.hr.web.employee_web import DEFAULT_PAGE_SIZE, DROPDOWN_LIMIT
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 router = APIRouter(tags=["positions"])
 
@@ -127,7 +127,7 @@ def list_positions(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Position list page."""
     org_id = coerce_uuid(auth.organization_id)
@@ -158,7 +158,7 @@ def list_positions(
 def positions_tree(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Organizational chart view rendered as a recursive tree."""
     org_id = coerce_uuid(auth.organization_id)
@@ -174,7 +174,7 @@ def positions_tree(
 def new_position_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New position form."""
     context = _position_form_context(
@@ -190,7 +190,7 @@ def new_position_form(
 async def create_position(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a position."""
     form = getattr(request.state, "csrf_form", None)
@@ -256,7 +256,7 @@ def edit_position_form(
     error: str | None = None,
     form_error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit position form."""
     try:
@@ -285,7 +285,7 @@ async def update_position(
     request: Request,
     position_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a position."""
     form = getattr(request.state, "csrf_form", None)
@@ -352,7 +352,7 @@ async def create_position_assignment(
     request: Request,
     position_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Assign an employee to a position."""
     form = getattr(request.state, "csrf_form", None)
@@ -400,7 +400,7 @@ async def end_position_assignment(
     position_id: UUID,
     assignment_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """End a position assignment."""
     form = getattr(request.state, "csrf_form", None)

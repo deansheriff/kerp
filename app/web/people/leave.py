@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.leave.web import leave_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
 
 router = APIRouter(prefix="/leave", tags=["people-leave-web"])
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/leave", tags=["people-leave-web"])
 def leave_overview(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave overview page."""
     return leave_web_service.leave_overview_response(request, auth, db)
@@ -32,7 +32,7 @@ def leave_types(
     is_active: bool | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave types list page."""
     return leave_web_service.leave_types_response(
@@ -57,7 +57,7 @@ def leave_applications(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave applications list page."""
     return leave_web_service.leave_applications_response(
@@ -87,7 +87,7 @@ def leave_allocations(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave allocations list page."""
     return leave_web_service.leave_allocations_response(
@@ -112,7 +112,7 @@ def leave_holidays(
     is_active: bool | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Holiday lists page."""
     return leave_web_service.leave_holidays_response(
@@ -134,7 +134,7 @@ def leave_holidays(
 def new_leave_type_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New leave type form."""
     return leave_web_service.new_leave_type_form_response(
@@ -148,7 +148,7 @@ def new_leave_type_form(
 async def create_leave_type(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle leave type creation."""
     return await leave_web_service.create_leave_type_response(
@@ -163,7 +163,7 @@ def edit_leave_type_form(
     request: Request,
     leave_type_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit leave type form."""
     return leave_web_service.edit_leave_type_form_response(
@@ -179,7 +179,7 @@ async def update_leave_type(
     request: Request,
     leave_type_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle leave type update."""
     return await leave_web_service.update_leave_type_response(
@@ -199,7 +199,7 @@ async def update_leave_type(
 def new_allocation_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New leave allocation form."""
     return leave_web_service.new_allocation_form_response(
@@ -213,7 +213,7 @@ def new_allocation_form(
 async def create_allocation(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle allocation creation."""
     return await leave_web_service.create_allocation_response(
@@ -230,7 +230,7 @@ def view_allocation(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View allocation details."""
     return leave_web_service.view_allocation_response(
@@ -248,7 +248,7 @@ def edit_allocation_form(
     request: Request,
     allocation_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit allocation form."""
     return leave_web_service.edit_allocation_form_response(
@@ -264,7 +264,7 @@ async def update_allocation(
     request: Request,
     allocation_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle allocation update."""
     return await leave_web_service.update_allocation_response(
@@ -280,7 +280,7 @@ async def delete_allocation(
     request: Request,
     allocation_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an allocation."""
     return leave_web_service.delete_allocation_response(
@@ -295,7 +295,7 @@ async def encash_allocation(
     request: Request,
     allocation_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Process leave encashment for an allocation."""
     return await leave_web_service.encash_allocation_response(
@@ -310,7 +310,7 @@ async def encash_allocation(
 async def bulk_create_allocations(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk create leave allocations for multiple employees."""
     return await leave_web_service.bulk_create_allocations_response(
@@ -329,7 +329,7 @@ async def bulk_create_allocations(
 def new_application_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New leave application form."""
     return leave_web_service.new_application_form_response(
@@ -343,7 +343,7 @@ def new_application_form(
 async def create_application(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle application creation."""
     return await leave_web_service.create_application_response(
@@ -360,7 +360,7 @@ def view_application(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View application details."""
     return leave_web_service.view_application_response(
@@ -378,7 +378,7 @@ def edit_application_form(
     request: Request,
     application_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit application form."""
     return leave_web_service.edit_application_form_response(
@@ -394,7 +394,7 @@ async def update_application(
     request: Request,
     application_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle application update."""
     return await leave_web_service.update_application_response(
@@ -410,7 +410,7 @@ async def approve_application(
     request: Request,
     application_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve a leave application."""
     return leave_web_service.approve_application_response(
@@ -425,7 +425,7 @@ async def reject_application(
     request: Request,
     application_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reject a leave application."""
     return await leave_web_service.reject_application_response(
@@ -441,7 +441,7 @@ async def cancel_application(
     request: Request,
     application_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel a leave application."""
     return leave_web_service.cancel_application_response(
@@ -460,7 +460,7 @@ async def cancel_application(
 def new_holiday_list_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New holiday list form."""
     return leave_web_service.new_holiday_list_form_response(
@@ -474,7 +474,7 @@ def new_holiday_list_form(
 async def create_holiday_list(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle holiday list creation."""
     return await leave_web_service.create_holiday_list_response(
@@ -489,7 +489,7 @@ def view_holiday_list(
     request: Request,
     holiday_list_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View holiday list details."""
     return leave_web_service.view_holiday_list_response(
@@ -505,7 +505,7 @@ def edit_holiday_list_form(
     request: Request,
     holiday_list_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit holiday list form."""
     return leave_web_service.edit_holiday_list_form_response(
@@ -521,7 +521,7 @@ async def update_holiday_list(
     request: Request,
     holiday_list_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle holiday list update."""
     return await leave_web_service.update_holiday_list_response(
@@ -537,7 +537,7 @@ async def delete_holiday_list(
     request: Request,
     holiday_list_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a holiday list."""
     return leave_web_service.delete_holiday_list_response(
@@ -559,7 +559,7 @@ def leave_balance_report(
     department_id: str | None = None,
     page: int = Query(1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave balance report page."""
     return leave_web_service.leave_balance_report_response(
@@ -578,7 +578,7 @@ def leave_usage_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave usage report page."""
     return leave_web_service.leave_usage_report_response(
@@ -597,7 +597,7 @@ def leave_calendar_report(
     end_date: str | None = None,
     department_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave calendar report page."""
     return leave_web_service.leave_calendar_report_response(
@@ -615,7 +615,7 @@ def leave_trends_report(
     request: Request,
     months: int = Query(default=12, ge=3, le=24),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Leave trends report page."""
     return leave_web_service.leave_trends_report_response(
@@ -635,7 +635,7 @@ def leave_trends_report(
 async def bulk_approve_applications(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk approve leave applications."""
     return await leave_web_service.bulk_approve_applications_response(
@@ -649,7 +649,7 @@ async def bulk_approve_applications(
 async def bulk_reject_applications(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk reject leave applications."""
     return await leave_web_service.bulk_reject_applications_response(

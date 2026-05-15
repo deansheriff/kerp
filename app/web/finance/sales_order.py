@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.finance.ar.web import sales_order_web_service
-from app.web.deps import WebAuthContext, get_db, require_finance_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_finance_access
 
 router = APIRouter(prefix="/sales-orders", tags=["sales-orders-web"])
 
@@ -31,7 +31,7 @@ def sales_order_list(
     sort_dir: str | None = None,
     page: int = 1,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Sales order list page."""
     return sales_order_web_service.list_response(
@@ -59,7 +59,7 @@ def new_so_form(
     customer_id: str | None = None,
     quote_id: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New sales order form."""
     return sales_order_web_service.new_form_response(
@@ -90,7 +90,7 @@ def create_sales_order(
     internal_notes: str | None = Form(None),
     lines_json: str = Form("[]"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create new sales order."""
     return sales_order_web_service.create_response(
@@ -129,7 +129,7 @@ def sales_order_detail(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Sales order detail page."""
     return sales_order_web_service.detail_response(request, auth, db, so_id)
@@ -145,7 +145,7 @@ def submit_order(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit sales order for approval."""
     return sales_order_web_service.submit_response(request, auth, db, so_id)
@@ -156,7 +156,7 @@ def approve_order(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve sales order."""
     return sales_order_web_service.approve_response(request, auth, db, so_id)
@@ -167,7 +167,7 @@ def confirm_order(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Confirm sales order."""
     return sales_order_web_service.confirm_response(request, auth, db, so_id)
@@ -179,7 +179,7 @@ def cancel_order(
     so_id: str,
     reason: str | None = Form(None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel sales order."""
     return sales_order_web_service.cancel_response(request, auth, db, so_id, reason)
@@ -190,7 +190,7 @@ def hold_order(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Put sales order on hold."""
     return sales_order_web_service.hold_response(request, auth, db, so_id)
@@ -201,7 +201,7 @@ def release_order(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Release sales order from hold."""
     return sales_order_web_service.release_response(request, auth, db, so_id)
@@ -212,7 +212,7 @@ def create_invoice_from_order(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create invoice from shipped lines."""
     return sales_order_web_service.create_invoice_response(request, auth, db, so_id)
@@ -228,7 +228,7 @@ def ship_order_form(
     request: Request,
     so_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Shipment form for sales order."""
     return sales_order_web_service.shipment_form_response(request, auth, db, so_id)
@@ -245,7 +245,7 @@ def create_shipment(
     notes: str | None = Form(None),
     line_quantities_json: str = Form("[]"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create shipment for sales order."""
     return sales_order_web_service.create_shipment_response(
@@ -267,7 +267,7 @@ def mark_delivered(
     request: Request,
     shipment_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark shipment as delivered."""
     return sales_order_web_service.mark_delivered_response(

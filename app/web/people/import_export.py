@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.services.people.hr.web.import_web import hr_import_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 
 def _build_target_fields(
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/import", tags=["people-import-web"])
 def hr_import_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """HR import dashboard page."""
     context = base_context(request, auth, "People Import", "people", db=db)
@@ -49,7 +49,7 @@ def hr_import_form(
     request: Request,
     entity_type: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """HR import form for a specific entity type."""
     from app.services.finance.import_export.base import build_alias_map
@@ -104,7 +104,7 @@ async def hr_import_preview(
     entity_type: str,
     file: UploadFile = File(...),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Preview HR import with validation and column mapping."""
     try:
@@ -133,7 +133,7 @@ async def hr_execute_import(
     dry_run: str | None = Form(default=None),
     column_mapping: str | None = Form(default=None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Execute HR import operation (web route)."""
     import json

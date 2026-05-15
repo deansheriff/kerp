@@ -13,8 +13,8 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
-    get_db,
     require_government_pms_mode,
     require_hr_access,
 )
@@ -37,7 +37,7 @@ router = APIRouter(
 def pms_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """OHCSF PMS compliance dashboard."""
     from app.services.people.perf.web.ohcsf_dashboard_web import (
@@ -51,7 +51,7 @@ def pms_dashboard(
 def governance_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """PMS governance dashboard."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -72,7 +72,7 @@ def list_contracts(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Performance contracts list page."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -88,7 +88,7 @@ def new_contract_form(
     cycle_id: str | None = None,
     employee_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New performance contract form."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -102,7 +102,7 @@ def new_contract_form(
 async def create_contract(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new performance contract."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -117,7 +117,7 @@ def contract_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Performance contract detail page."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -132,7 +132,7 @@ async def sign_contract_employee(
     request: Request,
     contract_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Employee signs the performance contract."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -145,7 +145,7 @@ async def sign_contract_supervisor(
     request: Request,
     contract_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Supervisor signs the performance contract."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -158,7 +158,7 @@ async def amend_contract(
     request: Request,
     contract_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create amendment and start staged signoff workflow."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -176,7 +176,7 @@ async def approve_contract_amendment_stage(
     contract_id: str,
     stage: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve one stage of amendment signoff chain."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -196,7 +196,7 @@ async def reject_contract_amendment_stage(
     contract_id: str,
     stage: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reject pending amendment at a specific stage."""
     from app.services.people.perf.web.contract_web import ContractWebService
@@ -220,7 +220,7 @@ def list_reviews(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Monthly reviews list page."""
     from app.services.people.perf.web.monthly_review_web import MonthlyReviewWebService
@@ -242,7 +242,7 @@ def pms_countersign_queue(
     request: Request,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS countersign queue."""
     from app.services.people.perf.web import perf_web_service
@@ -257,7 +257,7 @@ def pms_self_assessment_queue(
     request: Request,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS self-assessment queue."""
     from app.services.people.perf.web import perf_web_service
@@ -272,7 +272,7 @@ def pms_quarterly_reviews(
     request: Request,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS quarterly reviews overview."""
     from app.services.people.perf.web import perf_web_service
@@ -285,7 +285,7 @@ def pms_manager_review_queue(
     request: Request,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS manager review queue."""
     from app.services.people.perf.web import perf_web_service
@@ -300,7 +300,7 @@ def pms_committee_queue(
     request: Request,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS committee queue."""
     from app.services.people.perf.web import perf_web_service
@@ -314,7 +314,7 @@ def pms_committee_queue(
 def pms_start_self_assessment(
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Start PMS self-assessment."""
     from app.services.people.perf.web import perf_web_service
@@ -326,7 +326,7 @@ def pms_start_self_assessment(
 def pms_start_manager_review(
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Start PMS manager review."""
     from app.services.people.perf.web import perf_web_service
@@ -339,7 +339,7 @@ def pms_self_assessment_form(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """PMS self-assessment form page."""
     from app.services.people.perf.web import perf_web_service
@@ -354,7 +354,7 @@ async def pms_submit_self_assessment(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit PMS self-assessment."""
     from app.services.people.perf.web import perf_web_service
@@ -369,7 +369,7 @@ def pms_manager_review_form(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """PMS manager review form page."""
     from app.services.people.perf.web import perf_web_service
@@ -384,7 +384,7 @@ async def pms_submit_manager_review(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit PMS manager review."""
     from app.services.people.perf.web import perf_web_service
@@ -399,7 +399,7 @@ def pms_appraisal_detail(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS appraisal queue detail."""
     from app.services.people.perf.web import perf_web_service
@@ -414,7 +414,7 @@ async def pms_submit_countersign(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS countersign action."""
     from app.services.people.perf.web import perf_web_service
@@ -429,7 +429,7 @@ async def pms_submit_committee_review(
     request: Request,
     appraisal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Government PMS committee review action."""
     from app.services.people.perf.web import perf_web_service
@@ -445,7 +445,7 @@ def new_review_form(
     employee_id: str | None = None,
     contract_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New monthly review form."""
     from app.services.people.perf.web.monthly_review_web import MonthlyReviewWebService
@@ -459,7 +459,7 @@ def new_review_form(
 async def create_review(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new monthly review."""
     from app.services.people.perf.web.monthly_review_web import MonthlyReviewWebService
@@ -474,7 +474,7 @@ def review_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Monthly review detail page."""
     from app.services.people.perf.web.monthly_review_web import MonthlyReviewWebService
@@ -489,7 +489,7 @@ async def submit_review(
     request: Request,
     review_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit a monthly review."""
     from app.services.people.perf.web.monthly_review_web import MonthlyReviewWebService
@@ -504,7 +504,7 @@ async def acknowledge_review(
     request: Request,
     review_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Acknowledge a monthly review."""
     from app.services.people.perf.web.monthly_review_web import MonthlyReviewWebService
@@ -524,7 +524,7 @@ def list_pips(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """PIPs list page."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -543,7 +543,7 @@ def list_pips(
 def new_pip_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New PIP form."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -555,7 +555,7 @@ def new_pip_form(
 async def create_pip(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new PIP."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -568,7 +568,7 @@ def pip_detail(
     request: Request,
     pip_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """PIP detail page."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -581,7 +581,7 @@ async def activate_pip(
     request: Request,
     pip_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Activate a PIP."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -594,7 +594,7 @@ async def extend_pip(
     request: Request,
     pip_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Extend a PIP end date."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -607,7 +607,7 @@ async def pip_record_review(
     request: Request,
     pip_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Record a PIP interval review."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -620,7 +620,7 @@ async def complete_pip(
     request: Request,
     pip_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Complete a PIP with an outcome."""
     from app.services.people.perf.web.pip_web import PIPWebService
@@ -640,7 +640,7 @@ def list_appeals(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appeals list page."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -659,7 +659,7 @@ def list_appeals(
 def new_appeal_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New appeal form."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -671,7 +671,7 @@ def new_appeal_form(
 async def create_appeal(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new appeal."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -684,7 +684,7 @@ def appeal_detail(
     request: Request,
     appeal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appeal detail page."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -697,7 +697,7 @@ async def assign_mediator(
     request: Request,
     appeal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Assign a mediator to an appeal."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -712,7 +712,7 @@ async def record_mediation_outcome(
     request: Request,
     appeal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Record the outcome of mediation for an appeal."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -727,7 +727,7 @@ async def record_committee_decision(
     request: Request,
     appeal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Record an appeal committee decision."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -742,7 +742,7 @@ async def communicate_appeal_decision(
     request: Request,
     appeal_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Communicate the final decision on an appeal to the appellant."""
     from app.services.people.perf.web.appeal_web import AppealWebService
@@ -764,7 +764,7 @@ def list_institutional(
     cycle_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Institutional performance list page."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -783,7 +783,7 @@ def list_institutional(
 def new_institutional_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New institutional performance form."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -795,7 +795,7 @@ def new_institutional_form(
 async def create_institutional(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new institutional performance record."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -810,7 +810,7 @@ def institutional_detail(
     request: Request,
     inst_perf_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Institutional performance detail page."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -825,7 +825,7 @@ async def score_institutional(
     request: Request,
     inst_perf_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Score criteria for an institutional performance record."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -840,7 +840,7 @@ async def reconcile_institutional(
     request: Request,
     inst_perf_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reconcile institutional performance with employee ratings."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -857,7 +857,7 @@ async def assign_institutional_governance(
     request: Request,
     inst_perf_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Assign governance owner/reviewer/approver for institutional record."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -874,7 +874,7 @@ async def transition_institutional_stage(
     request: Request,
     inst_perf_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Transition institutional governance workflow stage."""
     from app.services.people.perf.web.institutional_web import InstitutionalWebService
@@ -896,7 +896,7 @@ def list_objectives(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Strategic objectives list page."""
     from app.services.people.perf.web.strategic_objective_web import (
@@ -917,7 +917,7 @@ def list_objectives(
 def new_objective_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New strategic objective form."""
     from app.services.people.perf.web.strategic_objective_web import (
@@ -931,7 +931,7 @@ def new_objective_form(
 async def create_objective(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new strategic objective."""
     from app.services.people.perf.web.strategic_objective_web import (
@@ -952,7 +952,7 @@ async def create_objective(
 def pms_reports_hub(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """PMS reports hub."""
     from app.services.people.perf.web.pms_reports_web import PMSReportsWebService
@@ -965,7 +965,7 @@ def pms_report(
     request: Request,
     report_type: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Individual PMS report page."""
     from app.services.people.perf.web.pms_reports_web import PMSReportsWebService
@@ -991,7 +991,7 @@ def pms_list_kras(
     department_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KRAs list page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1011,7 +1011,7 @@ def pms_list_kras(
 def pms_new_kra_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New KRA form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1023,7 +1023,7 @@ def pms_new_kra_form(
 async def pms_create_kra(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new KRA (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1037,7 +1037,7 @@ def pms_kra_detail(
     kra_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KRA detail page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1052,7 +1052,7 @@ def pms_edit_kra_form(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit KRA form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1065,7 +1065,7 @@ async def pms_update_kra(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a KRA (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1078,7 +1078,7 @@ def pms_toggle_kra_active(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle KRA active status (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1091,7 +1091,7 @@ def pms_delete_kra(
     request: Request,
     kra_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a KRA (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1112,7 +1112,7 @@ def pms_list_cycles(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal cycles list page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1132,7 +1132,7 @@ def pms_list_cycles(
 def pms_new_cycle_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New appraisal cycle form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1144,7 +1144,7 @@ def pms_new_cycle_form(
 async def pms_create_cycle(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new appraisal cycle (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1159,7 +1159,7 @@ def pms_cycle_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal cycle detail page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1174,7 +1174,7 @@ def pms_edit_cycle_form(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit appraisal cycle form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1187,7 +1187,7 @@ async def pms_update_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an appraisal cycle (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1200,7 +1200,7 @@ def pms_activate_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Activate an appraisal cycle (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1213,7 +1213,7 @@ def pms_advance_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Advance cycle to next phase (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1226,7 +1226,7 @@ def pms_cancel_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel an appraisal cycle (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1239,7 +1239,7 @@ def pms_delete_cycle(
     request: Request,
     cycle_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an appraisal cycle (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1262,7 +1262,7 @@ def pms_list_goals(
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KPIs list page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1277,7 +1277,7 @@ def pms_new_goal_form(
     request: Request,
     employee_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New KPI form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1289,7 +1289,7 @@ def pms_new_goal_form(
 async def pms_create_goal(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new KPI (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1302,7 +1302,7 @@ def pms_goal_detail(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """KPI detail page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1315,7 +1315,7 @@ def pms_edit_goal_form(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit KPI form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1328,7 +1328,7 @@ async def pms_update_goal(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a KPI (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1341,7 +1341,7 @@ async def pms_update_goal_progress(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update KPI progress (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1356,7 +1356,7 @@ def pms_delete_goal(
     request: Request,
     kpi_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a KPI (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1377,7 +1377,7 @@ def pms_list_feedback_requests(
     submitted: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Feedback requests list page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1392,7 +1392,7 @@ def pms_request_feedback_form(
     request: Request,
     appraisal_id: str = Query(...),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Request feedback form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1406,7 +1406,7 @@ def pms_request_feedback_form(
 async def pms_create_feedback_request(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create feedback request (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1421,7 +1421,7 @@ def pms_feedback_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Feedback detail page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1436,7 +1436,7 @@ def pms_submit_feedback_form(
     request: Request,
     feedback_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit feedback form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1451,7 +1451,7 @@ async def pms_submit_feedback(
     request: Request,
     feedback_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit feedback (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1466,7 +1466,7 @@ def pms_delete_feedback(
     request: Request,
     feedback_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a feedback request (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1487,7 +1487,7 @@ def pms_list_templates(
     department_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal templates list page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1507,7 +1507,7 @@ def pms_list_templates(
 def pms_new_template_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New appraisal template form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1519,7 +1519,7 @@ def pms_new_template_form(
 async def pms_create_template(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new appraisal template (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1533,7 +1533,7 @@ def pms_template_detail(
     template_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Appraisal template detail page (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1552,7 +1552,7 @@ def pms_edit_template_form(
     request: Request,
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit appraisal template form (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1565,7 +1565,7 @@ async def pms_update_template(
     request: Request,
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an appraisal template (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1579,7 +1579,7 @@ async def pms_update_template(
 def pms_toggle_template_active(
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle template active status (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1591,7 +1591,7 @@ def pms_toggle_template_active(
 def pms_delete_template(
     template_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a template (PMS mode)."""
     from app.services.people.perf.web import perf_web_service
@@ -1610,7 +1610,7 @@ def list_grievances(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """PMS grievance list page."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1622,7 +1622,7 @@ def list_grievances(
 def new_grievance_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New grievance form page."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1634,7 +1634,7 @@ def new_grievance_form(
 async def create_grievance(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create governance grievance."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1647,7 +1647,7 @@ async def assign_grievance(
     request: Request,
     grievance_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Assign grievance to HR/committee officer."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1665,7 +1665,7 @@ async def resolve_grievance(
     request: Request,
     grievance_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Resolve grievance with final notes."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1683,7 +1683,7 @@ async def escalate_grievance(
     request: Request,
     grievance_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Escalate unresolved grievance to FCSC."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1707,7 +1707,7 @@ def list_stakeholder_feedback(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Stakeholder feedback list page."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1719,7 +1719,7 @@ def list_stakeholder_feedback(
 def new_stakeholder_feedback_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New stakeholder feedback form page."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1731,7 +1731,7 @@ def new_stakeholder_feedback_form(
 async def create_stakeholder_feedback(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create stakeholder feedback."""
     from app.services.people.perf.web.governance_web import governance_web_service
@@ -1751,7 +1751,7 @@ def rewards_hub(
     cycle_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Rewards and recognition workflow page."""
     from app.services.people.perf.web.reward_web import reward_web_service
@@ -1770,7 +1770,7 @@ def rewards_hub(
 async def nominate_reward(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create reward nomination from completed appraisal."""
     from app.services.people.perf.web.reward_web import reward_web_service
@@ -1783,7 +1783,7 @@ async def approve_reward(
     request: Request,
     action_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve pending reward nomination."""
     from app.services.people.perf.web.reward_web import reward_web_service
@@ -1801,7 +1801,7 @@ async def cancel_reward(
     request: Request,
     action_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel pending reward nomination."""
     from app.services.people.perf.web.reward_web import reward_web_service

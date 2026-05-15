@@ -20,7 +20,7 @@ from app.services.finance.rpt.async_exports import (
     get_export_status,
     queue_background_export,
 )
-from app.web.deps import WebAuthContext, get_db, require_finance_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_finance_access
 
 router = APIRouter(prefix="/ar", tags=["ar-web"])
 
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/ar", tags=["ar-web"])
 def ar_home(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Accounts receivable landing page."""
     return ar_web_service.ar_home_response(request, auth, db)
@@ -46,7 +46,7 @@ def list_customers(
     sort: str | None = None,
     sort_dir: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Customers list page."""
     return ar_web_service.list_customers_response(
@@ -67,7 +67,7 @@ def list_customers(
 def new_customer_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New customer form page."""
     return ar_web_service.customer_new_form_response(request, auth, db)
@@ -79,7 +79,7 @@ async def export_all_customers(
     search: str = "",
     status: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all customers matching filters to CSV."""
     return await ar_web_service.export_all_customers_response(auth, db, search, status)
@@ -90,7 +90,7 @@ def view_customer(
     request: Request,
     customer_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Customer detail page."""
     return ar_web_service.customer_detail_response(request, auth, db, customer_id)
@@ -101,7 +101,7 @@ def edit_customer_form(
     request: Request,
     customer_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit customer form page."""
     return ar_web_service.customer_edit_form_response(request, auth, db, customer_id)
@@ -111,7 +111,7 @@ def edit_customer_form(
 async def create_customer(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle customer form submission."""
     return await ar_web_service.create_customer_response(request, auth, db)
@@ -122,7 +122,7 @@ async def update_customer(
     request: Request,
     customer_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle customer update form submission."""
     return await ar_web_service.update_customer_response(request, auth, db, customer_id)
@@ -133,7 +133,7 @@ def delete_customer(
     request: Request,
     customer_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a customer."""
     return ar_web_service.delete_customer_response(request, auth, db, customer_id)
@@ -148,7 +148,7 @@ def delete_customer(
 async def bulk_delete_customers(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete customers."""
     return await ar_web_service.bulk_delete_customers_response(request, auth, db)
@@ -158,7 +158,7 @@ async def bulk_delete_customers(
 async def bulk_export_customers(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected customers to CSV."""
     return await ar_web_service.bulk_export_customers_response(request, auth, db)
@@ -168,7 +168,7 @@ async def bulk_export_customers(
 async def bulk_activate_customers(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk activate customers."""
     return await ar_web_service.bulk_activate_customers_response(request, auth, db)
@@ -178,7 +178,7 @@ async def bulk_activate_customers(
 async def bulk_deactivate_customers(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk deactivate customers."""
     return await ar_web_service.bulk_deactivate_customers_response(request, auth, db)
@@ -197,7 +197,7 @@ def list_invoices(
     sort: str | None = None,
     sort_dir: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR invoices list page."""
     return ar_web_service.list_invoices_response(
@@ -222,7 +222,7 @@ def new_invoice_form(
     customer_id: str | None = Query(None),
     duplicate_from: str | None = Query(None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New AR invoice form page."""
     return ar_web_service.invoice_new_form_response(
@@ -234,7 +234,7 @@ def new_invoice_form(
 async def create_invoice(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AR invoice form submission."""
     return await ar_web_service.create_invoice_response(request, auth, db)
@@ -249,7 +249,7 @@ async def export_all_invoices(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all invoices matching filters to CSV."""
     return await ar_web_service.export_all_invoices_response(
@@ -265,7 +265,7 @@ def queue_invoices_export(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Queue all AR invoices matching filters for CSV export."""
     instance = queue_background_export(
@@ -296,7 +296,7 @@ def queue_invoices_export(
 def download_invoices_export(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> Response:
     """Download a completed queued AR Invoices export."""
     body, filename, media_type, content_length = get_completed_export_for_download(
@@ -319,7 +319,7 @@ def download_invoices_export(
 def invoices_export_status(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Return the status of a queued AR Invoices export."""
     return JSONResponse(
@@ -338,7 +338,7 @@ def view_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR invoice detail page."""
     return ar_web_service.invoice_detail_response(request, auth, db, invoice_id)
@@ -349,7 +349,7 @@ def edit_invoice_form(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit AR invoice form page."""
     return ar_web_service.invoice_edit_form_response(request, auth, db, invoice_id)
@@ -360,7 +360,7 @@ async def update_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AR invoice update form submission."""
     return await ar_web_service.update_invoice_response(request, auth, db, invoice_id)
@@ -371,7 +371,7 @@ def submit_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit AR invoice for approval."""
     return ar_web_service.submit_invoice_response(request, auth, db, invoice_id)
@@ -382,7 +382,7 @@ def approve_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve AR invoice."""
     return ar_web_service.approve_invoice_response(request, auth, db, invoice_id)
@@ -393,7 +393,7 @@ def post_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Post AR invoice to general ledger."""
     return ar_web_service.post_invoice_response(request, auth, db, invoice_id)
@@ -404,7 +404,7 @@ def void_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Void an AR invoice."""
     return ar_web_service.void_invoice_response(request, auth, db, invoice_id)
@@ -415,7 +415,7 @@ def cancel_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel an AR invoice, returning to DRAFT for editing."""
     return ar_web_service.cancel_invoice_response(request, auth, db, invoice_id)
@@ -426,7 +426,7 @@ def delete_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an AR invoice."""
     return ar_web_service.delete_invoice_response(request, auth, db, invoice_id)
@@ -441,7 +441,7 @@ def delete_invoice(
 async def bulk_delete_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete AR invoices (only DRAFT status)."""
     return await ar_web_service.bulk_delete_invoices_response(request, auth, db)
@@ -451,7 +451,7 @@ async def bulk_delete_invoices(
 async def bulk_export_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected AR invoices to CSV."""
     return await ar_web_service.bulk_export_invoices_response(request, auth, db)
@@ -461,7 +461,7 @@ async def bulk_export_invoices(
 async def bulk_approve_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk approve AR invoices (from SUBMITTED status)."""
     return await ar_web_service.bulk_approve_invoices_response(request, auth, db)
@@ -471,7 +471,7 @@ async def bulk_approve_invoices(
 async def bulk_post_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk post AR invoices to General Ledger (from APPROVED status)."""
     return await ar_web_service.bulk_post_invoices_response(request, auth, db)
@@ -490,7 +490,7 @@ def list_receipts(
     sort: str | None = None,
     sort_dir: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR receipts list page."""
     return ar_web_service.list_receipts_response(
@@ -515,7 +515,7 @@ def new_receipt_form(
     invoice_id: str | None = None,
     customer_id: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New AR receipt form page."""
     return ar_web_service.receipt_new_form_response(
@@ -536,7 +536,7 @@ async def export_all_receipts(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all receipts matching filters to CSV."""
     return await ar_web_service.export_all_receipts_response(
@@ -552,7 +552,7 @@ def queue_receipts_export(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Queue all AR receipts matching filters for CSV export."""
     instance = queue_background_export(
@@ -583,7 +583,7 @@ def queue_receipts_export(
 def download_receipts_export(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> Response:
     """Download a completed queued AR Receipts export."""
     body, filename, media_type, content_length = get_completed_export_for_download(
@@ -606,7 +606,7 @@ def download_receipts_export(
 def receipts_export_status(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Return the status of a queued AR Receipts export."""
     return JSONResponse(
@@ -625,7 +625,7 @@ def view_receipt(
     request: Request,
     receipt_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR receipt detail page."""
     return ar_web_service.receipt_detail_response(request, auth, db, receipt_id)
@@ -635,7 +635,7 @@ def view_receipt(
 async def create_receipt(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AR receipt form submission."""
     return await ar_web_service.create_receipt_response(request, auth, db)
@@ -646,7 +646,7 @@ def edit_receipt_form(
     request: Request,
     receipt_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit AR receipt form page."""
     return ar_web_service.receipt_edit_form_response(request, auth, db, receipt_id)
@@ -657,7 +657,7 @@ async def update_receipt(
     request: Request,
     receipt_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AR receipt update form submission."""
     return await ar_web_service.update_receipt_response(request, auth, db, receipt_id)
@@ -668,7 +668,7 @@ def delete_receipt(
     request: Request,
     receipt_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an AR receipt."""
     return ar_web_service.delete_receipt_response(request, auth, db, receipt_id)
@@ -683,7 +683,7 @@ def delete_receipt(
 async def bulk_delete_receipts(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete AR receipts (only PENDING status)."""
     return await ar_web_service.bulk_delete_receipts_response(request, auth, db)
@@ -693,7 +693,7 @@ async def bulk_delete_receipts(
 async def bulk_export_receipts(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected AR receipts to CSV."""
     return await ar_web_service.bulk_export_receipts_response(request, auth, db)
@@ -710,7 +710,7 @@ def list_credit_notes(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR credit notes list page."""
     return ar_web_service.list_credit_notes_response(
@@ -732,7 +732,7 @@ def new_credit_note_form(
     request: Request,
     invoice_id: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New AR credit note form page."""
     return ar_web_service.credit_note_new_form_response(request, auth, db, invoice_id)
@@ -742,7 +742,7 @@ def new_credit_note_form(
 async def create_credit_note(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AR credit note form submission."""
     return await ar_web_service.create_credit_note_response(request, auth, db)
@@ -753,7 +753,7 @@ def view_credit_note(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR credit note detail page."""
     return ar_web_service.credit_note_detail_response(request, auth, db, credit_note_id)
@@ -764,7 +764,7 @@ def edit_credit_note_form(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit AR credit note form page."""
     return ar_web_service.credit_note_edit_form_response(
@@ -777,7 +777,7 @@ async def update_credit_note(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AR credit note update form submission."""
     return await ar_web_service.update_credit_note_response(
@@ -790,7 +790,7 @@ def submit_credit_note(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit AR credit note for approval."""
     return ar_web_service.submit_credit_note_response(request, auth, db, credit_note_id)
@@ -801,7 +801,7 @@ def approve_credit_note(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve AR credit note."""
     return ar_web_service.approve_credit_note_response(
@@ -814,7 +814,7 @@ def post_credit_note(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Post AR credit note to general ledger."""
     return ar_web_service.post_credit_note_response(request, auth, db, credit_note_id)
@@ -825,7 +825,7 @@ def void_credit_note(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Void an AR credit note."""
     return ar_web_service.void_credit_note_response(request, auth, db, credit_note_id)
@@ -836,7 +836,7 @@ def delete_credit_note(
     request: Request,
     credit_note_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an AR credit note."""
     return ar_web_service.delete_credit_note_response(request, auth, db, credit_note_id)
@@ -848,7 +848,7 @@ def aging_report(
     as_of_date: str | None = None,
     customer_id: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR aging report page."""
     return ar_web_service.aging_report_response(
@@ -862,7 +862,7 @@ async def upload_invoice_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a customer invoice."""
     return await ar_web_service.upload_invoice_attachment_response(
@@ -880,7 +880,7 @@ async def upload_receipt_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a customer receipt/payment."""
     return await ar_web_service.upload_receipt_attachment_response(
@@ -898,7 +898,7 @@ async def upload_credit_note_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a credit note."""
     return await ar_web_service.upload_credit_note_attachment_response(
@@ -916,7 +916,7 @@ async def upload_customer_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a customer."""
     return await ar_web_service.upload_customer_attachment_response(
@@ -932,7 +932,7 @@ async def upload_customer_attachment(
 def download_attachment(
     attachment_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download an attachment file."""
     return ar_web_service.download_attachment_response(attachment_id, auth, db)
@@ -942,7 +942,7 @@ def download_attachment(
 def delete_attachment(
     attachment_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an attachment."""
     return ar_web_service.delete_attachment_response(attachment_id, auth, db)

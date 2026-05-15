@@ -17,9 +17,9 @@ from app.services.finance.ipsas.web.ipsas_web import IPSASWebService
 from app.services.finance.platform.org_context import org_context_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_public_sector_access,
 )
 
@@ -34,7 +34,7 @@ def list_appropriations(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Appropriation list page."""
     context = base_context(request, auth, "Appropriations", "ps_funds", db=db)
@@ -57,7 +57,7 @@ def list_appropriations(
 def new_appropriation_form(
     request: Request,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create appropriation form page."""
     from sqlalchemy import select
@@ -104,7 +104,7 @@ def create_appropriation(
     business_unit_id: str | None = Form(None),
     appropriation_act_reference: str | None = Form(None),
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create an appropriation (form submission)."""
     from datetime import date as date_type
@@ -140,7 +140,7 @@ def view_appropriation(
     request: Request,
     appropriation_id: str,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Appropriation detail page."""
     context = base_context(request, auth, "Appropriation Detail", "ps_funds", db=db)
@@ -160,7 +160,7 @@ def approve_appropriation(
     request: Request,
     appropriation_id: str,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Approve an appropriation (web form submission)."""
     from app.services.finance.ipsas.appropriation_service import AppropriationService

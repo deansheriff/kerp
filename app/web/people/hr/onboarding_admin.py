@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web.onboarding_admin_web import onboarding_admin_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding-admin"])
 
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/onboarding", tags=["onboarding-admin"])
 def onboarding_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Onboarding dashboard with metrics and overview."""
     return onboarding_admin_web_service.dashboard_response(
@@ -46,7 +46,7 @@ def templates_list(
     request: Request,
     page: int = 1,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List all checklist templates."""
     return onboarding_admin_web_service.templates_list_response(
@@ -58,7 +58,7 @@ def templates_list(
 def new_template_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Form to create new checklist template."""
     return onboarding_admin_web_service.template_form_response(
@@ -70,7 +70,7 @@ def new_template_form(
 async def create_template(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create new checklist template."""
     return await onboarding_admin_web_service.save_template_response(
@@ -83,7 +83,7 @@ def template_detail(
     request: Request,
     template_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View template with items."""
     return onboarding_admin_web_service.template_detail_response(
@@ -96,7 +96,7 @@ def edit_template_form(
     request: Request,
     template_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Form to edit checklist template."""
     return onboarding_admin_web_service.template_form_response(
@@ -109,7 +109,7 @@ async def update_template(
     request: Request,
     template_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update checklist template."""
     return await onboarding_admin_web_service.save_template_response(
@@ -122,7 +122,7 @@ async def add_template_item(
     request: Request,
     template_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Add item to template."""
     return await onboarding_admin_web_service.add_template_item_response(
@@ -136,7 +136,7 @@ async def delete_template_item(
     template_id: UUID,
     item_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete item from template."""
     return await onboarding_admin_web_service.delete_template_item_response(
@@ -155,7 +155,7 @@ def employees_list(
     status: str | None = Query(None),
     page: int = Query(1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List all employee onboardings."""
     return onboarding_admin_web_service.employees_list_response(
@@ -168,7 +168,7 @@ def employee_detail(
     request: Request,
     onboarding_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View employee onboarding detail."""
     return onboarding_admin_web_service.employee_detail_response(
@@ -182,7 +182,7 @@ async def toggle_activity(
     onboarding_id: UUID,
     activity_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle activity completion status."""
     return await onboarding_admin_web_service.toggle_activity_response(

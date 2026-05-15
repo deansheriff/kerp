@@ -17,7 +17,12 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import (
+    WebAuthContext,
+    base_context,
+    get_db_for_org,
+    require_hr_access,
+)
 
 from .competencies import router as competencies_router
 from .discipline import router as discipline_router
@@ -42,7 +47,7 @@ router = APIRouter(prefix="/hr", tags=["hr-web"])
 def hr_index(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Human Resources landing page."""
     context = base_context(request, auth, "Human Resources", "hr", db=db)

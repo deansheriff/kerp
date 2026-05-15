@@ -24,7 +24,7 @@ from app.services.people.hr import (
 from app.services.people.hr.web import hr_web_service
 from app.services.people.hr.web.employee_web import DROPDOWN_LIMIT
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 from ._common import _parse_bool
 
@@ -51,7 +51,7 @@ def list_departments(
     is_active: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Department list page."""
     filter_is_active: bool | None = None
@@ -78,7 +78,7 @@ def list_departments(
 def new_department_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New department form page."""
     return hr_web_service.department_form_response(request, auth, db)
@@ -89,7 +89,7 @@ def edit_department_form(
     request: Request,
     department_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit department form page."""
     return hr_web_service.department_form_response(request, auth, db, department_id)
@@ -101,7 +101,7 @@ def view_department(
     department_id: str,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Department detail page."""
     return hr_web_service.department_detail_response(
@@ -117,7 +117,7 @@ def view_department(
 async def create_department(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle new department form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -190,7 +190,7 @@ async def update_department(
     request: Request,
     department_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle department update form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -275,7 +275,7 @@ def list_designations(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=200),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Designation list page."""
     return hr_web_service.list_designations_response(
@@ -287,7 +287,7 @@ def list_designations(
 def new_designation_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New designation form page."""
     return hr_web_service.designation_form_response(request, auth, db)
@@ -298,7 +298,7 @@ def edit_designation_form(
     request: Request,
     designation_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit designation form page."""
     return hr_web_service.designation_form_response(request, auth, db, designation_id)
@@ -308,7 +308,7 @@ def edit_designation_form(
 async def create_designation(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle new designation form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -364,7 +364,7 @@ async def update_designation(
     request: Request,
     designation_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle designation update form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -429,7 +429,7 @@ def list_employment_types(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Employment types list page."""
     return hr_web_service.list_employment_types_response(
@@ -441,7 +441,7 @@ def list_employment_types(
 def new_employment_type_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New employment type form page."""
     return hr_web_service.employment_type_form_response(request, auth, db)
@@ -452,7 +452,7 @@ def edit_employment_type_form(
     request: Request,
     employment_type_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit employment type form page."""
     return hr_web_service.employment_type_form_response(
@@ -464,7 +464,7 @@ def edit_employment_type_form(
 async def create_employment_type(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle new employment type form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -520,7 +520,7 @@ async def update_employment_type(
     request: Request,
     employment_type_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle employment type update form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -586,7 +586,7 @@ def list_grades(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Employee grades list page."""
     return hr_web_service.list_grades_response(request, auth, db, search, page)
@@ -596,7 +596,7 @@ def list_grades(
 def new_grade_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New grade form page."""
     return hr_web_service.grade_form_response(request, auth, db)
@@ -607,7 +607,7 @@ def edit_grade_form(
     request: Request,
     grade_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit grade form page."""
     return hr_web_service.grade_form_response(request, auth, db, grade_id)
@@ -617,7 +617,7 @@ def edit_grade_form(
 async def create_grade(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle new grade form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -715,7 +715,7 @@ async def update_grade(
     request: Request,
     grade_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle grade update form submission."""
     form = getattr(request.state, "csrf_form", None)

@@ -14,7 +14,7 @@ from starlette.datastructures import UploadFile
 from app.schemas.person import PersonUpdate
 from app.services.person import people
 from app.services.profile_web import profile_web_service
-from app.web.deps import WebAuthContext, get_db, require_web_auth
+from app.web.deps import get_db_for_org, WebAuthContext, require_web_auth
 
 router = APIRouter(tags=["web-profile"])
 
@@ -30,7 +30,7 @@ def _get_form_str(form: Any, key: str, default: str = "") -> str:
 def two_factor_page(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Display the two-factor authentication setup page.
@@ -42,7 +42,7 @@ def two_factor_page(
 def sessions_page(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Display the sessions management page.
@@ -54,7 +54,7 @@ def sessions_page(
 def change_password_page(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Display the change password page.
@@ -66,7 +66,7 @@ def change_password_page(
 def profile_page(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Display the user profile page.
@@ -99,7 +99,7 @@ def _derive_display_name(
 async def update_profile(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     form = getattr(request.state, "csrf_form", None)
     if form is None:
@@ -127,7 +127,7 @@ async def update_profile(
 async def update_profile_preferences(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     form = getattr(request.state, "csrf_form", None)
     if form is None:

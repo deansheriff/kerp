@@ -13,7 +13,7 @@ from app.models.people.hr.info_change_request import (
 )
 from app.services.people.hr.info_change_service import InfoChangeService
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 router = APIRouter(tags=["hr-info-changes"])
 
@@ -27,7 +27,7 @@ def info_change_requests(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List info change requests for HR review."""
     org_id = (
@@ -113,7 +113,7 @@ def info_change_request_detail(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Detail view for a specific info change request."""
     org_id = (
@@ -144,7 +144,7 @@ def approve_info_change_request(
     request_id: UUID,
     reviewer_notes: str | None = Form(default=None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Approve a change request."""
     org_id = (
@@ -187,7 +187,7 @@ def reject_info_change_request(
     request_id: UUID,
     reviewer_notes: str | None = Form(default=None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Reject a change request."""
     org_id = (

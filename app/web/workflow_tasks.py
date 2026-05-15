@@ -18,9 +18,9 @@ from app.services.people.hr.employees import EmployeeService
 from app.services.workflow_task_service import WorkflowTaskService
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_web_auth,
 )
 
@@ -99,7 +99,7 @@ async def workflow_tasks_list(
     priority: str | None = Query(None, description="Filter by priority"),
     page: int = Query(1, ge=1),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Display workflow tasks dashboard."""
     if not auth.is_authenticated:
@@ -189,7 +189,7 @@ async def complete_task(
     request: Request,
     task_id: str,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark a task as completed."""
     if not auth.is_authenticated:
@@ -215,7 +215,7 @@ async def snooze_task(
     task_id: str,
     days: int = Form(1),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Snooze a task."""
     if not auth.is_authenticated:
@@ -241,7 +241,7 @@ async def update_task_status(
     task_id: str,
     status: str = Form(...),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update task status."""
     if not auth.is_authenticated:

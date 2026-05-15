@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web import hr_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
 
 router = APIRouter(tags=["employees"])
 
@@ -29,7 +29,7 @@ def list_employees(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Employee list page."""
     return hr_web_service.list_employees_response(
@@ -65,7 +65,7 @@ def view_org_chart(
 @router.get("/employees/stats")
 def employee_stats(
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Employee stats endpoint for dashboards."""
     return hr_web_service.employee_stats_response(auth, db)
@@ -75,7 +75,7 @@ def employee_stats(
 def new_employee_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New employee form page."""
     return hr_web_service.employee_new_form_response(request, auth, db)
@@ -85,7 +85,7 @@ def new_employee_form(
 async def create_employee(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle new employee form submission."""
     return await hr_web_service.create_employee_response(
@@ -101,7 +101,7 @@ def view_employee(
     employee_id: UUID,
     saved: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Employee detail page."""
     return hr_web_service.employee_detail_response(
@@ -114,7 +114,7 @@ def edit_employee_form(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit employee form page."""
     return hr_web_service.employee_edit_form_response(
@@ -127,7 +127,7 @@ async def update_employee(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle employee update form submission."""
     return await hr_web_service.update_employee_response(
@@ -142,7 +142,7 @@ async def update_employee(
 def activate_employee(
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Activate an employee."""
     return hr_web_service.activate_employee_response(
@@ -157,7 +157,7 @@ async def suspend_employee(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Suspend an employee."""
     return await hr_web_service.suspend_employee_response(
@@ -172,7 +172,7 @@ async def suspend_employee(
 def set_employee_on_leave(
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Set an employee on leave."""
     return hr_web_service.set_employee_on_leave_response(
@@ -187,7 +187,7 @@ async def resign_employee(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Record employee resignation."""
     return await hr_web_service.resign_employee_response(
@@ -203,7 +203,7 @@ async def rehire_employee(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Rehire a previously separated employee."""
     return await hr_web_service.rehire_employee_response(
@@ -219,7 +219,7 @@ async def terminate_employee(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Terminate an employee."""
     return await hr_web_service.terminate_employee_response(
@@ -235,7 +235,7 @@ async def update_final_payroll(
     request: Request,
     employee_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update final payroll settings for an exited employee."""
     return await hr_web_service.update_final_payroll_response(
@@ -252,7 +252,7 @@ async def toggle_employee_credential(
     employee_id: UUID,
     credential_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Enable/disable a user's login credential from the employee record."""
     return await hr_web_service.toggle_user_credential_response(

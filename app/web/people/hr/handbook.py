@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.services.people.hr.handbook_service import HRDocumentService
 from app.services.people.hr.web.handbook_web import handbook_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
 
 router = APIRouter(prefix="/handbook", tags=["handbook"])
 
@@ -31,7 +31,7 @@ def documents_list(
     status: str | None = Query(None),
     search: str | None = Query(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List all HR documents."""
     return handbook_web_service.documents_list_response(
@@ -48,7 +48,7 @@ def documents_list(
 def new_document_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Form to create new document."""
     return handbook_web_service.document_form_response(
@@ -60,7 +60,7 @@ def new_document_form(
 async def create_document(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create new document with file upload."""
     return await handbook_web_service.save_document_response(
@@ -73,7 +73,7 @@ def document_detail(
     request: Request,
     document_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View document details with acknowledgment stats."""
     return handbook_web_service.document_detail_response(
@@ -86,7 +86,7 @@ def edit_document_form(
     request: Request,
     document_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Form to edit document."""
     return handbook_web_service.document_form_response(
@@ -99,7 +99,7 @@ async def update_document(
     request: Request,
     document_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update document metadata."""
     return await handbook_web_service.save_document_response(
@@ -112,7 +112,7 @@ async def activate_document(
     request: Request,
     document_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Activate a document."""
     return await handbook_web_service.activate_document_response(
@@ -125,7 +125,7 @@ async def archive_document(
     request: Request,
     document_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Archive a document."""
     return await handbook_web_service.archive_document_response(
@@ -138,7 +138,7 @@ def download_document(
     request: Request,
     document_id: UUID,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download document file."""
     from fastapi import HTTPException

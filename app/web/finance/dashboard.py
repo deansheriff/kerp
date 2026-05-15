@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.services.finance.dashboard_web import dashboard_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_finance_access
+from app.web.deps import (
+    get_db_for_org,
+    WebAuthContext,
+    base_context,
+    require_finance_access,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +44,7 @@ def ifrs_alias_slash_redirect():
 def ifrs_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
     year: str | None = Query(default=None),
     basis: str = Query(default="accrual"),
 ):

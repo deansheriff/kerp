@@ -16,9 +16,9 @@ from sqlalchemy.orm import Session
 from app.services.finance.ipsas.web.ipsas_web import IPSASWebService
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_public_sector_access,
 )
 
@@ -31,7 +31,7 @@ def budget_comparison(
     fiscal_year_id: str | None = None,
     fund_id: str | None = None,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """IPSAS 24 Budget vs Actual statement page."""
     context = base_context(request, auth, "Budget Comparison", "ps_commitments", db=db)
@@ -83,7 +83,7 @@ def available_balance_dashboard(
     request: Request,
     fund_id: str | None = None,
     auth: WebAuthContext = Depends(require_public_sector_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Available balance dashboard page."""
     context = base_context(request, auth, "Available Balance", "ps_funds", db=db)

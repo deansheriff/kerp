@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.services.people.training.web import training_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 router = APIRouter(prefix="/training", tags=["people-training-web"])
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/training", tags=["people-training-web"])
 def training_index(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Training landing page."""
     context = base_context(request, auth, "Training", "training", db=db)
@@ -41,7 +41,7 @@ def list_programs(
     category: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Training programs list page."""
     return training_web_service.list_programs_response(
@@ -53,7 +53,7 @@ def list_programs(
 def new_program_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New training program form."""
     return training_web_service.program_new_form_response(request, auth, db)
@@ -63,7 +63,7 @@ def new_program_form(
 async def create_program(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new training program."""
     return await training_web_service.create_program_response(request, auth, db)
@@ -75,7 +75,7 @@ def view_program(
     program_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View training program detail."""
     return training_web_service.program_detail_response(
@@ -88,7 +88,7 @@ def edit_program_form(
     request: Request,
     program_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit training program form."""
     return training_web_service.program_edit_form_response(
@@ -101,7 +101,7 @@ async def update_program(
     request: Request,
     program_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a training program."""
     return await training_web_service.update_program_response(
@@ -113,7 +113,7 @@ async def update_program(
 def activate_program(
     program_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Activate a training program."""
     return training_web_service.activate_program_response(auth, db, program_id)
@@ -123,7 +123,7 @@ def activate_program(
 def retire_program(
     program_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Retire a training program."""
     return training_web_service.retire_program_response(auth, db, program_id)
@@ -144,7 +144,7 @@ def list_events(
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Training events list page."""
     return training_web_service.list_events_response(
@@ -157,7 +157,7 @@ def new_event_form(
     request: Request,
     program_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New training event form."""
     return training_web_service.event_new_form_response(request, auth, db, program_id)
@@ -167,7 +167,7 @@ def new_event_form(
 async def create_event(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new training event."""
     return await training_web_service.create_event_response(request, auth, db)
@@ -179,7 +179,7 @@ def view_event(
     event_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View training event detail."""
     return training_web_service.event_detail_response(
@@ -192,7 +192,7 @@ def edit_event_form(
     request: Request,
     event_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit training event form."""
     return training_web_service.event_edit_form_response(request, auth, db, event_id)
@@ -203,7 +203,7 @@ async def update_event(
     request: Request,
     event_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a training event."""
     return await training_web_service.update_event_response(request, auth, db, event_id)
@@ -213,7 +213,7 @@ async def update_event(
 def schedule_event(
     event_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Schedule a draft event."""
     return training_web_service.schedule_event_response(auth, db, event_id)
@@ -223,7 +223,7 @@ def schedule_event(
 def start_event(
     event_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Start a training event."""
     return training_web_service.start_event_response(auth, db, event_id)
@@ -233,7 +233,7 @@ def start_event(
 def complete_event(
     event_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Complete a training event."""
     return training_web_service.complete_event_response(auth, db, event_id)
@@ -243,7 +243,7 @@ def complete_event(
 def cancel_event(
     event_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel a training event."""
     return training_web_service.cancel_event_response(auth, db, event_id)
@@ -255,7 +255,7 @@ def invite_attendees_form(
     event_id: str,
     search: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Invite attendees to a training event."""
     return training_web_service.invite_attendees_form_response(
@@ -268,7 +268,7 @@ async def invite_attendees(
     request: Request,
     event_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Invite selected attendees to a training event."""
     return await training_web_service.invite_attendees_response(
@@ -283,7 +283,7 @@ def confirm_attendee(
     event_id: str,
     attendee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Confirm attendance for an invited attendee."""
     return training_web_service.confirm_attendee_response(
@@ -298,7 +298,7 @@ def mark_attendee_attended(
     event_id: str,
     attendee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark an attendee as attended."""
     return training_web_service.mark_attended_response(auth, db, event_id, attendee_id)
@@ -312,7 +312,7 @@ def issue_attendee_certificate(
     event_id: str,
     attendee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Issue a certificate to an attendee."""
     return training_web_service.issue_certificate_response(
@@ -327,7 +327,7 @@ def remove_attendee(
     event_id: str,
     attendee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Remove an attendee from an event."""
     return training_web_service.remove_attendee_response(
@@ -346,7 +346,7 @@ def report_completion(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Training completion rates report."""
     return training_web_service.completion_report_response(
@@ -360,7 +360,7 @@ def report_by_department(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Training participation by department report."""
     return training_web_service.by_department_report_response(
@@ -374,7 +374,7 @@ def report_cost_analysis(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Training cost analysis report."""
     return training_web_service.cost_analysis_report_response(
@@ -388,7 +388,7 @@ def report_effectiveness(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Training effectiveness/feedback report."""
     return training_web_service.effectiveness_report_response(

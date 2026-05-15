@@ -47,9 +47,9 @@ from app.services.procurement.vendor import VendorPrequalificationService
 from app.services.procurement.web.procurement_web import ProcurementWebService
 from app.services.upload_utils import get_env_max_bytes, read_upload_bytes
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_procurement_access,
     templates,
 )
@@ -307,7 +307,7 @@ def _load_import_rows(
 def procurement_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Procurement management dashboard."""
     context = base_context(request, auth, "Procurement", "procurement", db=db)
@@ -332,7 +332,7 @@ def plan_list(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List procurement plans."""
     context = base_context(request, auth, "Procurement Plans", "procurement", db=db)
@@ -357,7 +357,7 @@ def plan_list(
 def plan_new(
     request: Request,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New procurement plan form."""
     context = base_context(request, auth, "New Plan", "procurement", db=db)
@@ -370,7 +370,7 @@ def plan_new(
 def plan_import_template(
     format: str = Query("csv"),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download a procurement plan import template."""
     fmt = (format or "csv").lower()
@@ -435,7 +435,7 @@ def plan_export(
     status: str | None = None,
     fiscal_year: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export procurement plans to CSV/XLSX."""
     fmt = (format or "csv").lower()
@@ -489,7 +489,7 @@ def plan_detail(
     request: Request,
     plan_id: UUID,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Plan detail view."""
     context = base_context(request, auth, "Plan Details", "procurement", db=db)
@@ -511,7 +511,7 @@ async def plan_import(
     file: UploadFile = File(...),
     format: str | None = Form(None),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Import procurement plans from CSV/XLSX."""
     if not auth.user_id:
@@ -757,7 +757,7 @@ def requisition_list(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List purchase requisitions."""
     context = base_context(request, auth, "Requisitions", "procurement", db=db)
@@ -784,7 +784,7 @@ def requisition_list(
 def requisition_import_template(
     format: str = Query("csv"),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download a requisition import template."""
     fmt = (format or "csv").lower()
@@ -856,7 +856,7 @@ def requisition_export(
     status: str | None = None,
     urgency: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export requisitions to CSV/XLSX."""
     fmt = (format or "csv").lower()
@@ -911,7 +911,7 @@ async def requisition_import(
     file: UploadFile = File(...),
     format: str | None = Form(None),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Import requisitions from CSV/XLSX."""
     if not auth.user_id:
@@ -1245,7 +1245,7 @@ async def requisition_import(
 def requisition_new(
     request: Request,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New requisition form."""
     context = base_context(request, auth, "New Requisition", "procurement", db=db)
@@ -1261,7 +1261,7 @@ def requisition_detail(
     request: Request,
     requisition_id: UUID,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Requisition detail view."""
     context = base_context(request, auth, "Requisition Details", "procurement", db=db)
@@ -1298,7 +1298,7 @@ def rfq_list(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List RFQs."""
     context = base_context(request, auth, "RFQs", "procurement", db=db)
@@ -1323,7 +1323,7 @@ def rfq_list(
 def rfq_import_template(
     format: str = Query("csv"),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download an RFQ import template."""
     fmt = (format or "csv").lower()
@@ -1384,7 +1384,7 @@ def rfq_export(
     status: str | None = None,
     method: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export RFQs to CSV/XLSX."""
     fmt = (format or "csv").lower()
@@ -1475,7 +1475,7 @@ async def rfq_import(
     file: UploadFile = File(...),
     format: str | None = Form(None),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Import RFQs from CSV/XLSX."""
     if not auth.user_id:
@@ -1698,7 +1698,7 @@ async def rfq_import(
 def rfq_new(
     request: Request,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New RFQ form."""
     context = base_context(request, auth, "New RFQ", "procurement", db=db)
@@ -1712,7 +1712,7 @@ def rfq_detail(
     request: Request,
     rfq_id: UUID,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """RFQ detail view."""
     context = base_context(request, auth, "RFQ Details", "procurement", db=db)
@@ -1736,7 +1736,7 @@ def evaluation_list(
     offset: int = Query(0, ge=0),
     limit: int = Query(25, ge=1, le=100),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List bid evaluations."""
     context = base_context(request, auth, "Bid Evaluations", "proc_evaluations", db=db)
@@ -1760,7 +1760,7 @@ def evaluation_matrix(
     request: Request,
     rfq_id: UUID,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Evaluation matrix view."""
     context = base_context(request, auth, "Bid Evaluation", "proc_evaluations", db=db)
@@ -1795,7 +1795,7 @@ def contract_list(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List contracts."""
     context = base_context(request, auth, "Contracts", "procurement", db=db)
@@ -1821,7 +1821,7 @@ def contract_list(
 def contract_import_template(
     format: str = Query("csv"),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download a contract import template."""
     fmt = (format or "csv").lower()
@@ -1887,7 +1887,7 @@ def contract_export(
     format: str = Query("csv"),
     status: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export contracts to CSV/XLSX."""
     fmt = (format or "csv").lower()
@@ -1976,7 +1976,7 @@ async def contract_import(
     file: UploadFile = File(...),
     format: str | None = Form(None),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Import contracts from CSV/XLSX."""
     if not auth.user_id:
@@ -2265,7 +2265,7 @@ async def contract_import(
 def contract_new(
     request: Request,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New contract form."""
     context = base_context(request, auth, "New Contract", "procurement", db=db)
@@ -2280,7 +2280,7 @@ def contract_new(
 async def contract_create(
     request: Request,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle contract form submission."""
     form = getattr(request.state, "csrf_form", None)
@@ -2391,7 +2391,7 @@ def contract_detail(
     request: Request,
     contract_id: UUID,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Contract detail view."""
     context = base_context(request, auth, "Contract Details", "procurement", db=db)
@@ -2425,7 +2425,7 @@ def vendor_list(
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=100),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Vendor registry."""
     offset = (page - 1) * limit
@@ -2461,7 +2461,7 @@ def prequalification_list(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Vendor prequalification list."""
     context = base_context(
@@ -2487,7 +2487,7 @@ def prequalification_new(
     request: Request,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New vendor prequalification form."""
     context = base_context(
@@ -2514,7 +2514,7 @@ def prequalification_create(
     itf_compliance: str | None = Form(None),
     nsitf_compliance: str | None = Form(None),
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new vendor prequalification record."""
     if not auth.user_id:
@@ -2636,7 +2636,7 @@ def prequalification_detail(
     request: Request,
     prequalification_id: UUID,
     auth: WebAuthContext = Depends(require_procurement_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Prequalification detail view."""
     context = base_context(

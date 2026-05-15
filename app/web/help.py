@@ -17,7 +17,7 @@ from app.services.help_center import (
 )
 from app.services.settings_spec import resolve_value
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_web_auth
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_web_auth
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ def toggle_progress(
     request: Request,
     slug: str,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle article completion. Returns an HTMX snippet for the button."""
     from app.services.help.progress_service import HelpProgressService
@@ -81,7 +81,7 @@ def submit_feedback(
     slug: str,
     rating: str = Form(...),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit article feedback. Returns an HTMX snippet for the buttons."""
     from app.services.help.feedback_service import HelpFeedbackService
@@ -130,7 +130,7 @@ def submit_feedback(
 @router.get("/api/progress", response_class=JSONResponse)
 def get_progress(
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Return user's completed article slugs and feedback map as JSON."""
     from app.services.help.feedback_service import HelpFeedbackService
@@ -160,7 +160,7 @@ def search_page(
     module: str | None = Query(default=None),
     content_type: str | None = Query(default=None),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     context = base_context(request, auth, "Help Search", "help", db=db)
     search_results = search_help_articles(
@@ -208,7 +208,7 @@ def article_detail(
     request: Request,
     slug: str,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     article = get_help_article_by_slug(
         accessible_modules=auth.accessible_modules,
@@ -279,7 +279,7 @@ def module_hub(
     request: Request,
     module_key: str,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     payload = build_help_module_hub(
         accessible_modules=auth.accessible_modules,
@@ -310,7 +310,7 @@ def module_hub(
 def tracks_page(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     from app.services.help.progress_service import HelpProgressService
 
@@ -334,7 +334,7 @@ def track_detail(
     request: Request,
     slug: str,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     from app.services.help.progress_service import HelpProgressService
 
@@ -371,7 +371,7 @@ def track_detail(
 def glossary_page(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     context = base_context(request, auth, "Glossary", "help", db=db)
     payload = _help_experience(auth, db)
@@ -385,7 +385,7 @@ def glossary_page(
 def release_notes_page(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     context = base_context(request, auth, "Release Notes", "help", db=db)
     payload = _help_experience(auth, db)
@@ -413,7 +413,7 @@ def admin_article_list(
     module: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService
@@ -437,7 +437,7 @@ def admin_article_list(
 def admin_article_new(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService
@@ -460,7 +460,7 @@ def admin_article_create(
     content_type: str = Form("workflow"),
     summary: str = Form(""),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService
@@ -483,7 +483,7 @@ def admin_article_edit(
     request: Request,
     article_id: UUID,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService
@@ -513,7 +513,7 @@ def admin_article_update(
     content_type: str = Form("workflow"),
     summary: str = Form(""),
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService
@@ -542,7 +542,7 @@ def admin_article_publish(
     request: Request,
     article_id: UUID,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService
@@ -564,7 +564,7 @@ def admin_article_archive(
     request: Request,
     article_id: UUID,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService
@@ -585,7 +585,7 @@ def admin_article_archive(
 def admin_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     _require_admin(auth)
     from app.services.help.admin_web import HelpAdminWebService

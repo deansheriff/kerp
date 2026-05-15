@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.attendance.web import attendance_web_service
-from app.web.deps import WebAuthContext, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
 
 router = APIRouter(prefix="/attendance", tags=["people-attendance-web"])
 
@@ -29,7 +29,7 @@ def attendance_overview(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Attendance records list page."""
     return attendance_web_service.attendance_overview_response(
@@ -50,7 +50,7 @@ def attendance_overview(
 def delete_attendance_record(
     attendance_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Delete an attendance record."""
     try:
@@ -67,7 +67,7 @@ def delete_attendance_record(
 async def bulk_mark_attendance(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk mark attendance for multiple employees."""
     return await attendance_web_service.bulk_mark_attendance_response(
@@ -84,7 +84,7 @@ def attendance_shifts(
     is_active: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Shift type list page."""
     return attendance_web_service.attendance_shifts_response(
@@ -101,7 +101,7 @@ def attendance_shifts(
 def new_attendance_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New attendance record form."""
     return attendance_web_service.new_attendance_form_response(
@@ -115,7 +115,7 @@ def new_attendance_form(
 async def create_attendance(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new attendance record."""
     return await attendance_web_service.create_attendance_response(
@@ -129,7 +129,7 @@ async def create_attendance(
 def new_shift_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New shift type form."""
     return attendance_web_service.new_shift_form_response(
@@ -143,7 +143,7 @@ def new_shift_form(
 async def create_shift(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new shift type."""
     return await attendance_web_service.create_shift_response(
@@ -158,7 +158,7 @@ def edit_shift_form(
     request: Request,
     shift_type_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit shift type form."""
     return attendance_web_service.edit_shift_form_response(
@@ -174,7 +174,7 @@ async def update_shift(
     request: Request,
     shift_type_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a shift type."""
     return await attendance_web_service.update_shift_response(
@@ -197,7 +197,7 @@ def attendance_summary_report(
     end_date: str | None = None,
     department_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Attendance summary report page."""
     return attendance_web_service.attendance_summary_report_response(
@@ -218,7 +218,7 @@ def attendance_by_employee_report(
     department_id: str | None = None,
     page: int = Query(1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Attendance by employee report page."""
     return attendance_web_service.attendance_by_employee_report_response(
@@ -239,7 +239,7 @@ def attendance_late_early_report(
     end_date: str | None = None,
     department_id: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Late arrivals and early departures report page."""
     return attendance_web_service.attendance_late_early_report_response(
@@ -257,7 +257,7 @@ def attendance_trends_report(
     request: Request,
     months: int = Query(default=12, ge=3, le=24),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Attendance trends report page."""
     return attendance_web_service.attendance_trends_report_response(
@@ -283,7 +283,7 @@ def attendance_requests_list(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Attendance requests list page."""
     return attendance_web_service.attendance_requests_list_response(
@@ -303,7 +303,7 @@ def attendance_requests_list(
 def attendance_request_new_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New attendance request form."""
     return attendance_web_service.attendance_request_new_form_response(
@@ -315,7 +315,7 @@ def attendance_request_new_form(
 async def create_attendance_request(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new attendance request."""
     return await attendance_web_service.create_attendance_request_response(
@@ -327,7 +327,7 @@ async def create_attendance_request(
 async def approve_attendance_request(
     request_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve an attendance request."""
     try:
@@ -347,7 +347,7 @@ async def approve_attendance_request(
 async def reject_attendance_request(
     request_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reject an attendance request."""
     try:
@@ -367,7 +367,7 @@ async def reject_attendance_request(
 async def bulk_approve_attendance_requests(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk approve attendance requests."""
     try:
@@ -387,7 +387,7 @@ async def bulk_approve_attendance_requests(
 async def bulk_reject_attendance_requests(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk reject attendance requests."""
     try:

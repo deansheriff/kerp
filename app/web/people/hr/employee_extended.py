@@ -25,7 +25,7 @@ from app.services.people.hr import (
     SkillService,
 )
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 from ._common import _parse_bool
 
@@ -62,7 +62,7 @@ def list_employee_documents(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List documents for an employee."""
     org_id = coerce_uuid(auth.organization_id)
@@ -114,7 +114,7 @@ def new_document_form(
     request: Request,
     employee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New document upload form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -154,7 +154,7 @@ def create_document(
     issue_date: str | None = Form(None),
     expiry_date: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new document record."""
     org_id = coerce_uuid(auth.organization_id)
@@ -219,7 +219,7 @@ def verify_document(
     document_id: str,
     notes: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Verify a document."""
     org_id = coerce_uuid(auth.organization_id)
@@ -253,7 +253,7 @@ def delete_document(
     employee_id: str,
     document_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a document."""
     org_id = coerce_uuid(auth.organization_id)
@@ -284,7 +284,7 @@ def list_employee_qualifications(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List qualifications for an employee."""
     org_id = coerce_uuid(auth.organization_id)
@@ -332,7 +332,7 @@ def new_qualification_form(
     request: Request,
     employee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New qualification form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -374,7 +374,7 @@ def create_qualification(
     grade: str | None = Form(None),
     notes: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new qualification."""
     org_id = coerce_uuid(auth.organization_id)
@@ -415,7 +415,7 @@ def delete_qualification(
     employee_id: str,
     qualification_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a qualification."""
     org_id = coerce_uuid(auth.organization_id)
@@ -446,7 +446,7 @@ def list_employee_certifications(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List certifications for an employee."""
     org_id = coerce_uuid(auth.organization_id)
@@ -493,7 +493,7 @@ def new_certification_form(
     request: Request,
     employee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New certification form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -533,7 +533,7 @@ def create_certification(
     credential_url: str | None = Form(None),
     notes: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new certification."""
     org_id = coerce_uuid(auth.organization_id)
@@ -573,7 +573,7 @@ def delete_certification(
     employee_id: str,
     certification_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a certification."""
     org_id = coerce_uuid(auth.organization_id)
@@ -604,7 +604,7 @@ def list_employee_dependents(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List dependents for an employee."""
     org_id = coerce_uuid(auth.organization_id)
@@ -654,7 +654,7 @@ def new_dependent_form(
     request: Request,
     employee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New dependent form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -698,7 +698,7 @@ def create_dependent(
     beneficiary_percentage: str | None = Form(None),
     notes: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new dependent."""
     org_id = coerce_uuid(auth.organization_id)
@@ -745,7 +745,7 @@ def delete_dependent(
     employee_id: str,
     dependent_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a dependent."""
     org_id = coerce_uuid(auth.organization_id)
@@ -776,7 +776,7 @@ def list_employee_skills(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """List skills for an employee."""
     org_id = coerce_uuid(auth.organization_id)
@@ -825,7 +825,7 @@ def new_skill_form(
     request: Request,
     employee_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Add skill form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -879,7 +879,7 @@ def add_employee_skill(
     is_certified: str | None = Form(None),
     notes: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Add a skill to an employee."""
     org_id = coerce_uuid(auth.organization_id)
@@ -913,7 +913,7 @@ def remove_employee_skill(
     employee_id: str,
     employee_skill_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Remove a skill from an employee."""
     org_id = coerce_uuid(auth.organization_id)

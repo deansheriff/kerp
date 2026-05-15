@@ -16,9 +16,9 @@ from app.services.inventory.web import inv_web_service
 from app.services.operations.inv_web import operations_inv_web_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_any_web_permission,
     require_inventory_access,
 )
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/inventory", tags=["inventory-web"])
 def inventory_index(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory landing page."""
     context = base_context(request, auth, "Inventory", "inventory", db=db)
@@ -45,7 +45,7 @@ def inventory_index(
 def inventory_quick_entry(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory quick entry landing page."""
     context = base_context(request, auth, "Quick Entry", "quick-entry", db=db)
@@ -62,7 +62,7 @@ def list_items(
     item_type: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Items list page."""
     return inv_web_service.list_items_response(
@@ -74,7 +74,7 @@ def list_items(
 def new_item_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New inventory item form page."""
     return inv_web_service.item_new_form_response(request, auth, db)
@@ -106,7 +106,7 @@ def create_item(
     track_serial_numbers: str | None = Form(default=None),
     is_purchaseable: str | None = Form(default=None),
     is_saleable: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new inventory item."""
     # HTML checkboxes send nothing when unchecked, so we check for presence
@@ -147,7 +147,7 @@ async def export_all_items(
     category: str = "",
     item_type: str = "",
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all items matching filters to CSV."""
     from app.services.inventory.bulk import get_item_bulk_service
@@ -162,7 +162,7 @@ def view_item(
     request: Request,
     item_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Item detail page."""
     return inv_web_service.item_detail_response(request, auth, db, item_id)
@@ -173,7 +173,7 @@ def edit_item_form(
     request: Request,
     item_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit inventory item form page."""
     return inv_web_service.item_edit_form_response(request, auth, db, item_id)
@@ -184,7 +184,7 @@ async def update_item(
     request: Request,
     item_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an inventory item."""
     form = await request.form()
@@ -252,7 +252,7 @@ async def update_item(
 async def bulk_delete_items(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete items (if no transactions)."""
     from app.schemas.bulk_actions import BulkActionRequest
@@ -268,7 +268,7 @@ async def bulk_delete_items(
 async def bulk_export_items(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected items to CSV."""
     from app.schemas.bulk_actions import BulkExportRequest
@@ -284,7 +284,7 @@ async def bulk_export_items(
 async def bulk_activate_items(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk activate items."""
     from app.schemas.bulk_actions import BulkActionRequest
@@ -300,7 +300,7 @@ async def bulk_activate_items(
 async def bulk_deactivate_items(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk deactivate items."""
     from app.schemas.bulk_actions import BulkActionRequest
@@ -319,7 +319,7 @@ def list_transactions(
     search: str | None = None,
     transaction_type: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory transactions list page."""
     return inv_web_service.list_transactions_response(
@@ -345,7 +345,7 @@ def list_categories(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Item categories list page."""
     return inv_web_service.list_categories_response(
@@ -357,7 +357,7 @@ def list_categories(
 def new_category_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New item category form page."""
     return inv_web_service.category_form_response(request, auth, db)
@@ -378,7 +378,7 @@ def create_category(
     description: str | None = Form(default=None),
     parent_category_id: str | None = Form(default=None),
     purchase_variance_account_id: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new item category."""
     return inv_web_service.create_category_response(
@@ -404,7 +404,7 @@ def edit_category_form(
     request: Request,
     category_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit item category form page."""
     return inv_web_service.category_edit_form_response(request, auth, db, category_id)
@@ -426,7 +426,7 @@ def update_category(
     description: str | None = Form(default=None),
     parent_category_id: str | None = Form(default=None),
     purchase_variance_account_id: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an item category."""
     return inv_web_service.update_category_response(
@@ -453,7 +453,7 @@ def toggle_category_status(
     request: Request,
     category_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle category active/inactive status."""
     return inv_web_service.toggle_category_status_response(
@@ -474,7 +474,7 @@ def list_warehouses(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Warehouses list page."""
     return inv_web_service.list_warehouses_response(
@@ -486,7 +486,7 @@ def list_warehouses(
 def new_warehouse_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New warehouse form page."""
     return inv_web_service.warehouse_form_response(request, auth, db)
@@ -512,7 +512,7 @@ def create_warehouse(
     is_shipping: str | None = Form(default=None),
     is_consignment: str | None = Form(default=None),
     is_transit: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new warehouse."""
     return inv_web_service.create_warehouse_response(
@@ -543,7 +543,7 @@ def view_warehouse(
     request: Request,
     warehouse_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Warehouse detail page."""
     return inv_web_service.warehouse_detail_response(request, auth, db, warehouse_id)
@@ -554,7 +554,7 @@ def edit_warehouse_form(
     request: Request,
     warehouse_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit warehouse form page."""
     return inv_web_service.warehouse_edit_form_response(request, auth, db, warehouse_id)
@@ -581,7 +581,7 @@ def update_warehouse(
     is_shipping: str | None = Form(default=None),
     is_consignment: str | None = Form(default=None),
     is_transit: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a warehouse."""
     return inv_web_service.update_warehouse_response(
@@ -613,7 +613,7 @@ def toggle_warehouse_status(
     request: Request,
     warehouse_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle warehouse active/inactive status."""
     return inv_web_service.toggle_warehouse_status_response(
@@ -630,7 +630,7 @@ def toggle_warehouse_status(
 def new_receipt_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New inventory receipt form page."""
     return inv_web_service.transaction_form_response(request, auth, "RECEIPT", db)
@@ -655,7 +655,7 @@ def create_receipt_transaction(
     serial_numbers: str | None = Form(default=None),
     serial_auto_generate: str | None = Form(default=None),
     serial_prefix: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a manual inventory receipt."""
     return inv_web_service.create_transaction_response(
@@ -685,7 +685,7 @@ def create_receipt_transaction(
 def new_inventory_return_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New return-to-store form page."""
     return operations_inv_web_service.new_inventory_return_form_response(
@@ -701,7 +701,7 @@ def inventory_return_list(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=100),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory returned-items list page."""
     return operations_inv_web_service.inventory_return_list_response(
@@ -717,7 +717,7 @@ def inventory_return_list(
 async def create_inventory_return(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a return-to-store record."""
     form_data = await request.form()
@@ -733,7 +733,7 @@ async def create_inventory_return(
 def download_inventory_attachment(
     attachment_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download an inventory attachment file."""
     return operations_inv_web_service.download_attachment_response(
@@ -747,7 +747,7 @@ def download_inventory_attachment(
 def delete_inventory_attachment(
     attachment_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an inventory attachment file."""
     return operations_inv_web_service.delete_attachment_response(
@@ -762,7 +762,7 @@ def inventory_return_material_request_search(
     q: str = Query(..., min_length=1),
     limit: int = Query(default=8, ge=1, le=20),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Search issued material requests for return linkage."""
     return InventoryReturnWebService.material_request_typeahead(
@@ -778,7 +778,7 @@ def inventory_return_item_search(
     q: str = Query(..., min_length=1),
     limit: int = Query(default=8, ge=1, le=20),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Search inventory items for return selection."""
     return InventoryReturnWebService.item_typeahead(
@@ -794,7 +794,7 @@ def inventory_return_detail(
     request: Request,
     return_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory return detail page."""
     return operations_inv_web_service.inventory_return_detail_response(
@@ -809,7 +809,7 @@ def inventory_return_detail(
 def new_issue_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New inventory issue form page."""
     return inv_web_service.transaction_form_response(request, auth, "ISSUE", db)
@@ -828,7 +828,7 @@ def create_issue_transaction(
     notes: str | None = Form(default=None),
     lot_number: str | None = Form(default=None),
     serial_numbers: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a manual inventory issue."""
     return inv_web_service.create_transaction_response(
@@ -852,7 +852,7 @@ def create_issue_transaction(
 def new_transfer_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New inventory transfer form page."""
     return inv_web_service.transaction_form_response(request, auth, "TRANSFER", db)
@@ -871,7 +871,7 @@ def create_transfer_transaction(
     notes: str | None = Form(default=None),
     lot_number: str | None = Form(default=None),
     serial_numbers: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create an inventory transfer."""
     return inv_web_service.create_transfer_response(
@@ -894,7 +894,7 @@ def create_transfer_transaction(
 def new_adjustment_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New inventory adjustment form page."""
     return inv_web_service.transaction_form_response(request, auth, "ADJUSTMENT", db)
@@ -912,7 +912,7 @@ def create_adjustment_transaction(
     adjustment_type: str = Form(...),
     reason: str = Form(...),
     reference: str | None = Form(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create an inventory adjustment."""
     return inv_web_service.create_adjustment_response(
@@ -946,7 +946,7 @@ def material_request_list(
     page: int = 1,
     limit: int = 50,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Material request list page."""
     return operations_inv_web_service.material_request_list_response(
@@ -975,7 +975,7 @@ def new_material_request_form(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New material request form."""
     return operations_inv_web_service.new_material_request_form_response(
@@ -998,7 +998,7 @@ def material_request_requested_by_search(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Search active employees for material request requested-by typeahead."""
     payload = MaterialRequestWebService.requested_by_typeahead(
@@ -1022,7 +1022,7 @@ async def create_material_request(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create new material request."""
     form = getattr(request.state, "csrf_form", None)
@@ -1043,7 +1043,7 @@ def material_request_report(
     end_date: str | None = None,
     group_by: str = Query(default="status", pattern="^(status|type)$"),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Material request summary report page."""
     return operations_inv_web_service.material_request_report_response(
@@ -1061,7 +1061,7 @@ def material_request_detail(
     request: Request,
     request_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Material request detail page."""
     return operations_inv_web_service.material_request_detail_response(
@@ -1085,7 +1085,7 @@ def edit_material_request_form(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit material request form."""
     return operations_inv_web_service.edit_material_request_form_response(
@@ -1109,7 +1109,7 @@ async def update_material_request(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update material request."""
     form = getattr(request.state, "csrf_form", None)
@@ -1137,7 +1137,7 @@ def submit_material_request(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit material request."""
     return operations_inv_web_service.submit_material_request_response(
@@ -1160,7 +1160,7 @@ def approve_material_request(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve material request and auto-deduct stock."""
     return operations_inv_web_service.approve_material_request_response(
@@ -1184,7 +1184,7 @@ def cancel_material_request(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel material request."""
     return operations_inv_web_service.cancel_material_request_response(
@@ -1208,7 +1208,7 @@ def delete_material_request(
         )
     ),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete material request."""
     return operations_inv_web_service.delete_material_request_response(
@@ -1228,7 +1228,7 @@ def transaction_detail(
     request: Request,
     transaction_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory transaction detail page."""
     return operations_inv_web_service.transaction_detail_response(
@@ -1244,7 +1244,7 @@ def reverse_transaction(
     request: Request,
     transaction_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reverse an inventory transaction."""
     return operations_inv_web_service.reverse_transaction_response(
@@ -1270,7 +1270,7 @@ def list_counts(
     limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = Query(default="count_date"),
     sort_dir: str | None = Query(default="desc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory counts list page."""
     return operations_inv_web_service.list_counts_response(
@@ -1291,7 +1291,7 @@ def list_counts(
 def new_count_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New inventory count form."""
     return operations_inv_web_service.new_count_form_response(
@@ -1305,7 +1305,7 @@ def new_count_form(
 async def create_count(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create new inventory count."""
     return await operations_inv_web_service.create_count_response(
@@ -1320,7 +1320,7 @@ def count_detail(
     request: Request,
     count_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory count detail page."""
     return operations_inv_web_service.count_detail_response(
@@ -1336,7 +1336,7 @@ def export_count(
     count_id: str,
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export a posted inventory count as CSV or PDF."""
     if format == "pdf":
@@ -1357,7 +1357,7 @@ def start_count(
     request: Request,
     count_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Start an inventory count."""
     return operations_inv_web_service.start_count_response(
@@ -1372,7 +1372,7 @@ def complete_count(
     request: Request,
     count_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Complete an inventory count."""
     return operations_inv_web_service.complete_count_response(
@@ -1387,7 +1387,7 @@ def post_count(
     request: Request,
     count_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Post inventory count adjustments."""
     return operations_inv_web_service.post_count_response(
@@ -1403,7 +1403,7 @@ async def record_count_line(
     count_id: str,
     line_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Record counted quantity for a count line."""
     return await operations_inv_web_service.record_count_line_response(
@@ -1420,7 +1420,7 @@ async def bulk_record_count_lines(
     request: Request,
     count_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Record counted quantities for multiple selected count lines."""
     return await operations_inv_web_service.bulk_record_count_lines_response(
@@ -1444,7 +1444,7 @@ def list_boms(
     bom_type: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bill of Materials list page."""
     return operations_inv_web_service.list_boms_response(
@@ -1462,7 +1462,7 @@ def list_boms(
 def new_bom_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New BOM form."""
     return operations_inv_web_service.new_bom_form_response(
@@ -1476,7 +1476,7 @@ def new_bom_form(
 async def create_bom(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create new BOM."""
     return await operations_inv_web_service.create_bom_response(
@@ -1491,7 +1491,7 @@ def bom_detail(
     request: Request,
     bom_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """BOM detail page."""
     return operations_inv_web_service.bom_detail_response(
@@ -1515,7 +1515,7 @@ def list_price_lists(
     price_list_type: str | None = None,
     list_type: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Price lists page."""
     return operations_inv_web_service.list_price_lists_response(
@@ -1532,7 +1532,7 @@ def list_price_lists(
 def new_price_list_form(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New price list form."""
     return operations_inv_web_service.new_price_list_form_response(
@@ -1546,7 +1546,7 @@ def new_price_list_form(
 async def create_price_list(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create new price list."""
     return await operations_inv_web_service.create_price_list_response(
@@ -1571,7 +1571,7 @@ def list_serials(
     item: str | None = None,
     lot: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Serial numbers list page."""
     return operations_inv_web_service.list_serials_response(
@@ -1592,7 +1592,7 @@ def serial_detail(
     request: Request,
     serial_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Serial number detail page."""
     return operations_inv_web_service.serial_detail_response(
@@ -1611,7 +1611,7 @@ def list_lots(
     status: str | None = None,
     warehouse: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Lots and serial numbers list page."""
     return operations_inv_web_service.list_lots_response(
@@ -1630,7 +1630,7 @@ def lot_detail(
     request: Request,
     lot_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Lot detail page."""
     return operations_inv_web_service.lot_detail_response(
@@ -1646,7 +1646,7 @@ def toggle_lot_quarantine(
     request: Request,
     lot_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle lot quarantine status."""
     return operations_inv_web_service.toggle_lot_quarantine_response(
@@ -1665,7 +1665,7 @@ def toggle_lot_quarantine(
 def inventory_reports_hub(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory reports hub page."""
     return operations_inv_web_service.inventory_reports_hub_response(
@@ -1683,7 +1683,7 @@ def stock_on_hand_report(
     show_zero: str | None = None,
     format: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Stock on hand report."""
     return operations_inv_web_service.stock_on_hand_report_response(
@@ -1706,7 +1706,7 @@ def serial_stock_report(
     item: str | None = None,
     search: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Serial stock by warehouse report."""
     return operations_inv_web_service.serial_stock_report_response(
@@ -1724,7 +1724,7 @@ def serial_stock_report(
 def inventory_valuation_report(
     request: Request,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory valuation report."""
     return operations_inv_web_service.inventory_valuation_report_response(
@@ -1738,7 +1738,7 @@ def inventory_valuation_report(
 def export_inventory_valuation_report(
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export inventory valuation summary rows as CSV or PDF."""
     if format == "pdf":
@@ -1758,7 +1758,7 @@ def inventory_valuation_wac_breakdown_report(
     item_id: str,
     warehouse_id: str,
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory valuation WAC breakdown report."""
     return operations_inv_web_service.wac_breakdown_report_response(
@@ -1776,7 +1776,7 @@ def export_inventory_valuation_wac_breakdown(
     warehouse_id: str | None = None,
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
     auth: WebAuthContext = Depends(require_inventory_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export WAC breakdown rows as CSV or PDF."""
     if format == "pdf":
@@ -1802,7 +1802,7 @@ def fifo_layers_report(
     item: str | None = None,
     search: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """FIFO layers report."""
     return operations_inv_web_service.fifo_layers_report_response(
@@ -1824,7 +1824,7 @@ def stock_aging_report(
     item: str | None = None,
     search: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Stock aging report."""
     return operations_inv_web_service.stock_aging_report_response(
@@ -1847,7 +1847,7 @@ def stock_movement_report(
     transaction_type: str | None = None,
     search: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Stock movement report."""
     return operations_inv_web_service.stock_movement_report_response(
@@ -1872,7 +1872,7 @@ def yearly_stock_movement_report(
     item: str | None = None,
     search: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Yearly stock movement summary report."""
     return operations_inv_web_service.yearly_stock_movement_report_response(
@@ -1897,7 +1897,7 @@ def export_yearly_stock_movement_report(
     warehouse: str | None = None,
     item: str | None = None,
     search: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export yearly stock movement summary as CSV or PDF."""
     if format == "pdf":

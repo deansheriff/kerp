@@ -16,7 +16,12 @@ from starlette.responses import RedirectResponse
 from app.services.finance.tax.control_tracker import tax_control_tracker_service
 from app.services.finance.tax.web import tax_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_finance_access
+from app.web.deps import (
+    get_db_for_org,
+    WebAuthContext,
+    base_context,
+    require_finance_access,
+)
 
 router = APIRouter(prefix="/tax", tags=["tax-web"])
 
@@ -48,7 +53,7 @@ def list_jurisdictions(
     country_code: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax jurisdictions list page."""
     return tax_web_service.list_jurisdictions_response(
@@ -70,7 +75,7 @@ def list_tax_codes(
     is_active: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax codes list page."""
     # Convert is_active string to boolean
@@ -96,7 +101,7 @@ def list_tax_codes(
 def new_tax_code_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New tax code form page."""
     return tax_web_service.new_tax_code_form_response(request, auth, db)
@@ -106,7 +111,7 @@ def new_tax_code_form(
 async def create_tax_code(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new tax code."""
     return await tax_web_service.create_tax_code_response(request, auth, db)
@@ -117,7 +122,7 @@ def edit_tax_code_form(
     request: Request,
     tax_code_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit tax code form page."""
     return tax_web_service.edit_tax_code_form_response(request, auth, tax_code_id, db)
@@ -128,7 +133,7 @@ async def update_tax_code(
     request: Request,
     tax_code_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an existing tax code."""
     return await tax_web_service.update_tax_code_response(
@@ -140,7 +145,7 @@ async def update_tax_code(
 def toggle_tax_code(
     tax_code_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Toggle tax code active/inactive status."""
     return tax_web_service.toggle_tax_code_response(auth, tax_code_id, db)
@@ -156,7 +161,7 @@ def list_tax_periods(
     year: int | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax periods list page."""
     return tax_web_service.list_tax_periods_response(
@@ -177,7 +182,7 @@ def overdue_periods(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
     as_of_date: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Overdue tax periods page."""
     return tax_web_service.overdue_periods_response(request, auth, as_of_date, db)
@@ -192,7 +197,7 @@ def list_tax_returns(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax returns list page."""
     return tax_web_service.list_tax_returns_response(
@@ -211,7 +216,7 @@ def list_tax_returns(
 def new_return_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New tax return form page."""
     return tax_web_service.new_return_form_response(request, auth, db)
@@ -221,7 +226,7 @@ def new_return_form(
 async def create_return(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new tax return."""
     return await tax_web_service.create_return_response(request, auth, db)
@@ -232,7 +237,7 @@ def view_tax_return(
     request: Request,
     return_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax return detail page."""
     return tax_web_service.view_tax_return_response(request, auth, return_id, db)
@@ -243,7 +248,7 @@ def edit_return_form(
     request: Request,
     return_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit tax return form page."""
     return tax_web_service.edit_return_form_response(request, auth, return_id, db)
@@ -254,7 +259,7 @@ async def update_return(
     request: Request,
     return_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a tax return."""
     return await tax_web_service.update_return_response(request, auth, return_id, db)
@@ -265,7 +270,7 @@ def deferred_tax_summary(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
     as_of_date: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Deferred tax summary page."""
     return tax_web_service.deferred_tax_summary_response(request, auth, as_of_date, db)
@@ -280,7 +285,7 @@ def vat_register(
     transaction_type: str | None = None,
     tax_code_id: str | None = None,
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """VAT register page - list of all tax transactions."""
     return tax_web_service.vat_register_response(
@@ -302,7 +307,7 @@ def tax_liability_summary(
     start_date: str | None = None,
     end_date: str | None = None,
     group_by: str = Query(default="month"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax liability summary page - output vs input tax summary."""
     return tax_web_service.tax_liability_summary_response(
@@ -320,7 +325,7 @@ def tax_control_tracker(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
     year: int | None = Query(default=None, ge=2000, le=2100),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """VAT/WHT control tracker built from source-specific bases."""
     return tax_web_service.tax_control_tracker_response(
@@ -335,7 +340,7 @@ def tax_control_tracker(
 def export_tax_control_customer_deductions(
     year: int | None = Query(default=None, ge=2000, le=2100),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export tracker customer deduction rows as CSV."""
     tracker_year = year or (date.today().year - 1)
@@ -351,7 +356,7 @@ def export_tax_control_customer_deductions(
 def export_tax_control_supplier_wht(
     year: int | None = Query(default=None, ge=2000, le=2100),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export tracker supplier WHT rows as CSV."""
     tracker_year = year or (date.today().year - 1)
@@ -367,7 +372,7 @@ def export_tax_control_supplier_wht(
 async def save_tax_control_evidence(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Save manual evidence tracking for customer certificates or supplier remittances."""
     form = await request.form()
@@ -403,7 +408,7 @@ def view_tax_transaction(
     request: Request,
     transaction_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax transaction detail page."""
     return tax_web_service.view_tax_transaction_response(
@@ -417,7 +422,7 @@ def return_transactions(
     return_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
     page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View transactions included in a tax return."""
     return tax_web_service.return_transactions_response(
@@ -429,7 +434,7 @@ def return_transactions(
 def recalculate_return(
     return_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Recalculate a draft tax return."""
     return tax_web_service.recalculate_return_response(return_id, auth, db)
@@ -439,7 +444,7 @@ def recalculate_return(
 def review_return(
     return_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark a tax return as reviewed."""
     return tax_web_service.review_return_response(return_id, auth, db)
@@ -449,7 +454,7 @@ def review_return(
 def file_return(
     return_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """File a tax return."""
     return tax_web_service.file_return_response(return_id, auth, db)
@@ -467,7 +472,7 @@ def tax_summary_by_type(
     end_date: str | None = None,
     basis: str = "accrual",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax summary report grouped by tax type."""
     return tax_web_service.tax_summary_by_type_page(
@@ -483,7 +488,7 @@ def wht_report(
     include_details: bool = True,
     basis: str = "accrual",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Withholding tax report."""
     return tax_web_service.wht_report_page(
@@ -498,7 +503,7 @@ def stamp_duty_report(
     end_date: str | None = None,
     include_details: bool = True,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Stamp duty report."""
     return tax_web_service.stamp_duty_report_page(
@@ -513,7 +518,7 @@ def vat_return(
     end_date: str | None = None,
     basis: str = "cash",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """VAT return (FIRS Form 002). Defaults to cash basis (Nigerian filing rule)."""
     return tax_web_service.vat_return_page(
@@ -531,7 +536,7 @@ def list_fiscal_positions(
     is_active: str | None = None,
     page: int = 1,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Fiscal positions list page."""
     from app.services.finance.tax.fiscal_position_web import (
@@ -547,7 +552,7 @@ def list_fiscal_positions(
 def new_fiscal_position(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Fiscal position creation form."""
     from app.services.finance.tax.fiscal_position_web import (
@@ -561,7 +566,7 @@ def new_fiscal_position(
 async def create_fiscal_position(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle fiscal position creation."""
     from app.services.finance.tax.fiscal_position_web import (
@@ -581,7 +586,7 @@ def fiscal_position_detail(
     request: Request,
     fiscal_position_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Fiscal position detail page."""
     from app.services.finance.tax.fiscal_position_web import (
@@ -598,7 +603,7 @@ def edit_fiscal_position(
     request: Request,
     fiscal_position_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Fiscal position edit form."""
     from app.services.finance.tax.fiscal_position_web import (
@@ -615,7 +620,7 @@ async def update_fiscal_position(
     request: Request,
     fiscal_position_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle fiscal position update."""
     from app.services.finance.tax.fiscal_position_web import (
@@ -639,7 +644,7 @@ def delete_fiscal_position(
     request: Request,
     fiscal_position_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle fiscal position deletion."""
     from app.services.finance.tax.fiscal_position_web import (

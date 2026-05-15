@@ -15,9 +15,9 @@ from app.models.notification import EntityType, NotificationType
 from app.services.notification import notification_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_web_auth,
 )
 
@@ -99,7 +99,7 @@ def format_notification_for_template(notification) -> dict:
 async def notifications_list(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
     filter: str | None = Query(None, description="Filter: all, unread, or entity type"),
     page: int = Query(1, ge=1),
 ):
@@ -186,7 +186,7 @@ async def mark_notification_read(
     request: Request,
     notification_id: UUID,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark a single notification as read."""
     if not auth.is_authenticated:
@@ -224,7 +224,7 @@ async def mark_notification_read(
 async def mark_all_notifications_read(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Mark all notifications as read."""
     if not auth.is_authenticated:
@@ -255,7 +255,7 @@ async def mark_all_notifications_read(
 @router.get("/notifications/context", response_class=JSONResponse)
 async def notifications_context(
     auth: WebAuthContext = Depends(require_web_auth),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
     limit: int = Query(5, ge=1, le=20),
 ):
     """Return recent notifications + unread count for header/topbar hydration."""

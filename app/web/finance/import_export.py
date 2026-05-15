@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.services.finance.import_export.web import import_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_finance_access
+from app.web.deps import (
+    get_db_for_org,
+    WebAuthContext,
+    base_context,
+    require_finance_access,
+)
 
 
 def _build_target_fields(
@@ -34,7 +39,7 @@ router = APIRouter(prefix="/import", tags=["import-web"])
 def import_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Data import dashboard page."""
     context = base_context(request, auth, "Data Import", "import")
@@ -127,7 +132,7 @@ def import_form(
     request: Request,
     entity_type: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Import form for a specific entity type."""
     entity_names = {
@@ -247,7 +252,7 @@ async def preview_import(
     entity_type: str,
     file: UploadFile = File(...),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Preview import with validation and column mapping (web route)."""
     try:
@@ -276,7 +281,7 @@ async def execute_import(
     dry_run: str | None = Form(default=None),
     column_mapping: str | None = Form(default=None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Execute import operation (web route)."""
     import json

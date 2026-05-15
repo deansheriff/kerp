@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.services.people.scheduling.web import scheduling_web_service
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 router = APIRouter(prefix="/scheduling", tags=["people-scheduling-web"])
 
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/scheduling", tags=["people-scheduling-web"])
 def scheduling_index(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Scheduling landing page."""
     context = base_context(request, auth, "Scheduling", "scheduling", db=db)
@@ -41,7 +41,7 @@ def patterns_list(
     error: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Shift patterns list page."""
     return scheduling_web_service.patterns_list_response(
@@ -60,7 +60,7 @@ def patterns_list(
 def new_pattern_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New shift pattern form."""
     return scheduling_web_service.new_pattern_form_response(
@@ -74,7 +74,7 @@ def new_pattern_form(
 async def create_pattern(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new shift pattern."""
     return await scheduling_web_service.create_pattern_response(
@@ -89,7 +89,7 @@ def edit_pattern_form(
     request: Request,
     pattern_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit shift pattern form."""
     return scheduling_web_service.edit_pattern_form_response(
@@ -105,7 +105,7 @@ async def update_pattern(
     request: Request,
     pattern_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a shift pattern."""
     return await scheduling_web_service.update_pattern_response(
@@ -121,7 +121,7 @@ async def delete_pattern(
     request: Request,
     pattern_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Deactivate a shift pattern."""
     return await scheduling_web_service.delete_pattern_response(
@@ -145,7 +145,7 @@ def assignments_list(
     error: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Pattern assignments list page."""
     return scheduling_web_service.assignments_list_response(
@@ -163,7 +163,7 @@ def assignments_list(
 def new_assignment_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New pattern assignment form."""
     return scheduling_web_service.new_assignment_form_response(
@@ -177,7 +177,7 @@ def new_assignment_form(
 async def create_assignment(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new pattern assignment."""
     return await scheduling_web_service.create_assignment_response(
@@ -192,7 +192,7 @@ async def delete_assignment(
     request: Request,
     assignment_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Delete (end) a pattern assignment."""
     return await scheduling_web_service.delete_assignment_response(
@@ -215,7 +215,7 @@ def schedules_list(
     year_month: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Schedules list/calendar page."""
     return scheduling_web_service.schedules_list_response(
@@ -232,7 +232,7 @@ def schedules_list(
 def generate_schedule_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Generate schedule form."""
     return scheduling_web_service.generate_schedule_form_response(
@@ -246,7 +246,7 @@ def generate_schedule_form(
 async def generate_schedule(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Generate schedules for a month."""
     return await scheduling_web_service.generate_schedule_response(
@@ -260,7 +260,7 @@ async def generate_schedule(
 async def publish_schedule(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Publish schedules for a month."""
     return await scheduling_web_service.publish_schedule_response(
@@ -275,7 +275,7 @@ async def delete_schedule(
     request: Request,
     schedule_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Delete a draft schedule entry."""
     return await scheduling_web_service.delete_schedule_response(
@@ -297,7 +297,7 @@ def swap_requests_list(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Swap requests list page."""
     return scheduling_web_service.swap_requests_list_response(
@@ -314,7 +314,7 @@ async def approve_swap_request(
     request: Request,
     request_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Approve a swap request."""
     return await scheduling_web_service.approve_swap_request_response(
@@ -330,7 +330,7 @@ async def reject_swap_request(
     request: Request,
     request_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Reject a swap request."""
     return await scheduling_web_service.reject_swap_request_response(

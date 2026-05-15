@@ -26,9 +26,9 @@ from app.services.finance.rpt.async_exports import (
 from app.services.finance.rpt.web import reports_web_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_finance_access,
 )
 
@@ -60,7 +60,7 @@ def reports_dashboard(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reports landing page."""
     context = base_context(request, auth, "Reports", "reports", db=db)
@@ -74,7 +74,7 @@ def trial_balance_report(
     as_of_date: str | None = None,
     basis: str = Query("accrual", pattern="^(accrual|cash)$"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Trial balance report page."""
     return reports_web_service.trial_balance_response(
@@ -88,7 +88,7 @@ def export_trial_balance(
     basis: str = Query("accrual", pattern="^(accrual|cash)$"),
     fmt: str = Query("csv", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export trial balance as CSV or PDF."""
     org_id = str(auth.organization_id)
@@ -111,7 +111,7 @@ def income_statement_report(
     end_date: str | None = None,
     basis: str = Query("accrual", pattern="^(accrual|cash)$"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Income statement report page."""
     return reports_web_service.income_statement_response(
@@ -126,7 +126,7 @@ def export_income_statement(
     basis: str = Query("accrual", pattern="^(accrual|cash)$"),
     fmt: str = Query("csv", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export income statement as CSV or PDF."""
     org_id = str(auth.organization_id)
@@ -147,7 +147,7 @@ def balance_sheet_report(
     request: Request,
     as_of_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Balance sheet report page."""
     return reports_web_service.balance_sheet_response(request, auth, as_of_date, db)
@@ -158,7 +158,7 @@ def export_balance_sheet(
     as_of_date: str | None = None,
     fmt: str = Query("csv", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export balance sheet as CSV or PDF."""
     org_id = str(auth.organization_id)
@@ -174,7 +174,7 @@ def ap_aging_report(
     request: Request,
     as_of_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AP aging report page."""
     return reports_web_service.ap_aging_response(request, auth, as_of_date, db)
@@ -185,7 +185,7 @@ def export_ap_aging(
     as_of_date: str | None = None,
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export AP aging as PDF."""
     org_id = str(auth.organization_id)
@@ -202,7 +202,7 @@ def ar_aging_report(
     request: Request,
     as_of_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AR aging report page."""
     return reports_web_service.ar_aging_response(request, auth, as_of_date, db)
@@ -213,7 +213,7 @@ def export_ar_aging(
     as_of_date: str | None = None,
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export AR aging as PDF."""
     org_id = str(auth.organization_id)
@@ -231,7 +231,7 @@ def general_ledger_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """General ledger detail report page."""
     return reports_web_service.general_ledger_response(
@@ -251,7 +251,7 @@ def export_general_ledger(
     end_date: str | None = None,
     fmt: str = Query("csv", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export general ledger as CSV or PDF."""
     org_id = str(auth.organization_id)
@@ -273,7 +273,7 @@ def queue_general_ledger_export_route(
     end_date: str | None = None,
     fmt: str = Query("csv", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Queue general ledger export for background processing."""
     if not auth.organization_id or not auth.user_id:
@@ -307,7 +307,7 @@ def queue_general_ledger_export_route(
 def download_general_ledger_export(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> Response:
     """Download a completed queued General Ledger export."""
     if not auth.organization_id or not auth.user_id:
@@ -335,7 +335,7 @@ def download_general_ledger_export(
 def general_ledger_export_status(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Return the status of a queued General Ledger export."""
     if not auth.organization_id or not auth.user_id:
@@ -355,7 +355,7 @@ def tax_summary_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Tax summary report page."""
     return reports_web_service.tax_summary_response(
@@ -371,7 +371,7 @@ def vendor_payout_breakdown_report(
     supplier_id: str | None = None,
     status: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Supplier payout report with payment-level line-item breakdown."""
     return reports_web_service.vendor_payout_breakdown_response(
@@ -392,7 +392,7 @@ def export_vendor_payout_breakdown(
     supplier_id: str | None = None,
     status: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export supplier payout breakdown as CSV."""
     csv = reports_web_service.export_vendor_payout_breakdown_csv(
@@ -412,7 +412,7 @@ def export_tax_summary(
     end_date: str | None = None,
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export tax summary as PDF."""
     org_id = str(auth.organization_id)
@@ -426,7 +426,7 @@ def expense_summary_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Expense summary report page."""
     return reports_web_service.expense_summary_response(
@@ -440,7 +440,7 @@ def export_expense_summary(
     end_date: str | None = None,
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export expense summary as PDF."""
     org_id = str(auth.organization_id)
@@ -456,7 +456,7 @@ def cash_flow_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cash flow statement report page."""
     return reports_web_service.cash_flow_response(
@@ -470,7 +470,7 @@ def export_cash_flow(
     end_date: str | None = None,
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export cash flow as PDF."""
     org_id = str(auth.organization_id)
@@ -484,7 +484,7 @@ def ias7_cash_flow_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """IAS 7 cash flow statement (indirect method)."""
     return reports_web_service.ias7_cash_flow_response(
@@ -498,7 +498,7 @@ def export_ias7_cash_flow(
     end_date: str | None = None,
     fmt: str = Query("csv", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export IAS 7 cash flow as CSV or PDF."""
     org_id = str(auth.organization_id)
@@ -519,7 +519,7 @@ def changes_in_equity_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Changes in equity report page."""
     return reports_web_service.changes_in_equity_response(
@@ -533,7 +533,7 @@ def export_changes_in_equity(
     end_date: str | None = None,
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export changes in equity as PDF."""
     org_id = str(auth.organization_id)
@@ -549,7 +549,7 @@ def management_accounts_report(
     start_date: str | None = None,
     end_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Management accounts report page."""
     return reports_web_service.management_accounts_response(
@@ -563,7 +563,7 @@ def export_management_accounts(
     end_date: str | None = None,
     fmt: str = Query("csv", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export management accounts as CSV or PDF."""
     org_id = str(auth.organization_id)
@@ -582,7 +582,7 @@ def export_management_accounts(
 def analysis_report(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Pivot-style analysis report page."""
     return reports_web_service.analysis_response(request, auth, db)
@@ -592,7 +592,7 @@ def analysis_report(
 def inventory_valuation_reconciliation_report(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Inventory valuation reconciliation report page."""
     return reports_web_service.inventory_valuation_reconciliation_response(
@@ -604,7 +604,7 @@ def inventory_valuation_reconciliation_report(
 def export_inventory_valuation(
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export inventory valuation reconciliation as PDF."""
     org_id = str(auth.organization_id)
@@ -620,7 +620,7 @@ def budget_vs_actual_report(
     budget_id: str | None = None,
     budget_code: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Budget vs actual report page."""
     return reports_web_service.budget_vs_actual_response(
@@ -636,7 +636,7 @@ def export_budget_vs_actual(
     budget_code: str | None = None,
     fmt: str = Query("pdf", alias="format"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> StreamingResponse:
     """Export budget vs actual as PDF."""
     org_id = str(auth.organization_id)

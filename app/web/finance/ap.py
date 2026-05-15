@@ -23,9 +23,9 @@ from sqlalchemy.orm import Session
 from app.services.finance.ap.web import ap_web_service
 from app.templates import templates
 from app.web.deps import (
+    get_db_for_org,
     WebAuthContext,
     base_context,
-    get_db,
     require_any_web_permission,
     require_web_permission,
 )
@@ -78,7 +78,7 @@ def list_suppliers(
     limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = None,
     sort_dir: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Suppliers list page."""
     return ap_web_service.list_suppliers_response(
@@ -112,7 +112,7 @@ def supplier_search(
             ]
         )
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Search active suppliers for typeahead/autocomplete."""
     payload = ap_web_service.supplier_typeahead(
@@ -131,7 +131,7 @@ def people_search(
     auth: WebAuthContext = Depends(
         require_any_web_permission(["ap:invoices:read", "ap:suppliers:read"])
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Search people by name/email for comment @mentions."""
     org_id = auth.organization_id
@@ -151,7 +151,7 @@ def people_search(
 def new_supplier_form(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New supplier form page."""
     return ap_web_service.supplier_new_form_response(request, auth, db)
@@ -163,7 +163,7 @@ async def export_all_suppliers(
     search: str = "",
     status: str = "",
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all suppliers matching filters to CSV."""
     return await ap_web_service.export_all_suppliers_response(auth, db, search, status)
@@ -174,7 +174,7 @@ def view_supplier(
     request: Request,
     supplier_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Supplier detail page."""
     return ap_web_service.supplier_detail_response(request, auth, db, supplier_id)
@@ -185,7 +185,7 @@ def edit_supplier_form(
     request: Request,
     supplier_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit supplier form page."""
     return ap_web_service.supplier_edit_form_response(request, auth, db, supplier_id)
@@ -195,7 +195,7 @@ def edit_supplier_form(
 async def create_supplier(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle supplier form submission."""
     return await ap_web_service.create_supplier_response(request, auth, db)
@@ -206,7 +206,7 @@ async def update_supplier(
     request: Request,
     supplier_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle supplier update form submission."""
     return await ap_web_service.update_supplier_response(request, auth, db, supplier_id)
@@ -217,7 +217,7 @@ def delete_supplier(
     request: Request,
     supplier_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:delete")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a supplier."""
     return ap_web_service.delete_supplier_response(request, auth, db, supplier_id)
@@ -232,7 +232,7 @@ def delete_supplier(
 async def bulk_delete_suppliers(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:delete")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete suppliers."""
     return await ap_web_service.bulk_delete_suppliers_response(request, auth, db)
@@ -242,7 +242,7 @@ async def bulk_delete_suppliers(
 async def bulk_export_suppliers(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected suppliers to CSV."""
     return await ap_web_service.bulk_export_suppliers_response(request, auth, db)
@@ -252,7 +252,7 @@ async def bulk_export_suppliers(
 async def bulk_activate_suppliers(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk activate suppliers."""
     return await ap_web_service.bulk_activate_suppliers_response(request, auth, db)
@@ -262,7 +262,7 @@ async def bulk_activate_suppliers(
 async def bulk_deactivate_suppliers(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk deactivate suppliers."""
     return await ap_web_service.bulk_deactivate_suppliers_response(request, auth, db)
@@ -286,7 +286,7 @@ def list_invoices(
     limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = None,
     sort_dir: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AP invoices list page."""
     return ap_web_service.list_invoices_response(
@@ -312,7 +312,7 @@ def new_invoice_form(
     po_id: str | None = None,
     duplicate_from: str | None = Query(None),
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New AP invoice form page."""
     return ap_web_service.invoice_new_form_response(
@@ -324,7 +324,7 @@ def new_invoice_form(
 async def create_invoice(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AP invoice form submission."""
     return await ap_web_service.create_invoice_response(request, auth, db)
@@ -339,7 +339,7 @@ async def export_all_ap_invoices(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all AP invoices matching filters to CSV."""
     return await ap_web_service.export_all_invoices_response(
@@ -352,7 +352,7 @@ def view_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AP invoice detail page."""
     return ap_web_service.invoice_detail_response(request, auth, db, invoice_id)
@@ -363,7 +363,7 @@ def edit_invoice_form(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit AP invoice form page."""
     return ap_web_service.invoice_edit_form_response(request, auth, db, invoice_id)
@@ -374,7 +374,7 @@ async def update_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AP invoice update form submission."""
     return await ap_web_service.update_invoice_response(request, auth, db, invoice_id)
@@ -385,7 +385,7 @@ def submit_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:submit")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit AP invoice for approval."""
     return ap_web_service.submit_invoice_response(request, auth, db, invoice_id)
@@ -396,7 +396,7 @@ def approve_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:approve")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve AP invoice."""
     return ap_web_service.approve_invoice_response(request, auth, db, invoice_id)
@@ -407,7 +407,7 @@ def post_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:post")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Post AP invoice to general ledger."""
     return ap_web_service.post_invoice_response(request, auth, db, invoice_id)
@@ -418,7 +418,7 @@ def void_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:void")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Void an AP invoice."""
     return ap_web_service.void_invoice_response(request, auth, db, invoice_id)
@@ -429,7 +429,7 @@ async def add_invoice_comment(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Append an internal comment to an AP invoice."""
     return await ap_web_service.add_invoice_comment_response(
@@ -442,7 +442,7 @@ def delete_invoice(
     request: Request,
     invoice_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an AP invoice."""
     return ap_web_service.delete_invoice_response(request, auth, db, invoice_id)
@@ -457,7 +457,7 @@ def delete_invoice(
 async def bulk_delete_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete AP invoices (only DRAFT status)."""
     return await ap_web_service.bulk_delete_invoices_response(request, auth, db)
@@ -467,7 +467,7 @@ async def bulk_delete_invoices(
 async def bulk_export_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected AP invoices to CSV."""
     return await ap_web_service.bulk_export_invoices_response(request, auth, db)
@@ -477,7 +477,7 @@ async def bulk_export_invoices(
 async def bulk_approve_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:approve")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk approve AP invoices (from SUBMITTED status)."""
     return await ap_web_service.bulk_approve_invoices_response(request, auth, db)
@@ -487,7 +487,7 @@ async def bulk_approve_invoices(
 async def bulk_post_invoices(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:post")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk post AP invoices to General Ledger (from APPROVED status)."""
     return await ap_web_service.bulk_post_invoices_response(request, auth, db)
@@ -511,7 +511,7 @@ def list_payments(
     limit: int = Query(default=50, ge=10, le=500),
     sort: str | None = None,
     sort_dir: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AP payments list page."""
     return ap_web_service.list_payments_response(
@@ -535,7 +535,7 @@ def new_payment_form(
     request: Request,
     invoice_id: str | None = Query(None),
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New AP payment form page."""
     return ap_web_service.payment_new_form_response(
@@ -552,7 +552,7 @@ async def export_all_ap_payments(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all AP payments matching filters to CSV."""
     return await ap_web_service.export_all_payments_response(
@@ -565,7 +565,7 @@ def view_payment(
     request: Request,
     payment_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AP payment detail page."""
     return ap_web_service.payment_detail_response(request, auth, db, payment_id)
@@ -575,7 +575,7 @@ def view_payment(
 async def create_payment(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AP payment form submission."""
     return await ap_web_service.create_payment_response(request, auth, db)
@@ -586,7 +586,7 @@ def edit_payment_form(
     request: Request,
     payment_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit AP payment form page."""
     return ap_web_service.payment_edit_form_response(request, auth, db, payment_id)
@@ -597,7 +597,7 @@ async def update_payment(
     request: Request,
     payment_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle AP payment update form submission."""
     return await ap_web_service.update_payment_response(request, auth, db, payment_id)
@@ -616,7 +616,7 @@ def approve_payment(
             ]
         )
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve AP payment."""
     return ap_web_service.approve_payment_response(request, auth, db, payment_id)
@@ -627,7 +627,7 @@ def post_payment(
     request: Request,
     payment_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:post")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Post AP payment to general ledger."""
     return ap_web_service.post_payment_response(request, auth, db, payment_id)
@@ -638,7 +638,7 @@ def void_payment(
     request: Request,
     payment_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:void")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Void an AP payment."""
     return ap_web_service.void_payment_response(request, auth, db, payment_id)
@@ -649,7 +649,7 @@ def delete_payment(
     request: Request,
     payment_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:delete")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an AP payment."""
     return ap_web_service.delete_payment_response(request, auth, db, payment_id)
@@ -664,7 +664,7 @@ def delete_payment(
 async def bulk_delete_payments(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:delete")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete AP payments (only DRAFT status)."""
     return await ap_web_service.bulk_delete_payments_response(request, auth, db)
@@ -674,7 +674,7 @@ async def bulk_delete_payments(
 async def bulk_export_payments(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected AP payments to CSV."""
     return await ap_web_service.bulk_export_payments_response(request, auth, db)
@@ -692,7 +692,7 @@ def list_payment_batches(
     status: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Payment batches list page."""
     return ap_web_service.list_payment_batches_response(
@@ -706,7 +706,7 @@ def new_payment_batch_form(
     search: str | None = None,
     supplier_id: str | None = None,
     auth: WebAuthContext = Depends(require_web_permission("ap:payment_batches:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New payment batch form page."""
     return ap_web_service.payment_batch_new_form_response(
@@ -722,7 +722,7 @@ def new_payment_batch_form(
 async def create_payment_batch(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:payment_batches:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle payment batch form submission."""
     return await ap_web_service.create_payment_batch_response(request, auth, db)
@@ -734,7 +734,7 @@ def download_batch_bank_file(
     batch_id: str,
     bank_format: str = Query(default="zenith"),
     auth: WebAuthContext = Depends(require_web_permission("ap:payment_batches:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download bank upload file for a payment batch."""
     return ap_web_service.download_batch_bank_file_response(
@@ -758,7 +758,7 @@ def list_purchase_orders(
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Purchase orders list page."""
     return ap_web_service.list_purchase_orders_response(
@@ -779,7 +779,7 @@ def list_purchase_orders(
 def new_purchase_order_form(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New purchase order form page."""
     return ap_web_service.purchase_order_new_form_response(request, auth, db)
@@ -790,7 +790,7 @@ def view_purchase_order(
     request: Request,
     po_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Purchase order detail page."""
     return ap_web_service.purchase_order_detail_response(request, auth, db, po_id)
@@ -801,7 +801,7 @@ def edit_purchase_order_form(
     request: Request,
     po_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit purchase order form page."""
     return ap_web_service.purchase_order_edit_form_response(request, auth, db, po_id)
@@ -811,7 +811,7 @@ def edit_purchase_order_form(
 async def create_purchase_order(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle purchase order form submission."""
     return await ap_web_service.create_purchase_order_response(request, auth, db)
@@ -822,7 +822,7 @@ async def update_purchase_order(
     request: Request,
     po_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle purchase order edit form submission."""
     return await ap_web_service.update_purchase_order_response(request, auth, db, po_id)
@@ -833,7 +833,7 @@ def delete_purchase_order(
     request: Request,
     po_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:delete")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle purchase order deletion."""
     return ap_web_service.delete_purchase_order_response(request, auth, db, po_id)
@@ -844,7 +844,7 @@ def submit_purchase_order(
     request: Request,
     po_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:submit")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Submit purchase order for approval."""
     return ap_web_service.submit_purchase_order_response(request, auth, db, po_id)
@@ -857,7 +857,7 @@ def approve_purchase_order(
     auth: WebAuthContext = Depends(
         require_web_permission("ap:purchase_orders:approve")
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Approve purchase order."""
     return ap_web_service.approve_purchase_order_response(request, auth, db, po_id)
@@ -868,7 +868,7 @@ def cancel_purchase_order(
     request: Request,
     po_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:void")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Cancel purchase order."""
     return ap_web_service.cancel_purchase_order_response(request, auth, db, po_id)
@@ -891,7 +891,7 @@ def list_goods_receipts(
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=10, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Goods receipts list page."""
     return ap_web_service.list_goods_receipts_response(
@@ -914,7 +914,7 @@ def new_goods_receipt_form(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:goods_receipts:create")),
     po_id: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New goods receipt form page."""
     return ap_web_service.goods_receipt_new_form_response(request, auth, po_id, db)
@@ -925,7 +925,7 @@ def view_goods_receipt(
     request: Request,
     receipt_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:goods_receipts:read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Goods receipt detail page."""
     return ap_web_service.goods_receipt_detail_response(request, auth, db, receipt_id)
@@ -935,7 +935,7 @@ def view_goods_receipt(
 async def create_goods_receipt(
     request: Request,
     auth: WebAuthContext = Depends(require_web_permission("ap:goods_receipts:create")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Handle goods receipt form submission."""
     return await ap_web_service.create_goods_receipt_response(request, auth, db)
@@ -946,7 +946,7 @@ def start_inspection(
     request: Request,
     receipt_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:goods_receipts:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Start inspection on goods receipt."""
     return ap_web_service.start_inspection_response(request, auth, db, receipt_id)
@@ -957,7 +957,7 @@ def accept_all(
     request: Request,
     receipt_id: str,
     auth: WebAuthContext = Depends(require_web_permission("ap:goods_receipts:approve")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Accept all items on goods receipt."""
     return ap_web_service.accept_all_response(request, auth, db, receipt_id)
@@ -974,7 +974,7 @@ def aging_report(
     auth: WebAuthContext = Depends(require_web_permission("ap:aging:read")),
     as_of_date: str | None = None,
     supplier_id: str | None = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """AP aging report page."""
     return ap_web_service.aging_report_response(
@@ -994,7 +994,7 @@ async def upload_invoice_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_web_permission("ap:invoices:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a supplier invoice."""
     return await ap_web_service.upload_invoice_attachment_response(
@@ -1013,7 +1013,7 @@ async def upload_po_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_web_permission("ap:purchase_orders:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a purchase order."""
     return await ap_web_service.upload_po_attachment_response(
@@ -1031,7 +1031,7 @@ async def upload_goods_receipt_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_web_permission("ap:goods_receipts:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a goods receipt."""
     return await ap_web_service.upload_goods_receipt_attachment_response(
@@ -1049,7 +1049,7 @@ async def upload_payment_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_web_permission("ap:payments:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a supplier payment."""
     return await ap_web_service.upload_payment_attachment_response(
@@ -1067,7 +1067,7 @@ async def upload_supplier_attachment(
     file: UploadFile = File(...),
     description: str | None = None,
     auth: WebAuthContext = Depends(require_web_permission("ap:suppliers:update")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Upload an attachment for a supplier."""
     return await ap_web_service.upload_supplier_attachment_response(
@@ -1093,7 +1093,7 @@ def download_attachment(
             ]
         )
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Download an attachment file."""
     return ap_web_service.download_attachment_response(attachment_id, auth, db)
@@ -1113,7 +1113,7 @@ def delete_attachment(
             ]
         )
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete an attachment."""
     return ap_web_service.delete_attachment_response(attachment_id, auth, db)

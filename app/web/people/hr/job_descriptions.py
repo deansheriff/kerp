@@ -15,7 +15,7 @@ from app.services.people.hr import (
 )
 from app.services.people.hr.web.constants import DEFAULT_PAGE_SIZE
 from app.templates import templates
-from app.web.deps import WebAuthContext, base_context, get_db, require_hr_access
+from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
 from ._common import _parse_bool
 
@@ -37,7 +37,7 @@ def list_job_descriptions(
     success: str | None = None,
     error: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Job description list page."""
     org_id = coerce_uuid(auth.organization_id)
@@ -88,7 +88,7 @@ def list_job_descriptions(
 def new_job_description_form(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New job description form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -142,7 +142,7 @@ def create_job_description(
     direct_reports: str | None = Form(None),
     status: str = Form("draft"),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new job description."""
     org_id = coerce_uuid(auth.organization_id)
@@ -228,7 +228,7 @@ def view_job_description(
     jd_id: str,
     success: str | None = None,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """View job description detail."""
     org_id = coerce_uuid(auth.organization_id)
@@ -263,7 +263,7 @@ def edit_job_description_form(
     request: Request,
     jd_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit job description form."""
     org_id = coerce_uuid(auth.organization_id)
@@ -327,7 +327,7 @@ def update_job_description(
     direct_reports: str | None = Form(None),
     status: str = Form("draft"),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update a job description."""
     org_id = coerce_uuid(auth.organization_id)
@@ -400,7 +400,7 @@ def activate_job_description(
     request: Request,
     jd_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Activate a job description."""
     org_id = coerce_uuid(auth.organization_id)
@@ -423,7 +423,7 @@ def archive_job_description(
     request: Request,
     jd_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Archive a job description."""
     org_id = coerce_uuid(auth.organization_id)
@@ -450,7 +450,7 @@ def add_competency_to_jd(
     is_mandatory: str | None = Form(None),
     notes: str | None = Form(None),
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Add a competency to a job description."""
     org_id = coerce_uuid(auth.organization_id)
@@ -483,7 +483,7 @@ def remove_competency_from_jd(
     jd_id: str,
     competency_id: str,
     auth: WebAuthContext = Depends(require_hr_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Remove a competency from a job description."""
     org_id = coerce_uuid(auth.organization_id)
