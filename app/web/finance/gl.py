@@ -29,7 +29,7 @@ from app.templates import templates
 from app.web.deps import (
     WebAuthContext,
     base_context,
-    get_db,
+    get_db_for_org,
     require_finance_access,
     require_finance_admin,
 )
@@ -47,7 +47,7 @@ def list_accounts(
     sort: str | None = None,
     sort_dir: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Chart of Accounts list page."""
     return gl_web_service.list_accounts_response(
@@ -67,7 +67,7 @@ def list_accounts(
 def new_account_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New account form page."""
     return gl_web_service.account_new_form_response(request, auth, db)
@@ -77,7 +77,7 @@ def new_account_form(
 def suggest_account_code(
     category_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """
     Suggest the next account code for a category.
@@ -100,7 +100,7 @@ async def export_all_accounts(
     status: str = "",
     category: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all accounts matching filters to CSV."""
     return await gl_web_service.export_all_accounts_response(
@@ -112,7 +112,7 @@ async def export_all_accounts(
 def account_category_tree(
     active_only: bool = True,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Return the category hierarchy as a depth-annotated flat list (JSON)."""
     return gl_web_service.category_tree_response(
@@ -129,7 +129,7 @@ def view_account(
     date_from: str | None = None,
     date_to: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Account detail page."""
     return gl_web_service.account_detail_response(
@@ -147,7 +147,7 @@ def edit_account_form(
     request: Request,
     account_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit account form page."""
     return gl_web_service.account_edit_form_response(request, auth, db, account_id)
@@ -173,7 +173,7 @@ def create_account(
     is_cash_equivalent: str | None = Form(None),
     is_financial_instrument: str | None = Form(None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new GL account."""
     # HTML checkboxes send nothing when unchecked, so we check for presence
@@ -221,7 +221,7 @@ def update_account(
     is_cash_equivalent: str | None = Form(None),
     is_financial_instrument: str | None = Form(None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an existing GL account."""
     # HTML checkboxes send nothing when unchecked, so we check for presence
@@ -254,7 +254,7 @@ def delete_account(
     request: Request,
     account_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a GL account."""
     return gl_web_service.delete_account_response(request, auth, db, account_id)
@@ -269,7 +269,7 @@ def delete_account(
 async def bulk_delete_accounts(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete accounts (if no journal entries)."""
     return await gl_web_service.bulk_delete_accounts_response(request, auth, db)
@@ -279,7 +279,7 @@ async def bulk_delete_accounts(
 async def bulk_export_accounts(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected accounts to CSV."""
     return await gl_web_service.bulk_export_accounts_response(request, auth, db)
@@ -289,7 +289,7 @@ async def bulk_export_accounts(
 async def bulk_activate_accounts(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk activate accounts."""
     return await gl_web_service.bulk_activate_accounts_response(request, auth, db)
@@ -299,7 +299,7 @@ async def bulk_activate_accounts(
 async def bulk_deactivate_accounts(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk deactivate accounts."""
     return await gl_web_service.bulk_deactivate_accounts_response(request, auth, db)
@@ -319,7 +319,7 @@ def list_ledger(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """General Ledger transactions page - all posted ledger entries."""
     return gl_web_service.list_ledger_response(
@@ -345,7 +345,7 @@ def list_journals(
     sort: str | None = None,
     sort_dir: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Journal entries list page."""
     return gl_web_service.list_journals_response(
@@ -366,7 +366,7 @@ def list_journals(
 def new_journal_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New journal entry form page."""
     return gl_web_service.journal_new_form_response(request, auth, db)
@@ -380,7 +380,7 @@ async def export_all_journals(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export all journal entries matching filters to CSV."""
     return await gl_web_service.export_all_journals_response(
@@ -395,7 +395,7 @@ def queue_journals_export(
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Queue all journal entries matching filters for CSV export."""
     instance = queue_background_export(
@@ -425,7 +425,7 @@ def queue_journals_export(
 def download_journals_export(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> Response:
     """Download a completed queued GL Journals export."""
     body, filename, media_type, content_length = get_completed_export_for_download(
@@ -448,7 +448,7 @@ def download_journals_export(
 def journals_export_status(
     instance_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ) -> JSONResponse:
     """Return the status of a queued GL Journals export."""
     return JSONResponse(
@@ -467,7 +467,7 @@ def view_journal(
     request: Request,
     entry_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Journal entry detail page."""
     return gl_web_service.journal_detail_response(request, auth, db, entry_id)
@@ -478,7 +478,7 @@ def edit_journal_form(
     request: Request,
     entry_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Edit journal entry form page."""
     return gl_web_service.journal_edit_form_response(request, auth, db, entry_id)
@@ -497,7 +497,7 @@ def create_journal(
     exchange_rate: str = Form("1.0"),
     lines_json: str = Form("[]"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new journal entry."""
     return gl_web_service.create_journal_response(
@@ -530,7 +530,7 @@ def update_journal(
     exchange_rate: str = Form("1.0"),
     lines_json: str = Form("[]"),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Update an existing journal entry."""
     return gl_web_service.update_journal_response(
@@ -555,7 +555,7 @@ def delete_journal(
     request: Request,
     entry_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Delete a journal entry."""
     return gl_web_service.delete_journal_response(request, auth, db, entry_id)
@@ -566,7 +566,7 @@ def post_journal(
     request: Request,
     entry_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Post a journal entry to the general ledger."""
     return gl_web_service.post_journal_response(request, auth, db, entry_id)
@@ -577,7 +577,7 @@ def reverse_journal(
     request: Request,
     entry_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Reverse a posted journal entry."""
     return gl_web_service.reverse_journal_response(request, auth, db, entry_id)
@@ -592,7 +592,7 @@ def reverse_journal(
 async def bulk_delete_journals(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete journal entries (only DRAFT status)."""
     return await gl_web_service.bulk_delete_journals_response(request, auth, db)
@@ -602,7 +602,7 @@ async def bulk_delete_journals(
 async def bulk_export_journals(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Export selected journal entries to CSV."""
     return await gl_web_service.bulk_export_journals_response(request, auth, db)
@@ -612,7 +612,7 @@ async def bulk_export_journals(
 async def bulk_approve_journals(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk approve journal entries (from DRAFT status)."""
     return await gl_web_service.bulk_approve_journals_response(request, auth, db)
@@ -622,7 +622,7 @@ async def bulk_approve_journals(
 async def bulk_post_journals(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Bulk post journal entries to ledger."""
     return await gl_web_service.bulk_post_journals_response(request, auth, db)
@@ -642,7 +642,7 @@ def list_periods(
     request: Request,
     year_id: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Fiscal periods list page."""
     return gl_web_service.list_periods_response(request, auth, db, year_id=year_id)
@@ -652,7 +652,7 @@ def list_periods(
 def new_period_form(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """New fiscal period form page."""
     return gl_web_service.new_period_form_response(request, auth, db)
@@ -670,7 +670,7 @@ def create_period(
     is_adjustment_period: str | None = Form(None),
     is_closing_period: str | None = Form(None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Create a new fiscal period."""
     return gl_web_service.create_period_response(
@@ -694,7 +694,7 @@ def open_period(
     period_id: str,
     year_id: str | None = Form(default=None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Open (or reopen) a fiscal period."""
     return gl_web_service.open_period_response(
@@ -732,7 +732,7 @@ def close_period(
     period_id: str,
     year_id: str | None = Form(default=None),
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Soft-close a fiscal period."""
     return gl_web_service.close_period_response(
@@ -768,7 +768,7 @@ def trial_balance(
     request: Request,
     as_of_date: str | None = None,
     auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Trial balance report page."""
     return gl_web_service.trial_balance_response(request, auth, db, as_of_date)
@@ -782,7 +782,7 @@ def period_fx_revaluation_preview(
     request: Request,
     period_id: str,
     auth: WebAuthContext = Depends(require_finance_admin),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Render the FX revaluation preview page for a fiscal period.
 
@@ -810,7 +810,7 @@ def period_fx_revaluation_post(
     period_id: str,
     reason: str | None = Form(default=None),
     auth: WebAuthContext = Depends(require_finance_admin),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_org),
 ):
     """Post the period-end FX revaluation pair (period-end + reversal)."""
     ws = FXRevaluationWebService(db)
