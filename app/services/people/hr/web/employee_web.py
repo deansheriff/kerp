@@ -1898,28 +1898,6 @@ class HRWebService:
             context,
         )
 
-    def org_chart_response(
-        self,
-        request: Request,
-        auth: WebAuthContext,
-        db: Session,
-    ) -> HTMLResponse:
-        """Render organization chart page."""
-        org_id = coerce_uuid(auth.organization_id)
-        svc = EmployeeService(db, org_id)
-        chart = svc.get_org_chart()
-
-        context = {
-            **base_context(request, auth, "Org Chart", "employees"),
-            "chart": chart,
-        }
-
-        return templates.TemplateResponse(
-            request,
-            "people/hr/org_chart.html",
-            context,
-        )
-
     def employee_new_form_response(
         self,
         request: Request,

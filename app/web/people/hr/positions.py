@@ -154,20 +154,25 @@ def list_positions(
     return templates.TemplateResponse(request, "people/hr/positions.html", context)
 
 
-@router.get("/positions/tree", response_class=HTMLResponse)
-def positions_tree(
+@router.get("/org-chart", response_class=HTMLResponse)
+def org_chart(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db),
 ):
-    """Organizational chart view rendered as a recursive tree."""
+    """Canonical organogram — position tree with incumbents and vacancies."""
     org_id = coerce_uuid(auth.organization_id)
     roots = PositionService(db, org_id).build_org_chart()
     context = {
-        **base_context(request, auth, "Organization Chart", "positions", db=db),
+        **base_context(request, auth, "Organization Chart", "org_chart", db=db),
         "roots": roots,
     }
     return templates.TemplateResponse(request, "people/hr/positions_tree.html", context)
+
+
+@router.get("/positions/tree", include_in_schema=False)
+def positions_tree_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/people/hr/org-chart", status_code=301)
 
 
 @router.get("/positions/new", response_class=HTMLResponse)

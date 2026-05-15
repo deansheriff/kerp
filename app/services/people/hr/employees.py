@@ -58,7 +58,6 @@ from .employee_types import (
     EmployeeFilters,
     EmployeeSummary,
     EmployeeUpdateData,
-    OrgChartNode,
     TerminationData,
 )
 from .errors import (
@@ -569,91 +568,6 @@ class EmployeeService:
             self.organization_id,
         )
         return sorted(reports, key=lambda emp: emp.employee_code or "")
-
-    def get_org_chart(
-        self, root_employee_id: uuid.UUID | None = None, depth: int = 3
-    ) -> list[OrgChartNode]:
-        """Get organization chart as a tree.
-
-        Args:
-            root_employee_id: Start from this employee. If None, starts from
-                             employees with no manager.
-            depth: Maximum depth to traverse.
-
-        Returns:
-            List of OrgChartNode objects with nested direct_reports.
-        """
-
-        def build_node(employee: Employee, current_depth: int) -> OrgChartNode:
-            person = employee.person
-            name = person.name if person else ""
-            email = person.email if person else None
-
-            designation_name = (
-                employee.designation.designation_name if employee.designation else None
-            )
-            department_name = (
-                employee.department.department_name if employee.department else None
-            )
-
-            node = OrgChartNode(
-                employee_id=employee.employee_id,
-                name=name,
-                designation=designation_name,
-                department=department_name,
-                email=email,
-                direct_reports=[],
-            )
-
-            if current_depth < depth:
-                reports = OrgResolver(self.db).get_direct_reports(
-                    employee.employee_id,
-                    self.organization_id,
-                )
-                for report in reports:
-                    node.direct_reports.append(build_node(report, current_depth + 1))
-
-            return node
-
-        if root_employee_id:
-            root_stmt = (
-                select(Employee)
-                .where(
-                    Employee.employee_id == root_employee_id,
-                    Employee.organization_id == self.organization_id,
-                    Employee.status != EmployeeStatus.TERMINATED,
-                )
-                .options(
-                    selectinload(Employee.person),
-                    selectinload(Employee.department),
-                    selectinload(Employee.designation),
-                )
-            )
-            root = self.db.scalar(root_stmt)
-            if not root:
-                raise EmployeeNotFoundError(root_employee_id)
-
-            return [build_node(root, 0)]
-
-        root_positions_stmt = select(Position).where(
-            Position.organization_id == self.organization_id,
-            Position.parent_position_id.is_(None),
-            Position.is_active.is_(True),
-        )
-        resolver = OrgResolver(self.db)
-        root_employees = [
-            incumbent
-            for position in self.db.scalars(root_positions_stmt).all()
-            if (
-                incumbent := resolver.get_position_incumbent(
-                    position.position_id,
-                    self.organization_id,
-                )
-            )
-        ]
-        root_employees.sort(key=lambda emp: emp.employee_code or "")
-
-        return [build_node(emp, 0) for emp in root_employees]
 
     # =========================================================================
     # CRUD

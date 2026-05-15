@@ -132,7 +132,6 @@ __all__ = [
     "EmployeeCreateData",
     "EmployeeUpdateData",
     "EmployeeSummary",
-    "OrgChartNode",
     "TerminationData",
     "BulkResult",
     "BulkUpdateData",
@@ -263,18 +262,6 @@ class EmployeeSummary:
     department: str | None
     designation: str | None
     status: EmploymentStatus
-
-
-@dataclass
-class OrgChartNode:
-    """Node in organization chart."""
-
-    employee_id: uuid.UUID
-    name: str
-    designation: str | None
-    department: str | None
-    email: str | None
-    direct_reports: list[OrgChartNode] = field(default_factory=list)
 
 
 @dataclass
