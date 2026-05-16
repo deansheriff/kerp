@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -625,10 +625,15 @@ def test_webhook_failed_status_records_error_on_linked_account() -> None:
 def test_webhook_sync_status_failed_with_data_status_available_records_error() -> None:
     """When Mono reports ``sync_status=FAILED`` alongside ``data_status=AVAILABLE``,
     the bank scrape failed but Mono is still serving cached data from a prior
-    successful scrape. Without this branch the handler sees ``AVAILABLE`` and
-    silently enqueues a sync that reads the stale cache, returns zero new,
-    and clears any previously recorded error — so the operator never sees
-    that reauthorisation is needed.
+    successful scrape.
+
+    Current behavior (post-2026-05-16 rework):
+    - Record the error so operators see the bank-side scrape failed.
+    - ALSO enqueue an ingest task — the indexer still has transactions for
+      us to pull. The race-wipe the earlier design protected against is
+      neutralised by the recent-success suppression inside
+      ``_record_webhook_failure``: once a sync clears the error, subsequent
+      webhooks within 5 minutes do not overwrite it.
 
     Exact shape observed for the UBA account on 2026-04-20: ``data_status=AVAILABLE
     sync_status=FAILED retrieved_data=['balance','transactions']``.
@@ -637,6 +642,7 @@ def test_webhook_sync_status_failed_with_data_status_available_records_error() -
     linked_account = _account(
         mono_account_id="mono-uba-failed",
         mono_last_sync_error=None,
+        mono_last_synced_at=None,  # no recent success → don't suppress
     )
     db.scalar.return_value = linked_account
     payload = {
@@ -669,13 +675,115 @@ def test_webhook_sync_status_failed_with_data_status_available_records_error() -
         )
 
     assert result["status"] == "success"
-    # Critical: the sync must NOT be enqueued. A zero-transaction sync on
-    # the stale cache would wipe the error banner we just set.
-    enqueue.assert_not_called()
+    # Ingest IS queued — there are transactions to pull. The
+    # recent-success suppression in ``_record_webhook_failure`` is what
+    # keeps stale-cache reads from wiping a legitimate error banner.
+    enqueue.assert_called_once_with("mono-uba-failed")
     assert linked_account.mono_last_sync_error is not None
     assert "Mono data refresh failed" in linked_account.mono_last_sync_error
     assert "job-uba-42" in linked_account.mono_last_sync_error
     db.flush.assert_called()
+
+
+def test_webhook_failure_suppressed_when_recent_sync_succeeded() -> None:
+    """Successful pull wins. If a sync succeeded within the last 5 minutes,
+    a follow-up ``sync_status=FAILED`` webhook is treated as a stale signal
+    about the same refresh attempt that already drove a successful pull.
+
+    Regression for the 2026-05-16 UBA report where the integration health
+    banner stayed red ("Mono data refresh failed... data_request_id=…")
+    for hours after a manual reauth + sync had already landed the new
+    transactions.
+    """
+    db = MagicMock()
+    linked_account = _account(
+        mono_account_id="mono-uba-fresh",
+        # The just-recorded webhook failure that ``_record_webhook_failure``
+        # would otherwise overwrite again.
+        mono_last_sync_error=None,
+        # 30 seconds ago — well inside the 5-minute "recent" window.
+        mono_last_synced_at=datetime.now(UTC) - timedelta(seconds=30),
+    )
+    db.scalar.return_value = linked_account
+    payload = {
+        "event": "mono.events.account_updated",
+        "data": {
+            "account": {"_id": "mono-uba-fresh"},
+            "meta": {
+                "data_status": "AVAILABLE",
+                "sync_status": "FAILED",
+                "job_id": "job-uba-99",
+                "retrieved_data": ["balance", "transactions"],
+                "data_request_id": "REQ-UBA-99",
+            },
+        },
+    }
+
+    with (
+        patch(
+            "app.services.finance.banking.mono_sync.resolve_value",
+            return_value="webhook-secret",
+        ),
+        patch("app.services.finance.banking.mono_sync.MonoClient") as mono_client,
+        patch("app.tasks.finance.sync_mono_account.delay"),
+    ):
+        mono_client.return_value.verify_webhook.return_value = True
+        MonoSyncService(db).process_webhook(
+            "webhook-secret",
+            json.dumps(payload).encode(),
+        )
+
+    # Suppressed — error stays cleared because the recent successful sync
+    # has authoritative news the webhook can't override.
+    assert linked_account.mono_last_sync_error is None
+
+
+def test_webhook_reauthorisation_required_is_never_suppressed() -> None:
+    """REAUTHORISATION_REQUIRED is structural — the bank link is dead and
+    the user must act, regardless of whether cached data is still flowing.
+    The recent-success suppression must NOT apply to it, otherwise users
+    silently miss the actionable banner that tells them how to recover.
+    """
+    db = MagicMock()
+    linked_account = _account(
+        mono_account_id="mono-zenith-fresh-reauth",
+        mono_last_sync_error=None,
+        # Recent enough that the FAILED-with-data suppression would fire.
+        mono_last_synced_at=datetime.now(UTC) - timedelta(seconds=10),
+    )
+    db.scalar.return_value = linked_account
+    payload = {
+        "event": "mono.events.account_updated",
+        "data": {
+            "account": {"_id": "mono-zenith-fresh-reauth"},
+            "meta": {
+                "data_status": "AVAILABLE",
+                "sync_status": "REAUTHORISATION_REQUIRED",
+                "job_id": "job-reauth-11",
+                "retrieved_data": ["balance", "transactions"],
+                "data_request_id": "REQ-REAUTH-11",
+            },
+        },
+    }
+
+    with (
+        patch(
+            "app.services.finance.banking.mono_sync.resolve_value",
+            return_value="webhook-secret",
+        ),
+        patch("app.services.finance.banking.mono_sync.MonoClient") as mono_client,
+        patch("app.tasks.finance.sync_mono_account.delay"),
+    ):
+        mono_client.return_value.verify_webhook.return_value = True
+        MonoSyncService(db).process_webhook(
+            "webhook-secret",
+            json.dumps(payload).encode(),
+        )
+
+    # Structural reauth-required is recorded even with a fresh successful
+    # sync — the user must see it.
+    assert linked_account.mono_last_sync_error is not None
+    assert "Reauthorise" in linked_account.mono_last_sync_error
 
 
 def test_webhook_sync_status_reauthorisation_required_records_actionable_error() -> (
@@ -728,7 +836,12 @@ def test_webhook_sync_status_reauthorisation_required_records_actionable_error()
         )
 
     assert result["status"] == "success"
-    enqueue.assert_not_called()
+    # Ingest IS queued — cached transactions remain usable up to the point
+    # of expiry, even though the connection needs renewal. The error
+    # message persists regardless: REAUTHORISATION_REQUIRED is structural
+    # and exempt from the recent-success suppression in
+    # ``_record_webhook_failure``.
+    enqueue.assert_called_once_with("mono-zenith-reauth")
     assert linked_account.mono_last_sync_error is not None
     # Actionable copy: the user can fix this themselves by reauthorising
     # in the Mono Connect widget. The message must say so plainly.
@@ -1145,6 +1258,15 @@ def test_parse_date_rejects_missing_or_invalid_dates() -> None:
 
     with pytest.raises(MonoError, match="invalid"):
         MonoSyncService._parse_date("not-a-date")
+
+
+def test_parse_date_converts_lagos_midnight_to_correct_business_day() -> None:
+    # Mono ships every transaction at T23:00:00Z = Lagos midnight on day D+1.
+    # Taking the UTC date returns D; we want D+1, the business day Mono's UI
+    # displays. Regression for the off-by-one-day bug spotted on 2026-05-16.
+    assert MonoSyncService._parse_date("2026-05-14T23:00:00.000Z") == date(2026, 5, 15)
+    # An afternoon UTC timestamp stays on the same Lagos date.
+    assert MonoSyncService._parse_date("2026-05-15T12:00:00.000Z") == date(2026, 5, 15)
 
 
 def test_invalid_mono_transaction_date_marks_sync_failed_without_watermark_move() -> (

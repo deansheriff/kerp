@@ -15,11 +15,18 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 try:
     from datetime import UTC  # type: ignore
 except ImportError:  # pragma: no cover
     UTC = timezone.utc
+
+# Mono normalizes every transaction timestamp to Lagos-midnight expressed in
+# UTC (i.e. T23:00:00Z on day D-1 means "business day D" in Africa/Lagos).
+# Consumers that take `.date()` on the raw UTC datetime end up one day behind
+# Mono's own UI for every transaction.
+_LAGOS = ZoneInfo("Africa/Lagos")
 
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -383,27 +390,38 @@ class MonoSyncService:
                 meta.get("data_request_id"),
             )
             # Allow-list the sync_status values that mean "bank-side scrape
-            # was healthy." Anything else — FAILED, REAUTHORISATION_REQUIRED,
-            # and any future state Mono ships — means the indexer is serving
-            # cached data only, and queuing a sync would dedupe-pull the same
-            # stale lines and race-wipe ``mono_last_sync_error`` on success,
-            # which would falsely show "up to date" while the user is blind
-            # to weeks of missing transactions. The empty-string case covers
-            # older event versions that omit the field. The branch fires
-            # before AVAILABLE so the banner persists; undrained cache will
-            # be picked up by the next genuinely-successful account_updated.
-            # Mono's v2 docs say "SUCCESS" but older payloads have shown
-            # "SUCCESSFUL" in the wild — allow-list both so a doc/emit drift
-            # doesn't classify real successes as failures.
+            # was healthy." Mono's v2 docs say "SUCCESS" but older payloads
+            # have shown "SUCCESSFUL" in the wild; the empty-string case
+            # covers older event versions that omit the field.
             bank_fetch_ok = sync_status in ("", "SUCCESS", "SUCCESSFUL")
+            # Mono lists what it actually fetched in retrieved_data. Even
+            # when sync_status=FAILED, an indexer that successfully fetched
+            # transactions has data we can ingest — we should not skip the
+            # ingest just because the bank-side scrape stage reported
+            # failure, otherwise the user sees a stale error and no new
+            # rows even though the cache holds them.
+            retrieved_has_transactions = "transactions" in (
+                meta.get("retrieved_data") or []
+            )
             if not bank_fetch_ok and mono_account_id:
+                # Record the failure first — _record_webhook_failure now
+                # self-suppresses when our last sync is freshly successful,
+                # so this no longer overwrites a just-cleared error.
                 self._record_webhook_failure(mono_account_id, meta)
-            elif data_status == "AVAILABLE" and mono_account_id:
+            elif data_status in {"FAILED", "PROCESSING_FAILED"} and mono_account_id:
+                self._record_webhook_failure(mono_account_id, meta)
+
+            # Queue ingest whenever Mono claims data is AVAILABLE *or* when
+            # the bank-side scrape reported failure but transactions were
+            # still retrieved into the indexer. The success path inside the
+            # task will clear any error this webhook just recorded.
+            if mono_account_id and (
+                (bank_fetch_ok and data_status == "AVAILABLE")
+                or (not bank_fetch_ok and retrieved_has_transactions)
+            ):
                 from app.tasks.finance import sync_mono_account
 
                 sync_mono_account.delay(mono_account_id)
-            elif data_status in {"FAILED", "PROCESSING_FAILED"} and mono_account_id:
-                self._record_webhook_failure(mono_account_id, meta)
         elif event == "mono.events.account_connected":
             logger.info(
                 "Mono account_connected: mono_id=%s",
@@ -531,6 +549,30 @@ class MonoSyncService:
         sync_status = meta.get("sync_status") or "FAILED"
         retrieved_data = list(meta.get("retrieved_data") or [])
         data_request_id = meta.get("data_request_id")
+
+        # Successful pull wins. If our most recent sync succeeded very
+        # recently, the webhook is almost certainly reporting on the
+        # bank-side refresh attempt that drove that sync — Mono got us the
+        # data even though it flagged the upstream scrape FAILED. Surfacing
+        # this as an error contradicts the freshly-cleared
+        # ``mono_last_sync_error`` and leaves the UI stuck on a stale red
+        # banner for hours. REAUTHORISATION_REQUIRED is exempt: it's a
+        # structural state the user must address regardless of whether
+        # cached data is currently flowing.
+        if sync_status != "REAUTHORISATION_REQUIRED":
+            last_synced_at = bank_account.mono_last_synced_at
+            if last_synced_at is not None:
+                age = datetime.now(UTC) - last_synced_at
+                if age < timedelta(minutes=5):
+                    logger.info(
+                        "Mono webhook reports sync_status=%s for mono_id=%s "
+                        "but last sync succeeded %.0fs ago — treating "
+                        "webhook as stale; not overwriting cleared error.",
+                        sync_status,
+                        mono_account_id,
+                        age.total_seconds(),
+                    )
+                    return
 
         # Webhooks inconsistently populate data_request_id (observed missing
         # on fresh relink follow-ups). When absent, pull the authoritative
@@ -1044,7 +1086,10 @@ class MonoSyncService:
             bank_account.last_statement_date = as_of_date
 
         # Freshness: every successful API call advances this, even with
-        # zero new transactions. Clears any previously recorded error.
+        # zero new transactions. Clears any previously recorded error —
+        # ``_record_webhook_failure`` is responsible for not re-recording
+        # right back after this clear (it self-suppresses on recent
+        # ``mono_last_synced_at``).
         bank_account.mono_last_synced_at = datetime.now(UTC)
         bank_account.mono_last_sync_error = None
 
@@ -1354,13 +1399,18 @@ class MonoSyncService:
 
     @staticmethod
     def _parse_date(date_str: str) -> date:
-        """Parse a Mono ISO 8601 date string to a date object."""
+        """Parse a Mono ISO 8601 date string to a date object.
+
+        Mono ships every transaction at ``T23:00:00.000Z`` — Lagos midnight in
+        UTC — so the UTC date is one day behind the date the bank (and the
+        Mono UI) attribute the transaction to. Convert to Africa/Lagos before
+        truncating, otherwise every transaction reads as the prior day.
+        """
         if not date_str:
             raise MonoError("Mono transaction is missing a transaction date")
-        # Mono returns ISO 8601: "2023-12-14T00:02:00.500Z"
         try:
             dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            return dt.date()
+            return dt.astimezone(_LAGOS).date()
         except (ValueError, AttributeError) as exc:
             raise MonoError(
                 f"Mono transaction has invalid transaction date: {date_str!r}"
