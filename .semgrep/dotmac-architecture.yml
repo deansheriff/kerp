@@ -109,7 +109,6 @@ rules:
         - "**/app/tasks/project_sla.py"
         - "**/app/tasks/license.py"
         - "**/app/tasks/feature_flags.py"
-        - "**/app/tasks/exchange_rates.py"
         - "**/app/tasks/email.py"
         - "**/app/tasks/audit_integrity.py"
         - "**/app/tasks/audit.py"
