@@ -1120,7 +1120,27 @@ def sync_mono_account(mono_account_id: str, **_legacy_kwargs: Any) -> dict[str, 
     """
     logger.info("Syncing Mono account %s", mono_account_id)
 
-    with SessionLocal() as db:
+    # Mode 3 — we have the Mono account ID but not its owning org.
+    # Resolve BankAccount.mono_account_id → bank_account.organization_id
+    # under cross-org bypass, then sync under a session primed for that
+    # org so all the GL/junction writes inside MonoSyncService hit a
+    # tenant-scoped session.
+    from app.db.session_context import cross_org_session, session_for_org
+    from app.models.finance.banking.bank_account import BankAccount
+
+    with cross_org_session() as cross_db:
+        bank_account = cross_db.scalar(
+            select(BankAccount).where(BankAccount.mono_account_id == mono_account_id)
+        )
+        if bank_account is None:
+            logger.warning(
+                "sync_mono_account: no BankAccount linked to mono_id=%s",
+                mono_account_id,
+            )
+            return {"success": True, "skipped": True, "reason": "unlinked"}
+        owning_org_id = bank_account.organization_id
+
+    with session_for_org(owning_org_id) as db:
         from app.services.finance.banking.mono_sync import MonoSyncService
 
         sync_svc = MonoSyncService(db)

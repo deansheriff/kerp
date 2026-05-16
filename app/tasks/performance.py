@@ -16,6 +16,7 @@ from celery import shared_task
 from sqlalchemy import select
 
 from app.db import SessionLocal
+from app.db.session_context import cross_org_session, session_for_org
 from app.models.people.perf.appraisal_cycle import AppraisalCycle, AppraisalCycleStatus
 
 logger = logging.getLogger(__name__)
@@ -117,14 +118,22 @@ def generate_cycle_appraisals(cycle_id: str, template_id: str | None = None) -> 
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        try:
-            cycle = db.scalar(
-                select(AppraisalCycle).where(
-                    AppraisalCycle.cycle_id == UUID(cycle_id),
-                )
-            )
+    # Mode 3 — chicken-and-egg: we have a cycle_id but not its org. Look
+    # up the cycle's organization under cross-org bypass, then process
+    # the cycle under a session primed for that org.
+    cycle_uuid = UUID(cycle_id)
+    with cross_org_session() as cross_db:
+        cycle = cross_db.get(AppraisalCycle, cycle_uuid)
+        if not cycle:
+            results["errors"].append({"error": f"Cycle {cycle_id} not found"})
+            return results
+        owning_org_id = cycle.organization_id
 
+    try:
+        with session_for_org(owning_org_id) as db:
+            # Re-fetch in the primed session so the row binds to this
+            # session's identity map (not the cross-org lookup's).
+            cycle = db.get(AppraisalCycle, cycle_uuid)
             if not cycle:
                 results["errors"].append({"error": f"Cycle {cycle_id} not found"})
                 return results
@@ -155,12 +164,9 @@ def generate_cycle_appraisals(cycle_id: str, template_id: str | None = None) -> 
 
             db.commit()
 
-        except Exception as e:
-            logger.exception(
-                "Appraisal generation failed for cycle %s: %s", cycle_id, e
-            )
-            db.rollback()
-            results["errors"].append({"error": str(e)})
+    except Exception as e:
+        logger.exception("Appraisal generation failed for cycle %s: %s", cycle_id, e)
+        results["errors"].append({"error": str(e)})
 
     logger.info(
         "Appraisal generation complete for cycle %s: %d created, %d skipped",
@@ -187,14 +193,18 @@ def calculate_cycle_progress(cycle_id: str) -> dict:
 
     logger.info("Calculating progress for cycle %s", cycle_id)
 
-    with SessionLocal() as db:
-        try:
-            cycle = db.scalar(
-                select(AppraisalCycle).where(
-                    AppraisalCycle.cycle_id == UUID(cycle_id),
-                )
-            )
+    # Mode 3 — resolve cycle's org under cross-org bypass, then run
+    # progress calc under a session primed for that org.
+    cycle_uuid = UUID(cycle_id)
+    with cross_org_session() as cross_db:
+        cycle = cross_db.get(AppraisalCycle, cycle_uuid)
+        if not cycle:
+            return {"error": f"Cycle {cycle_id} not found"}
+        owning_org_id = cycle.organization_id
 
+    try:
+        with session_for_org(owning_org_id) as db:
+            cycle = db.get(AppraisalCycle, cycle_uuid)
             if not cycle:
                 return {"error": f"Cycle {cycle_id} not found"}
 
@@ -210,11 +220,9 @@ def calculate_cycle_progress(cycle_id: str) -> dict:
 
             return progress
 
-        except Exception as e:
-            logger.exception(
-                "Progress calculation failed for cycle %s: %s", cycle_id, e
-            )
-            return {"error": str(e)}
+    except Exception as e:
+        logger.exception("Progress calculation failed for cycle %s: %s", cycle_id, e)
+        return {"error": str(e)}
 
 
 @shared_task
@@ -403,14 +411,19 @@ def activate_cycle(cycle_id: str, template_id: str | None = None) -> dict:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        try:
-            cycle = db.scalar(
-                select(AppraisalCycle).where(
-                    AppraisalCycle.cycle_id == UUID(cycle_id),
-                )
-            )
+    # Mode 3 — resolve cycle's org under cross-org bypass, then activate
+    # the cycle under a session primed for that org.
+    cycle_uuid = UUID(cycle_id)
+    with cross_org_session() as cross_db:
+        cycle = cross_db.get(AppraisalCycle, cycle_uuid)
+        if not cycle:
+            results["errors"].append({"error": f"Cycle {cycle_id} not found"})
+            return results
+        owning_org_id = cycle.organization_id
 
+    try:
+        with session_for_org(owning_org_id) as db:
+            cycle = db.get(AppraisalCycle, cycle_uuid)
             if not cycle:
                 results["errors"].append({"error": f"Cycle {cycle_id} not found"})
                 return results
@@ -446,11 +459,10 @@ def activate_cycle(cycle_id: str, template_id: str | None = None) -> dict:
                 len(appraisals),
             )
 
-        except Exception as e:
-            logger.exception("Cycle activation failed for %s: %s", cycle_id, e)
-            db.rollback()
-            results["activated"] = False
-            results["errors"].append({"error": str(e)})
+    except Exception as e:
+        logger.exception("Cycle activation failed for %s: %s", cycle_id, e)
+        results["activated"] = False
+        results["errors"].append({"error": str(e)})
 
     return results
 
@@ -479,14 +491,19 @@ def complete_cycle(cycle_id: str) -> dict:
         "reason": None,
     }
 
-    with SessionLocal() as db:
-        try:
-            cycle = db.scalar(
-                select(AppraisalCycle).where(
-                    AppraisalCycle.cycle_id == UUID(cycle_id),
-                )
-            )
+    # Mode 3 — resolve cycle's org under cross-org bypass, then complete
+    # the cycle under a session primed for that org.
+    cycle_uuid = UUID(cycle_id)
+    with cross_org_session() as cross_db:
+        cycle = cross_db.get(AppraisalCycle, cycle_uuid)
+        if not cycle:
+            results["reason"] = "Cycle not found"
+            return results
+        owning_org_id = cycle.organization_id
 
+    try:
+        with session_for_org(owning_org_id) as db:
+            cycle = db.get(AppraisalCycle, cycle_uuid)
             if not cycle:
                 results["reason"] = "Cycle not found"
                 return results
@@ -508,9 +525,8 @@ def complete_cycle(cycle_id: str) -> dict:
                 results["reason"] = "Not all appraisals are completed"
                 logger.info("Cycle %s cannot be completed yet", cycle_id)
 
-        except Exception as e:
-            logger.exception("Cycle completion failed for %s: %s", cycle_id, e)
-            db.rollback()
-            results["reason"] = str(e)
+    except Exception as e:
+        logger.exception("Cycle completion failed for %s: %s", cycle_id, e)
+        results["reason"] = str(e)
 
     return results

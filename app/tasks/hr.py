@@ -1152,9 +1152,20 @@ def send_welcome_email(onboarding_id: str) -> dict:
 
     logger.info("Sending welcome email for onboarding %s", onboarding_id)
 
-    with SessionLocal() as db:
+    # Mode 3 — resolve the onboarding's owning org under cross-org bypass,
+    # then re-fetch + send under a session primed for that org.
+    from app.db.session_context import cross_org_session
+
+    onboarding_uuid = uuid.UUID(onboarding_id)
+    with cross_org_session() as cross_db:
+        onboarding = cross_db.get(EmployeeOnboarding, onboarding_uuid)
+        if not onboarding:
+            return {"success": False, "error": "Onboarding not found"}
+        owning_org_id = onboarding.organization_id
+
+    with session_for_org(owning_org_id) as db:
         try:
-            onboarding = db.get(EmployeeOnboarding, uuid.UUID(onboarding_id))
+            onboarding = db.get(EmployeeOnboarding, onboarding_uuid)
             if not onboarding:
                 return {"success": False, "error": "Onboarding not found"}
 
