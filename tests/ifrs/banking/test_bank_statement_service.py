@@ -504,67 +504,6 @@ class TestGetUnmatchedLines:
         assert len(result) == 3
 
 
-class TestMarkLineMatched:
-    """Tests for mark_line_matched method."""
-
-    def test_mark_line_matched_success(self, service, mock_db, org_id, user_id):
-        """Test marking line as matched."""
-        statement = MockBankStatement(unmatched_lines=5, matched_lines=0)
-        line = MockBankStatementLine(is_matched=False)
-        line.statement = statement
-        mock_db.scalars.return_value.first.return_value = line
-
-        result = service.mark_line_matched(
-            mock_db, org_id, line.line_id, uuid4(), user_id
-        )
-
-        assert result.is_matched is True
-        assert result.matched_by == user_id
-        mock_db.flush.assert_called_once()
-
-    def test_mark_line_nonexistent_fails(self, service, mock_db, org_id):
-        """Test marking non-existent line fails."""
-        mock_db.scalars.return_value.first.return_value = None
-
-        with pytest.raises(ValueError, match="not found"):
-            service.mark_line_matched(mock_db, org_id, uuid4(), uuid4())
-
-
-class TestUnmatchLine:
-    """Tests for unmatch_line method."""
-
-    def test_unmatch_line_success(self, service, mock_db, org_id):
-        """Test unmatching a line."""
-        statement = MockBankStatement(
-            matched_lines=3, unmatched_lines=2, status="processing"
-        )
-        line = MockBankStatementLine(is_matched=True)
-        line.statement = statement
-        mock_db.scalars.return_value.first.return_value = line
-
-        result = service.unmatch_line(mock_db, org_id, line.line_id)
-
-        assert result.is_matched is False
-        assert result.matched_journal_line_id is None
-        mock_db.flush.assert_called_once()
-
-    def test_unmatch_already_unmatched(self, service, mock_db, org_id):
-        """Test unmatching an already unmatched line returns unchanged."""
-        line = MockBankStatementLine(is_matched=False)
-        mock_db.scalars.return_value.first.return_value = line
-
-        result = service.unmatch_line(mock_db, org_id, line.line_id)
-
-        assert result.is_matched is False
-
-    def test_unmatch_nonexistent_fails(self, service, mock_db, org_id):
-        """Test unmatching non-existent line fails."""
-        mock_db.scalars.return_value.first.return_value = None
-
-        with pytest.raises(ValueError, match="not found"):
-            service.unmatch_line(mock_db, org_id, uuid4())
-
-
 class TestUpdateStatus:
     """Tests for update_status method."""
 

@@ -319,53 +319,6 @@ class BankingAccountWebService:
                 }
             )
 
-        # Also check legacy single-match field if no multi-matches found
-        if not gl_matches and line.matched_journal_line_id:
-            jl = db.get(JournalEntryLine, line.matched_journal_line_id)
-            if jl:
-                entry = getattr(jl, "journal_entry", None) or getattr(jl, "entry", None)
-                if entry:
-                    source_url = _build_source_url(
-                        getattr(entry, "source_document_type", None),
-                        getattr(entry, "source_document_id", None),
-                        getattr(entry, "entry_id", None),
-                    )
-                    meta = resolve_payment_metadata(
-                        db,
-                        getattr(entry, "source_document_type", None),
-                        getattr(entry, "source_document_id", None),
-                    )
-                    gl_matches.append(
-                        {
-                            "journal_line_id": str(jl.line_id),
-                            "entry_id": str(entry.entry_id),
-                            "entry_date": _format_date(entry.entry_date),
-                            "description": jl.description or entry.description or "",
-                            "reference": entry.reference or "",
-                            "debit_amount": _format_currency(jl.debit_amount, currency),
-                            "credit_amount": _format_currency(
-                                jl.credit_amount, currency
-                            ),
-                            "account_name": (
-                                f"{jl.account.account_code} - {jl.account.account_name}"
-                                if jl.account
-                                else ""
-                            ),
-                            "source_url": source_url,
-                            "match_detail": _build_match_detail(
-                                db, entry, source_url, metadata=meta
-                            ),
-                            "match_type": "LEGACY",
-                            "match_score": None,
-                            "is_primary": True,
-                            "matched_at": (
-                                line.matched_at.strftime("%d %b %Y %H:%M")
-                                if line.matched_at
-                                else None
-                            ),
-                        }
-                    )
-
         # Suggested account name lookup
         suggested_account_name = None
         if line.suggested_account_id:

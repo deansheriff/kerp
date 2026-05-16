@@ -7,7 +7,7 @@ from app.services.finance.banking.web_parts.base import (
     BankAccount,
     BankAccountStatus,
     BankReconciliation,
-    BankStatementLine,
+    BankStatementLineMatch,
     Decimal,
     HTMLResponse,
     JournalEntry,
@@ -80,9 +80,7 @@ class BankingDashboardWebService:
                         JournalEntry.status == JournalStatus.POSTED,
                         JournalEntryLine.account_id.in_(gl_account_ids),
                         ~JournalEntryLine.line_id.in_(
-                            select(BankStatementLine.matched_journal_line_id).where(
-                                BankStatementLine.matched_journal_line_id.isnot(None)
-                            )
+                            select(BankStatementLineMatch.journal_line_id)
                         ),
                     )
                 )

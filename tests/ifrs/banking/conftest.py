@@ -236,6 +236,10 @@ class MockBankStatementLine:
             return self.amount
         return -self.amount
 
+    @property
+    def primary_journal_line_id(self) -> uuid.UUID | None:
+        return self.matched_journal_line_id
+
 
 class MockBankReconciliation:
     """Mock BankReconciliation model."""

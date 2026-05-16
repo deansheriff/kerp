@@ -23,7 +23,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import ValidationError
 from sqlalchemy import case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from starlette.datastructures import UploadFile
 from starlette.responses import Response
 
@@ -36,6 +36,7 @@ from app.models.finance.banking.bank_reconciliation import (
 from app.models.finance.banking.bank_statement import (
     BankStatement,
     BankStatementLine,
+    BankStatementLineMatch,
     BankStatementStatus,
 )
 from app.models.finance.gl.account import Account
@@ -285,8 +286,8 @@ def _statement_line_view(line: BankStatementLine, currency: str = "") -> dict:
         "bank_reference": line.bank_reference,
         "running_balance": _format_currency(line.running_balance, currency),
         "is_matched": line.is_matched,
-        "matched_journal_line_id": str(line.matched_journal_line_id)
-        if line.matched_journal_line_id
+        "matched_journal_line_id": str(line.primary_journal_line_id)
+        if line.primary_journal_line_id
         else None,
         # Categorization fields
         "categorization_status": line.categorization_status.value

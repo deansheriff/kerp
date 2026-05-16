@@ -297,12 +297,6 @@ class BankStatementLine(Base):
     )
     matched_by: Mapped[UUID | None] = mapped_column(SAUUID(as_uuid=True), nullable=True)
 
-    # GL matching (for matched transactions)
-    matched_journal_line_id: Mapped[UUID | None] = mapped_column(
-        SAUUID(as_uuid=True),
-        nullable=True,
-    )
-
     # Additional data from import
     raw_data: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
@@ -363,6 +357,13 @@ class BankStatementLine(Base):
         if self.transaction_type == StatementLineType.credit:
             return self.amount
         return -self.amount
+
+    @property
+    def primary_journal_line_id(self) -> UUID | None:
+        # matched_gl_lines is ordered by is_primary.desc() — first row is primary.
+        return (
+            self.matched_gl_lines[0].journal_line_id if self.matched_gl_lines else None
+        )
 
 
 class BankStatementLineMatch(Base):

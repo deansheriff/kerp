@@ -1414,12 +1414,9 @@ def test_get_scored_candidates_returns_sorted_by_score() -> None:
         nonlocal call_count
         result = MagicMock()
         if call_count == 0:
-            # Junction table query (matched GL IDs)
+            # Junction table query (matched GL IDs) — now the only matched-IDs query
             result.scalars.return_value.all.return_value = []
         elif call_count == 1:
-            # Legacy FK matched IDs
-            result.scalars.return_value.all.return_value = []
-        elif call_count == 2:
             # GL lines query
             result.scalars.return_value.all.return_value = [gl_good, gl_bad]
         else:
@@ -1498,7 +1495,14 @@ def test_multi_match_statement_line_happy_path() -> None:
     )
 
     assert result.is_matched is True
-    assert result.matched_journal_line_id == gl1.line_id  # primary = first
+    # Primary match = first GL line, asserted via the junction row, not the
+    # legacy column (which the model no longer carries).
+    primary_match = next(
+        c.args[0]
+        for c in db.add.call_args_list
+        if isinstance(c.args[0], BankStatementLineMatch) and c.args[0].is_primary
+    )
+    assert primary_match.journal_line_id == gl1.line_id
     assert result.statement.matched_lines == 6
     assert result.statement.unmatched_lines == 9
     # Two junction table rows added
@@ -1840,7 +1844,6 @@ def test_unmatch_statement_line_clears_junction_table() -> None:
     result = svc.unmatch_statement_line(db, org_id, stmt_line.line_id)
 
     assert result.is_matched is False
-    assert result.matched_journal_line_id is None
     assert result.matched_at is None
     assert result.matched_by is None
     assert result.statement.matched_lines == 4
@@ -1906,9 +1909,12 @@ def test_match_statement_line_creates_junction_row() -> None:
     )
 
     assert result.is_matched is True
-    assert result.matched_journal_line_id == gl_line.line_id
-    # db.add called once for the junction table row
+    # The single junction row gets is_primary=True with this gl_line.
     db.add.assert_called_once()
+    added = db.add.call_args.args[0]
+    assert isinstance(added, BankStatementLineMatch)
+    assert added.is_primary is True
+    assert added.journal_line_id == gl_line.line_id
     db.flush.assert_called_once()
 
 
@@ -1989,7 +1995,6 @@ def test_match_statement_line_heals_stale_state_from_existing_pair() -> None:
     assert result is stmt_line
     assert stmt_line.is_matched is True
     assert stmt_line.matched_by == matched_by
-    assert stmt_line.matched_journal_line_id == journal_line_id
     assert stmt_line.statement.matched_lines == 3
     assert stmt_line.statement.unmatched_lines == 3
     db.add.assert_not_called()

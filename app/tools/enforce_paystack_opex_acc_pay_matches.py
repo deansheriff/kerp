@@ -172,7 +172,7 @@ def main() -> None:
 
                 if (
                     stmt_line.is_matched
-                    and stmt_line.matched_journal_line_id == bank_jel.line_id
+                    and stmt_line.primary_journal_line_id == bank_jel.line_id
                 ):
                     stats = Stats(
                         **{

@@ -52,6 +52,7 @@ from app.services.finance.banking.web_parts.base import (
     re,
     resolve_payment_metadata_batch,
     select,
+    selectinload,
     spreadsheet_formats_label,
     templates,
 )
@@ -213,6 +214,7 @@ class BankingStatementWebService:
             select(BankStatementLine, BankStatement)
             .join(BankStatement, join_clause)
             .where(*base_conditions)
+            .options(selectinload(BankStatementLine.matched_gl_lines))
         )
         txn_stmt = apply_sort(
             txn_stmt,
@@ -243,8 +245,8 @@ class BankingStatementWebService:
             transactions.append(txn)
             if line.suggested_account_id:
                 suggested_account_ids.add(line.suggested_account_id)
-            if line.matched_journal_line_id:
-                matched_jl_ids.add(line.matched_journal_line_id)
+            if line.primary_journal_line_id:
+                matched_jl_ids.add(line.primary_journal_line_id)
 
         # Batch-resolve matched journal entry info
         match_detail_map: dict[str, dict[str, str]] = {}
@@ -436,6 +438,7 @@ class BankingStatementWebService:
                 .order_by(BankStatementLine.transaction_date)
                 .offset(offset)
                 .limit(limit)
+                .options(selectinload(BankStatementLine.matched_gl_lines))
             ).all()
         )
         lines = [_statement_line_view(line, currency) for line in paged_lines]
@@ -524,9 +527,9 @@ class BankingStatementWebService:
         )
 
         matched_jl_ids = [
-            line.matched_journal_line_id
+            line.primary_journal_line_id
             for line in paged_lines
-            if line.is_matched and line.matched_journal_line_id
+            if line.is_matched and line.primary_journal_line_id
         ]
         matched_source_urls: dict[str, str] = {}
         # Map journal_line_id → JournalEntry for metadata resolution
@@ -566,8 +569,8 @@ class BankingStatementWebService:
         # Map statement line → matched journal line id for lookup
         stmt_line_to_jl: dict[str, str] = {}
         for line in paged_lines:
-            if line.is_matched and line.matched_journal_line_id:
-                stmt_line_to_jl[str(line.line_id)] = str(line.matched_journal_line_id)
+            if line.is_matched and line.primary_journal_line_id:
+                stmt_line_to_jl[str(line.line_id)] = str(line.primary_journal_line_id)
 
         match_details: dict[str, dict[str, str]] = {}
         for stmt_lid, jl_id in stmt_line_to_jl.items():
@@ -2337,7 +2340,11 @@ class BankingStatementWebService:
         # Resolve source URL for the newly matched GL line
         source_url = ""
         match_detail: dict[str, str] | None = None
-        gl_line = db.get(JournalEntryLine, stmt_line.matched_journal_line_id)
+        gl_line = (
+            db.get(JournalEntryLine, stmt_line.primary_journal_line_id)
+            if stmt_line.primary_journal_line_id
+            else None
+        )
         if gl_line:
             entry = getattr(gl_line, "journal_entry", None) or getattr(
                 gl_line, "entry", None

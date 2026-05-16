@@ -199,7 +199,7 @@ class StatementLineRead(BaseModel):
     bank_category: str | None = None
     is_matched: bool
     matched_at: datetime | None = None
-    matched_journal_line_id: UUID | None = None
+    primary_journal_line_id: UUID | None = None
     created_at: datetime
 
 

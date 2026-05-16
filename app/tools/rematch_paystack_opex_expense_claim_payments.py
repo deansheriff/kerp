@@ -27,7 +27,11 @@ from sqlalchemy import select, text
 from app.db import SessionLocal
 from app.models.expense.expense_claim import ExpenseClaim, ExpenseClaimStatus
 from app.models.finance.banking.bank_account import BankAccount
-from app.models.finance.banking.bank_statement import BankStatement, BankStatementLine
+from app.models.finance.banking.bank_statement import (
+    BankStatement,
+    BankStatementLine,
+    BankStatementLineMatch,
+)
 from app.models.finance.gl.journal_entry import JournalEntry
 from app.models.finance.gl.journal_entry_line import JournalEntryLine
 from app.services.expense.expense_posting_adapter import ExpensePostingAdapter
@@ -93,8 +97,12 @@ def main() -> None:
                 BankStatement.statement_id == BankStatementLine.statement_id,
             )
             .join(
+                BankStatementLineMatch,
+                BankStatementLineMatch.statement_line_id == BankStatementLine.line_id,
+            )
+            .join(
                 JournalEntryLine,
-                JournalEntryLine.line_id == BankStatementLine.matched_journal_line_id,
+                JournalEntryLine.line_id == BankStatementLineMatch.journal_line_id,
             )
             .join(
                 JournalEntry,

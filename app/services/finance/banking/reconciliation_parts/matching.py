@@ -152,10 +152,31 @@ class ReconciliationMatchingService:
         db.add(recon_line)
 
         # Mark statement line as matched
+        now = datetime.now(tz=UTC)
         statement_line.is_matched = True
-        statement_line.matched_at = datetime.utcnow()
+        statement_line.matched_at = now
         statement_line.matched_by = created_by
-        statement_line.matched_journal_line_id = input.journal_line_id
+
+        # Mirror into the junction: cleanup any stale rows, insert a primary
+        # match. Without this, the recon-line path would leave is_matched=True
+        # but no junction row, breaking reads that go through matched_gl_lines.
+        db.execute(
+            delete(BankStatementLineMatch).where(
+                BankStatementLineMatch.statement_line_id == input.statement_line_id
+            )
+        )
+        source_type, source_id = self._derive_match_source(gl_line)
+        db.add(
+            BankStatementLineMatch(
+                statement_line_id=input.statement_line_id,
+                journal_line_id=input.journal_line_id,
+                matched_at=now,
+                matched_by=created_by,
+                is_primary=True,
+                source_type=source_type,
+                source_id=source_id,
+            )
+        )
 
         # Update reconciliation totals
         reconciliation.total_matched += abs(statement_amount)
@@ -218,13 +239,11 @@ class ReconciliationMatchingService:
     def _get_matched_gl_ids(db: Session, organization_id: UUID) -> set[UUID]:
         """Return GL line IDs already matched to any statement line for this org.
 
-        Checks both the junction table and the legacy FK column, scoped
-        to the given *organization_id* to prevent cross-tenant leaks.
+        Scoped to the given *organization_id* to prevent cross-tenant leaks.
         """
         from app.models.finance.banking.bank_statement import BankStatementLineMatch
 
-        # Junction table — join through statement_line → statement for org scope
-        junction_matched: set[UUID] = {
+        return {
             row
             for row in db.execute(
                 select(BankStatementLineMatch.journal_line_id)
@@ -243,25 +262,6 @@ class ReconciliationMatchingService:
             .all()
             if row is not None
         }
-        # Legacy FK column — join through statement for org scope
-        legacy_matched: set[UUID] = {
-            row
-            for row in db.execute(
-                select(BankStatementLine.matched_journal_line_id)
-                .join(
-                    BankStatement,
-                    BankStatementLine.statement_id == BankStatement.statement_id,
-                )
-                .where(
-                    BankStatement.organization_id == organization_id,
-                    BankStatementLine.matched_journal_line_id.isnot(None),
-                )
-            )
-            .scalars()
-            .all()
-            if row is not None
-        }
-        return junction_matched | legacy_matched
 
     def _resolve_gl_metadata(
         self,
@@ -1403,7 +1403,6 @@ class ReconciliationMatchingService:
         stmt_line.is_matched = True
         stmt_line.matched_at = now
         stmt_line.matched_by = matched_by
-        stmt_line.matched_journal_line_id = gl_lines[0].line_id
 
         # Update statement counters
         statement.matched_lines = (statement.matched_lines or 0) + 1
@@ -1465,12 +1464,8 @@ class ReconciliationMatchingService:
                 stmt_line.is_matched = True
                 stmt_line.matched_at = existing_match.matched_at
                 stmt_line.matched_by = existing_match.matched_by
-                stmt_line.matched_journal_line_id = journal_line_id
                 statement.matched_lines = (statement.matched_lines or 0) + 1
                 statement.unmatched_lines = max((statement.unmatched_lines or 0) - 1, 0)
-                db.flush()
-            elif stmt_line.matched_journal_line_id is None:
-                stmt_line.matched_journal_line_id = journal_line_id
                 db.flush()
             logger.info(
                 "Statement line %s already matched to GL line %s; no-op",
@@ -1518,7 +1513,6 @@ class ReconciliationMatchingService:
         stmt_line.is_matched = True
         stmt_line.matched_at = now
         stmt_line.matched_by = matched_by
-        stmt_line.matched_journal_line_id = journal_line_id
 
         # Remove any stale junction rows first (idempotent cleanup)
         db.execute(
@@ -1604,7 +1598,6 @@ class ReconciliationMatchingService:
         stmt_line.is_matched = False
         stmt_line.matched_at = None
         stmt_line.matched_by = None
-        stmt_line.matched_journal_line_id = None
 
         # Update statement counters
         statement.matched_lines = max((statement.matched_lines or 0) - 1, 0)

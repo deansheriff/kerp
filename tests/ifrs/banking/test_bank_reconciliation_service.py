@@ -218,7 +218,9 @@ class TestAddMatch:
             user_id,
         )
 
-        mock_db.add.assert_called_once()
+        # Two adds now: the BankReconciliationLine and the junction
+        # BankStatementLineMatch row mirroring the match.
+        assert mock_db.add.call_count == 2
         assert mock_db.flush.call_count >= 1
 
     def test_add_match_nonexistent_reconciliation_fails(self, service, mock_db):

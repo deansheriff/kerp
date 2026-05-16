@@ -499,6 +499,10 @@ class MockStatementLine:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+    @property
+    def primary_journal_line_id(self) -> uuid.UUID | None:
+        return self.matched_journal_line_id
+
 
 class MockReconciliationLine:
     """Mock ReconciliationLine model."""
