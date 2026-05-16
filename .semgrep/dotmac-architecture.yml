@@ -97,7 +97,6 @@ rules:
         - "**/app/tasks/performance.py"
         - "**/app/tasks/data_health.py"
         - "**/app/tasks/crm.py"
-        - "**/app/tasks/pms.py"
         - "**/app/tasks/splynx.py"
         - "**/app/tasks/discipline.py"
         - "**/app/tasks/automation.py"

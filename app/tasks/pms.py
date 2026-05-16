@@ -18,7 +18,7 @@ from uuid import UUID
 
 from celery import shared_task
 
-from app.db import SessionLocal
+from app.db.session_context import cross_org_session, session_for_org
 
 logger = logging.getLogger(__name__)
 
@@ -71,51 +71,51 @@ def pms_monthly_review_reminder() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        from sqlalchemy import select
+    from sqlalchemy import select
 
-        from app.models.finance.core_org.organization import Organization
-        from app.models.notification import (
-            EntityType,
-            NotificationChannel,
-            NotificationType,
+    from app.models.finance.core_org.organization import Organization
+    from app.models.notification import (
+        EntityType,
+        NotificationChannel,
+        NotificationType,
+    )
+    from app.models.people.perf.monthly_review import MonthlyReview
+    from app.models.people.perf.performance_contract import PerformanceContract
+    from app.models.people.perf.pms_enums import ContractStatus
+    from app.services.notification import NotificationService
+
+    today = date.today()
+    first_of_this_month = today.replace(day=1)
+    last_month_end = first_of_this_month - timedelta(days=1)
+    review_month = last_month_end.replace(day=1)
+
+    notification_service = NotificationService()
+
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.pms_ohcsf_enabled == True  # noqa: E712
+                )
+            ).all()
         )
-        from app.models.people.perf.monthly_review import MonthlyReview
-        from app.models.people.perf.performance_contract import PerformanceContract
-        from app.models.people.perf.pms_enums import ContractStatus
-        from app.services.notification import NotificationService
 
-        today = date.today()
-        # First day of the current month = day after last month ends
-        first_of_this_month = today.replace(day=1)
-        # Previous month: go back one day from the 1st to get last month's last day,
-        # then take the 1st of that month
-        last_month_end = first_of_this_month - timedelta(days=1)
-        review_month = last_month_end.replace(day=1)
-
-        notification_service = NotificationService()
-
-        orgs = db.scalars(
-            select(Organization).where(Organization.pms_ohcsf_enabled == True)  # noqa: E712
-        ).all()
-
-        for org in orgs:
-            results["orgs_checked"] += 1
-            try:
-                # Active contracts for this org
+    for org_id in org_ids:
+        results["orgs_checked"] += 1
+        try:
+            with session_for_org(org_id) as db:
                 active_contracts = db.scalars(
                     select(PerformanceContract).where(
-                        PerformanceContract.organization_id == org.organization_id,
+                        PerformanceContract.organization_id == org_id,
                         PerformanceContract.status == ContractStatus.ACTIVE,
                     )
                 ).all()
 
                 for contract in active_contracts:
                     try:
-                        # Check if monthly review already exists for last month
                         existing = db.scalar(
                             select(MonthlyReview).where(
-                                MonthlyReview.organization_id == org.organization_id,
+                                MonthlyReview.organization_id == org_id,
                                 MonthlyReview.employee_id == contract.employee_id,
                                 MonthlyReview.review_month == review_month,
                             )
@@ -124,7 +124,7 @@ def pms_monthly_review_reminder() -> dict[str, Any]:
                             continue
 
                         supervisor_person_id = _resolve_person_id(
-                            db, org.organization_id, contract.supervisor_id
+                            db, org_id, contract.supervisor_id
                         )
                         if supervisor_person_id is None:
                             logger.warning(
@@ -133,10 +133,9 @@ def pms_monthly_review_reminder() -> dict[str, Any]:
                             )
                             continue
 
-                        # Notify supervisor to complete the review
                         created = notification_service.create_if_not_sent_since(
                             db,
-                            organization_id=org.organization_id,
+                            organization_id=org_id,
                             recipient_id=supervisor_person_id,
                             entity_type=EntityType.EMPLOYEE,
                             entity_id=contract.contract_id,
@@ -162,15 +161,15 @@ def pms_monthly_review_reminder() -> dict[str, Any]:
                         )
                         results["errors"].append(str(e))
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to process org %s for monthly review reminders: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(str(e))
+                db.commit()
 
-        db.commit()
+        except Exception as e:
+            logger.exception(
+                "Failed to process org %s for monthly review reminders: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(str(e))
 
     logger.info(
         "Completed pms_monthly_review_reminder: %d reminders sent across %d orgs",
@@ -201,44 +200,49 @@ def pms_quarterly_appraisal_reminder() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        from sqlalchemy import select
+    from sqlalchemy import select
 
-        from app.models.finance.core_org.organization import Organization
-        from app.models.notification import (
-            EntityType,
-            NotificationChannel,
-            NotificationType,
+    from app.models.finance.core_org.organization import Organization
+    from app.models.notification import (
+        EntityType,
+        NotificationChannel,
+        NotificationType,
+    )
+    from app.models.people.perf.performance_contract import PerformanceContract
+    from app.models.people.perf.pms_enums import ContractStatus
+    from app.services.notification import NotificationService
+
+    today = date.today()
+    month = today.month
+    # Only send during the 1st week of Apr(4), Jul(7), Oct(10), Dec(12)
+    if month not in (4, 7, 10, 12) or today.day > 7:
+        logger.info(
+            "pms_quarterly_appraisal_reminder: not a quarterly reminder month/week (%s), skipping",
+            today,
         )
-        from app.models.people.perf.performance_contract import PerformanceContract
-        from app.models.people.perf.pms_enums import ContractStatus
-        from app.services.notification import NotificationService
+        return results
 
-        today = date.today()
-        month = today.month
-        # Only send during the 1st week of Apr(4), Jul(7), Oct(10), Dec(12)
-        if month not in (4, 7, 10, 12) or today.day > 7:
-            logger.info(
-                "pms_quarterly_appraisal_reminder: not a quarterly reminder month/week (%s), skipping",
-                today,
-            )
-            return results
+    quarter_labels = {4: "Q1", 7: "Q2", 10: "Q3", 12: "Q4/Year-End"}
+    quarter_label = quarter_labels.get(month, "Quarterly")
 
-        quarter_labels = {4: "Q1", 7: "Q2", 10: "Q3", 12: "Q4/Year-End"}
-        quarter_label = quarter_labels.get(month, "Quarterly")
+    notification_service = NotificationService()
 
-        notification_service = NotificationService()
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.pms_ohcsf_enabled == True  # noqa: E712
+                )
+            ).all()
+        )
 
-        orgs = db.scalars(
-            select(Organization).where(Organization.pms_ohcsf_enabled == True)  # noqa: E712
-        ).all()
-
-        for org in orgs:
-            results["orgs_checked"] += 1
-            try:
+    for org_id in org_ids:
+        results["orgs_checked"] += 1
+        try:
+            with session_for_org(org_id) as db:
                 active_contracts = db.scalars(
                     select(PerformanceContract).where(
-                        PerformanceContract.organization_id == org.organization_id,
+                        PerformanceContract.organization_id == org_id,
                         PerformanceContract.status == ContractStatus.ACTIVE,
                     )
                 ).all()
@@ -246,17 +250,16 @@ def pms_quarterly_appraisal_reminder() -> dict[str, Any]:
                 for contract in active_contracts:
                     try:
                         employee_person_id = _resolve_person_id(
-                            db, org.organization_id, contract.employee_id
+                            db, org_id, contract.employee_id
                         )
                         supervisor_person_id = _resolve_person_id(
-                            db, org.organization_id, contract.supervisor_id
+                            db, org_id, contract.supervisor_id
                         )
 
-                        # Notify employee to begin self-assessment
                         if employee_person_id is not None:
                             created = notification_service.create_if_not_sent_since(
                                 db,
-                                organization_id=org.organization_id,
+                                organization_id=org_id,
                                 recipient_id=employee_person_id,
                                 entity_type=EntityType.EMPLOYEE,
                                 entity_id=contract.contract_id,
@@ -273,11 +276,10 @@ def pms_quarterly_appraisal_reminder() -> dict[str, Any]:
                             if created is not None:
                                 results["employee_reminders_sent"] += 1
 
-                        # Notify supervisor to prepare
                         if supervisor_person_id is not None:
                             created = notification_service.create_if_not_sent_since(
                                 db,
-                                organization_id=org.organization_id,
+                                organization_id=org_id,
                                 recipient_id=supervisor_person_id,
                                 entity_type=EntityType.EMPLOYEE,
                                 entity_id=contract.contract_id,
@@ -302,15 +304,15 @@ def pms_quarterly_appraisal_reminder() -> dict[str, Any]:
                         )
                         results["errors"].append(str(e))
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to process org %s for quarterly appraisal reminders: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(str(e))
+                db.commit()
 
-        db.commit()
+        except Exception as e:
+            logger.exception(
+                "Failed to process org %s for quarterly appraisal reminders: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(str(e))
 
     logger.info(
         "Completed pms_quarterly_appraisal_reminder: %d employee + %d supervisor reminders sent",
@@ -340,42 +342,46 @@ def pms_contract_deadline_check() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        from sqlalchemy import select
+    from sqlalchemy import select
 
-        from app.models.finance.core_org.organization import Organization
-        from app.models.notification import (
-            EntityType,
-            NotificationChannel,
-            NotificationType,
+    from app.models.finance.core_org.organization import Organization
+    from app.models.notification import (
+        EntityType,
+        NotificationChannel,
+        NotificationType,
+    )
+    from app.models.people.perf.performance_contract import PerformanceContract
+    from app.models.people.perf.pms_enums import ContractStatus
+    from app.services.notification import NotificationService
+
+    today = date.today()
+    # Only run in January after the 3rd week (day > 21)
+    if today.month != 1 or today.day <= 21:
+        logger.info(
+            "pms_contract_deadline_check: not in January deadline window (%s), skipping",
+            today,
         )
-        from app.models.people.perf.performance_contract import PerformanceContract
-        from app.models.people.perf.pms_enums import ContractStatus
-        from app.services.notification import NotificationService
+        return results
 
-        today = date.today()
-        # Only run in January after the 3rd week (day > 21)
-        if today.month != 1 or today.day <= 21:
-            logger.info(
-                "pms_contract_deadline_check: not in January deadline window (%s), skipping",
-                today,
-            )
-            return results
+    notification_service = NotificationService()
+    unsigned_statuses = [ContractStatus.DRAFT, ContractStatus.PENDING_SIGNATURE]
 
-        notification_service = NotificationService()
-        unsigned_statuses = [ContractStatus.DRAFT, ContractStatus.PENDING_SIGNATURE]
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.pms_ohcsf_enabled == True  # noqa: E712
+                )
+            ).all()
+        )
 
-        orgs = db.scalars(
-            select(Organization).where(Organization.pms_ohcsf_enabled == True)  # noqa: E712
-        ).all()
-
-        for org in orgs:
-            results["orgs_checked"] += 1
-            try:
-                # Find contracts not yet signed/active
+    for org_id in org_ids:
+        results["orgs_checked"] += 1
+        try:
+            with session_for_org(org_id) as db:
                 unsigned_contracts = db.scalars(
                     select(PerformanceContract).where(
-                        PerformanceContract.organization_id == org.organization_id,
+                        PerformanceContract.organization_id == org_id,
                         PerformanceContract.status.in_(unsigned_statuses),
                     )
                 ).all()
@@ -383,7 +389,7 @@ def pms_contract_deadline_check() -> dict[str, Any]:
                 for contract in unsigned_contracts:
                     try:
                         supervisor_person_id = _resolve_person_id(
-                            db, org.organization_id, contract.supervisor_id
+                            db, org_id, contract.supervisor_id
                         )
                         if supervisor_person_id is None:
                             logger.warning(
@@ -392,10 +398,9 @@ def pms_contract_deadline_check() -> dict[str, Any]:
                             )
                             continue
 
-                        # Get HR officer — notify supervisor as proxy for HR alert
                         created = notification_service.create_if_not_sent_since(
                             db,
-                            organization_id=org.organization_id,
+                            organization_id=org_id,
                             recipient_id=supervisor_person_id,
                             entity_type=EntityType.EMPLOYEE,
                             entity_id=contract.contract_id,
@@ -421,15 +426,15 @@ def pms_contract_deadline_check() -> dict[str, Any]:
                         )
                         results["errors"].append(str(e))
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to process org %s for contract deadline check: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(str(e))
+                db.commit()
 
-        db.commit()
+        except Exception as e:
+            logger.exception(
+                "Failed to process org %s for contract deadline check: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(str(e))
 
     logger.info(
         "Completed pms_contract_deadline_check: %d contracts flagged across %d orgs",
@@ -460,46 +465,50 @@ def pms_underperformance_detection() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        from sqlalchemy import select
+    from sqlalchemy import select
 
-        from app.models.finance.core_org.organization import Organization
-        from app.models.people.perf.appraisal_cycle import (
-            AppraisalCycle,
-            AppraisalCycleStatus,
+    from app.models.finance.core_org.organization import Organization
+    from app.models.people.perf.appraisal_cycle import (
+        AppraisalCycle,
+        AppraisalCycleStatus,
+    )
+    from app.services.people.perf.underperformance_service import (
+        UnderperformanceService,
+    )
+
+    today = date.today()
+    month = today.month
+    day = today.day
+
+    # Quarterly: 1st week of Apr(4), Jul(7), Oct(10); Annual: 2nd week of Jan(1)
+    run_quarterly = month in (4, 7, 10) and day <= 7
+    run_annual = month == 1 and 8 <= day <= 14
+
+    if not run_quarterly and not run_annual:
+        logger.info(
+            "pms_underperformance_detection: not in a detection window (%s), skipping",
+            today,
         )
-        from app.services.people.perf.underperformance_service import (
-            UnderperformanceService,
+        return results
+
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.pms_ohcsf_enabled == True  # noqa: E712
+                )
+            ).all()
         )
 
-        today = date.today()
-        month = today.month
-        day = today.day
-
-        # Quarterly: 1st week of Apr(4), Jul(7), Oct(10); Annual: 2nd week of Jan(1)
-        run_quarterly = month in (4, 7, 10) and day <= 7
-        run_annual = month == 1 and 8 <= day <= 14
-
-        if not run_quarterly and not run_annual:
-            logger.info(
-                "pms_underperformance_detection: not in a detection window (%s), skipping",
-                today,
-            )
-            return results
-
-        orgs = db.scalars(
-            select(Organization).where(Organization.pms_ohcsf_enabled == True)  # noqa: E712
-        ).all()
-
-        for org in orgs:
-            results["orgs_checked"] += 1
-            try:
+    for org_id in org_ids:
+        results["orgs_checked"] += 1
+        try:
+            with session_for_org(org_id) as db:
                 service = UnderperformanceService(db)
 
-                # Find active appraisal cycles for this org
                 active_cycles = db.scalars(
                     select(AppraisalCycle).where(
-                        AppraisalCycle.organization_id == org.organization_id,
+                        AppraisalCycle.organization_id == org_id,
                         AppraisalCycle.status == AppraisalCycleStatus.ACTIVE,
                     )
                 ).all()
@@ -508,26 +517,26 @@ def pms_underperformance_detection() -> dict[str, Any]:
                     try:
                         if run_quarterly:
                             flagged = service.detect_quarterly_trigger(
-                                org_id=org.organization_id,
+                                org_id=org_id,
                                 cycle_id=cycle.cycle_id,
                             )
                             results["quarterly_flagged"] += len(flagged)
                             logger.info(
                                 "Quarterly detection: org=%s cycle=%s flagged=%d",
-                                org.organization_id,
+                                org_id,
                                 cycle.cycle_id,
                                 len(flagged),
                             )
 
                         if run_annual:
                             flagged = service.detect_annual_trigger(
-                                org_id=org.organization_id,
+                                org_id=org_id,
                                 cycle_id=cycle.cycle_id,
                             )
                             results["annual_flagged"] += len(flagged)
                             logger.info(
                                 "Annual detection: org=%s cycle=%s flagged=%d",
-                                org.organization_id,
+                                org_id,
                                 cycle.cycle_id,
                                 len(flagged),
                             )
@@ -540,15 +549,15 @@ def pms_underperformance_detection() -> dict[str, Any]:
                         )
                         results["errors"].append(str(e))
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to process org %s for underperformance detection: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(str(e))
+                db.commit()
 
-        db.commit()
+        except Exception as e:
+            logger.exception(
+                "Failed to process org %s for underperformance detection: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(str(e))
 
     logger.info(
         "Completed pms_underperformance_detection: quarterly=%d annual=%d",
@@ -578,37 +587,40 @@ def pms_probation_check() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        from sqlalchemy import select
+    from sqlalchemy import select
 
-        from app.models.finance.core_org.organization import Organization
-        from app.models.notification import (
-            EntityType,
-            NotificationChannel,
-            NotificationType,
-        )
-        from app.models.people.hr.employee import Employee, EmployeeStatus
-        from app.services.notification import NotificationService
-        from app.services.people.hr.org_resolver import OrgResolver
-        from app.services.people.perf.underperformance_service import (
-            UnderperformanceService,
-        )
+    from app.models.finance.core_org.organization import Organization
+    from app.models.notification import (
+        EntityType,
+        NotificationChannel,
+        NotificationType,
+    )
+    from app.models.people.hr.employee import Employee, EmployeeStatus
+    from app.services.notification import NotificationService
+    from app.services.people.hr.org_resolver import OrgResolver
+    from app.services.people.perf.underperformance_service import (
+        UnderperformanceService,
+    )
 
-        today = date.today()
-        notification_service = NotificationService()
-        first_of_month = today.replace(day=1)
+    today = date.today()
+    notification_service = NotificationService()
+    first_of_month = today.replace(day=1)
 
-        orgs = db.scalars(
-            select(Organization).where(Organization.pms_ohcsf_enabled == True)  # noqa: E712
-        ).all()
-
-        for org in orgs:
-            results["orgs_checked"] += 1
-            try:
-                service = UnderperformanceService(db)
-                milestones = service.check_probation_milestones(
-                    org_id=org.organization_id
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.pms_ohcsf_enabled == True  # noqa: E712
                 )
+            ).all()
+        )
+
+    for org_id in org_ids:
+        results["orgs_checked"] += 1
+        try:
+            with session_for_org(org_id) as db:
+                service = UnderperformanceService(db)
+                milestones = service.check_probation_milestones(org_id=org_id)
 
                 for milestone in milestones:
                     try:
@@ -621,7 +633,7 @@ def pms_probation_check() -> dict[str, Any]:
                         employee = db.get(Employee, employee_id)
                         if (
                             employee is None
-                            or employee.organization_id != org.organization_id
+                            or employee.organization_id != org_id
                             or employee.status == EmployeeStatus.TERMINATED
                         ):
                             logger.warning(
@@ -631,7 +643,7 @@ def pms_probation_check() -> dict[str, Any]:
                             continue
 
                         manager = OrgResolver(db).get_manager(
-                            employee.employee_id, org.organization_id
+                            employee.employee_id, org_id
                         )
                         recipient_person_id = manager.person_id if manager else None
                         if recipient_person_id is None:
@@ -641,7 +653,6 @@ def pms_probation_check() -> dict[str, Any]:
                             )
                             continue
 
-                        # Determine milestone label
                         if months_served >= 21:
                             label = "21-month (final probation milestone)"
                         elif months_served >= 20:
@@ -651,7 +662,7 @@ def pms_probation_check() -> dict[str, Any]:
 
                         created = notification_service.create_if_not_sent_since(
                             db,
-                            organization_id=org.organization_id,
+                            organization_id=org_id,
                             recipient_id=recipient_person_id,
                             entity_type=EntityType.EMPLOYEE,
                             entity_id=employee_id,
@@ -677,15 +688,15 @@ def pms_probation_check() -> dict[str, Any]:
                         )
                         results["errors"].append(str(e))
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to process org %s for probation check: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(str(e))
+                db.commit()
 
-        db.commit()
+        except Exception as e:
+            logger.exception(
+                "Failed to process org %s for probation check: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(str(e))
 
     logger.info(
         "Completed pms_probation_check: %d notifications sent across %d orgs",
@@ -715,56 +726,61 @@ def pms_appeal_deadline_check() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        from sqlalchemy import select
+    from sqlalchemy import select
 
-        from app.models.finance.core_org.organization import Organization
-        from app.models.notification import (
-            EntityType,
-            NotificationChannel,
-            NotificationType,
+    from app.models.finance.core_org.organization import Organization
+    from app.models.notification import (
+        EntityType,
+        NotificationChannel,
+        NotificationType,
+    )
+    from app.models.people.perf.appraisal_appeal import AppraisalAppeal
+    from app.models.people.perf.pms_enums import AppealStatus
+    from app.services.notification import NotificationService
+
+    today = date.today()
+    # Only run in January and February
+    if today.month not in (1, 2):
+        logger.info(
+            "pms_appeal_deadline_check: not in Jan/Feb (%s), skipping",
+            today,
         )
-        from app.models.people.perf.appraisal_appeal import AppraisalAppeal
-        from app.models.people.perf.pms_enums import AppealStatus
-        from app.services.notification import NotificationService
+        return results
 
-        today = date.today()
-        # Only run in January and February
-        if today.month not in (1, 2):
-            logger.info(
-                "pms_appeal_deadline_check: not in Jan/Feb (%s), skipping",
-                today,
-            )
-            return results
+    # OHCSF appeal deadline: February 28 of the current year
+    appeal_deadline = date(today.year, 2, 28)
+    days_to_deadline = (appeal_deadline - today).days
 
-        # OHCSF appeal deadline: February 28 of the current year
-        appeal_deadline = date(today.year, 2, 28)
-        days_to_deadline = (appeal_deadline - today).days
+    if days_to_deadline < 0:
+        logger.info(
+            "pms_appeal_deadline_check: appeal deadline already passed for %d, skipping",
+            today.year,
+        )
+        return results
 
-        if days_to_deadline < 0:
-            logger.info(
-                "pms_appeal_deadline_check: appeal deadline already passed for %d, skipping",
-                today.year,
-            )
-            return results
+    notification_service = NotificationService()
+    open_appeal_statuses = [
+        AppealStatus.FILED,
+        AppealStatus.UNDER_MEDIATION,
+        AppealStatus.REFERRED_TO_COMMITTEE,
+    ]
 
-        notification_service = NotificationService()
-        open_appeal_statuses = [
-            AppealStatus.FILED,
-            AppealStatus.UNDER_MEDIATION,
-            AppealStatus.REFERRED_TO_COMMITTEE,
-        ]
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.pms_ohcsf_enabled == True  # noqa: E712
+                )
+            ).all()
+        )
 
-        orgs = db.scalars(
-            select(Organization).where(Organization.pms_ohcsf_enabled == True)  # noqa: E712
-        ).all()
-
-        for org in orgs:
-            results["orgs_checked"] += 1
-            try:
+    for org_id in org_ids:
+        results["orgs_checked"] += 1
+        try:
+            with session_for_org(org_id) as db:
                 open_appeals = db.scalars(
                     select(AppraisalAppeal).where(
-                        AppraisalAppeal.organization_id == org.organization_id,
+                        AppraisalAppeal.organization_id == org_id,
                         AppraisalAppeal.status.in_(open_appeal_statuses),
                     )
                 ).all()
@@ -772,7 +788,7 @@ def pms_appeal_deadline_check() -> dict[str, Any]:
                 for appeal in open_appeals:
                     try:
                         employee_person_id = _resolve_person_id(
-                            db, org.organization_id, appeal.employee_id
+                            db, org_id, appeal.employee_id
                         )
                         if employee_person_id is None:
                             logger.warning(
@@ -783,7 +799,7 @@ def pms_appeal_deadline_check() -> dict[str, Any]:
 
                         created = notification_service.create_if_not_sent_since(
                             db,
-                            organization_id=org.organization_id,
+                            organization_id=org_id,
                             recipient_id=employee_person_id,
                             entity_type=EntityType.EMPLOYEE,
                             entity_id=appeal.appeal_id,
@@ -810,15 +826,15 @@ def pms_appeal_deadline_check() -> dict[str, Any]:
                         )
                         results["errors"].append(str(e))
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to process org %s for appeal deadline check: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(str(e))
+                db.commit()
 
-        db.commit()
+        except Exception as e:
+            logger.exception(
+                "Failed to process org %s for appeal deadline check: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(str(e))
 
     logger.info(
         "Completed pms_appeal_deadline_check: %d appeals flagged across %d orgs",
@@ -848,40 +864,44 @@ def pms_pip_review_reminder() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        from sqlalchemy import select
+    from sqlalchemy import select
 
-        from app.models.finance.core_org.organization import Organization
-        from app.models.notification import (
-            EntityType,
-            NotificationChannel,
-            NotificationType,
+    from app.models.finance.core_org.organization import Organization
+    from app.models.notification import (
+        EntityType,
+        NotificationChannel,
+        NotificationType,
+    )
+    from app.models.people.perf.pip import PerformanceImprovementPlan
+    from app.models.people.perf.pms_enums import PIPStatus
+    from app.services.notification import NotificationService
+
+    today = date.today()
+    window_end = today + timedelta(days=7)
+    notification_service = NotificationService()
+
+    active_pip_statuses = [
+        PIPStatus.ACTIVE,
+        PIPStatus.UNDER_REVIEW,
+        PIPStatus.EXTENDED,
+    ]
+
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.pms_ohcsf_enabled == True  # noqa: E712
+                )
+            ).all()
         )
-        from app.models.people.perf.pip import PerformanceImprovementPlan
-        from app.models.people.perf.pms_enums import PIPStatus
-        from app.services.notification import NotificationService
 
-        today = date.today()
-        window_end = today + timedelta(days=7)
-        notification_service = NotificationService()
-
-        active_pip_statuses = [
-            PIPStatus.ACTIVE,
-            PIPStatus.UNDER_REVIEW,
-            PIPStatus.EXTENDED,
-        ]
-
-        orgs = db.scalars(
-            select(Organization).where(Organization.pms_ohcsf_enabled == True)  # noqa: E712
-        ).all()
-
-        for org in orgs:
-            results["orgs_checked"] += 1
-            try:
+    for org_id in org_ids:
+        results["orgs_checked"] += 1
+        try:
+            with session_for_org(org_id) as db:
                 active_pips = db.scalars(
                     select(PerformanceImprovementPlan).where(
-                        PerformanceImprovementPlan.organization_id
-                        == org.organization_id,
+                        PerformanceImprovementPlan.organization_id == org_id,
                         PerformanceImprovementPlan.status.in_(active_pip_statuses),
                     )
                 ).all()
@@ -894,7 +914,6 @@ def pms_pip_review_reminder() -> dict[str, Any]:
 
                         for interval in review_intervals:
                             try:
-                                # Expect each interval to have a "review_date" key (ISO format string)
                                 if not isinstance(interval, dict):
                                     continue
                                 interval_date_str = interval.get("review_date")
@@ -913,18 +932,17 @@ def pms_pip_review_reminder() -> dict[str, Any]:
                                 )
 
                                 supervisor_person_id = _resolve_person_id(
-                                    db, org.organization_id, pip.supervisor_id
+                                    db, org_id, pip.supervisor_id
                                 )
                                 hr_person_id = _resolve_person_id(
-                                    db, org.organization_id, pip.hr_officer_id
+                                    db, org_id, pip.hr_officer_id
                                 )
 
-                                # Notify supervisor
                                 since = _window_start(today - timedelta(days=7))
                                 if supervisor_person_id is not None:
                                     created = notification_service.create_if_not_sent_since(
                                         db,
-                                        organization_id=org.organization_id,
+                                        organization_id=org_id,
                                         recipient_id=supervisor_person_id,
                                         entity_type=EntityType.EMPLOYEE,
                                         entity_id=pip.pip_id,
@@ -943,11 +961,10 @@ def pms_pip_review_reminder() -> dict[str, Any]:
                                     if created is not None:
                                         results["reminders_sent"] += 1
 
-                                # Notify HR officer
                                 if hr_person_id is not None:
                                     created = notification_service.create_if_not_sent_since(
                                         db,
-                                        organization_id=org.organization_id,
+                                        organization_id=org_id,
                                         recipient_id=hr_person_id,
                                         entity_type=EntityType.EMPLOYEE,
                                         entity_id=pip.pip_id,
@@ -980,15 +997,15 @@ def pms_pip_review_reminder() -> dict[str, Any]:
                         )
                         results["errors"].append(str(e))
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to process org %s for PIP review reminders: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(str(e))
+                db.commit()
 
-        db.commit()
+        except Exception as e:
+            logger.exception(
+                "Failed to process org %s for PIP review reminders: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(str(e))
 
     logger.info(
         "Completed pms_pip_review_reminder: %d reminders sent across %d orgs",
