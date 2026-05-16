@@ -18,8 +18,7 @@ from typing import Any
 from celery import shared_task
 
 from app.config import settings
-from app.db import SessionLocal
-from app.db.session_context import session_for_org
+from app.db.session_context import cross_org_session, session_for_org
 
 logger = logging.getLogger(__name__)
 
@@ -458,20 +457,30 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        # Get all active organizations
-        orgs = db.scalars(
-            select(Organization).where(Organization.is_active == True)
-        ).all()
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.is_active == True  # noqa: E712
+                )
+            ).all()
+        )
 
-        for org in orgs:
-            results["organizations_checked"] += 1
+    for org_id in org_ids:
+        results["organizations_checked"] += 1
 
-            try:
+        org_legal_name = "Unknown"
+        try:
+            with session_for_org(org_id) as db:
+                org = db.get(Organization, org_id)
+                if org is None:
+                    continue
+                org_legal_name = org.legal_name or "Unknown"
+
                 # Check if auto-generation is enabled for this org
                 enabled = _get_org_setting(
                     db,
-                    org.organization_id,
+                    org_id,
                     SettingDomain.payroll,
                     "auto_generate_enabled",
                     default=False,
@@ -483,7 +492,7 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
                 # Check if today is the right day (N days before month end)
                 days_before = _get_org_setting(
                     db,
-                    org.organization_id,
+                    org_id,
                     SettingDomain.payroll,
                     "auto_generate_days_before",
                     default=5,
@@ -499,7 +508,7 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
                 existing_count = (
                     db.scalar(
                         select(func.count(PayrollEntry.entry_id)).where(
-                            PayrollEntry.organization_id == org.organization_id,
+                            PayrollEntry.organization_id == org_id,
                             PayrollEntry.start_date == period_start,
                             PayrollEntry.end_date == period_end,
                             PayrollEntry.status != PayrollEntryStatus.CANCELLED,
@@ -511,8 +520,8 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
                 if existing_count > 0:
                     results["skipped"].append(
                         {
-                            "org_id": str(org.organization_id),
-                            "org_name": org.legal_name,
+                            "org_id": str(org_id),
+                            "org_name": org_legal_name,
                             "reason": "Payroll already exists for period",
                         }
                     )
@@ -521,7 +530,7 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
                 # Run data completeness check
                 readiness_service = PayrollReadinessService(db)
                 readiness_report = readiness_service.check_readiness(
-                    organization_id=org.organization_id,
+                    organization_id=org_id,
                     period_start=period_start,
                     period_end=period_end,
                 )
@@ -529,7 +538,7 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
                 # Create payroll entry
                 payroll_service = PayrollService(db)
                 entry = payroll_service.create_payroll_entry(
-                    org_id=org.organization_id,
+                    org_id=org_id,
                     posting_date=period_end,
                     start_date=period_start,
                     end_date=period_end,
@@ -541,7 +550,7 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
 
                 # Generate salary slips with auto-fetched data
                 generation_result = payroll_service.generate_salary_slips_auto(
-                    org_id=org.organization_id,
+                    org_id=org_id,
                     entry_id=entry.entry_id,
                     include_attendance=True,
                     include_lwp=True,
@@ -562,8 +571,8 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
 
                 results["payrolls_generated"].append(
                     {
-                        "org_id": str(org.organization_id),
-                        "org_name": org.legal_name,
+                        "org_id": str(org_id),
+                        "org_name": org_legal_name,
                         "entry_id": str(entry.entry_id),
                         "entry_number": entry.entry_number,
                         "employee_count": generation_result.created,
@@ -575,25 +584,24 @@ def auto_generate_draft_payroll() -> dict[str, Any]:
                 logger.info(
                     "Generated draft payroll %s for %s: %d employees, %d flagged",
                     entry.entry_number,
-                    org.legal_name,
+                    org_legal_name,
                     generation_result.created,
                     len(generation_result.flagged_for_review),
                 )
 
-            except Exception as e:
-                logger.exception(
-                    "Failed to generate payroll for org %s: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(
-                    {
-                        "org_id": str(org.organization_id),
-                        "org_name": getattr(org, "legal_name", "Unknown"),
-                        "error": str(e),
-                    }
-                )
-                db.rollback()
+        except Exception as e:
+            logger.exception(
+                "Failed to generate payroll for org %s: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(
+                {
+                    "org_id": str(org_id),
+                    "org_name": org_legal_name,
+                    "error": str(e),
+                }
+            )
 
     logger.info(
         "Auto-generate draft payroll completed: %d orgs checked, %d generated, %d skipped, %d errors",

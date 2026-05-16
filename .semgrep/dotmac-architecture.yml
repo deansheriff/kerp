@@ -99,7 +99,6 @@ rules:
         - "**/app/tasks/crm.py"
         - "**/app/tasks/pms.py"
         - "**/app/tasks/splynx.py"
-        - "**/app/tasks/payroll.py"
         - "**/app/tasks/discipline.py"
         - "**/app/tasks/automation.py"
         - "**/app/tasks/hooks.py"

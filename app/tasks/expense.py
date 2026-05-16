@@ -24,7 +24,7 @@ from celery import shared_task
 from sqlalchemy import select
 
 from app.db import SessionLocal
-from app.db.session_context import session_for_org
+from app.db.session_context import cross_org_session, session_for_org
 from app.models.expense import (
     ExpenseClaim,
     ExpenseClaimStatus,
@@ -64,22 +64,23 @@ def refresh_period_usage_cache(organization_id: str | None = None) -> dict:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        # Get organizations to process
-        org_query = select(Organization).where(Organization.is_active == True)
+    with cross_org_session() as cross_db:
+        org_query = select(Organization.organization_id).where(
+            Organization.is_active == True  # noqa: E712
+        )
         if organization_id:
             org_query = org_query.where(
                 Organization.organization_id == uuid.UUID(organization_id)
             )
+        org_ids = list(cross_db.scalars(org_query).all())
 
-        organizations = db.scalars(org_query).all()
-
-        for org in organizations:
-            try:
+    for org_id in org_ids:
+        try:
+            with session_for_org(org_id) as db:
                 # Get all active employees
                 employees = db.scalars(
                     select(Employee).where(
-                        Employee.organization_id == org.organization_id,
+                        Employee.organization_id == org_id,
                         Employee.status == EmployeeStatus.ACTIVE,
                     )
                 ).all()
@@ -88,7 +89,6 @@ def refresh_period_usage_cache(organization_id: str | None = None) -> dict:
 
                 for employee in employees:
                     try:
-                        # Refresh for each period type
                         for period_type in [
                             LimitPeriodType.DAY,
                             LimitPeriodType.WEEK,
@@ -97,7 +97,7 @@ def refresh_period_usage_cache(organization_id: str | None = None) -> dict:
                             LimitPeriodType.YEAR,
                         ]:
                             limit_service.refresh_usage_cache(
-                                org.organization_id,
+                                org_id,
                                 employee.employee_id,
                                 period_type,
                             )
@@ -118,21 +118,20 @@ def refresh_period_usage_cache(organization_id: str | None = None) -> dict:
                         )
 
                 db.commit()
-                results["organizations_processed"] += 1
+            results["organizations_processed"] += 1
 
-            except Exception as e:
-                logger.error(
-                    "Failed to process organization %s: %s",
-                    org.organization_id,
-                    e,
-                )
-                db.rollback()
-                results["errors"].append(
-                    {
-                        "organization_id": str(org.organization_id),
-                        "error": str(e),
-                    }
-                )
+        except Exception as e:
+            logger.error(
+                "Failed to process organization %s: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(
+                {
+                    "organization_id": str(org_id),
+                    "error": str(e),
+                }
+            )
 
     logger.info(
         "Period usage cache refresh complete: %d orgs, %d employees",
@@ -315,25 +314,30 @@ def reset_weekly_approver_budgets() -> dict:
         "errors": [],
     }
 
-    with SessionLocal() as db:
-        now_lagos = datetime.now(AFRICA_LAGOS_TZ)
-        current_week_start = (now_lagos - timedelta(days=now_lagos.weekday())).date()
-        current_week_end = current_week_start + timedelta(days=6)
-        previous_week_start = current_week_start - timedelta(days=7)
-        previous_week_end = current_week_end - timedelta(days=7)
-        week_window_start = datetime.combine(
-            current_week_start, datetime.min.time(), tzinfo=AFRICA_LAGOS_TZ
+    now_lagos = datetime.now(AFRICA_LAGOS_TZ)
+    current_week_start = (now_lagos - timedelta(days=now_lagos.weekday())).date()
+    current_week_end = current_week_start + timedelta(days=6)
+    previous_week_start = current_week_start - timedelta(days=7)
+    previous_week_end = current_week_end - timedelta(days=7)
+    week_window_start = datetime.combine(
+        current_week_start, datetime.min.time(), tzinfo=AFRICA_LAGOS_TZ
+    )
+
+    with cross_org_session() as cross_db:
+        org_ids = list(
+            cross_db.scalars(
+                select(Organization.organization_id).where(
+                    Organization.is_active == True  # noqa: E712
+                )
+            ).all()
         )
 
-        orgs = db.scalars(
-            select(Organization).where(Organization.is_active == True)
-        ).all()
-
-        for org in orgs:
-            try:
+    for org_id in org_ids:
+        try:
+            with session_for_org(org_id) as db:
                 employees = db.scalars(
                     select(Employee).where(
-                        Employee.organization_id == org.organization_id,
+                        Employee.organization_id == org_id,
                         Employee.status == EmployeeStatus.ACTIVE,
                     )
                 ).all()
@@ -342,14 +346,14 @@ def reset_weekly_approver_budgets() -> dict:
                 for employee in employees:
                     results["employees_evaluated"] += 1
                     budget_info = limit_service._get_approver_weekly_budget(
-                        org.organization_id, employee
+                        org_id, employee
                     )
                     if budget_info is None:
                         continue
 
                     _, approver_limit_id = budget_info
                     already_reset = limit_service.get_latest_weekly_reset(
-                        org.organization_id,
+                        org_id,
                         employee.employee_id,
                         approver_limit_id,
                         from_datetime=week_window_start,
@@ -359,7 +363,7 @@ def reset_weekly_approver_budgets() -> dict:
                         continue
 
                     limit_service.create_weekly_budget_reset(
-                        org.organization_id,
+                        org_id,
                         approver_id=employee.employee_id,
                         reviewed_by_id=employee.person_id,
                         reset_reason="Scheduled weekly budget reset",
@@ -369,21 +373,20 @@ def reset_weekly_approver_budgets() -> dict:
                     results["resets_created"] += 1
 
                 db.commit()
-                results["organizations_processed"] += 1
+            results["organizations_processed"] += 1
 
-            except Exception as e:
-                db.rollback()
-                logger.error(
-                    "Failed to process automatic budget reset for org %s: %s",
-                    org.organization_id,
-                    e,
-                )
-                results["errors"].append(
-                    {
-                        "organization_id": str(org.organization_id),
-                        "error": str(e),
-                    }
-                )
+        except Exception as e:
+            logger.error(
+                "Failed to process automatic budget reset for org %s: %s",
+                org_id,
+                e,
+            )
+            results["errors"].append(
+                {
+                    "organization_id": str(org_id),
+                    "error": str(e),
+                }
+            )
 
     logger.info(
         "Weekly approver budget reset complete: %d orgs, %d resets",
