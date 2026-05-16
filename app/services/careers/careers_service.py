@@ -27,6 +27,7 @@ from app.models.people.hr.department import Department
 from app.models.people.recruit.job_applicant import ApplicantStatus, JobApplicant
 from app.models.people.recruit.job_offer import JobOffer, OfferStatus
 from app.models.people.recruit.job_opening import JobOpening, JobOpeningStatus
+from app.db.session_context import prime_session
 from app.rls import bypass_rls_sync, set_current_organization_sync
 from app.services.careers.candidate_notifications import CandidateNotificationService
 from app.services.careers.resume_service import ResumeService
@@ -116,6 +117,14 @@ class CareersService:
                 org = self.db.scalar(stmt)
 
         if org:
+            # Prime BOTH tenant layers: the PostgreSQL GUC (consumed by
+            # native RLS policies) AND the SQLAlchemy ORM listener
+            # (consumed by ``session.info["organization_id"]``). Setting
+            # only one half is the recurring bug class that hit
+            # ``session_for_org`` and the Mono webhook handler — name
+            # the two together so the next reader can't drop one
+            # silently.
+            prime_session(self.db, org.organization_id)
             set_current_organization_sync(self.db, org.organization_id)
             return org
         return None
