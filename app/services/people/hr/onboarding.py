@@ -26,7 +26,9 @@ from uuid import UUID
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.db.session_context import prime_tenant_context
 from app.models.people.hr import Employee, EmployeeStatus
+from app.rls import bypass_rls_sync
 from app.models.people.hr.checklist_template import (
     ChecklistTemplate,
     ChecklistTemplateType,
@@ -268,6 +270,12 @@ class OnboardingService:
         - Organization is active (multi-tenancy validation)
         - Onboarding is not cancelled
 
+        Session lifecycle: the public portal route opens this session
+        unprimed (the org isn't known until the token resolves). We
+        bypass tenant scoping for the lookup, then call
+        :func:`prime_tenant_context` once the org is identified so the
+        rest of the request runs with both tenant layers set.
+
         Security: Tokens are stored as SHA-256 hashes. The incoming token
         is hashed before comparison to prevent timing attacks and ensure
         tokens aren't exposed in database.
@@ -277,15 +285,25 @@ class OnboardingService:
         # Hash the provided token for comparison
         token_hash = self._hash_token(token)
 
-        onboarding = self.db.scalar(
-            select(EmployeeOnboarding)
-            .options(joinedload(EmployeeOnboarding.activities))
-            .where(EmployeeOnboarding.self_service_token == token_hash)
-        )
+        # The initial lookup is cross-org by necessity — the token is
+        # the *only* identifier we have, and the row carries the org.
+        # Without ``bypass_rls_sync`` this select silently returns None
+        # on any RLS-protected schema (today the people.hr schema does
+        # not have DB-native RLS so the bug is latent; this guards
+        # against tightening in either direction).
+        with bypass_rls_sync(self.db):
+            onboarding = self.db.scalar(
+                select(EmployeeOnboarding)
+                .options(joinedload(EmployeeOnboarding.activities))
+                .where(EmployeeOnboarding.self_service_token == token_hash)
+            )
 
-        if not onboarding:
-            logger.warning("Invalid self-service token attempted")
-            raise InvalidSelfServiceTokenError()
+            if not onboarding:
+                logger.warning("Invalid self-service token attempted")
+                raise InvalidSelfServiceTokenError()
+
+            # Org-active check is also cross-org until prime fires below.
+            org = self.db.get(Organization, onboarding.organization_id)
 
         # Validate token expiry (use timezone-aware comparison)
         if onboarding.self_service_token_expires:
@@ -303,7 +321,6 @@ class OnboardingService:
                 raise InvalidSelfServiceTokenError("Self-service token has expired")
 
         # Validate organization is active (multi-tenancy check)
-        org = self.db.get(Organization, onboarding.organization_id)
         if not org or not getattr(org, "is_active", True):
             logger.warning(
                 "Token lookup for inactive organization %s", onboarding.organization_id
@@ -316,6 +333,10 @@ class OnboardingService:
                 "Token lookup for cancelled onboarding %s", onboarding.onboarding_id
             )
             raise InvalidSelfServiceTokenError("Onboarding has been cancelled")
+
+        # Validation passed — prime both tenant layers so subsequent
+        # service+route work on this session runs scoped to the org.
+        prime_tenant_context(self.db, onboarding.organization_id)
 
         logger.debug(
             "Valid token access for onboarding %s (org: %s)",

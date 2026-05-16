@@ -86,6 +86,35 @@ class TestAllowCrossOrg:
         )
 
 
+class TestPrimeTenantContext:
+    """Contract for the in-place dual-layer primer used by public portals
+    after slug/token → org_id resolution. See
+    :func:`app.db.session_context.prime_tenant_context`.
+    """
+
+    def test_calls_both_layers(self):
+        """The whole point of this helper: callers can't forget one layer
+        because the helper composes both. Future refactors must not drop
+        the prime_session OR the set_current_organization_sync call.
+        """
+        from unittest.mock import patch
+
+        from app.db.session_context import prime_tenant_context
+
+        org_id = uuid4()
+        session = MagicMock()
+        session.info = {}
+        with (
+            patch("app.db.session_context.prime_session") as mock_prime,
+            patch(
+                "app.db.session_context.set_current_organization_sync"
+            ) as mock_set_guc,
+        ):
+            prime_tenant_context(session, org_id)
+            mock_prime.assert_called_once_with(session, org_id)
+            mock_set_guc.assert_called_once_with(session, org_id)
+
+
 class TestSessionForOrg:
     def test_yields_primed_session(self):
         from app.db.session_context import session_for_org

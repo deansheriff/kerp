@@ -116,6 +116,43 @@ def allow_cross_org(session: Session) -> Iterator[None]:
         session.info["allow_cross_org"] = prior
 
 
+def prime_tenant_context(session: Session, organization_id: UUID) -> None:
+    """Set both tenant layers on an *existing* session.
+
+    Use this when a request opens unprimed (the org isn't known at
+    request entry — e.g., a public portal route resolving an org from a
+    URL slug, or an onboarding portal resolving from a token) and the
+    service has just looked the org up under :func:`allow_cross_org` /
+    :func:`app.rls.bypass_rls_sync`. After the lookup, retroactively
+    prime the session for the rest of the work:
+
+        # Route opens unprimed because slug → org_id isn't known yet
+        @router.get("/{org_slug}/jobs")
+        def list_jobs(org_slug: str, db: Session = Depends(get_db)):
+            org = service.resolve_org_from_slug(org_slug)  # bypass internally
+            # ... lookup complete; switch the session to tenant scope:
+            prime_tenant_context(db, org.organization_id)
+            return service.list_jobs(org.organization_id)
+
+    This composes :func:`prime_session` (ORM listener via
+    ``session.info``) and :func:`app.rls.set_current_organization_sync`
+    (PostgreSQL GUC) so callers can't forget one layer — the same
+    dual-layer guarantee that :func:`session_for_org` and
+    :func:`app.api.deps.get_db_with_org` provide for the
+    open-already-primed flow.
+
+    .. warning::
+
+       Only use this for the open-unprimed-then-resolve pattern.
+       New Celery tasks should use :func:`session_for_org`; new HTTP
+       routes should use :func:`app.api.deps.get_db_with_org` (API) or
+       :func:`app.web.deps.get_db_for_org` (web). This helper exists
+       for the legitimately-public-with-resolved-org case only.
+    """
+    prime_session(session, organization_id)
+    set_current_organization_sync(session, organization_id)
+
+
 @contextmanager
 def session_for_org(organization_id: UUID) -> Iterator[Session]:
     """Canonical tenant-scoped session for non-HTTP entry points.
