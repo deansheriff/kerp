@@ -137,7 +137,7 @@ def list_positions(
         pagination=pagination,
     )
     context = {
-        **base_context(request, auth, "Positions", "positions", db=db),
+        **base_context(request, auth, "Position Seats", "positions", db=db),
         "positions": result.items,
         "search": search or "",
         "page": page,
@@ -152,6 +152,37 @@ def list_positions(
         ),
     }
     return templates.TemplateResponse(request, "people/hr/positions.html", context)
+
+
+@router.get("/positions/roles", response_class=HTMLResponse)
+def list_position_roles(
+    request: Request,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    auth: WebAuthContext = Depends(require_hr_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Grouped role/headcount view for position seats."""
+    org_id = coerce_uuid(auth.organization_id)
+    pagination = PaginationParams.from_page(page, DEFAULT_PAGE_SIZE)
+    result = PositionService(db, org_id).list_role_summaries(
+        search=search,
+        pagination=pagination,
+    )
+    context = {
+        **base_context(request, auth, "Roles & Headcount", "positions", db=db),
+        "roles": result.items,
+        "search": search or "",
+        "page": page,
+        "limit": result.limit,
+        "total_count": result.total,
+        "total_pages": result.total_pages,
+        "active_filters": build_active_filters(
+            params={"search": search},
+            labels={"search": "Search"},
+        ),
+    }
+    return templates.TemplateResponse(request, "people/hr/position_roles.html", context)
 
 
 @router.get("/org-chart", response_class=HTMLResponse)
@@ -186,7 +217,7 @@ def new_position_form(
         request,
         auth,
         db,
-        title="New Position",
+        title="New Position Seat",
     )
     return templates.TemplateResponse(request, "people/hr/position_form.html", context)
 
@@ -217,7 +248,7 @@ async def create_position(
             request,
             auth,
             db,
-            title="New Position",
+            title="New Position Seat",
             position=position,
             errors=errors,
             error="Enter a position name and select at least a designation or department.",
@@ -238,7 +269,7 @@ async def create_position(
             request,
             auth,
             db,
-            title="New Position",
+            title="New Position Seat",
             position=position,
             error=exc.message,
         )
@@ -249,7 +280,7 @@ async def create_position(
         )
 
     return RedirectResponse(
-        url="/people/hr/positions?success=Position+created", status_code=303
+        url="/people/hr/positions?success=Position+seat+created", status_code=303
     )
 
 
@@ -270,14 +301,14 @@ def edit_position_form(
         )
     except ServiceError:
         return RedirectResponse(
-            url="/people/hr/positions?error=Position+not+found",
+            url="/people/hr/positions?error=Position+seat+not+found",
             status_code=303,
         )
     context = _position_form_context(
         request,
         auth,
         db,
-        title="Edit Position",
+        title="Edit Position Seat",
         position=position,
         success=success,
         error=form_error or error,
@@ -313,7 +344,7 @@ async def update_position(
             request,
             auth,
             db,
-            title="Edit Position",
+            title="Edit Position Seat",
             position=position,
             errors=errors,
             error="Enter a position name and select at least a designation or department.",
@@ -337,7 +368,7 @@ async def update_position(
             request,
             auth,
             db,
-            title="Edit Position",
+            title="Edit Position Seat",
             position=position,
             error=exc.message,
         )
@@ -348,7 +379,7 @@ async def update_position(
         )
 
     return RedirectResponse(
-        url="/people/hr/positions?success=Position+saved", status_code=303
+        url="/people/hr/positions?success=Position+seat+saved", status_code=303
     )
 
 
