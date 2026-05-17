@@ -24,8 +24,7 @@ router = APIRouter(prefix="/settings", tags=["people-settings"])
 
 
 @router.get("", response_class=HTMLResponse)
-@router.get("/", response_class=HTMLResponse)
-async def settings_index(
+async def people_settings_index(
     request: Request,
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db_for_org),

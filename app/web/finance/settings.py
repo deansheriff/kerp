@@ -32,7 +32,7 @@ router = APIRouter(prefix="/settings", tags=["finance-settings"])
 
 
 @router.get("", response_class=HTMLResponse)
-async def settings_index(
+async def finance_settings_index(
     request: Request,
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db_for_org),

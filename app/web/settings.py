@@ -97,7 +97,6 @@ def _normalize_form(form) -> dict[str, str]:
 
 
 @router.get("", response_class=HTMLResponse)
-@router.get("/", response_class=HTMLResponse)
 def settings_index(
     request: Request,
     auth: WebAuthContext = Depends(require_settings_access),

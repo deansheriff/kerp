@@ -9,9 +9,13 @@ load_dotenv()
 
 def _derive_default_currency_code() -> str:
     """Infer a default currency from the host locale with safe fallback."""
-    code = (
-        locale.getlocale(locale.LC_MONETARY)[0] or locale.getdefaultlocale()[0] or ""
-    ).upper()
+    code = (locale.getlocale(locale.LC_MONETARY)[0] or "").upper()
+    if not code:
+        for env_var in ("LC_ALL", "LC_CTYPE", "LANG"):
+            raw = os.environ.get(env_var, "")
+            if raw:
+                code = raw.split(".", 1)[0].upper()
+                break
     if "NG" in code:
         return "NGN"
     if "US" in code:
