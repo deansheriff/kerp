@@ -55,6 +55,7 @@ class CreditNoteSyncMixin:
     _extract_tax: Any
     _create_invoice_lines: Any
     _replace_invoice_lines: Any
+    _reprime_tenant_context: Any
 
     def sync_credit_notes(
         self,

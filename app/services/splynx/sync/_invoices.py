@@ -62,6 +62,7 @@ class InvoiceSyncMixin:
     _map_invoice_status: Any
     _extract_tax: Any
     _create_line_tax_record: Any
+    _reprime_tenant_context: Any
 
     def sync_invoices(
         self,

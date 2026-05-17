@@ -58,6 +58,7 @@ class PaymentSyncMixin:
     _get_payment_method_name: Any
     _parse_date: Any
     _generate_payment_number: Any
+    _reprime_tenant_context: Any
 
     def sync_payments(
         self,

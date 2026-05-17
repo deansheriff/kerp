@@ -36,6 +36,7 @@ class CustomerSyncMixin:
     _get_synced_entity: Any
     _get_existing_customer: Any
     _make_customer_code: Any
+    _reprime_tenant_context: Any
 
     def sync_customers(
         self,
