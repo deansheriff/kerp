@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
 from app.config import settings
 from app.db import SessionLocal
-from app.db.session_context import prime_session
+from app.db.session_context import prime_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -389,11 +389,10 @@ async def crm_webhook(
 
     organization_id = UUID(settings.default_organization_id)
 
-    # Prime the webhook session so the planned do_orm_execute listener
-    # accepts subsequent ORM queries against org-scoped models. This is
-    # a no-op today (listener gated by ENFORCE_ORG_FILTER=false) but
-    # required for it to land.
-    prime_session(db, organization_id)
+    # Prime both tenant layers before handing the un-authenticated webhook
+    # session to org-scoped services. The route opens unprimed because the
+    # org is resolved from webhook context rather than auth dependencies.
+    prime_tenant_context(db, organization_id)
 
     logger.info(
         "Processing CRM webhook: %s.%s for %s",
