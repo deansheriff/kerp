@@ -25,6 +25,7 @@ from app.models.finance.ar.external_sync import (
 from app.models.finance.ar.invoice import Invoice
 from app.models.finance.ar.invoice_line_tax import InvoiceLineTax
 from app.models.finance.tax.tax_code import TaxCode, TaxType
+from app.db.session_context import prime_tenant_context
 from app.services.splynx.client import SplynxClient, SplynxConfig
 
 from ._constants import DEFAULT_BANK_NAME_MAPPING
@@ -72,6 +73,10 @@ class BaseSyncMixin:
 
         # Sync entity cache
         self._sync_entity_cache: dict[tuple[str, str], UUID | None] = {}
+
+    def _reprime_tenant_context(self) -> None:
+        """Restore tenant context after an internal commit clears SET LOCAL."""
+        prime_tenant_context(self.db, self.organization_id)
 
     @property
     def sales_tax_code(self) -> TaxCode | None:

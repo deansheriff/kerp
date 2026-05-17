@@ -11,7 +11,6 @@ Covers:
 from __future__ import annotations
 
 import uuid
-from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 
 try:
@@ -33,6 +32,7 @@ from app.tasks.splynx import (
     run_splynx_full_reconciliation,
     run_splynx_incremental_sync,
 )
+from tests._helpers.session_mocks import org_session_context, session_context
 
 # ---------------------------------------------------------------------------
 # Fixtures & helpers
@@ -78,12 +78,6 @@ def _make_mock_service() -> MagicMock:
     return svc
 
 
-@contextmanager
-def _mock_session_local(mock_db: MagicMock):  # type: ignore[no-untyped-def]
-    """Yield a context manager that returns mock_db."""
-    yield mock_db
-
-
 def _setup_patches(
     mock_db: MagicMock,
     mock_service: MagicMock,
@@ -101,7 +95,7 @@ def _setup_patches(
 
     # patch.multiple takes short attribute names (not full dotted paths)
     return {
-        "SessionLocal": lambda: _mock_session_local(mock_db),
+        "session_for_org": org_session_context(mock_db),
         "_resolve_org_id": lambda x: org_id,
         "SplynxConfig": MagicMock(
             from_settings=MagicMock(
@@ -469,7 +463,7 @@ class TestStaleHistoryCleanup:
         row2 = MagicMock(history_id=uuid.uuid4(), started_at=datetime.now(UTC))
         mock_db.scalars.return_value.all.return_value = [row1, row2]
 
-        with patch(f"{_MODULE}.SessionLocal", lambda: _mock_session_local(mock_db)):
+        with patch(f"{_MODULE}.cross_org_session", session_context(mock_db)):
             result = cleanup_stale_splynx_sync_history()
 
         assert result["success"] is True
@@ -484,7 +478,7 @@ class TestStaleHistoryCleanup:
         row = MagicMock(history_id=uuid.uuid4(), started_at=datetime.now(UTC))
         mock_db.scalars.return_value.all.return_value = [row]
 
-        with patch(f"{_MODULE}.SessionLocal", lambda: _mock_session_local(mock_db)):
+        with patch(f"{_MODULE}.cross_org_session", session_context(mock_db)):
             result = cleanup_stale_splynx_sync_history(dry_run=True)
 
         assert result["success"] is True
@@ -497,7 +491,7 @@ class TestStaleHistoryCleanup:
         mock_db = MagicMock()
         mock_db.scalars.return_value.all.return_value = []
 
-        with patch(f"{_MODULE}.SessionLocal", lambda: _mock_session_local(mock_db)):
+        with patch(f"{_MODULE}.cross_org_session", session_context(mock_db)):
             result = cleanup_stale_splynx_sync_history()
 
         assert result["success"] is True

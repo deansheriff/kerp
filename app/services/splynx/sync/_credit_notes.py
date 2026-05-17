@@ -92,6 +92,7 @@ class CreditNoteSyncMixin:
 
                     if processed % 500 == 0:
                         self.db.commit()
+                        self._reprime_tenant_context()
                         self.db.expunge_all()
                         logger.info(
                             "Progress: %d credit notes processed",
