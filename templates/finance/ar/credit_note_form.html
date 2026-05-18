@@ -103,6 +103,21 @@
         background: rgba(255, 255, 255, 0.05);
         border-color: rgba(255, 255, 255, 0.1);
         color: white;
+        caret-color: white;
+    }
+
+    .dark input.form-input,
+    .dark textarea.form-input,
+    .dark select.form-input,
+    .dark input.table-input,
+    .dark select.table-input {
+        color: white;
+        -webkit-text-fill-color: white;
+    }
+
+    .dark .form-input::placeholder,
+    .dark .table-input::placeholder {
+        color: rgba(255, 255, 255, 0.45);
     }
 
     .table-input {
@@ -126,6 +141,7 @@
         background: rgba(255, 255, 255, 0.04);
         border-color: rgba(255, 255, 255, 0.08);
         color: white;
+        caret-color: white;
     }
 
     select.form-input, select.table-input {
@@ -135,6 +151,18 @@
         background-position: right 0.75rem center;
         background-size: 1rem;
         padding-right: 2.5rem;
+    }
+
+    select.form-input option,
+    select.table-input option {
+        background: white;
+        color: var(--ink);
+    }
+
+    .dark select.form-input option,
+    .dark select.table-input option {
+        background: #1a1f36;
+        color: white;
     }
 
     .lines-table { width: 100%; border-collapse: separate; border-spacing: 0; }
@@ -295,8 +323,15 @@
 
         <!-- Header Information -->
         <div class="form-card">
-            <h2 class="section-title">Credit Note Details</h2>
-            <p class="section-subtitle">Customer and credit note information</p>
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="section-title">Credit Note Details</h2>
+                    <p class="section-subtitle">Customer and credit note information</p>
+                </div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                    <span class="text-red-500">*</span> Required fields
+                </p>
+            </div>
 
             <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <!-- Customer -->
@@ -550,10 +585,7 @@
         </div>
 
         <!-- Form Actions -->
-        <div class="flex items-center justify-between py-4">
-            <div class="text-sm text-slate-500 dark:text-slate-400">
-                <span class="text-red-500">*</span> Required fields
-            </div>
+        <div class="flex items-center justify-end py-4">
             <div class="flex items-center gap-4">
                 <a href="/finance/ar/credit-notes" class="btn-secondary">
                     Cancel

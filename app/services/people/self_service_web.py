@@ -76,6 +76,11 @@ class SelfServiceWebService:
     """View service for employee self-service pages."""
 
     @staticmethod
+    def _expense_approver_employee_statuses() -> tuple[EmployeeStatus, ...]:
+        """Statuses that represent employed staff eligible for expense approval."""
+        return (EmployeeStatus.ACTIVE, EmployeeStatus.ON_LEAVE)
+
+    @staticmethod
     def _match_org_bank(
         allowed_banks: list,
         *,
@@ -464,7 +469,9 @@ class SelfServiceWebService:
             .join(Person, Person.id == Employee.person_id)
             .where(
                 Employee.organization_id == org_id,
-                Employee.status == EmployeeStatus.ACTIVE,
+                Employee.status.in_(
+                    SelfServiceWebService._expense_approver_employee_statuses()
+                ),
                 Role.is_active == True,
                 or_(
                     func.lower(Role.name) == "admin",
@@ -508,7 +515,9 @@ class SelfServiceWebService:
                 .outerjoin(Permission, Permission.id == RolePermission.permission_id)
                 .where(
                     Employee.organization_id == org_id,
-                    Employee.status == EmployeeStatus.ACTIVE,
+                    Employee.status.in_(
+                        SelfServiceWebService._expense_approver_employee_statuses()
+                    ),
                     Employee.employee_id == approver_id,
                     Role.is_active == True,
                     or_(

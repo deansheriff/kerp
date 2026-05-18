@@ -190,6 +190,7 @@ def _employee(
     code: str,
     *,
     reports_to_id: UUID | None = None,
+    status: EmployeeStatus = EmployeeStatus.ACTIVE,
 ) -> Employee:
     return Employee(
         employee_id=uuid4(),
@@ -198,7 +199,7 @@ def _employee(
         employee_code=code,
         date_of_joining=date.today(),
         reports_to_id=reports_to_id,
-        status=EmployeeStatus.ACTIVE,
+        status=status,
     )
 
 
@@ -254,11 +255,18 @@ def test_expense_approver_options_include_all_active_expense_approvers_and_defau
     requester_person = _person(org_id, "Request", "User")
     manager_person = _person(org_id, "Manager", "Approver")
     other_person = _person(org_id, "Other", "Approver")
+    on_leave_person = _person(org_id, "Leave", "Approver")
     inactive_person = _person(org_id, "Inactive", "Approver")
     non_approver_person = _person(org_id, "Plain", "Manager")
 
     manager = _employee(org_id, manager_person, "MGR")
     other = _employee(org_id, other_person, "APR")
+    on_leave = _employee(
+        org_id,
+        on_leave_person,
+        "APR-LVE",
+        status=EmployeeStatus.ON_LEAVE,
+    )
     inactive = _employee(org_id, inactive_person, "INA")
     inactive.status = EmployeeStatus.SUSPENDED
     non_approver = _employee(org_id, non_approver_person, "PLN")
@@ -274,15 +282,18 @@ def test_expense_approver_options_include_all_active_expense_approvers_and_defau
             requester_person,
             manager_person,
             other_person,
+            on_leave_person,
             inactive_person,
             non_approver_person,
             requester,
             manager,
             other,
+            on_leave,
             inactive,
             non_approver,
             PersonRole(id=uuid4(), person_id=manager.person_id, role_id=role.id),
             PersonRole(id=uuid4(), person_id=other.person_id, role_id=role.id),
+            PersonRole(id=uuid4(), person_id=on_leave.person_id, role_id=role.id),
             PersonRole(id=uuid4(), person_id=inactive.person_id, role_id=role.id),
         ]
     )
@@ -297,9 +308,45 @@ def test_expense_approver_options_include_all_active_expense_approvers_and_defau
     )
 
     option_ids = {option["id"] for option in options}
-    assert option_ids == {str(manager.employee_id), str(other.employee_id)}
+    assert option_ids == {
+        str(manager.employee_id),
+        str(other.employee_id),
+        str(on_leave.employee_id),
+    }
     selected_ids = {option["id"] for option in options if option["selected"]}
     assert selected_ids == {str(manager.employee_id)}
+
+
+def test_expense_approver_validation_accepts_on_leave_expense_approver(
+    db_session,
+    engine,
+):
+    _ensure_employee_table(engine)
+    org_id = uuid4()
+    role = _expense_approver_role(db_session)
+
+    approver_person = _person(org_id, "Leave", "Validator")
+    approver = _employee(
+        org_id,
+        approver_person,
+        "APR-VALID-LEAVE",
+        status=EmployeeStatus.ON_LEAVE,
+    )
+
+    db_session.add_all(
+        [
+            approver_person,
+            approver,
+            PersonRole(id=uuid4(), person_id=approver.person_id, role_id=role.id),
+        ]
+    )
+    db_session.commit()
+
+    assert SelfServiceWebService._is_active_expense_approver(
+        db_session,
+        org_id,
+        approver.employee_id,
+    )
 
 
 def test_expense_approver_options_leave_default_empty_when_report_to_is_not_expense_approver(

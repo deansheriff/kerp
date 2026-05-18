@@ -272,12 +272,12 @@ class TaxWebService:
 
         # Calculate totals for the current filter
         total_output = sum(
-            t["functional_tax_amount"]
+            Decimal(str(t["functional_tax_amount"]))
             for t in transactions
             if t["transaction_type"] == "OUTPUT"
         )
         total_input = sum(
-            t["functional_tax_amount"]
+            Decimal(str(t["functional_tax_amount"]))
             for t in transactions
             if t["transaction_type"] == "INPUT"
         )
@@ -298,9 +298,9 @@ class TaxWebService:
             "transaction_type": transaction_type or "",
             "tax_code_id": tax_code_id or "",
             "summary": {
-                "total_output_tax": _format_currency(Decimal(str(total_output))),
-                "total_input_tax": _format_currency(Decimal(str(total_input))),
-                "net_tax": _format_currency(Decimal(str(total_output - total_input))),
+                "total_output_tax": _format_currency(total_output),
+                "total_input_tax": _format_currency(total_input),
+                "net_tax": _format_currency(total_output - total_input),
             },
             "transaction_types": [
                 {"value": t.value, "label": t.value.replace("_", " ").title()}
@@ -332,23 +332,26 @@ class TaxWebService:
         )
 
         # Calculate grand totals
-        grand_output = sum(row.get("output_tax", 0) for row in summary_data)
-        grand_input = sum(row.get("input_tax", 0) for row in summary_data)
-        grand_net = sum(row.get("net_payable", 0) for row in summary_data)
+        grand_output = sum(
+            Decimal(str(row.get("output_tax", 0))) for row in summary_data
+        )
+        grand_input = sum(Decimal(str(row.get("input_tax", 0))) for row in summary_data)
+        grand_net = sum(Decimal(str(row.get("net_payable", 0))) for row in summary_data)
 
         # Format amounts for display
         formatted_data = []
         for row in summary_data:
+            output_tax = Decimal(str(row.get("output_tax", 0)))
+            input_tax = Decimal(str(row.get("input_tax", 0)))
+            net_payable = Decimal(str(row.get("net_payable", 0)))
             formatted_row = {
                 "group_key": row.get("group_key", ""),
-                "output_tax": _format_currency(Decimal(str(row.get("output_tax", 0)))),
-                "output_tax_raw": row.get("output_tax", 0),
-                "input_tax": _format_currency(Decimal(str(row.get("input_tax", 0)))),
-                "input_tax_raw": row.get("input_tax", 0),
-                "net_payable": _format_currency(
-                    Decimal(str(row.get("net_payable", 0)))
-                ),
-                "net_payable_raw": row.get("net_payable", 0),
+                "output_tax": _format_currency(output_tax),
+                "output_tax_raw": output_tax,
+                "input_tax": _format_currency(input_tax),
+                "input_tax_raw": input_tax,
+                "net_payable": _format_currency(net_payable),
+                "net_payable_raw": net_payable,
                 "transaction_count": row.get("transaction_count", 0),
             }
             formatted_data.append(formatted_row)
@@ -876,7 +879,7 @@ class TaxWebService:
             period = period_map.get(ret.tax_period_id)
             formatted_returns.append(
                 {
-                    "return_id": ret.return_id,
+                    "return_id": str(ret.return_id),
                     "return_reference": ret.return_reference,
                     "return_type": ret.return_type.value
                     if hasattr(ret.return_type, "value")

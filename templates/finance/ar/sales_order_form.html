@@ -35,8 +35,15 @@
 
         <!-- Order Details -->
         <div class="card p-6">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Order Details</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Customer and order information</p>
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Order Details</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Customer and order information</p>
+                </div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                    <span class="text-rose-500">*</span> Required fields
+                </p>
+            </div>
 
             <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <!-- Customer -->
@@ -326,9 +333,6 @@
 
         <!-- Form Actions -->
         <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <div class="text-sm text-slate-500">
-                <span class="text-rose-500">*</span> Required fields
-            </div>
             <div class="flex items-center gap-4">
                 <a href="/finance/sales-orders" class="btn btn-secondary">Cancel</a>
                 <button type="submit" class="btn btn-primary">

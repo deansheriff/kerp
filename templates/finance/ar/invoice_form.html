@@ -99,8 +99,15 @@
 
         <!-- Header Information -->
         <div class="card p-6 fade-up delay-1">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Invoice Details</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Customer and invoice information</p>
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Invoice Details</h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Customer and invoice information</p>
+                </div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                    <span class="text-rose-500">*</span> Required fields
+                </p>
+            </div>
 
             <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <!-- Customer -->
@@ -633,10 +640,7 @@
         </div>
 
         <!-- Form Actions -->
-        <div class="fade-up delay-4 flex items-center justify-between py-4">
-            <div class="text-sm text-slate-500 dark:text-slate-400">
-                <span class="text-rose-500">*</span> Required fields
-            </div>
+        <div class="fade-up delay-4 flex items-center justify-end py-4">
             <div class="flex items-center gap-3">
                 <a href="/finance/ar/invoices" class="btn btn-secondary">
                     Cancel

@@ -23,7 +23,6 @@
 {% block content %}
 <div class="space-y-6">
     <!-- Filters -->
-    {# Filters #}
     {% call(filter_attrs) compact_filters(
         base_url="/finance/sales-orders",
         active_filters=active_filters | default([]),
@@ -37,7 +36,7 @@
     {{ filter_entity_select_field("customer_id", "Customer", filter_customer_id, customers, "id", "name", filter_attrs) }}
     {% endcall %}
 
-    <div id="results-container">
+    <div id="results-container" class="space-y-6">
     <!-- Status Summary -->
     <div class="grid gap-4 sm:grid-cols-3 lg:grid-cols-9">
         <div class="card p-4">

@@ -85,9 +85,11 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         end_date: str | None,
         search: str | None = None,
         employee_id: str | None = None,
+        approver_id: str | None = None,
     ):
         auth_employee_id = coerce_uuid(auth.employee_id)
         filter_employee_id = coerce_uuid(employee_id) if employee_id else None
+        filter_approver_id = coerce_uuid(approver_id) if approver_id else None
         filter_view = "submitted_to_me" if view == "submitted_to_me" else "all"
         status_value = ExpenseClaimsWebMixin._claim_status_filter(status)
         start = ExpenseClaimsWebMixin._parse_claim_filter_date(start_date)
@@ -129,6 +131,32 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 )
             else:
                 stmt = stmt.where(false())
+        if filter_approver_id:
+            latest_round = (
+                select(func.max(ExpenseClaimApprovalStep.submission_round))
+                .where(ExpenseClaimApprovalStep.claim_id == ExpenseClaim.claim_id)
+                .correlate(ExpenseClaim)
+                .scalar_subquery()
+            )
+            assigned_in_latest_round = exists(
+                select(1).where(
+                    ExpenseClaimApprovalStep.claim_id == ExpenseClaim.claim_id,
+                    ExpenseClaimApprovalStep.submission_round == latest_round,
+                    ExpenseClaimApprovalStep.approver_id == filter_approver_id,
+                )
+            )
+            has_steps = exists(
+                select(1).where(
+                    ExpenseClaimApprovalStep.claim_id == ExpenseClaim.claim_id
+                )
+            )
+            legacy_assignment = or_(
+                ExpenseClaim.requested_approver_id == filter_approver_id,
+                ExpenseClaim.approver_id == filter_approver_id,
+            )
+            stmt = stmt.where(
+                or_(assigned_in_latest_round, and_(~has_steps, legacy_assignment))
+            )
         if filter_employee_id:
             stmt = stmt.where(ExpenseClaim.employee_id == filter_employee_id)
         if status_value:
@@ -145,7 +173,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                     ExpenseClaim.purpose.ilike(term),
                 )
             )
-        return stmt, filter_view, filter_employee_id
+        return stmt, filter_view, filter_employee_id, filter_approver_id
 
     @staticmethod
     def _claim_query_options():
@@ -244,11 +272,12 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         end_date: str | None,
         search: str | None = None,
         employee_id: str | None = None,
+        approver_id: str | None = None,
         offset: int = 0,
         limit: int = 25,
     ) -> HTMLResponse:
         org_id = coerce_uuid(auth.organization_id)
-        stmt, filter_view, filter_employee_id = (
+        stmt, filter_view, filter_employee_id, filter_approver_id = (
             ExpenseClaimsWebMixin._filtered_claims_stmt(
                 auth=auth,
                 org_id=org_id,
@@ -258,6 +287,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 end_date=end_date,
                 search=search,
                 employee_id=employee_id,
+                approver_id=approver_id,
             )
         )
         total = db.scalar(select(func.count()).select_from(stmt.subquery()))
@@ -293,8 +323,42 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             .unique()
             .all()
         )
+        claim_approvers = list(
+            db.scalars(
+                select(Employee)
+                .join(Person, Person.id == Employee.person_id)
+                .options(joinedload(Employee.person))
+                .where(
+                    Employee.organization_id == org_id,
+                    or_(
+                        exists(
+                            select(1).where(
+                                ExpenseClaimApprovalStep.organization_id == org_id,
+                                ExpenseClaimApprovalStep.approver_id
+                                == Employee.employee_id,
+                            )
+                        ),
+                        exists(
+                            select(1).where(
+                                ExpenseClaim.organization_id == org_id,
+                                or_(
+                                    ExpenseClaim.requested_approver_id
+                                    == Employee.employee_id,
+                                    ExpenseClaim.approver_id == Employee.employee_id,
+                                ),
+                            )
+                        ),
+                    ),
+                )
+                .order_by(Person.first_name.asc(), Person.last_name.asc())
+            )
+            .unique()
+            .all()
+        )
         selected_employee = None
+        selected_approver = None
         employee_options: dict[str, str] = {}
+        approver_options: dict[str, str] = {}
         if filter_employee_id:
             selected_employee = db.scalars(
                 select(Employee)
@@ -310,6 +374,22 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                     selected_employee.full_name
                     or selected_employee.employee_code
                     or str(selected_employee.employee_id)
+                )
+        if filter_approver_id:
+            selected_approver = db.scalars(
+                select(Employee)
+                .join(Person, Person.id == Employee.person_id)
+                .options(joinedload(Employee.person))
+                .where(
+                    Employee.organization_id == org_id,
+                    Employee.employee_id == filter_approver_id,
+                )
+            ).first()
+            if selected_approver:
+                approver_options[str(selected_approver.employee_id)] = (
+                    selected_approver.full_name
+                    or selected_approver.employee_code
+                    or str(selected_approver.employee_id)
                 )
 
         status_rows = db.execute(
@@ -343,6 +423,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 "end_date": end_date,
                 "search": search,
                 "employee_id": employee_id,
+                "approver_id": approver_id,
             }.items()
             if value
         }
@@ -363,8 +444,11 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 "filter_start_date": start_date or "",
                 "filter_end_date": end_date or "",
                 "filter_employee_id": employee_id or "",
+                "filter_approver_id": approver_id or "",
                 "claim_employees": claim_employees,
+                "claim_approvers": claim_approvers,
                 "selected_employee": selected_employee,
+                "selected_approver": selected_approver,
                 "export_url": export_url,
                 "total": total or 0,
                 "offset": offset,
@@ -379,13 +463,18 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                         "start_date": start_date,
                         "end_date": end_date,
                         "employee_id": employee_id,
+                        "approver_id": approver_id,
                     },
                     labels={
                         "start_date": "From",
                         "end_date": "To",
                         "employee_id": "Employee",
+                        "approver_id": "Approver",
                     },
-                    options={"employee_id": employee_options},
+                    options={
+                        "employee_id": employee_options,
+                        "approver_id": approver_options,
+                    },
                 ),
             }
         )
@@ -421,9 +510,10 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         end_date: str | None,
         search: str | None = None,
         employee_id: str | None = None,
+        approver_id: str | None = None,
     ) -> Response:
         org_id = coerce_uuid(auth.organization_id)
-        stmt, _filter_view, _filter_employee_id = (
+        stmt, _filter_view, _filter_employee_id, _filter_approver_id = (
             ExpenseClaimsWebMixin._filtered_claims_stmt(
                 auth=auth,
                 org_id=org_id,
@@ -433,6 +523,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
                 end_date=end_date,
                 search=search,
                 employee_id=employee_id,
+                approver_id=approver_id,
             )
         )
         claims = list(

@@ -906,6 +906,121 @@ def test_claims_list_includes_selected_employee_filter_label(
     ]
 
 
+def test_claims_list_filters_by_approver_and_includes_filter_label(
+    db_session, engine, monkeypatch
+):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant10@example.com")
+    approver_person = _make_person(org_id, "approver10@example.com")
+    other_approver_person = _make_person(org_id, "other10@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-1001")
+    approver = _make_employee(org_id, approver_person, "EMP-1002")
+    other_approver = _make_employee(org_id, other_approver_person, "EMP-1003")
+    included_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-1001",
+        status=ExpenseClaimStatus.APPROVED,
+    )
+    excluded_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-1002",
+        status=ExpenseClaimStatus.APPROVED,
+    )
+
+    db_session.add_all(
+        [
+            claimant_person,
+            approver_person,
+            other_approver_person,
+            claimant,
+            approver,
+            other_approver,
+            included_claim,
+            excluded_claim,
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=included_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=approver.employee_id,
+                approver_name=f"{approver_person.first_name} {approver_person.last_name}",
+                decision="APPROVED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=excluded_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=other_approver.employee_id,
+                approver_name=(
+                    f"{other_approver_person.first_name} "
+                    f"{other_approver_person.last_name}"
+                ),
+                decision="APPROVED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=approver.person_id,
+        employee_id=approver.employee_id,
+        organization_id=org_id,
+        roles=["admin"],
+    )
+    captured_context: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.services.expense.web.base_context",
+        lambda request, auth, title, section: {"user": auth.user},
+    )
+
+    def _template_response(request, template_name, context):
+        captured_context.update(context)
+        return HTMLResponse("ok")
+
+    monkeypatch.setattr(
+        "app.services.expense.web.templates.TemplateResponse",
+        _template_response,
+    )
+
+    response = ExpenseClaimsWebService.claims_list_response(
+        request=_request(f"/expense/claims/list?approver_id={approver.employee_id}"),
+        auth=auth,
+        db=db_session,
+        view=None,
+        status=None,
+        start_date=None,
+        end_date=None,
+        approver_id=str(approver.employee_id),
+    )
+
+    assert response.status_code == 200
+    assert [c.claim_number for c in captured_context["claims"]] == ["CLM-1001"]
+    assert captured_context["selected_approver"].employee_id == approver.employee_id
+    assert {emp.employee_id for emp in captured_context["claim_approvers"]} == {
+        approver.employee_id,
+        other_approver.employee_id,
+    }
+    assert captured_context["active_filters"] == [
+        {
+            "name": "approver_id",
+            "value": str(approver.employee_id),
+            "display_value": f"Approver: {approver.full_name}",
+        }
+    ]
+    assert f"approver_id={approver.employee_id}" in captured_context["export_url"]
+
+
 def test_claims_export_uses_date_filters_and_includes_people(db_session, engine):
     _ensure_hr_tables(engine)
     org_id = uuid.uuid4()
@@ -989,6 +1104,93 @@ def test_claims_export_uses_date_filters_and_includes_people(db_session, engine)
     assert rows[0]["Approver"] == approver.full_name
     assert rows[0]["Claimed Amount"] == "250.50"
     assert rows[0]["Approved Amount"] == "240.00"
+
+
+def test_claims_export_filters_by_approver(db_session, engine):
+    _ensure_hr_tables(engine)
+    org_id = uuid.uuid4()
+
+    claimant_person = _make_person(org_id, "claimant11@example.com")
+    approver_person = _make_person(org_id, "approver11@example.com")
+    other_approver_person = _make_person(org_id, "other11@example.com")
+    claimant = _make_employee(org_id, claimant_person, "EMP-1101")
+    approver = _make_employee(org_id, approver_person, "EMP-1102")
+    other_approver = _make_employee(org_id, other_approver_person, "EMP-1103")
+    included_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-1101",
+        status=ExpenseClaimStatus.APPROVED,
+    )
+    excluded_claim = _make_claim(
+        org_id,
+        claimant.employee_id,
+        "CLM-1102",
+        status=ExpenseClaimStatus.APPROVED,
+    )
+    approver_name = f"{approver_person.first_name} {approver_person.last_name}"
+    other_approver_name = (
+        f"{other_approver_person.first_name} {other_approver_person.last_name}"
+    )
+
+    db_session.add_all(
+        [
+            claimant_person,
+            approver_person,
+            other_approver_person,
+            claimant,
+            approver,
+            other_approver,
+            included_claim,
+            excluded_claim,
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=included_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=approver.employee_id,
+                approver_name=approver_name,
+                decision="APPROVED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+            ExpenseClaimApprovalStep(
+                organization_id=org_id,
+                claim_id=excluded_claim.claim_id,
+                submission_round=1,
+                step_number=1,
+                approver_id=other_approver.employee_id,
+                approver_name=other_approver_name,
+                decision="APPROVED",
+                max_amount=Decimal("1000.00"),
+                requires_all_approvals=False,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=approver.person_id,
+        employee_id=approver.employee_id,
+        organization_id=org_id,
+        roles=["admin"],
+    )
+
+    response = ExpenseClaimsWebService.claims_export_response(
+        auth=auth,
+        db=db_session,
+        view=None,
+        status=None,
+        start_date=None,
+        end_date=None,
+        approver_id=str(approver.employee_id),
+    )
+
+    rows = list(csv.DictReader(io.StringIO(response.body.decode())))
+    assert len(rows) == 1
+    assert rows[0]["Claim Number"] == "CLM-1101"
+    assert rows[0]["Approver"] == approver.full_name
 
 
 def test_claim_employee_typeahead_returns_claim_employees_only(db_session, engine):

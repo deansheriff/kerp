@@ -42,7 +42,7 @@
     <form @submit.prevent="submitForm" class="space-y-6">
         <!-- Purchase Order Selection -->
         <div class="card stagger-in" style="animation-delay: 50ms;">
-            <div class="card-header border-b border-slate-100 dark:border-slate-700">
+            <div class="card-header mb-0 p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700 justify-between">
                 <div class="flex items-center gap-4">
                     <div class="card-icon bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
                         {{ icon_svg("clipboard", "h-5 w-5", stroke_width="1.5") }}
@@ -52,6 +52,9 @@
                         <p class="text-sm text-slate-500 dark:text-slate-400">Select the purchase order for this receipt</p>
                     </div>
                 </div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                    <span class="text-rose-500">*</span> Required fields
+                </p>
             </div>
 
             <div class="p-6 grid gap-6 sm:grid-cols-2">
@@ -101,7 +104,7 @@
 
         <!-- Receipt Lines -->
         <div class="card stagger-in" style="animation-delay: 100ms;" x-show="lines.length > 0" x-transition>
-            <div class="card-header border-b border-slate-100 dark:border-slate-700">
+            <div class="card-header mb-0 p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700">
                 <div class="flex items-center gap-4">
                     <div class="card-icon bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
                         {{ icon_svg("box", "h-5 w-5", stroke_width="1.5") }}
@@ -183,10 +186,7 @@
         </div>
 
         <!-- Form Actions -->
-        <div class="flex items-center justify-between pt-4 stagger-in" style="animation-delay: 150ms;">
-            <p class="text-sm text-slate-500 dark:text-slate-400">
-                <span class="text-rose-500">*</span> Required fields
-            </p>
+        <div class="flex items-center justify-end pt-4 stagger-in" style="animation-delay: 150ms;">
             <div class="flex items-center gap-4">
                 <a href="/finance/ap/goods-receipts" class="btn btn-ghost">
                     Cancel

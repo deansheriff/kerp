@@ -93,7 +93,7 @@
                     <tr class="group">
                         <td>
                             <a href="/finance/tax/returns/{{ tax_return.return_id }}" class="font-mono text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors">
-                                {{ tax_return.return_reference | default(tax_return.return_id[:8]) }}
+                                {{ tax_return.return_reference | default((tax_return.return_id|string)[:8]) }}
                             </a>
                         </td>
                         <td>

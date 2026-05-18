@@ -67,6 +67,28 @@
                 {% endfor %}
             </datalist>
         </div>
+        <div>
+            <label class="form-label text-xs" for="filter-approver-search">Approver</label>
+            <input type="text"
+                   id="filter-approver-search"
+                   value="{{ (selected_approver.full_name ~ ' (' ~ selected_approver.employee_code ~ ')') if selected_approver and selected_approver.employee_code else (selected_approver.full_name if selected_approver else '') }}"
+                   placeholder="Type approver name..."
+                   autocomplete="off"
+                   list="expense-claim-approver-options"
+                   class="form-input w-full">
+            <input type="hidden"
+                   id="filter-approver-id"
+                   name="approver_id"
+                   value="{{ filter_approver_id }}"
+                   {{ filter_attrs | safe }}>
+            <datalist id="expense-claim-approver-options">
+                {% for approver in claim_approvers %}
+                <option value="{{ (approver.full_name ~ ' (' ~ approver.employee_code ~ ')') if approver.employee_code else approver.full_name }}"
+                        data-approver-id="{{ approver.employee_id }}">
+                </option>
+                {% endfor %}
+            </datalist>
+        </div>
         {{ filter_date_field("start_date", "Start date", filter_start_date or '', filter_attrs) }}
         {{ filter_date_field("end_date", "End date", filter_end_date or '', filter_attrs) }}
     {% endcall %}
@@ -164,7 +186,8 @@
                     "status": filter_status,
                     "start_date": filter_start_date,
                     "end_date": filter_end_date,
-                    "employee_id": filter_employee_id
+                    "employee_id": filter_employee_id,
+                    "approver_id": filter_approver_id
                 }
             ) }}
         {% else %}
@@ -181,32 +204,37 @@
 {% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const employeeInput = document.getElementById('filter-employee-search');
-    const employeeHidden = document.getElementById('filter-employee-id');
-    const optionList = document.getElementById('expense-claim-employee-options');
-    if (!employeeInput || !employeeHidden || !optionList) {
-        return;
-    }
-
-    function syncEmployeeFilter() {
-        const match = Array.from(optionList.options).find(function (option) {
-            return option.value === employeeInput.value;
-        });
-        const nextValue = match ? (match.dataset.employeeId || '') : '';
-        if (employeeHidden.value === nextValue) {
+    function bindEmployeeBackedFilter(inputId, hiddenId, datalistId, dataKey) {
+        const textInput = document.getElementById(inputId);
+        const hiddenInput = document.getElementById(hiddenId);
+        const optionList = document.getElementById(datalistId);
+        if (!textInput || !hiddenInput || !optionList) {
             return;
         }
-        employeeHidden.value = nextValue;
-        employeeHidden.dispatchEvent(new Event('change', { bubbles: true }));
+
+        function syncFilter() {
+            const match = Array.from(optionList.options).find(function (option) {
+                return option.value === textInput.value;
+            });
+            const nextValue = match ? (match.dataset[dataKey] || '') : '';
+            if (hiddenInput.value === nextValue) {
+                return;
+            }
+            hiddenInput.value = nextValue;
+            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        textInput.addEventListener('change', syncFilter);
+        textInput.addEventListener('input', function () {
+            if (!textInput.value) {
+                hiddenInput.value = '';
+                hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
     }
 
-    employeeInput.addEventListener('change', syncEmployeeFilter);
-    employeeInput.addEventListener('input', function () {
-        if (!employeeInput.value) {
-            employeeHidden.value = '';
-            employeeHidden.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-    });
+    bindEmployeeBackedFilter('filter-employee-search', 'filter-employee-id', 'expense-claim-employee-options', 'employeeId');
+    bindEmployeeBackedFilter('filter-approver-search', 'filter-approver-id', 'expense-claim-approver-options', 'approverId');
 });
 </script>
 {% endblock %}

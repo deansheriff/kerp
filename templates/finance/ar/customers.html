@@ -1,7 +1,41 @@
 {% extends "finance/base_finance.html" %}
-{% from "components/macros.html" import compact_filters, pagination, status_badge, empty_state, stats_card, action_buttons, bulk_select_header, bulk_select_cell, bulk_action_bar, bulk_icon_delete, bulk_icon_export, bulk_icon_activate, bulk_icon_deactivate, filter_select_field, list_header_actions, sortable_th, icon_svg %}
+{% from "components/macros.html" import pagination, status_badge, empty_state, stats_card, action_buttons, bulk_select_header, bulk_select_cell, bulk_action_bar, bulk_icon_delete, bulk_icon_export, bulk_icon_activate, bulk_icon_deactivate, list_header_actions, sortable_th, icon_svg %}
 
 {% block page_title %}Customers{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .customer-filter-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
+    }
+
+    .customer-filter-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    @media (min-width: 640px) {
+        .customer-filter-actions {
+            flex-direction: row;
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .customer-filter-grid {
+            grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem) auto;
+            align-items: end;
+        }
+
+        .customer-filter-actions {
+            justify-content: flex-end;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
@@ -24,22 +58,6 @@
 
 {% block content %}
 <div class="space-y-6 page-enter">
-    {% call(filter_attrs) compact_filters(
-        base_url="/finance/ar/customers",
-        active_filters=active_filters | default([]),
-        show_search=true,
-        search=search | default('', true),
-        search_placeholder="Search customers by name, code, or tax ID...",
-        auto_submit=false,
-        show_apply_button=true
-    ) %}
-        {{ filter_select_field("status", "Status", status, [
-            {"value": "active", "label": "Active"},
-            {"value": "inactive", "label": "Inactive"}
-        ], filter_attrs) }}
-    {% endcall %}
-
-    <div id="results-container">
     {# Stats Summary #}
     <div class="grid gap-4 sm:grid-cols-4">
         {{ stats_card("Total Customers", total_count | default(0), icon="users", color="slate") }}
@@ -48,138 +66,238 @@
         {{ stats_card("With Balance", with_balance_count | default(0), icon="currency", color="amber") }}
     </div>
 
-    {# Customers Table with Bulk Selection #}
-    <div x-data="bulkActions({ entityName: 'customers' })">
-        <div class="card">
-            <div class="table-container">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            {{ bulk_select_header() }}
-                            {{ sortable_th("Customer Code", "customer_code", sort, sort_dir) }}
-                            {{ sortable_th("Customer Name", "legal_name", sort, sort_dir) }}
-                            <th class="hidden sm:table-cell" scope="col">Tax ID</th>
-                            <th class="hidden sm:table-cell" scope="col">Payment Terms</th>
-                            <th scope="col" class="text-right">Credit Limit</th>
-                            <th scope="col" class="text-right">Balance</th>
-                            {{ sortable_th("Status", "status", sort, sort_dir, class="text-center") }}
-                            <th class="hidden sm:table-cell" scope="col">Created</th>
-                            <th scope="col" class="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for customer in customers %}
-                        <tr class="group">
-                            {{ bulk_select_cell(customer.customer_id) }}
-                            <td>
-                                <span class="font-mono text-sm font-medium text-slate-900 dark:text-white">{{ customer.customer_code }}</span>
-                            </td>
-                            <td>
-                                <a href="/finance/ar/customers/{{ customer.customer_id }}" class="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">
-                                    {{ customer.customer_name }}
-                                </a>
-                                {% if customer.trading_name and customer.legal_name and customer.trading_name != customer.legal_name %}
-                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ customer.legal_name }}</div>
-                                {% endif %}
-                                {% if customer.parent_customer_name %}
-                                <div class="text-xs text-slate-400 dark:text-slate-500">
-                                    <span class="mr-0.5">&crarr;</span> Sub-account of {{ customer.parent_customer_name }}
-                                </div>
-                                {% endif %}
-                                {% if customer.child_count %}
-                                <span class="ml-1 inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">
-                                    {{ customer.child_count }} sub-account{{ 's' if customer.child_count != 1 else '' }}
-                                </span>
-                                {% endif %}
-                            </td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ customer.tax_id | default("—") }}</td>
-                            <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">Net {{ customer.payment_terms_days | default(30) }}</td>
-                            <td class="text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">{{ customer.credit_limit | default("—") }}</td>
-                            <td class="text-right font-mono tabular-nums font-medium text-slate-900 dark:text-white">{{ customer.balance | default("—") }}</td>
-                            <td class="text-center">
-                                {{ status_badge('active' if customer.is_active else 'inactive', 'sm') }}
-                            </td>
-                            <td class="hidden sm:table-cell">
-                                <div class="text-sm text-slate-600 dark:text-slate-300">
-                                    {% if customer.created_at %}
-                                    {{ customer.created_at | format_date }}
-                                    {% else %}
-                                    —
-                                    {% endif %}
-                                </div>
-                                {% if customer.created_by_name %}
-                                <div class="text-xs text-slate-400 dark:text-slate-500">
-                                    by {{ customer.created_by_name }}
-                                </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {{ action_buttons(
-                                    view_href="/finance/ar/customers/" ~ customer.customer_id,
-                                    edit_href="/finance/ar/customers/" ~ customer.customer_id ~ "/edit"
-                                ) }}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="10" class="py-12">
-                                {{ empty_state('No customers found', 'Get started by adding your first customer', 'users', 'Add Customer', '/finance/ar/customers/new') }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="card" data-compact-filters data-live-search x-data="{ open: false }">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700"
+             :class="{ 'border-b-0': !open && {{ active_filters | default([]) | length }} === 0 }">
+            <div class="flex items-center gap-3">
+                <button type="button"
+                        @click="open = !open"
+                        class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 transition-colors hover:text-teal-600 dark:text-slate-300 dark:hover:text-teal-400"
+                        :aria-expanded="open.toString()"
+                        aria-controls="customer-filter-panel">
+                    <svg class="h-4 w-4 transition-transform duration-200"
+                         :class="{ 'rotate-90': open }"
+                         fill="none"
+                         stroke="currentColor"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    {{ icon_svg("filter", "h-4 w-4 text-slate-400") }}
+                    <span>Filters</span>
+                    {% if active_filters | default([]) | length > 0 %}
+                    <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-teal-600 px-1.5 text-xs font-semibold text-white dark:bg-teal-500">
+                        {{ active_filters | default([]) | length }}
+                    </span>
+                    {% endif %}
+                </button>
+
+                <svg data-live-search-spinner class="hidden h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
             </div>
 
-            {# Pagination #}
-            {{ pagination(
-                page=page,
-                total_pages=total_pages,
-                total_count=total_count,
-                limit=limit,
-                search=search,
-                filters={"status": status, "sort": sort, "sort_dir": sort_dir}
-            ) }}
+            {% if active_filters | default([]) | length > 0 %}
+            <a href="/finance/ar/customers"
+               class="text-sm text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">
+                Clear all
+            </a>
+            {% endif %}
         </div>
 
-        {# Bulk Action Bar #}
-        {{ bulk_action_bar(
-            actions=[
-                {
-                    "name": "export",
-                    "label": "Export",
-                    "endpoint": "/finance/ar/customers/bulk-export",
-                    "icon": bulk_icon_export(),
-                    "class": "btn-secondary"
-                },
-                {
-                    "name": "activate",
-                    "label": "Activate",
-                    "endpoint": "/finance/ar/customers/bulk-activate",
-                    "icon": bulk_icon_activate(),
-                    "class": "btn-secondary",
-                    "confirm": "Activate selected customers?"
-                },
-                {
-                    "name": "deactivate",
-                    "label": "Deactivate",
-                    "endpoint": "/finance/ar/customers/bulk-deactivate",
-                    "icon": bulk_icon_deactivate(),
-                    "class": "btn-secondary",
-                    "confirm": "Deactivate selected customers?"
-                },
-                {
-                    "name": "delete",
-                    "label": "Delete",
-                    "endpoint": "/finance/ar/customers/bulk-delete",
-                    "icon": bulk_icon_delete(),
-                    "class": "btn-bulk-danger",
-                    "confirm": "Delete selected customers? This action cannot be undone."
-                }
-            ],
-            entity_name="customers"
-        ) }}
+        {% if active_filters | default([]) %}
+        <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+            {% for filter in active_filters %}
+            <span class="inline-flex items-center rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+                {{ filter.display_value }}
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div id="customer-filter-panel"
+             x-show="open"
+             x-cloak
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 -translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 -translate-y-2">
+            <form method="get"
+                  action="/finance/ar/customers"
+                  hx-get="/finance/ar/customers"
+                  hx-target="#results-container"
+                  hx-select="#results-container"
+                  hx-push-url="true"
+                  hx-indicator="closest [data-live-search]"
+                  class="p-5 sm:p-6">
+                <div class="customer-filter-grid">
+                    <div>
+                        <label for="customer-search" class="form-label text-xs">Search</label>
+                        <div class="relative">
+                            {{ icon_svg("search", "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400") }}
+                            <input id="customer-search"
+                                   type="search"
+                                   name="search"
+                                   value="{{ search | default('', true) }}"
+                                   placeholder="Search customers by name, code, or tax ID..."
+                                   autocomplete="off"
+                                   class="form-input w-full pl-10">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="customer-status-filter" class="form-label text-xs">Status</label>
+                        <select id="customer-status-filter" name="status" class="form-select w-full" aria-label="Status">
+                            <option value="">All Status</option>
+                            <option value="active" {{ "selected" if status == "active" else "" }}>Active</option>
+                            <option value="inactive" {{ "selected" if status == "inactive" else "" }}>Inactive</option>
+                        </select>
+                    </div>
+
+                    <div class="customer-filter-actions">
+                        <button type="submit" class="btn btn-primary justify-center">Apply Filters</button>
+                        <a href="/finance/ar/customers" class="btn btn-secondary justify-center">Clear</a>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
+
+    <div id="results-container">
+    {# Customers Table with Bulk Selection #}
+        <div x-data="bulkActions({ entityName: 'customers' })">
+            <div class="card">
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                {{ bulk_select_header() }}
+                                {{ sortable_th("Customer Code", "customer_code", sort, sort_dir) }}
+                                {{ sortable_th("Customer Name", "legal_name", sort, sort_dir) }}
+                                <th class="hidden sm:table-cell" scope="col">Tax ID</th>
+                                <th class="hidden sm:table-cell" scope="col">Payment Terms</th>
+                                <th scope="col" class="text-right">Credit Limit</th>
+                                <th scope="col" class="text-right">Balance</th>
+                                {{ sortable_th("Status", "status", sort, sort_dir, class="text-center") }}
+                                <th class="hidden sm:table-cell" scope="col">Created</th>
+                                <th scope="col" class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for customer in customers %}
+                            <tr class="group">
+                                {{ bulk_select_cell(customer.customer_id) }}
+                                <td>
+                                    <span class="font-mono text-sm font-medium text-slate-900 dark:text-white">{{ customer.customer_code }}</span>
+                                </td>
+                                <td>
+                                    <a href="/finance/ar/customers/{{ customer.customer_id }}" class="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">
+                                        {{ customer.customer_name }}
+                                    </a>
+                                    {% if customer.trading_name and customer.legal_name and customer.trading_name != customer.legal_name %}
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ customer.legal_name }}</div>
+                                    {% endif %}
+                                    {% if customer.parent_customer_name %}
+                                    <div class="text-xs text-slate-400 dark:text-slate-500">
+                                        <span class="mr-0.5">&crarr;</span> Sub-account of {{ customer.parent_customer_name }}
+                                    </div>
+                                    {% endif %}
+                                    {% if customer.child_count %}
+                                    <span class="ml-1 inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">
+                                        {{ customer.child_count }} sub-account{{ 's' if customer.child_count != 1 else '' }}
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">{{ customer.tax_id | default("—") }}</td>
+                                <td class="hidden sm:table-cell text-slate-600 dark:text-slate-300">Net {{ customer.payment_terms_days | default(30) }}</td>
+                                <td class="text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">{{ customer.credit_limit | default("—") }}</td>
+                                <td class="text-right font-mono tabular-nums font-medium text-slate-900 dark:text-white">{{ customer.balance | default("—") }}</td>
+                                <td class="text-center">
+                                    {{ status_badge('active' if customer.is_active else 'inactive', 'sm') }}
+                                </td>
+                                <td class="hidden sm:table-cell">
+                                    <div class="text-sm text-slate-600 dark:text-slate-300">
+                                        {% if customer.created_at %}
+                                        {{ customer.created_at | format_date }}
+                                        {% else %}
+                                        —
+                                        {% endif %}
+                                    </div>
+                                    {% if customer.created_by_name %}
+                                    <div class="text-xs text-slate-400 dark:text-slate-500">
+                                        by {{ customer.created_by_name }}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ action_buttons(
+                                        view_href="/finance/ar/customers/" ~ customer.customer_id,
+                                        edit_href="/finance/ar/customers/" ~ customer.customer_id ~ "/edit"
+                                    ) }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="10" class="py-12">
+                                    {{ empty_state('No customers found', 'Get started by adding your first customer', 'users', 'Add Customer', '/finance/ar/customers/new') }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {# Pagination #}
+                {{ pagination(
+                    page=page,
+                    total_pages=total_pages,
+                    total_count=total_count,
+                    limit=limit,
+                    search=search,
+                    filters={"status": status, "sort": sort, "sort_dir": sort_dir}
+                ) }}
+            </div>
+
+            {# Bulk Action Bar #}
+            {{ bulk_action_bar(
+                actions=[
+                    {
+                        "name": "export",
+                        "label": "Export",
+                        "endpoint": "/finance/ar/customers/bulk-export",
+                        "icon": bulk_icon_export(),
+                        "class": "btn-secondary"
+                    },
+                    {
+                        "name": "activate",
+                        "label": "Activate",
+                        "endpoint": "/finance/ar/customers/bulk-activate",
+                        "icon": bulk_icon_activate(),
+                        "class": "btn-secondary",
+                        "confirm": "Activate selected customers?"
+                    },
+                    {
+                        "name": "deactivate",
+                        "label": "Deactivate",
+                        "endpoint": "/finance/ar/customers/bulk-deactivate",
+                        "icon": bulk_icon_deactivate(),
+                        "class": "btn-secondary",
+                        "confirm": "Deactivate selected customers?"
+                    },
+                    {
+                        "name": "delete",
+                        "label": "Delete",
+                        "endpoint": "/finance/ar/customers/bulk-delete",
+                        "icon": bulk_icon_delete(),
+                        "class": "btn-bulk-danger",
+                        "confirm": "Delete selected customers? This action cannot be undone."
+                    }
+                ],
+                entity_name="customers"
+            ) }}
+        </div>
     </div>{# /results-container #}
 </div>
 {% endblock %}

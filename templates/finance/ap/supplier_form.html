@@ -3,6 +3,26 @@
 
 {% block page_title %}{{ "Edit Supplier" if supplier else "New Supplier" }}{% endblock %}
 
+{% block head %}
+{{ super() }}
+<style>
+    .supplier-form-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 1.25rem;
+        column-gap: 1rem;
+    }
+
+    @media (min-width: 768px) {
+        .supplier-form-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            row-gap: 1.5rem;
+            column-gap: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
     <ol class="flex items-center gap-2">
@@ -29,7 +49,7 @@
 
     <form method="post"
           action="{{ '/finance/ap/suppliers/' ~ supplier.supplier_id ~ '/edit' if supplier else '/finance/ap/suppliers/new' }}"
-          class="space-y-8">
+          class="space-y-5 sm:space-y-6">
         {{ request.state.csrf_form | safe }}
 
         <div id="form-result">
@@ -48,7 +68,7 @@
 
         <!-- Basic Information -->
         <div class="card stagger-in" style="animation-delay: 50ms;">
-            <div class="card-header border-b border-slate-100 dark:border-slate-700">
+            <div class="card-header mb-0 p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700 justify-between">
                 <div class="flex items-center gap-4">
                     <div class="card-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
                         {{ icon_svg("building", "h-5 w-5", stroke_width="1.5") }}
@@ -58,9 +78,12 @@
                         <p class="text-sm text-slate-500 dark:text-slate-400">Basic supplier identification</p>
                     </div>
                 </div>
+                <p class="hidden sm:block text-xs text-slate-500 dark:text-slate-400">
+                    <span class="text-rose-500">*</span> Required fields
+                </p>
             </div>
 
-            <div class="p-6 grid gap-6 sm:grid-cols-2">
+            <div class="p-5 sm:p-6 supplier-form-grid">
                 <div>
                     <label class="form-label">
                         Supplier Code <span class="text-rose-500">*</span>
@@ -117,7 +140,7 @@
 
         <!-- Payment Terms -->
         <div class="card stagger-in" style="animation-delay: 100ms;">
-            <div class="card-header border-b border-slate-100 dark:border-slate-700">
+            <div class="card-header mb-0 p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700">
                 <div class="flex items-center gap-4">
                     <div class="card-icon bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                         {{ icon_svg("currency", "h-5 w-5", stroke_width="1.5") }}
@@ -129,7 +152,7 @@
                 </div>
             </div>
 
-            <div class="p-6 grid gap-6 sm:grid-cols-2">
+            <div class="p-5 sm:p-6 supplier-form-grid">
                 <div>
                     <label class="form-label">Payment Terms (Days)</label>
                     <input aria-label="Payment Terms (Days)" type="number"
@@ -156,7 +179,7 @@
 
         <!-- GL Accounts -->
         <div class="card stagger-in" style="animation-delay: 150ms;">
-            <div class="card-header border-b border-slate-100 dark:border-slate-700">
+            <div class="card-header mb-0 p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700">
                 <div class="flex items-center gap-4">
                     <div class="card-icon bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
                         {{ icon_svg("calculator", "h-5 w-5", stroke_width="1.5") }}
@@ -168,7 +191,7 @@
                 </div>
             </div>
 
-            <div class="p-6 grid gap-6 sm:grid-cols-2">
+            <div class="p-5 sm:p-6 supplier-form-grid">
                 <div>
                     <label class="form-label">Default Expense Account</label>
                     <select aria-label="Default Expense Account" name="default_expense_account_id" class="form-select">
@@ -197,7 +220,7 @@
 
         <!-- Contact Information -->
         <div class="card stagger-in" style="animation-delay: 200ms;">
-            <div class="card-header border-b border-slate-100 dark:border-slate-700">
+            <div class="card-header mb-0 p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700">
                 <div class="flex items-center gap-4">
                     <div class="card-icon bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
                         {{ icon_svg("mail", "h-5 w-5", stroke_width="1.5") }}
@@ -209,7 +232,7 @@
                 </div>
             </div>
 
-            <div class="p-6 grid gap-6 sm:grid-cols-2">
+            <div class="p-5 sm:p-6 supplier-form-grid">
                 <div>
                     <label class="form-label">Email Address</label>
                     <input aria-label="Email Address" type="email"
@@ -241,7 +264,7 @@
         <!-- Status Toggle (Edit only) -->
         {% if supplier %}
         <div class="card stagger-in" style="animation-delay: 250ms;">
-            <div class="card-header border-b border-slate-100 dark:border-slate-700">
+            <div class="card-header mb-0 p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700">
                 <div class="flex items-center gap-4">
                     <div class="card-icon bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400">
                         {{ icon_svg("check-circle", "h-5 w-5", stroke_width="1.5") }}
@@ -253,7 +276,7 @@
                 </div>
             </div>
 
-            <div class="p-6" x-data="{ active: {{ 'true' if supplier.is_active else 'false' }} }">
+            <div class="p-5 sm:p-6" x-data="{ active: {{ 'true' if supplier.is_active else 'false' }} }">
                 <div class="flex items-center gap-4">
                     <button type="button"
                             @click="active = !active"
@@ -271,10 +294,7 @@
         {% endif %}
 
         <!-- Form Actions -->
-        <div class="flex items-center justify-between pt-4 stagger-in" style="animation-delay: 300ms;">
-            <p class="text-sm text-slate-500 dark:text-slate-400">
-                <span class="text-rose-500">*</span> Required fields
-            </p>
+        <div class="flex items-center justify-end pt-4 stagger-in" style="animation-delay: 300ms;">
             <div class="flex items-center gap-4">
                 <a href="/finance/ap/suppliers" class="btn btn-ghost">
                     Cancel
