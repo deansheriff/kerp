@@ -7,6 +7,7 @@ import pytest
 from starlette.requests import Request
 
 from app.models.person import Person
+from app.services.common import ValidationError
 from app.services.people.hr.web.employee_web import HRWebService
 from app.web.deps import WebAuthContext
 
@@ -44,6 +45,55 @@ def _make_auth(person_id, organization_id, scopes: list[str]) -> WebAuthContext:
         organization_id=organization_id,
         roles=["hr_manager"],
         scopes=["hr:access", *scopes],
+    )
+
+
+def _stub_new_employee_form_dependencies(monkeypatch, db_session) -> None:
+    empty_result = SimpleNamespace(items=[])
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.OrganizationService.list_departments",
+        lambda self, filters, pagination: empty_result,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.OrganizationService.list_designations",
+        lambda self, filters, pagination: empty_result,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.OrganizationService.list_employment_types",
+        lambda self, filters, pagination: empty_result,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.OrganizationService.list_employee_grades",
+        lambda self, filters, pagination: empty_result,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.list_employees",
+        lambda self, filters, pagination, eager_load=False: empty_result,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.AttendanceService.list_shift_types",
+        lambda self, organization_id, is_active, pagination: empty_result,
+    )
+    monkeypatch.setattr(
+        HRWebService, "_load_manager_position_titles", lambda self, db, org_id, ids: {}
+    )
+    monkeypatch.setattr(HRWebService, "_list_pfas", lambda self, db: [])
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.base_context",
+        lambda request, auth, title, active: {"title": title, "active_page": active},
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.templates.TemplateResponse",
+        lambda request, template_name, context: SimpleNamespace(
+            status_code=200,
+            context=context,
+        ),
+    )
+    monkeypatch.setattr(
+        db_session, "scalars", lambda stmt: SimpleNamespace(all=lambda: [])
+    )
+    monkeypatch.setattr(
+        db_session, "execute", lambda stmt: SimpleNamespace(all=lambda: [])
     )
 
 
@@ -293,6 +343,78 @@ async def test_create_employee_response_passes_selected_position_id(
     assert response.status_code == 303
     assert captured["person_id"] == person.id
     assert captured["position_id"] == position_id
+
+
+@pytest.mark.asyncio
+async def test_create_employee_response_does_not_fail_when_invite_fails(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    employee_id = uuid4()
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.create_employee",
+        lambda self, person_id, data: SimpleNamespace(
+            employee_id=employee_id,
+            person_id=person_id,
+        ),
+    )
+
+    def _raise_invite_error(self, employee_id, app_url):
+        raise ValidationError("Employee user credentials are not ready for invite")
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.send_employee_access_invite",
+        _raise_invite_error,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
+    )
+
+    request = _make_new_employee_request(
+        {
+            "linked_person_id": str(person.id),
+            "date_of_joining": "2026-01-01",
+        }
+    )
+    auth = _make_auth(person.id, person.organization_id, ["people:write"])
+
+    response = await service.create_employee_response(
+        request=request,
+        auth=auth,
+        db=db_session,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/people/hr/employees/{employee_id}?saved=1"
+
+
+def test_employee_new_form_does_not_load_position_options_initially(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    _stub_new_employee_form_dependencies(monkeypatch, db_session)
+
+    def _fail_position_load(db, org_id):
+        raise AssertionError("Position options should lazy-load after page render")
+
+    monkeypatch.setattr(
+        HRWebService, "_list_vacant_position_options", _fail_position_load
+    )
+
+    request = _make_new_employee_request({})
+    auth = _make_auth(person.id, person.organization_id, ["people:write"])
+
+    response = service.employee_new_form_response(
+        request=request,
+        auth=auth,
+        db=db_session,
+    )
+
+    assert response.status_code == 200
+    assert response.context["position_options"] == []
 
 
 @pytest.mark.asyncio
