@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-19
+
+### Added
+- HR birthday email automation with scheduler wiring and task coverage.
+- Employee person-edit web/API test coverage for HR profile updates.
+
+### Changed
+- Release metadata now treats the live app as the `1.x` production line.
+- Storage configuration supports explicit S3 connection/read timeouts.
+- Email and password-reset flows include small reliability and presentation updates.
+
 ## [2026-02-28]
 
 ### Added
