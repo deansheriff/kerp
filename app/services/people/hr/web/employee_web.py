@@ -1214,6 +1214,8 @@ class HRWebService:
                 status_enum = EmployeeStatus(status.upper())
             except ValueError:
                 pass
+        if status_enum == EmployeeStatus.TERMINATED:
+            status_enum = None
 
         joining_date = self._parse_date(date_of_joining)
         probation_date = self._parse_date(probation_end_date)
@@ -1381,25 +1383,25 @@ class HRWebService:
 
         self._update_linked_person(auth=auth, db=db, employee=employee, form=form)
 
-        svc.update_employee(coerce_uuid(employee_id), data)
+        updated_employee = svc.update_employee(coerce_uuid(employee_id), data)
         self._update_tax_profile(auth=auth, db=db, employee=employee, form=form)
+        assigned_location_log = (
+            str(getattr(updated_employee, "assigned_location_id", None))
+            if getattr(updated_employee, "assigned_location_id", None)
+            else None
+        )
         db.commit()
 
-        refreshed_employee = svc.get_employee(coerce_uuid(employee_id))
         logger.info(
             "Employee edit persisted",
             extra={
                 "employee_id": str(employee_id),
-                "assigned_location_id": (
-                    str(getattr(refreshed_employee, "assigned_location_id", None))
-                    if getattr(refreshed_employee, "assigned_location_id", None)
-                    else None
-                ),
+                "assigned_location_id": assigned_location_log,
             },
         )
 
         return RedirectResponse(
-            url=f"/people/hr/employees/{employee_id}?saved=1",
+            url=f"/people/hr/employees/{employee_id}/edit?success=Saved%20successfully.",
             status_code=303,
         )
 
@@ -2102,7 +2104,9 @@ class HRWebService:
             "locations": locations,
             "shift_types": shift_types,
             "user_accounts": user_accounts,
-            "statuses": [s.value for s in EmployeeStatus],
+            "statuses": [
+                s.value for s in EmployeeStatus if s != EmployeeStatus.TERMINATED
+            ],
             "salary_modes": [m.value for m in SalaryMode],
             "genders": self._gender_options(),
             "error": error,
@@ -2315,7 +2319,9 @@ class HRWebService:
             "user_accounts": user_accounts,
             "pfas": pfas,
             "tax_profile": tax_profile,
-            "statuses": [s.value for s in EmployeeStatus],
+            "statuses": [
+                s.value for s in EmployeeStatus if s != EmployeeStatus.TERMINATED
+            ],
             "salary_modes": [m.value for m in SalaryMode],
             "genders": self._gender_options(),
             "error": error,

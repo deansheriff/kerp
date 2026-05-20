@@ -469,8 +469,102 @@ async def test_update_employee_response_persists_nysc_dates(
     )
 
     assert response.status_code == 303
+    assert (
+        response.headers["location"]
+        == f"/people/hr/employees/{employee_id}/edit?success=Saved%20successfully."
+    )
     assert str(captured["nysc_start_date"]) == "2026-01-10"
     assert str(captured["nysc_end_date"]) == "2026-11-10"
+
+
+@pytest.mark.asyncio
+async def test_update_employee_response_ignores_terminal_status_from_edit_form(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    employee_id = uuid4()
+    employee = SimpleNamespace(employee_id=employee_id, person_id=person.id)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.get_employee",
+        lambda self, _employee_id: employee,
+    )
+
+    def _capture_update(self, _employee_id, data):
+        captured["status"] = data.status
+        return employee
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
+        _capture_update,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
+    )
+
+    request = _make_request({"status": "TERMINATED"})
+    auth = _make_auth(person.id, person.organization_id, [])
+
+    response = await service.update_employee_response(
+        request=request,
+        employee_id=employee_id,
+        auth=auth,
+        db=db_session,
+    )
+
+    assert response.status_code == 303
+    assert captured["status"] is None
+    assert (
+        response.headers["location"]
+        == f"/people/hr/employees/{employee_id}/edit?success=Saved%20successfully."
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_employee_response_does_not_reload_employee_after_commit(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    employee_id = uuid4()
+    employee = SimpleNamespace(employee_id=employee_id, person_id=person.id)
+    calls = 0
+
+    def _get_employee(self, _employee_id):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise AssertionError("Employee should not be reloaded after commit")
+        return employee
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.get_employee",
+        _get_employee,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
+        lambda self, _employee_id, data: employee,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
+    )
+
+    request = _make_request({})
+    auth = _make_auth(person.id, person.organization_id, [])
+
+    response = await service.update_employee_response(
+        request=request,
+        employee_id=employee_id,
+        auth=auth,
+        db=db_session,
+    )
+
+    assert response.status_code == 303
+    assert calls == 1
 
 
 @pytest.mark.asyncio
