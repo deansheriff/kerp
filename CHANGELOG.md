@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-05-20
+
+### Fixed
+- Fixed hardened Nuitka package layout so compiled `app.services` and `app.models` imports resolve at runtime.
+
 ## [1.1.3] - 2026-05-20
 
 ### Fixed

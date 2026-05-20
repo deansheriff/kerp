@@ -1621,6 +1621,17 @@ GLOSSARY: list[dict[str, Any]] = [
 
 RELEASE_NOTES: list[dict[str, Any]] = [
     {
+        "version": "1.1.4",
+        "date": "20 May 2026",
+        "type": "patch",
+        "summary": "Patch release for hardened image runtime imports.",
+        "features": [],
+        "improvements": [],
+        "fixes": [
+            "Fixed hardened Nuitka package layout so compiled app.services and app.models imports resolve at runtime.",
+        ],
+    },
+    {
         "version": "1.1.3",
         "date": "20 May 2026",
         "type": "patch",
