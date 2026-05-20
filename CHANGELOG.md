@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-05-20
+
+### Fixed
+- Fixed Alembic model imports so the hardened release image health check can run migrations.
+
 ## [1.1.1] - 2026-05-20
 
 ### Fixed
