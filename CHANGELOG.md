@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-05-20
+
+### Fixed
+- Allowed Alembic migrations to run in hardened images after model source removal.
+
 ## [1.1.2] - 2026-05-20
 
 ### Fixed

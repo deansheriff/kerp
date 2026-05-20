@@ -1621,6 +1621,17 @@ GLOSSARY: list[dict[str, Any]] = [
 
 RELEASE_NOTES: list[dict[str, Any]] = [
     {
+        "version": "1.1.3",
+        "date": "20 May 2026",
+        "type": "patch",
+        "summary": "Patch release for hardened image migration compatibility.",
+        "features": [],
+        "improvements": [],
+        "fixes": [
+            "Allowed Alembic migrations to run in hardened images after model source removal.",
+        ],
+    },
+    {
         "version": "1.1.2",
         "date": "20 May 2026",
         "type": "patch",
