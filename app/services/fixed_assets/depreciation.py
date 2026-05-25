@@ -461,6 +461,28 @@ class DepreciationService(ListResponseMixin):
             result["journal_entry_id"] = (
                 str(run.journal_entry_id) if run.journal_entry_id else None
             )
+            try:
+                from app.services.fixed_assets.reconciliation import (
+                    FixedAssetDepreciationReconciliationService,
+                )
+
+                reconciliation = (
+                    FixedAssetDepreciationReconciliationService.reconcile_run(
+                        db,
+                        org_id,
+                        run.run_id,
+                    )
+                )
+                result["gl_reconciliation"] = reconciliation.as_dict()
+            except Exception as exc:
+                logger.exception(
+                    "Automated depreciation GL reconciliation failed for run %s",
+                    run.run_id,
+                )
+                result["gl_reconciliation"] = {
+                    "status": "failed",
+                    "error": str(exc),
+                }
         elif auto_post:
             result["reason"] = "no_assets_to_post"
 

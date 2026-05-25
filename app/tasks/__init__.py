@@ -55,6 +55,7 @@ from app.tasks.feature_flags import archive_expired_feature_flags
 from app.tasks.finance import (
     process_ar_invoices_export,
     process_ar_receipts_export,
+    process_depreciation_gl_reconciliation,
     process_gl_journals_export,
     process_general_ledger_export,
     process_monthly_depreciation_runs,
@@ -164,6 +165,7 @@ __all__ = [
     "process_ar_receipts_export",
     "process_gl_journals_export",
     "process_general_ledger_export",
+    "process_depreciation_gl_reconciliation",
     "sync_paystack_transactions",
     "sync_mono_transactions",
     "refresh_analysis_cubes",

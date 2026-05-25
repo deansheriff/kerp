@@ -433,6 +433,8 @@ def process_monthly_depreciation_runs(
         "organizations_checked": 0,
         "runs_calculated": 0,
         "runs_posted": 0,
+        "runs_reconciled": 0,
+        "runs_requiring_review": 0,
         "skipped": 0,
         "errors": [],
     }
@@ -466,6 +468,12 @@ def process_monthly_depreciation_runs(
                 )
                 if outcome["status"] == "posted":
                     results["runs_posted"] += 1
+                    reconciliation = outcome.get("gl_reconciliation")
+                    if isinstance(reconciliation, dict):
+                        if reconciliation.get("is_reconciled"):
+                            results["runs_reconciled"] += 1
+                        else:
+                            results["runs_requiring_review"] += 1
                 elif outcome["status"] == "calculated":
                     results["runs_calculated"] += 1
                 else:
@@ -486,14 +494,51 @@ def process_monthly_depreciation_runs(
 
     logger.info(
         "Monthly FA depreciation automation complete: orgs=%d, calculated=%d, "
-        "posted=%d, skipped=%d, errors=%d",
+        "posted=%d, reconciled=%d, review=%d, skipped=%d, errors=%d",
         results["organizations_checked"],
         results["runs_calculated"],
         results["runs_posted"],
+        results["runs_reconciled"],
+        results["runs_requiring_review"],
         results["skipped"],
         len(results["errors"]),
     )
     return results
+
+
+@shared_task
+def process_depreciation_gl_reconciliation(
+    organization_id: str,
+    run_id: str,
+) -> dict[str, Any]:
+    """Auto-match a posted fixed-asset depreciation run against its GL journal."""
+    from app.services.fixed_assets.reconciliation import (
+        FixedAssetDepreciationReconciliationService,
+    )
+
+    org_id = UUID(organization_id)
+    with session_for_org(org_id) as db:
+        try:
+            result = FixedAssetDepreciationReconciliationService.reconcile_run(
+                db,
+                org_id,
+                UUID(run_id),
+            )
+            db.commit()
+            return {"success": True, **result.as_dict()}
+        except Exception as exc:
+            db.rollback()
+            logger.exception(
+                "FA depreciation GL reconciliation failed for run %s in org %s",
+                run_id,
+                organization_id,
+            )
+            return {
+                "success": False,
+                "organization_id": organization_id,
+                "run_id": run_id,
+                "error": str(exc),
+            }
 
 
 @shared_task
