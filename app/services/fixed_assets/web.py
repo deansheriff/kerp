@@ -293,6 +293,31 @@ class FixedAssetWebService:
         report_date = as_of or date.today()
         tolerance = Decimal("0.01")
 
+        posted_depreciation = (
+            select(
+                DepreciationSchedule.asset_id.label("asset_id"),
+                func.coalesce(
+                    func.sum(DepreciationSchedule.depreciation_amount), 0
+                ).label("as_of_accumulated_depreciation"),
+            )
+            .join(
+                DepreciationRun,
+                DepreciationRun.run_id == DepreciationSchedule.run_id,
+            )
+            .join(
+                FiscalPeriod,
+                FiscalPeriod.fiscal_period_id == DepreciationRun.fiscal_period_id,
+            )
+            .where(
+                DepreciationRun.organization_id == org_id,
+                DepreciationRun.status == DepreciationRunStatus.POSTED,
+                FiscalPeriod.organization_id == org_id,
+                FiscalPeriod.end_date <= report_date,
+            )
+            .group_by(DepreciationSchedule.asset_id)
+            .subquery()
+        )
+
         category_rows = db.execute(
             select(
                 AssetCategory.asset_account_id,
@@ -312,10 +337,25 @@ class FixedAssetWebService:
                 func.coalesce(func.sum(Asset.functional_currency_cost), 0).label(
                     "register_cost"
                 ),
-                func.coalesce(func.sum(Asset.accumulated_depreciation), 0).label(
-                    "register_accumulated_depreciation"
-                ),
-                func.coalesce(func.sum(Asset.net_book_value), 0).label("register_nbv"),
+                func.coalesce(
+                    func.sum(
+                        func.coalesce(
+                            posted_depreciation.c.as_of_accumulated_depreciation,
+                            0,
+                        )
+                    ),
+                    0,
+                ).label("register_accumulated_depreciation"),
+                func.coalesce(
+                    func.sum(
+                        Asset.functional_currency_cost
+                        - func.coalesce(
+                            posted_depreciation.c.as_of_accumulated_depreciation,
+                            0,
+                        )
+                    ),
+                    0,
+                ).label("register_nbv"),
             )
             .outerjoin(
                 Asset,
@@ -328,6 +368,10 @@ class FixedAssetWebService:
                         | (Asset.disposal_date > report_date)
                     ),
                 ),
+            )
+            .outerjoin(
+                posted_depreciation,
+                posted_depreciation.c.asset_id == Asset.asset_id,
             )
             .where(AssetCategory.organization_id == org_id)
             .where(AssetCategory.is_active.is_(True))

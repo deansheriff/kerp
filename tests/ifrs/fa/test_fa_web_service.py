@@ -1370,6 +1370,38 @@ class TestFAWebServiceDepreciation:
 class TestFAWebServiceGLReconciliation:
     """Tests for fixed asset to GL reconciliation context."""
 
+    def test_gl_reconciliation_uses_posted_depreciation_as_of_date(self):
+        """Register depreciation should be reconstructed for the report date."""
+        from sqlalchemy.dialects import postgresql
+
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        org_id = uuid.uuid4()
+        mock_db = MagicMock()
+        mock_db.execute.return_value.all.return_value = []
+
+        with patch(
+            "app.services.fixed_assets.web.get_currency_context",
+            return_value={
+                "presentation_currency_code": "NGN",
+                "currencies": [{"code": "NGN", "symbol": "NGN "}],
+            },
+        ):
+            FixedAssetWebService.gl_reconciliation_context(
+                mock_db,
+                str(org_id),
+                as_of=date(2026, 4, 30),
+            )
+
+        statement = mock_db.execute.call_args.args[0]
+        sql = str(statement.compile(dialect=postgresql.dialect()))
+
+        assert "fa.depreciation_schedule" in sql
+        assert "fa.depreciation_run" in sql
+        assert "gl.fiscal_period.end_date <= " in sql
+        assert "fa.asset.accumulated_depreciation" not in sql
+        assert "fa.asset.net_book_value" not in sql
+
     def test_gl_reconciliation_totals_count_shared_gl_accounts_once(self):
         """Summary totals should not duplicate GL balances for shared accounts."""
         from app.services.fixed_assets.web import FixedAssetWebService
