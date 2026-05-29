@@ -136,6 +136,13 @@ logger = logging.getLogger(__name__)
 logger.info("Enabled modules: %s", sorted(_ENABLED_MODULES))
 
 
+def _env_flag_enabled(name: str, default: bool = True) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
 def is_module_enabled(module: str) -> bool:
     """Check if a module is enabled for this deployment.
 
@@ -166,6 +173,11 @@ async def lifespan(app: FastAPI):
 
         # Seed default settings for all domains
         seed_all_settings(db)
+
+        if _env_flag_enabled("SEED_ADMIN_ON_START", default=True):
+            from scripts.seed_admin import main as seed_admin_main
+
+            seed_admin_main([])
 
         # Register payroll lifecycle event handlers so posted runs/slips
         # can create notifications and queue payslip emails.

@@ -18,6 +18,14 @@ def test_login_preserves_username_for_required_password_reset():
     assert "sessionStorage.setItem" in admin_login_template
 
 
+def test_admin_login_hides_loading_state_until_submit():
+    admin_login_template = _template("admin_login.html")
+
+    assert "Authentication Code" not in admin_login_template
+    assert "authenticator app" not in admin_login_template
+    assert "x-show=\"loading\" x-cloak" in admin_login_template
+
+
 def test_reset_required_form_prefills_and_validates_username():
     template = _template("reset_password_required.html")
 

@@ -51,7 +51,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Seed or repair an admin user with full permissions."
     )
@@ -116,7 +116,7 @@ def parse_args() -> argparse.Namespace:
         default=_env_bool("BOOTSTRAP_ADMIN_PRESERVE_PASSWORD", False),
         help="Do not reset the password if the admin credential already exists",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def ensure_permission(db, key: str, description: str) -> Permission:
@@ -194,11 +194,14 @@ def setup_rbac(db) -> Role:
     return admin_role
 
 
-def main() -> None:
+def main(
+    argv: list[str] | None = None,
+    session_factory=None,
+) -> None:
     load_dotenv()
-    args = parse_args()
+    args = parse_args(argv)
     organization_id = uuid.UUID(args.organization_id)
-    db = SessionLocal()
+    db = (session_factory or SessionLocal)()
 
     try:
         credential = db.scalar(
