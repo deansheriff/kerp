@@ -17,6 +17,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+ENV PIP_ROOT_USER_ACTION=ignore \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libcairo2 \
@@ -28,10 +31,8 @@ RUN apt-get update \
         fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install poetry && poetry config virtualenvs.create false
-
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --only main --no-interaction --no-ansi
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 # WeasyPrint 62.x expects pydyf.Stream.transform; pin a compatible pydyf.
 RUN pip install --no-cache-dir "pydyf==0.11.0"
 RUN pip install --no-cache-dir python-multipart
