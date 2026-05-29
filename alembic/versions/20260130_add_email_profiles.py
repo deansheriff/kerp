@@ -56,7 +56,7 @@ def upgrade() -> None:
         sa.Column("use_tls", sa.Boolean(), default=True),
         sa.Column("use_ssl", sa.Boolean(), default=False),
         sa.Column("from_email", sa.String(255), nullable=False),
-        sa.Column("from_name", sa.String(255), default="Dotmac ERP"),
+        sa.Column("from_name", sa.String(255), default="Kxmeleon ERP"),
         sa.Column("reply_to", sa.String(255), nullable=True),
         sa.Column("is_default", sa.Boolean(), default=False),
         sa.Column("is_active", sa.Boolean(), default=True),

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate UI illustrations for DotMac ERP using Google Gemini API.
+Generate UI illustrations for Kxmeleon ERP using Google Gemini API.
 
 Usage:
     python scripts/generate_illustrations.py --api-key YOUR_KEY
@@ -376,7 +376,7 @@ def generate_illustration(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate DotMac ERP illustrations")
+    parser = argparse.ArgumentParser(description="Generate Kxmeleon ERP illustrations")
     parser.add_argument("--api-key", default=os.environ.get("GEMINI_API_KEY", ""))
     parser.add_argument("--model", default="gemini-2.5-flash-preview-05-20")
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)

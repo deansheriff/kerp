@@ -136,7 +136,7 @@ class EmailProfile(Base):
     )
     from_name: Mapped[str] = mapped_column(
         String(255),
-        default="Dotmac ERP",
+        default="Kxmeleon ERP",
     )
     reply_to: Mapped[str | None] = mapped_column(
         String(255),
@@ -211,7 +211,7 @@ class EmailProfile(Base):
             "use_tls": self.use_tls,
             "use_ssl": self.use_ssl,
             "from_email": self.from_email,
-            "from_name": self.from_name or "Dotmac ERP",  # Ensure non-None
+            "from_name": self.from_name or "Kxmeleon ERP",  # Ensure non-None
             "reply_to": self.reply_to,  # May be None
         }
 

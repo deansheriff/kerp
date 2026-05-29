@@ -1,7 +1,7 @@
 """
 CRM Project Sync Service.
 
-Syncs projects from CRM to DotMac ERP core_org.project table.
+Syncs projects from CRM to Kxmeleon ERP core_org.project table.
 Handles create/update detection and field mapping.
 """
 

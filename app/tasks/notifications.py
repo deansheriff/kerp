@@ -173,7 +173,7 @@ def process_pending_notification_emails(
                     body_html = (
                         f"<p>{safe_message}</p>"
                         if safe_message
-                        else "<p>You have a new notification in Dotmac ERP.</p>"
+                        else "<p>You have a new notification in Kxmeleon ERP.</p>"
                     )
                     if notification.action_url:
                         url = notification.action_url

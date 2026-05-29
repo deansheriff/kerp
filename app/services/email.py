@@ -274,7 +274,7 @@ def _get_smtp_config(db: Session | None = None) -> SMTPConfig:
     from_name_raw = (
         _get_db_setting(db, "smtp_from_name")
         or _env_value("SMTP_FROM_NAME")
-        or "Dotmac ERP"
+        or "Kxmeleon ERP"
     )
     from_name = str(from_name_raw)
     reply_to_raw = _get_db_setting(db, "email_reply_to") or _env_value("EMAIL_REPLY_TO")

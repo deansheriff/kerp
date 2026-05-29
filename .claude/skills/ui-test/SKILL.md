@@ -6,7 +6,7 @@ arguments:
     description: "What to test: a URL path (e.g. '/finance/ar/invoices'), a module name (e.g. 'finance', 'people'), a page type (e.g. 'list', 'detail', 'form', 'dashboard'), or 'full' for all modules"
 ---
 
-# UI/UX Test — DotMac ERP
+# UI/UX Test — Kxmeleon ERP
 
 This extends the global `ui-test` skill with DotMac-specific rules. Follow ALL steps from the global skill, plus the DotMac-specific checks below.
 

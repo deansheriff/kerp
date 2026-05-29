@@ -1,4 +1,4 @@
-# DotMac ERP Design System
+# Kxmeleon ERP Design System
 
 Comprehensive reference for all UI decisions. Fonts are self-hosted. Stack: Tailwind CSS + Alpine.js + HTMX + Jinja2.
 

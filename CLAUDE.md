@@ -1,4 +1,4 @@
-# DotMac ERP — Claude Agent Guide
+# Kxmeleon ERP — Claude Agent Guide
 
 FastAPI + SQLAlchemy 2.0 + Jinja2/HTMX/Alpine.js + Celery + PostgreSQL.
 Multi-tenant SaaS ERP covering Finance, People/HR, Inventory, Expense, Operations, Procurement, Public Sector.

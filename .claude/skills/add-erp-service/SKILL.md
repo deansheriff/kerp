@@ -8,7 +8,7 @@ arguments:
 
 # Add ERP Service
 
-Scaffold a complete service module for the DotMac ERP system.
+Scaffold a complete service module for the Kxmeleon ERP system.
 
 ## Steps
 

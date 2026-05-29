@@ -1,7 +1,7 @@
 """
 Sync Models - External system sync state tracking.
 
-Tracks migration state from external systems (ERPNext, DotMac CRM) to DotMac ERP.
+Tracks migration state from external systems (ERPNext, DotMac CRM) to Kxmeleon ERP.
 """
 
 from .dotmac_crm_sync import CRMEntityType, CRMSyncMapping, CRMSyncStatus

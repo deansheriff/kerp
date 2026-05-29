@@ -2,7 +2,7 @@
 
 ## Overview
 
-This plan consolidates **Dotmac People Ops** into **Dotmac ERP** (the accounting app), creating a unified ERP platform. The Books app becomes the foundation, with People modules integrated as first-class citizens.
+This plan consolidates **Dotmac People Ops** into **Kxmeleon ERP** (the accounting app), creating a unified ERP platform. The Books app becomes the foundation, with People modules integrated as first-class citizens.
 
 ## Target Architecture
 

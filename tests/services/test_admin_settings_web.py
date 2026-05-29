@@ -29,14 +29,14 @@ class TestAdminSettingsWebServiceUpdateOrganization:
                 db,
                 uuid4(),
                 {
-                    "legal_name": "DotMac ERP",
+                    "legal_name": "Kxmeleon ERP",
                     "pms_ohcsf_enabled": "true",
                 },
             )
 
         assert success is True
         assert error is None
-        assert org.legal_name == "DotMac ERP"
+        assert org.legal_name == "Kxmeleon ERP"
         assert org.pms_ohcsf_enabled is True
         assert org.performance_mode == PerformanceMode.GOVERNMENT_PMS
         mock_pms_config.assert_called_once_with(db)

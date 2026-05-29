@@ -1,5 +1,5 @@
 # =============================================================================
-# DotMac ERP — Hardened Production Build (4-stage)
+# Kxmeleon ERP — Hardened Production Build (4-stage)
 #
 # Produces a Docker image with:
 #   - Core business logic compiled to .so via Nuitka (no Python source)

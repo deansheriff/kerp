@@ -13,7 +13,7 @@ reporting, analytics, or needs to understand entity relationships.
 
 ## Instructions
 
-You have access to the DotMac ERP PostgreSQL database via the `erp-db` MCP
+You have access to the Kxmeleon ERP PostgreSQL database via the `erp-db` MCP
 server. Use the `execute_sql` tool for SELECT queries only. The connection uses
 a **read-only** user (`claude_readonly`) — INSERT/UPDATE/DELETE will be rejected
 by PostgreSQL itself.

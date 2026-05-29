@@ -1,7 +1,7 @@
 """
 CRM Ticket Sync Service.
 
-Syncs tickets from CRM to DotMac ERP support.ticket table.
+Syncs tickets from CRM to Kxmeleon ERP support.ticket table.
 Handles create/update detection and field mapping.
 """
 

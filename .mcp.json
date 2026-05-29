@@ -6,7 +6,7 @@
         "-lc",
         "set -a; [ -f .env ] && . .env; set +a; if [ -z \"${DOTMAC_ERP_DB_DSN:-}\" ]; then echo \"DOTMAC_ERP_DB_DSN is required (export it or set it in .env). Example: postgresql://claude_readonly:<password>@localhost:5437/dotmac_erp\" >&2; exit 1; fi; exec npx -y @bytebase/dbhub --dsn \"$DOTMAC_ERP_DB_DSN\""
       ],
-      "description": "DotMac ERP database - read-only queries for debugging and analysis"
+      "description": "Kxmeleon ERP database - read-only queries for debugging and analysis"
     }
   }
 }

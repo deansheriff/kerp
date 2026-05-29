@@ -144,7 +144,7 @@ class EmailProfileService:
         smtp_host: str,
         smtp_port: int,
         from_email: str,
-        from_name: str = "Dotmac ERP",
+        from_name: str = "Kxmeleon ERP",
         smtp_username: str | None = None,
         smtp_password: str | None = None,
         use_tls: bool = True,

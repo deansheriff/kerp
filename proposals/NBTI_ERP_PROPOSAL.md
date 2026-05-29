@@ -20,7 +20,7 @@
 8. [Training & Change Management](#8-training--change-management)
 9. [Support & Maintenance](#9-support--maintenance)
 10. [Investment Summary](#10-investment-summary)
-11. [Why DotMac ERP](#11-why-dotmac-erp)
+11. [Why Kxmeleon ERP](#11-why-dotmac-erp)
 12. [Appendices](#12-appendices)
 
 ---
@@ -1442,7 +1442,7 @@ We will provide comprehensive training tailored to each user group:
 
 ---
 
-# 11. Why DotMac ERP
+# 11. Why Kxmeleon ERP
 
 ## 11.1 Our Differentiators
 

@@ -33,7 +33,7 @@ class SplynxSyncService(
     CreditNoteSyncMixin,
     ReconciliationMixin,
 ):
-    """Service for syncing data from Splynx to Dotmac ERP.
+    """Service for syncing data from Splynx to Kxmeleon ERP.
 
     Syncs:
     - Customers -> AR Customers

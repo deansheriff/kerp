@@ -3,7 +3,7 @@
 Splynx Sync Script.
 
 Syncs customers, invoices, payments, and credit notes from Splynx
-to Dotmac ERP. Supports incremental sync with batch processing.
+to Kxmeleon ERP. Supports incremental sync with batch processing.
 
 Usage:
     # Test connection
@@ -168,7 +168,7 @@ def run_sync(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sync data from Splynx to Dotmac ERP",
+        description="Sync data from Splynx to Kxmeleon ERP",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

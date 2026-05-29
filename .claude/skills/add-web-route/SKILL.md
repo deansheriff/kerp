@@ -8,7 +8,7 @@ arguments:
 
 # Add Web Route
 
-Add a server-rendered web route to the DotMac ERP.
+Add a server-rendered web route to the Kxmeleon ERP.
 
 ## Steps
 

@@ -8,7 +8,7 @@ arguments:
 
 # Database Health Check
 
-Run data integrity diagnostics against the DotMac ERP database.
+Run data integrity diagnostics against the Kxmeleon ERP database.
 
 ## Modes
 

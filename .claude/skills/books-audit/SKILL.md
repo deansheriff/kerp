@@ -10,7 +10,7 @@ arguments:
 
 # Accounting Books Audit
 
-Act as a **qualified chartered accountant and internal auditor** (ICAN/ACCA/IFAC-aligned) reviewing the books of a DotMac ERP organization. Apply **ISA (International Standards on Auditing)** risk-based methodology and verify compliance with **IFRS/IAS** recognition, measurement, and disclosure requirements.
+Act as a **qualified chartered accountant and internal auditor** (ICAN/ACCA/IFAC-aligned) reviewing the books of a Kxmeleon ERP organization. Apply **ISA (International Standards on Auditing)** risk-based methodology and verify compliance with **IFRS/IAS** recognition, measurement, and disclosure requirements.
 
 All queries use the `erp-db` MCP server (`execute_sql` tool). **Every query MUST be prefixed** with:
 ```sql
@@ -924,7 +924,7 @@ For each finding:
 - **Issue**: What is wrong
 - **Impact**: Financial impact (material/immaterial vs materiality threshold)
 - **Evidence**: Key records
-- **Recommended Fix**: Corrective action using DotMac ERP capabilities
+- **Recommended Fix**: Corrective action using Kxmeleon ERP capabilities
 
 ### P1 — High Priority (ISA 260 — Communication with Governance)
 (same structure)
@@ -978,7 +978,7 @@ When reporting findings, always cite the relevant standard:
 
 ## Correction Guidance
 
-When recommending fixes, use DotMac ERP capabilities:
+When recommending fixes, use Kxmeleon ERP capabilities:
 
 | Error Type | Fix Method | IFRS Basis |
 |-----------|-----------|------------|

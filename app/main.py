@@ -183,7 +183,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="DotMac ERP API", lifespan=lifespan)
+app = FastAPI(title="Kxmeleon ERP API", lifespan=lifespan)
 
 
 # Redirect legacy AR customers path to web UI (avoid JSON API response)

@@ -8,7 +8,7 @@ arguments:
 
 # Add Database Migration
 
-Create a safe, idempotent Alembic migration for the DotMac ERP.
+Create a safe, idempotent Alembic migration for the Kxmeleon ERP.
 
 ## Steps
 

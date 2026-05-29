@@ -6,7 +6,7 @@ Run from the Docker app container (it has DB connectivity):
     docker compose exec -T app python -m app.tools.post_and_match_paystack_opex_expense_reimbursements
 
 This addresses ERPNext-synced expense claims that were marked PAID but did not
-have the reimbursement (bank outflow) journal posted in DotMac ERP, which
+have the reimbursement (bank outflow) journal posted in Kxmeleon ERP, which
 prevents bank reconciliation from matching those Paystack OPEX statement lines.
 """
 

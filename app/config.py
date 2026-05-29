@@ -66,7 +66,7 @@ class Settings:
 
     # Branding
     app_version: str = os.getenv("APP_VERSION", "1.1.9")
-    brand_name: str = os.getenv("BRAND_NAME", "Dotmac ERP")
+    brand_name: str = os.getenv("BRAND_NAME", "Kxmeleon ERP")
     brand_tagline: str = os.getenv(
         "BRAND_TAGLINE",
         "Unified ERP for finance, HR, and operations",
@@ -95,7 +95,7 @@ class Settings:
     )
 
     # Landing page content (configurable without code changes)
-    landing_hero_badge: str = os.getenv("LANDING_HERO_BADGE", "Dotmac ERP")
+    landing_hero_badge: str = os.getenv("LANDING_HERO_BADGE", "Kxmeleon ERP")
     landing_hero_title: str = os.getenv(
         "LANDING_HERO_TITLE", "Run your entire business on one ERP"
     )

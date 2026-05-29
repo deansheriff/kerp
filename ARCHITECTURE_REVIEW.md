@@ -1,4 +1,4 @@
-# DotMac ERP - Architecture Review
+# Kxmeleon ERP - Architecture Review
 
 **Review Date:** 2026-02-02
 **Overall Maturity Score:** 82/100
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The DotMac ERP is a well-architected, primarily feature-complete financial and HR system with strong IFRS compliance. The main gaps are in advanced features like manufacturing, forecasting, and some specialized workflows rather than core functionality.
+The Kxmeleon ERP is a well-architected, primarily feature-complete financial and HR system with strong IFRS compliance. The main gaps are in advanced features like manufacturing, forecasting, and some specialized workflows rather than core functionality.
 
 ### Codebase Statistics
 - **Total Model Files**: 256
@@ -679,7 +679,7 @@ The DotMac ERP is a well-architected, primarily feature-complete financial and H
 
 **Overall Assessment:** Production-ready with clear growth path
 
-The DotMac ERP demonstrates solid architectural patterns and comprehensive coverage of core ERP functionality. The system is ready for production use with the understanding that certain advanced features (manufacturing, forecasting, mobile) are not yet implemented.
+The Kxmeleon ERP demonstrates solid architectural patterns and comprehensive coverage of core ERP functionality. The system is ready for production use with the understanding that certain advanced features (manufacturing, forecasting, mobile) are not yet implemented.
 
 **Priority Focus Areas:**
 1. Budget vs Actual reporting (CRITICAL)

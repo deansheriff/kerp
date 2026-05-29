@@ -53,7 +53,7 @@ class AuditMixin:
     Audit mixin for tracking who created/modified records.
 
     Links to public.people for user tracking. This requires the Person
-    model to exist (it does in DotMac ERP).
+    model to exist (it does in Kxmeleon ERP).
     """
 
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(

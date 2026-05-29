@@ -5,7 +5,7 @@ Revises: add_hr_settings_to_org
 Create Date: 2025-01-20
 
 This migration creates temporary mapping tables in the migration schema
-to support data migration from DotMac People to DotMac ERP.
+to support data migration from DotMac People to Kxmeleon ERP.
 
 Tables:
 - company_org_map: Maps People company strings to Books organization UUIDs
@@ -39,7 +39,7 @@ def upgrade() -> None:
             UUID(as_uuid=True),
             sa.ForeignKey("core_org.organization.organization_id"),
             nullable=False,
-            comment="Mapped organization ID in DotMac ERP",
+            comment="Mapped organization ID in Kxmeleon ERP",
         ),
         sa.Column(
             "created_at",
@@ -70,7 +70,7 @@ def upgrade() -> None:
             "new_id",
             UUID(as_uuid=True),
             nullable=False,
-            comment="New UUID in DotMac ERP",
+            comment="New UUID in Kxmeleon ERP",
         ),
         sa.Column(
             "created_at",

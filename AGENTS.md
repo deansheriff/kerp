@@ -1,4 +1,4 @@
-# Codex Instructions for Dotmac ERP
+# Codex Instructions for Kxmeleon ERP
 
 These are the repo-level instructions Codex should follow for this workspace.
 

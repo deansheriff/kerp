@@ -3,7 +3,7 @@
 Backfill ExpenseClaim reimbursement journals and match Paystack OPEX bank lines.
 
 This addresses historical ERPNext-synced expense claims that were marked PAID
-but never had the reimbursement (bank outflow) journal posted in DotMac ERP.
+but never had the reimbursement (bank outflow) journal posted in Kxmeleon ERP.
 """
 
 from __future__ import annotations

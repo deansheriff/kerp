@@ -2,6 +2,7 @@ import ipaddress
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pyotp
 
 try:
     from datetime import UTC  # type: ignore
@@ -130,6 +131,62 @@ class TestLoginAPI:
         data = response.json()
         # Error handler transforms response to {"code": ..., "message": ..., "details": ...}
         assert data["code"] == "PASSWORD_RESET_REQUIRED"
+
+    def test_admin_login_bypasses_mfa_for_admin(
+        self, client, db_session, admin_person
+    ):
+        """Admin login accepts username/password even when TOTP is configured."""
+        credential = UserCredential(
+            person_id=admin_person.id,
+            username=f"adminlogin_{uuid.uuid4().hex[:8]}",
+            password_hash=hash_password("password123"),
+            is_active=True,
+        )
+        db_session.add(credential)
+        db_session.commit()
+
+        setup = auth_flow_service.auth_flow.mfa_setup(
+            db_session, str(admin_person.id), label="admin device"
+        )
+        code = pyotp.TOTP(setup["secret"]).now()
+        auth_flow_service.auth_flow.mfa_confirm(
+            db_session, str(setup["method_id"]), code, str(admin_person.id)
+        )
+
+        regular_response = client.post(
+            "/auth/login",
+            json={"username": credential.username, "password": "password123"},
+        )
+        assert regular_response.status_code == 200
+        assert regular_response.json()["mfa_required"] is True
+
+        admin_response = client.post(
+            "/auth/admin-login",
+            json={"username": credential.username, "password": "password123"},
+        )
+        assert admin_response.status_code == 200
+        data = admin_response.json()
+        assert data["access_token"]
+        assert data["mfa_required"] is False
+        payload = auth_flow_service.decode_access_token(db_session, data["access_token"])
+        assert "admin" in payload["roles"]
+
+    def test_admin_login_rejects_non_admin(self, client, db_session, person):
+        """Admin login does not issue a session for non-admin credentials."""
+        credential = UserCredential(
+            person_id=person.id,
+            username=f"notadmin_{uuid.uuid4().hex[:8]}",
+            password_hash=hash_password("password123"),
+            is_active=True,
+        )
+        db_session.add(credential)
+        db_session.commit()
+
+        response = client.post(
+            "/auth/admin-login",
+            json={"username": credential.username, "password": "password123"},
+        )
+        assert response.status_code == 403
 
 
 class TestMeAPI:

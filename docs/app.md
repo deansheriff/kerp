@@ -1,10 +1,10 @@
-# Dotmac ERP App Guide
+# Kxmeleon ERP App Guide
 
-This document describes the runtime architecture, configuration, and core workflows for the Dotmac ERP application. It is intended for developers and operators.
+This document describes the runtime architecture, configuration, and core workflows for the Kxmeleon ERP application. It is intended for developers and operators.
 
 ## Overview
 
-Dotmac ERP is a unified, multi-tenant ERP system built on FastAPI covering finance, HR, and operations. It ships both a JSON API (`/api/v1/...`) and a server-rendered web UI (`/finance/...`, `/people/...`) with shared business logic and models.
+Kxmeleon ERP is a unified, multi-tenant ERP system built on FastAPI covering finance, HR, and operations. It ships both a JSON API (`/api/v1/...`) and a server-rendered web UI (`/finance/...`, `/people/...`) with shared business logic and models.
 
 ## Architecture
 

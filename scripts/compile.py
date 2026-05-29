@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nuitka compilation orchestrator for DotMac ERP hardened builds.
+"""Nuitka compilation orchestrator for Kxmeleon ERP hardened builds.
 
 Compiles core business logic (services, models, licensing) into .so shared
 libraries so that Python source is not shipped to on-premise customers.
@@ -121,7 +121,7 @@ def remove_source(package: str, app_dir: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Compile DotMac ERP with Nuitka")
+    parser = argparse.ArgumentParser(description="Compile Kxmeleon ERP with Nuitka")
     parser.add_argument(
         "--output-dir",
         default="/build",
@@ -144,7 +144,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     app_dir = Path(args.app_dir)
 
-    print("DotMac ERP — Nuitka Compilation")
+    print("Kxmeleon ERP — Nuitka Compilation")
     print(f"Output directory: {output_dir}")
     print(f"Packages to compile: {COMPILE_PACKAGES}")
 

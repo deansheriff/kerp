@@ -103,6 +103,52 @@ def login(
 
 
 @router.post(
+    "/admin-login",
+    response_model=LoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Authenticate admin without MFA challenge",
+    description="""
+Authenticate an administrator with username and password.
+
+This endpoint is used by the admin sign-in page and requires the authenticated
+credential to belong to a user with the `admin` role. It bypasses the TOTP
+challenge for admins only, while the regular `/auth/login` endpoint continues
+to enforce MFA when configured.
+""",
+    responses={
+        200: {
+            "description": "Admin login successful. Returns access token.",
+        },
+        401: {
+            "model": ErrorResponse,
+            "description": "Invalid credentials",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "Authenticated user is not an admin",
+        },
+        428: {
+            "model": ErrorResponse,
+            "description": "Password reset required before login",
+        },
+    },
+)
+def admin_login(
+    payload: LoginRequest, request: Request, db: Session = Depends(get_db_auth_bypass)
+):
+    provider = payload.provider.value if payload.provider else None
+    return auth_flow_service.auth_flow.login_response(
+        db,
+        payload.username,
+        payload.password,
+        request,
+        provider,
+        skip_mfa=True,
+        required_role="admin",
+    )
+
+
+@router.post(
     "/mfa/setup",
     response_model=MfaSetupResponse,
     status_code=status.HTTP_200_OK,

@@ -759,8 +759,19 @@ class AuthFlow(ListResponseMixin):
         password: str,
         request: Request,
         provider: str | None,
+        *,
+        skip_mfa: bool = False,
+        required_role: str | None = None,
     ) -> Response | dict[str, Any]:
-        result = AuthFlow.login(db, username, password, request, provider)
+        result = AuthFlow.login(
+            db,
+            username,
+            password,
+            request,
+            provider,
+            skip_mfa=skip_mfa,
+            required_role=required_role,
+        )
         if result.get("refresh_token"):
             return AuthFlow._response_with_refresh_cookie(
                 db, result, LoginResponse, status.HTTP_200_OK
@@ -774,6 +785,9 @@ class AuthFlow(ListResponseMixin):
         password: str,
         request: Request,
         provider: str | None,
+        *,
+        skip_mfa: bool = False,
+        required_role: str | None = None,
     ) -> dict[str, Any]:
         if isinstance(provider, AuthProvider):
             provider_value = provider.value
@@ -822,6 +836,11 @@ class AuthFlow(ListResponseMixin):
                 },
             )
 
+        if required_role:
+            roles, _permissions = _load_rbac_claims(db, str(credential.person_id))
+            if required_role not in roles:
+                raise HTTPException(status_code=403, detail="Forbidden")
+
         credential.failed_login_attempts = 0
         credential.locked_until = None
         credential.last_login_at = now
@@ -835,7 +854,7 @@ class AuthFlow(ListResponseMixin):
             new_values={"username": username, "login_method": "password"},
         )
 
-        if _primary_totp_method(db, str(credential.person_id)):
+        if not skip_mfa and _primary_totp_method(db, str(credential.person_id)):
             return {
                 "mfa_required": True,
                 "mfa_token": _issue_mfa_token(db, str(credential.person_id)),

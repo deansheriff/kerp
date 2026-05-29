@@ -8,7 +8,7 @@ arguments:
 
 # Database Analytics Report Generator
 
-Generate a polished, formatted analytical report from the DotMac ERP database.
+Generate a polished, formatted analytical report from the Kxmeleon ERP database.
 Use the `erp-db` MCP server (`execute_sql` tool) for all queries.
 
 ## How to Generate a Report

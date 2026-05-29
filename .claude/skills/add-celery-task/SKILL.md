@@ -8,7 +8,7 @@ arguments:
 
 # Add Celery Task
 
-Create a new background task for the DotMac ERP.
+Create a new background task for the Kxmeleon ERP.
 
 ## Steps
 

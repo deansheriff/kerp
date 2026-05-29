@@ -152,12 +152,12 @@ def _rollback_session_safely(db: Session | None) -> None:
 def _brand_mark(name: str) -> str:
     """Generate a 2-letter brand mark from the brand name.
 
-    For multi-word names, uses the first letter of first two words (e.g., "DotMac ERP" → "DB").
+    For multi-word names, uses the first letter of first two words (e.g., "Kxmeleon ERP" -> "KE").
     For single-word names, uses first two letters (e.g., "Ledger" → "LE").
     """
     parts = [part for part in name.split() if part]
     if not parts:
-        return "DB"
+        return "KE"
     if len(parts) == 1:
         return parts[0][:2].upper()
     return (parts[0][0] + parts[1][0]).upper()
@@ -167,7 +167,7 @@ def brand_context() -> dict:
     """Get standard brand context for templates (system defaults)."""
     # Use configured brand_mark or derive from name
     mark = settings.brand_mark or (
-        _brand_mark(settings.brand_name) if settings.brand_name else "DB"
+        _brand_mark(settings.brand_name) if settings.brand_name else "KE"
     )
     return {
         "name": settings.brand_name,
@@ -272,7 +272,7 @@ def resolve_brand_context(
         if organization.logo_url and not brand.get("logo_url"):
             brand["logo_url"] = organization.logo_url
         if not brand.get("mark"):
-            brand["mark"] = _brand_mark(brand.get("name") or org_name or "DB")
+            brand["mark"] = _brand_mark(brand.get("name") or org_name or "KE")
     return brand
 
 
@@ -302,7 +302,7 @@ def landing_content() -> dict:
             {"key": "real_time", "label": "Real-time"},
         ],
         "benefits": {
-            "title": "Why teams choose Dotmac ERP",
+            "title": "Why teams choose Kxmeleon ERP",
             "subtitle": "Less busywork, faster closes, and a single source of truth.",
             "items": [
                 {

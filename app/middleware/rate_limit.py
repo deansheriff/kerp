@@ -264,6 +264,8 @@ DEFAULT_RATE_LIMITS: dict[str, RateLimitConfig] = {
     # Login endpoint - 5 requests per minute per IP (brute force protection)
     "/auth/login": RateLimitConfig(requests=5, window_seconds=60),
     "/api/v1/auth/login": RateLimitConfig(requests=5, window_seconds=60),
+    "/auth/admin-login": RateLimitConfig(requests=5, window_seconds=60),
+    "/api/v1/auth/admin-login": RateLimitConfig(requests=5, window_seconds=60),
     # Password reset - 3 requests per minute (email enumeration protection)
     "/auth/forgot-password": RateLimitConfig(requests=3, window_seconds=60),
     "/api/v1/auth/forgot-password": RateLimitConfig(requests=3, window_seconds=60),

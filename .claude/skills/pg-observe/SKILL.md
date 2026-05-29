@@ -8,7 +8,7 @@ arguments:
 
 # PostgreSQL Observability
 
-Run diagnostic queries against the DotMac ERP database using the `erp-db` MCP server.
+Run diagnostic queries against the Kxmeleon ERP database using the `erp-db` MCP server.
 
 ## Prerequisites
 

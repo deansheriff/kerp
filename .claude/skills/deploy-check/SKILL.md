@@ -8,7 +8,7 @@ arguments:
 
 # Pre-Deploy Check
 
-Validate that the DotMac ERP environment is ready for deployment.
+Validate that the Kxmeleon ERP environment is ready for deployment.
 
 ## Sections
 

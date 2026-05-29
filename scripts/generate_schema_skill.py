@@ -390,7 +390,7 @@ def generate() -> None:
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     lines: list[str] = []
 
-    lines.append("# DotMac ERP — Complete Database Schema Reference")
+    lines.append("# Kxmeleon ERP — Complete Database Schema Reference")
     lines.append("")
     lines.append(f"*Auto-generated on {now} from live database.*")
     lines.append("*Run `make schema-skill` to regenerate after migrations.*")

@@ -2,7 +2,7 @@
 
 > **Status**: Design Document (Draft)
 > **Created**: 2026-02-14
-> **Scope**: Cross-module AI coaching and business intelligence for DotMac ERP
+> **Scope**: Cross-module AI coaching and business intelligence for Kxmeleon ERP
 
 ## Table of Contents
 

@@ -8,7 +8,7 @@ arguments:
 
 # Celery Status
 
-Inspect the DotMac ERP Celery infrastructure using `docker exec` commands.
+Inspect the Kxmeleon ERP Celery infrastructure using `docker exec` commands.
 
 ## Sections
 

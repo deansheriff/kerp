@@ -1,4 +1,4 @@
-# Dotmac ERP
+# Kxmeleon ERP
 
 Unified ERP for finance, HR, and operations. Multi-tenant business software built with FastAPI, featuring comprehensive financial modules, human resources, authentication, RBAC, audit logging, background jobs, and full observability.
 
@@ -282,10 +282,10 @@ Services:
 | `JWT_REFRESH_TTL_DAYS` | Refresh token TTL | `30` |
 | `TOTP_ISSUER` | TOTP issuer name | `dotmac_erp` |
 | `TOTP_ENCRYPTION_KEY` | TOTP secret encryption key | Required |
-| `BRAND_NAME` | Application brand name | `Dotmac ERP` |
+| `BRAND_NAME` | Application brand name | `Kxmeleon ERP` |
 | `BRAND_TAGLINE` | Application tagline | `Unified ERP for finance, HR, and operations` |
 | `BRAND_MARK` | Two-letter brand mark override | - |
-| `LANDING_HERO_BADGE` | Landing page hero badge text | `Dotmac ERP` |
+| `LANDING_HERO_BADGE` | Landing page hero badge text | `Kxmeleon ERP` |
 | `LANDING_HERO_TITLE` | Landing page hero title | `Run your entire business on one ERP` |
 | `LANDING_HERO_SUBTITLE` | Landing page hero subtitle | `Finance, HR, and operations with real-time reporting.` |
 | `LANDING_CTA_PRIMARY` | Landing page primary CTA label | `Get started` |

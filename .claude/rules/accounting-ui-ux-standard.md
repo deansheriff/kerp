@@ -1,6 +1,6 @@
 # Accounting App UI/UX Standard
 
-Definitive reference for all user interface and experience decisions in DotMac ERP. Every new page, component, or template MUST conform to these standards. This document supersedes `ui-ux.md` for architectural decisions; `design-system.md` remains the token/component implementation reference.
+Definitive reference for all user interface and experience decisions in Kxmeleon ERP. Every new page, component, or template MUST conform to these standards. This document supersedes `ui-ux.md` for architectural decisions; `design-system.md` remains the token/component implementation reference.
 
 ---
 

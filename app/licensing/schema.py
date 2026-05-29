@@ -1,6 +1,6 @@
 """License Pydantic models and enums.
 
-Defines the structure of a DotMac ERP license file: the JSON payload carried
+Defines the structure of a Kxmeleon ERP license file: the JSON payload carried
 inside the signed envelope and the runtime status enum.
 """
 

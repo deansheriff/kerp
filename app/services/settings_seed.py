@@ -275,12 +275,17 @@ def seed_email_settings(db: Session) -> None:
         value_type=SettingValueType.string,
         value_text=os.getenv("SMTP_FROM_EMAIL", "noreply@example.com"),
     )
-    email_settings.ensure_by_key(
+    from_name_setting = email_settings.ensure_by_key(
         db,
         key="smtp_from_name",
         value_type=SettingValueType.string,
-        value_text=os.getenv("SMTP_FROM_NAME", "Dotmac ERP"),
+        value_text=os.getenv("SMTP_FROM_NAME", "Kxmeleon ERP"),
     )
+    legacy_from_names = {"Dotmac " + "ERP", "DotMac " + "ERP"}
+    if from_name_setting.value_text in legacy_from_names:
+        from_name_setting.value_text = "Kxmeleon ERP"
+        db.add(from_name_setting)
+        db.commit()
     reply_to = os.getenv("EMAIL_REPLY_TO")
     if reply_to:
         email_settings.ensure_by_key(

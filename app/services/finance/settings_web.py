@@ -524,7 +524,7 @@ class SettingsWebService:
             smtp_username = str(data.get(f"{prefix}smtp_username", "")).strip() or None
             smtp_password = str(data.get(f"{prefix}smtp_password", "")).strip() or None
             smtp_from_name = (
-                str(data.get(f"{prefix}smtp_from_name", "")).strip() or "Dotmac ERP"
+                str(data.get(f"{prefix}smtp_from_name", "")).strip() or "Kxmeleon ERP"
             )
             email_reply_to = (
                 str(data.get(f"{prefix}email_reply_to", "")).strip() or None

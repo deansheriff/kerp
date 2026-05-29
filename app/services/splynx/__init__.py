@@ -2,7 +2,7 @@
 Splynx Integration - ISP Billing System.
 
 Handles sync of customers, invoices, payments, and credit notes
-from Splynx (selfcare.dotmac.ng) to Dotmac ERP.
+from Splynx (selfcare.dotmac.ng) to Kxmeleon ERP.
 """
 
 from app.services.splynx.client import SplynxClient, SplynxConfig, SplynxError

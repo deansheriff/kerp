@@ -1,5 +1,5 @@
 """
-Base Sync Service for CRM to DotMac ERP integration.
+Base Sync Service for CRM to Kxmeleon ERP integration.
 
 Provides common functionality for syncing entities from crm.dotmac.io.
 Follows the same pattern as ERPNext sync but adapted for CRM API.
@@ -73,7 +73,7 @@ class SyncResult:
 
 class BaseCRMSyncService(ABC, Generic[T]):
     """
-    Base class for syncing entities from CRM to DotMac ERP.
+    Base class for syncing entities from CRM to Kxmeleon ERP.
 
     Handles:
     - Sync state tracking via SyncEntity
@@ -93,7 +93,7 @@ class BaseCRMSyncService(ABC, Generic[T]):
 
     # Subclasses must define these
     source_entity_type: str  # CRM entity type (e.g., 'ticket')
-    target_table: str  # DotMac ERP table (e.g., 'support.ticket')
+    target_table: str  # Kxmeleon ERP table (e.g., 'support.ticket')
 
     def __init__(
         self,
@@ -127,20 +127,20 @@ class BaseCRMSyncService(ABC, Generic[T]):
     @abstractmethod
     def transform_record(self, record: dict[str, Any]) -> dict[str, Any]:
         """
-        Transform CRM record to DotMac ERP format.
+        Transform CRM record to Kxmeleon ERP format.
 
         Args:
             record: CRM record
 
         Returns:
-            Transformed data for DotMac ERP entity
+            Transformed data for Kxmeleon ERP entity
         """
         pass
 
     @abstractmethod
     def create_entity(self, data: dict[str, Any]) -> T:
         """
-        Create DotMac ERP entity from transformed data.
+        Create Kxmeleon ERP entity from transformed data.
 
         Args:
             data: Transformed data
@@ -153,7 +153,7 @@ class BaseCRMSyncService(ABC, Generic[T]):
     @abstractmethod
     def update_entity(self, entity: T, data: dict[str, Any]) -> T:
         """
-        Update existing DotMac ERP entity.
+        Update existing Kxmeleon ERP entity.
 
         Args:
             entity: Existing entity

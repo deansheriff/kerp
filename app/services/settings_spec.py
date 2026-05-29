@@ -266,7 +266,7 @@ SETTINGS_SPECS: list[SettingSpec] = [
         key="smtp_from_name",
         env_var="SMTP_FROM_NAME",
         value_type=SettingValueType.string,
-        default="Dotmac ERP",
+        default="Kxmeleon ERP",
     ),
     SettingSpec(
         domain=SettingDomain.email,

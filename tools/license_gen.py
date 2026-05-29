@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DotMac ERP License Generation CLI.
+"""Kxmeleon ERP License Generation CLI.
 
 Internal-only tool — NOT shipped to customers.
 
@@ -45,7 +45,7 @@ SEPARATOR = "\n---\n"
 
 @click.group()
 def cli() -> None:
-    """DotMac ERP License Generation Tool."""
+    """Kxmeleon ERP License Generation Tool."""
 
 
 @cli.command()

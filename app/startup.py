@@ -324,7 +324,7 @@ def validate_license() -> None:
 def log_startup_info():
     """Log non-sensitive startup information for debugging."""
     logger.info("=" * 60)
-    logger.info("Dotmac ERP Starting")
+    logger.info("Kxmeleon ERP Starting")
     logger.info("=" * 60)
 
     # Log OpenBao configuration (without sensitive values)

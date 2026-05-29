@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to DotMac ERP are documented here.
+All notable changes to Kxmeleon ERP are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---

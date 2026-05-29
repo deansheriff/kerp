@@ -8,7 +8,7 @@ arguments:
 
 # Run Code Audit
 
-Perform a comprehensive audit of DotMac ERP code quality and security.
+Perform a comprehensive audit of Kxmeleon ERP code quality and security.
 
 ## Steps
 

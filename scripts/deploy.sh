@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy DotMac ERP — pull, restart containers, sync static files.
+# Deploy Kxmeleon ERP — pull, restart containers, sync static files.
 #
 # Usage:
 #   ./scripts/deploy.sh          # Full deploy
@@ -10,7 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== DotMac ERP Deploy ==="
+echo "=== Kxmeleon ERP Deploy ==="
 echo "Project: $PROJECT_DIR"
 echo ""
 
