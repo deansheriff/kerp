@@ -44,13 +44,13 @@ def _update_script_src(policy: str) -> str:
 
 
 def _allow_unsafe_script() -> bool:
-    """Allow unsafe script directives only when explicitly enabled."""
-    value = os.getenv("CSP_ALLOW_UNSAFE", "").strip().lower()
-    return value in {"1", "true", "yes", "on"}
+    """Allow Alpine-compatible script directives unless explicitly disabled."""
+    value = os.getenv("CSP_ALLOW_UNSAFE", "true").strip().lower()
+    return value not in {"0", "false", "no", "off"}
 
 
 def add_unsafe_eval_to_csp(policy: str | None) -> str:
-    """Optionally relax CSP for scripts when explicitly enabled via env."""
+    """Relax CSP for the server-rendered Alpine UI unless disabled via env."""
     if not _allow_unsafe_script():
         # Return policy unchanged (or a safe default if missing).
         return policy or "script-src 'self' https://cdn.jsdelivr.net"
