@@ -371,6 +371,13 @@ def _client_disconnect_response() -> Response:
     return Response(status_code=204)
 
 
+def _enqueue_audit_event(log_audit_event, audit_data: dict, logger: logging.Logger) -> None:
+    try:
+        log_audit_event.delay(**audit_data)
+    except Exception as exc:
+        logger.warning("Audit task enqueue failed; continuing request: %s", exc)
+
+
 @app.middleware("http")
 async def redirect_error_template_middleware(request: Request, call_next):
     """Convert redirect error query params into user-facing error templates."""
@@ -552,7 +559,7 @@ async def audit_middleware(request: Request, call_next):
                     )
             else:
                 audit_data = _extract_audit_data(request, audit_response)
-                log_audit_event.delay(**audit_data)
+                _enqueue_audit_event(log_audit_event, audit_data, logger)
         raise
     if should_log:
         # Log response asynchronously via Celery (or synchronously in tests)
@@ -561,7 +568,7 @@ async def audit_middleware(request: Request, call_next):
                 audit_service.audit_events.log_request(log_db, request, response)
         else:
             audit_data = _extract_audit_data(request, response)
-            log_audit_event.delay(**audit_data)
+            _enqueue_audit_event(log_audit_event, audit_data, logger)
     return response
 
 
