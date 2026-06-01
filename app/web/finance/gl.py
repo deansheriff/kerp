@@ -351,35 +351,21 @@ async def export_all_ledger(
 
 
 @router.post("/ledger/export")
-def queue_ledger_export(
+async def export_or_queue_ledger(
+    request: Request,
     search: str = "",
     account_id: str = "",
     start_date: str = "",
     end_date: str = "",
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db_for_org),
-) -> JSONResponse:
-    """Queue all posted ledger transactions matching filters for CSV export."""
-    instance = queue_background_export(
-        db,
-        auth.organization_id,
-        auth.user_id,
-        report_code="GL_LEDGER",
-        parameters={
-            "search": search,
-            "account_id": account_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        },
-        output_format="CSV",
-    )
-    return JSONResponse(
-        {
-            "message": "Ledger Transactions export is processing. You will be notified when it is ready.",
-            "instance_id": str(instance.instance_id),
-            "status_url": f"/finance/gl/ledger/exports/{instance.instance_id}/status",
-        },
-        status_code=202,
+) -> Response:
+    """
+    Export ledger transactions, inline for small result sets or queued (with an
+    emailed download link) for large ones. Returns CSV (200) or queued JSON (202).
+    """
+    return await gl_web_service.export_or_queue_ledger_response(
+        auth, db, search, account_id, start_date, end_date
     )
 
 

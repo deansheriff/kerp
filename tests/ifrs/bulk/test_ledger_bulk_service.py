@@ -160,6 +160,27 @@ class TestExportAll:
         assert "Posting Date" in content.split("\n")[0]
 
 
+class TestCountAll:
+    """Tests for count_all (drives the inline-vs-queue threshold decision)."""
+
+    def test_count_all_returns_scalar(self, mock_db, organization_id):
+        mock_db.scalar.return_value = 42
+
+        service = LedgerBulkService(mock_db, organization_id)
+        count = service.count_all(start_date="2025-01-01", end_date="2025-12-31")
+
+        assert count == 42
+        # A COUNT query was issued (not a full row fetch).
+        assert mock_db.scalar.called
+
+    def test_count_all_none_coerced_to_zero(self, mock_db, organization_id):
+        mock_db.scalar.return_value = None
+
+        service = LedgerBulkService(mock_db, organization_id)
+
+        assert service.count_all() == 0
+
+
 class TestFactoryFunction:
     """Tests for the get_ledger_bulk_service factory function."""
 

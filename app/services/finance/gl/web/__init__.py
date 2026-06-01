@@ -18,6 +18,7 @@ For backward compatibility, the original import path also works:
 """
 
 from fastapi import Request
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.schemas.bulk_actions import BulkActionRequest, BulkExportRequest
@@ -255,6 +256,86 @@ class GLWebService(
             start_date=start_date,
             end_date=end_date,
             extra_filters=extra,
+        )
+
+    async def export_or_queue_ledger_response(
+        self,
+        auth: WebAuthContext,
+        db: Session,
+        search: str = "",
+        account_id: str = "",
+        start_date: str = "",
+        end_date: str = "",
+    ) -> Response:
+        """
+        Export ledger transactions, choosing inline vs background by size.
+
+        Counts the matching rows first: small result sets stream back inline
+        as a CSV response; large sets are queued to a worker and the requester
+        is emailed a download link when ready (returns a 202 JSON payload).
+        """
+        import logging
+
+        from app.services.finance.gl.bulk import get_ledger_bulk_service
+        from app.services.finance.rpt.async_exports import (
+            INLINE_EXPORT_ROW_THRESHOLD,
+            queue_background_export,
+        )
+
+        logger = logging.getLogger(__name__)
+
+        service = get_ledger_bulk_service(
+            db,
+            coerce_uuid(auth.organization_id),
+            coerce_uuid(auth.user_id),
+        )
+        extra: dict[str, object] | None = (
+            {"account_id": coerce_uuid(account_id)} if account_id else None
+        )
+
+        row_count = service.count_all(
+            search=search,
+            start_date=start_date,
+            end_date=end_date,
+            extra_filters=extra,
+        )
+
+        if row_count <= INLINE_EXPORT_ROW_THRESHOLD:
+            logger.info("Ledger export: %d rows — exporting inline", row_count)
+            return await service.export_all(
+                search=search,
+                start_date=start_date,
+                end_date=end_date,
+                extra_filters=extra,
+            )
+
+        logger.info("Ledger export: %d rows — queuing background export", row_count)
+        instance = queue_background_export(
+            db,
+            coerce_uuid(auth.organization_id),
+            coerce_uuid(auth.user_id),
+            report_code="GL_LEDGER",
+            parameters={
+                "search": search,
+                "account_id": account_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            output_format="CSV",
+        )
+        return JSONResponse(
+            {
+                "message": (
+                    f"This export has {row_count:,} rows and is being prepared in "
+                    "the background. We'll email you a download link when it's ready."
+                ),
+                "instance_id": str(instance.instance_id),
+                "status_url": (
+                    f"/finance/gl/ledger/exports/{instance.instance_id}/status"
+                ),
+                "row_count": row_count,
+            },
+            status_code=202,
         )
 
     async def bulk_approve_journals_response(
