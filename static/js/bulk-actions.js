@@ -291,6 +291,10 @@ const BACKGROUND_EXPORTS = {
         label: 'GL Journals',
         statusBase: '/finance/gl/journals/exports'
     },
+    '/finance/gl/ledger/export': {
+        label: 'Ledger Transactions',
+        statusBase: '/finance/gl/ledger/exports'
+    },
     '/finance/ar/invoices/export': {
         label: 'AR Invoices',
         statusBase: '/finance/ar/invoices/exports'
@@ -353,11 +357,20 @@ function pollBackgroundExport(statusUrl, label, attempt) {
         });
 }
 
+function getCsrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+}
+
 function queueBackgroundExport(baseUrl, url) {
     var config = BACKGROUND_EXPORTS[baseUrl];
     exportToast(config.label + ' export is processing...', 'info');
 
-    fetch(url, { method: 'POST', credentials: 'same-origin' })
+    fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': getCsrfToken() },
+    })
         .then(function(response) {
             return response.json().then(function(data) {
                 if (!response.ok) {

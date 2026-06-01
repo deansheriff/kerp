@@ -33,6 +33,13 @@ EXPORT_DEFINITIONS = {
         "task": "process_gl_journals_export",
         "formats": {"CSV"},
     },
+    "GL_LEDGER": {
+        "download_base": "/finance/gl/ledger/exports",
+        "filename_prefix": "gl_ledger",
+        "label": "Ledger Transactions",
+        "task": "process_gl_ledger_export",
+        "formats": {"CSV"},
+    },
     "AR_INVOICES": {
         "download_base": "/finance/ar/invoices/exports",
         "filename_prefix": "ar_invoices",

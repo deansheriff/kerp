@@ -334,6 +334,96 @@ def list_ledger(
     )
 
 
+@router.get("/ledger/export")
+async def export_all_ledger(
+    request: Request,
+    search: str = "",
+    account_id: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Export all posted ledger transactions matching filters to CSV."""
+    return await gl_web_service.export_all_ledger_response(
+        auth, db, search, account_id, start_date, end_date
+    )
+
+
+@router.post("/ledger/export")
+def queue_ledger_export(
+    search: str = "",
+    account_id: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+) -> JSONResponse:
+    """Queue all posted ledger transactions matching filters for CSV export."""
+    instance = queue_background_export(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        report_code="GL_LEDGER",
+        parameters={
+            "search": search,
+            "account_id": account_id,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        output_format="CSV",
+    )
+    return JSONResponse(
+        {
+            "message": "Ledger Transactions export is processing. You will be notified when it is ready.",
+            "instance_id": str(instance.instance_id),
+            "status_url": f"/finance/gl/ledger/exports/{instance.instance_id}/status",
+        },
+        status_code=202,
+    )
+
+
+@router.get("/ledger/exports/{instance_id}/download")
+def download_ledger_export(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+) -> Response:
+    """Download a completed queued Ledger Transactions export."""
+    body, filename, media_type, content_length = get_completed_export_for_download(
+        db,
+        auth.organization_id,
+        auth.user_id,
+        instance_id,
+        report_code="GL_LEDGER",
+    )
+    if hasattr(body, "__fspath__"):
+        return FileResponse(body, filename=filename, media_type=media_type)
+
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    return StreamingResponse(body, media_type=media_type, headers=headers)
+
+
+@router.get("/ledger/exports/{instance_id}/status")
+def ledger_export_status(
+    instance_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+) -> JSONResponse:
+    """Return the status of a queued Ledger Transactions export."""
+    return JSONResponse(
+        get_export_status(
+            db,
+            auth.organization_id,
+            auth.user_id,
+            instance_id,
+            report_code="GL_LEDGER",
+        )
+    )
+
+
 @router.get("/journals", response_class=HTMLResponse)
 def list_journals(
     request: Request,

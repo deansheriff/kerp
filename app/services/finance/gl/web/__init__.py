@@ -226,6 +226,37 @@ class GLWebService(
             end_date=end_date,
         )
 
+    # =====================================================================
+    # Bulk Action Methods - Ledger
+    # =====================================================================
+
+    async def export_all_ledger_response(
+        self,
+        auth: WebAuthContext,
+        db: Session,
+        search: str = "",
+        account_id: str = "",
+        start_date: str = "",
+        end_date: str = "",
+    ):
+        """Export all posted ledger transactions matching filters to CSV."""
+        from app.services.finance.gl.bulk import get_ledger_bulk_service
+
+        service = get_ledger_bulk_service(
+            db,
+            coerce_uuid(auth.organization_id),
+            coerce_uuid(auth.user_id),
+        )
+        extra: dict[str, object] | None = (
+            {"account_id": coerce_uuid(account_id)} if account_id else None
+        )
+        return await service.export_all(
+            search=search,
+            start_date=start_date,
+            end_date=end_date,
+            extra_filters=extra,
+        )
+
     async def bulk_approve_journals_response(
         self,
         request: Request,
