@@ -666,6 +666,43 @@ class DepreciationService(ListResponseMixin):
                 detail="Segregation of duties violation: creator cannot post",
             )
 
+        schedules = list(
+            db.scalars(
+                select(DepreciationSchedule).where(
+                    DepreciationSchedule.run_id == r_id
+                )
+            )
+        )
+        if not schedules:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot post depreciation run with no schedules",
+            )
+
+        for schedule in schedules:
+            asset = db.get(Asset, schedule.asset_id)
+            if not asset or asset.organization_id != org_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot post depreciation run with missing asset schedule",
+                )
+
+            is_stale = (
+                schedule.accumulated_depreciation_opening
+                != asset.accumulated_depreciation
+                or schedule.net_book_value_opening != asset.net_book_value
+                or int(schedule.remaining_life_months_opening)
+                != int(asset.remaining_life_months)
+            )
+            if is_stale:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Depreciation run is stale for asset "
+                        f"{asset.asset_number}; recalculate the run before posting"
+                    ),
+                )
+
         run.status = DepreciationRunStatus.POSTING
         db.flush()
 
@@ -682,15 +719,6 @@ class DepreciationService(ListResponseMixin):
                 run.status = DepreciationRunStatus.FAILED
                 db.commit()
                 raise HTTPException(status_code=400, detail=result.message)
-
-            # Update asset records
-            schedules = list(
-                db.scalars(
-                    select(DepreciationSchedule).where(
-                        DepreciationSchedule.run_id == r_id
-                    )
-                )
-            )
 
             for schedule in schedules:
                 asset = db.get(Asset, schedule.asset_id)

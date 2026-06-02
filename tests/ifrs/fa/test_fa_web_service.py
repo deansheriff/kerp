@@ -1398,6 +1398,9 @@ class TestFAWebServiceGLReconciliation:
 
         assert "fa.depreciation_schedule" in sql
         assert "fa.depreciation_run" in sql
+        assert "accumulated_depreciation_closing" in sql
+        assert "net_book_value_closing" in sql
+        assert "row_number()" in sql
         assert "gl.fiscal_period.end_date <= " in sql
         assert "fa.asset.accumulated_depreciation" not in sql
         assert "fa.asset.net_book_value" not in sql
@@ -1929,3 +1932,178 @@ class TestFAWebServiceAssetCreate:
             )
 
         mock_db.rollback.assert_called_once()
+
+
+class TestFAWebServiceGLReconciliationPackages:
+    """Tests for FA GL reconciliation package web actions."""
+
+    def test_create_package_response_redirects_to_package_detail(self):
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        run_id = uuid.uuid4()
+        mock_db = MagicMock()
+        package = SimpleNamespace(run_id=run_id)
+
+        with patch(
+            "app.services.fixed_assets.reconciliation."
+            "FixedAssetGLReconciliationPackageService.create_package",
+            return_value=package,
+        ) as create_package:
+            response = FixedAssetWebService.create_gl_reconciliation_package_response(
+                mock_db,
+                str(org_id),
+                user_id,
+                as_of=date(2026, 4, 30),
+            )
+
+        assert response.status_code == 303
+        assert f"/fixed-assets/reports/gl-reconciliation/packages/{run_id}" in (
+            response.headers["location"]
+        )
+        create_package.assert_called_once_with(
+            mock_db,
+            org_id,
+            as_of=date(2026, 4, 30),
+            requested_by_user_id=user_id,
+            submit_for_approval=True,
+        )
+
+    def test_approve_package_response_uses_approval_workflow(self):
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        run_id = uuid.uuid4()
+        approval_request_id = uuid.uuid4()
+        run = SimpleNamespace(
+            run_id=run_id,
+            organization_id=org_id,
+            approval_request_id=approval_request_id,
+        )
+        mock_db = MagicMock()
+        mock_db.get.return_value = run
+
+        with patch(
+            "app.services.fixed_assets.web.ApprovalWorkflowService.approve"
+        ) as approve:
+            response = (
+                FixedAssetWebService.approve_gl_reconciliation_package_response(
+                    mock_db,
+                    str(org_id),
+                    str(run_id),
+                    user_id,
+                    comments="Reviewed",
+                )
+            )
+
+        assert response.status_code == 303
+        assert "success=Approval+recorded" in response.headers["location"]
+        approve.assert_called_once_with(
+            mock_db,
+            approval_request_id,
+            user_id,
+            comments="Reviewed",
+        )
+
+    def test_approve_package_response_redirects_with_error_when_not_eligible(self):
+        from fastapi import HTTPException
+
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        run_id = uuid.uuid4()
+        approval_request_id = uuid.uuid4()
+        run = SimpleNamespace(
+            run_id=run_id,
+            organization_id=org_id,
+            approval_request_id=approval_request_id,
+        )
+        mock_db = MagicMock()
+        mock_db.get.return_value = run
+
+        with patch(
+            "app.services.fixed_assets.web.ApprovalWorkflowService.approve",
+            side_effect=HTTPException(
+                status_code=403,
+                detail="User is not eligible to approve this level",
+            ),
+        ):
+            response = (
+                FixedAssetWebService.approve_gl_reconciliation_package_response(
+                    mock_db,
+                    str(org_id),
+                    str(run_id),
+                    user_id,
+                )
+            )
+
+        assert response.status_code == 303
+        assert f"/fixed-assets/reports/gl-reconciliation/packages/{run_id}" in (
+            response.headers["location"]
+        )
+        assert "User%20is%20not%20eligible%20to%20approve%20this%20level" in (
+            response.headers["location"]
+        )
+
+    def test_approval_current_level_label_uses_role_name(self):
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        role_id = uuid.uuid4()
+        mock_db = MagicMock()
+        mock_db.get.return_value = SimpleNamespace(name="finance_manager")
+        approval = SimpleNamespace(
+            current_level=1,
+            workflow=SimpleNamespace(
+                approval_levels=[
+                    {
+                        "approver_type": "ROLE",
+                        "approver_id": str(role_id),
+                    }
+                ]
+            ),
+        )
+
+        result = FixedAssetWebService._approval_current_level_label(
+            mock_db,
+            approval,
+        )
+
+        assert result == "Finance Manager"
+
+    def test_create_draft_journal_response_redirects_to_package_detail(self):
+        from app.services.fixed_assets.web import FixedAssetWebService
+
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        run_id = uuid.uuid4()
+        journal = SimpleNamespace(journal_number="JE-202604-0001")
+        mock_db = MagicMock()
+
+        with patch(
+            "app.services.fixed_assets.reconciliation."
+            "FixedAssetGLReconciliationPackageService."
+            "create_draft_correction_journal",
+            return_value=journal,
+        ) as create_draft:
+            response = (
+                FixedAssetWebService.create_gl_reconciliation_draft_journal_response(
+                    mock_db,
+                    str(org_id),
+                    str(run_id),
+                    user_id,
+                )
+            )
+
+        assert response.status_code == 303
+        assert f"/fixed-assets/reports/gl-reconciliation/packages/{run_id}" in (
+            response.headers["location"]
+        )
+        create_draft.assert_called_once_with(
+            mock_db,
+            org_id,
+            run_id,
+            created_by_user_id=user_id,
+        )

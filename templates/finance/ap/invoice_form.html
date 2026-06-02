@@ -962,17 +962,6 @@
 
                             <div class="grid gap-4">
                                 <div class="sm:col-span-2">
-                                    <label class="form-label">Serial Numbers</label>
-                                    <textarea aria-label="Receipt serial numbers"
-                                              x-model="line.receipt_serial_numbers"
-                                              rows="3"
-                                              placeholder="Enter one serial number per line or separate with commas."
-                                              class="form-input resize-none"
-                                              :disabled="line.receipt_auto_generate_serials"></textarea>
-                                    <p class="form-help">Serial-tracked quantities must have exactly one serial number per unit.</p>
-                                </div>
-
-                                <div class="sm:col-span-2">
                                     <label class="inline-flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
                                         <input type="checkbox"
                                                class="mt-1 rounded border-slate-300 text-teal-600 focus:ring-teal-500"

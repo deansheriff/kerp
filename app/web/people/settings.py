@@ -144,7 +144,10 @@ async def download_default_invite_attachment(
 
     filename = Path(str(metadata.get("filename") or "welcome-pack")).name
     content_type = str(metadata.get("content_type") or "application/octet-stream")
-    data = get_storage().download(str(metadata["s3_key"]))
+    try:
+        data = get_storage().download(str(metadata["s3_key"]))
+    except (ModuleNotFoundError, RuntimeError):
+        return RedirectResponse(url="/people/settings/hr?error=Attachment+not+found")
     return Response(
         content=data,
         media_type=content_type,
