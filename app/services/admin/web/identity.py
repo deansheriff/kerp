@@ -147,15 +147,15 @@ class AdminIdentityMixin:
             )
             credential = credential_map.get(person.id)
             locked_until = credential.get("locked_until") if credential else None
-            failed_login_attempts = int(
-                credential.get("failed_login_attempts") or 0
-            ) if credential else 0
+            failed_login_attempts = (
+                int(credential.get("failed_login_attempts") or 0) if credential else 0
+            )
             credential_active = bool(credential and credential.get("is_active"))
             is_locked = bool(
                 _datetime_after(locked_until, now) or failed_login_attempts >= 5
             )
-            person_active = (
-                person.status == PersonStatus.active and bool(person.is_active)
+            person_active = person.status == PersonStatus.active and bool(
+                person.is_active
             )
             account_is_active = person_active and credential_active and not is_locked
             if account_is_active:
@@ -242,14 +242,16 @@ class AdminIdentityMixin:
                 )
             )
             now = datetime.now(UTC)
-            failed_login_attempts = credential.failed_login_attempts if credential else 0
+            failed_login_attempts = (
+                credential.failed_login_attempts if credential else 0
+            )
             locked_until = credential.locked_until if credential else None
             credential_active = bool(credential and credential.is_active)
             is_locked = bool(
                 _datetime_after(locked_until, now) or failed_login_attempts >= 5
             )
-            person_active = (
-                person.status == PersonStatus.active and bool(person.is_active)
+            person_active = person.status == PersonStatus.active and bool(
+                person.is_active
             )
             account_is_active = person_active and credential_active and not is_locked
             if account_is_active:

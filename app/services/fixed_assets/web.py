@@ -971,14 +971,11 @@ class FixedAssetWebService:
         )
 
         try:
-            journal = (
-                FixedAssetGLReconciliationPackageService
-                .create_draft_correction_journal(
-                    db,
-                    coerce_uuid(organization_id),
-                    coerce_uuid(run_id),
-                    created_by_user_id=current_user_id,
-                )
+            journal = FixedAssetGLReconciliationPackageService.create_draft_correction_journal(
+                db,
+                coerce_uuid(organization_id),
+                coerce_uuid(run_id),
+                created_by_user_id=current_user_id,
             )
             return RedirectResponse(
                 url=(

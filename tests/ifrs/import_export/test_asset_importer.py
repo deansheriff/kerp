@@ -59,9 +59,7 @@ def test_asset_importer_generates_sequence_number_ignoring_file_value(
     assert asset.asset_name == "Workstation"
 
 
-def test_asset_importer_duplicate_check_uses_asset_fingerprint(
-    import_config, mock_db
-):
+def test_asset_importer_duplicate_check_uses_asset_fingerprint(import_config, mock_db):
     existing = SimpleNamespace(
         serial_number="8CC9491MB2",
         asset_name="Workstation",

@@ -151,7 +151,9 @@ class SupplierInvoiceService(ListResponseMixin):
             if value in (None, ""):
                 return None
             if isinstance(value, list):
-                serials = [str(serial).strip() for serial in value if str(serial).strip()]
+                serials = [
+                    str(serial).strip() for serial in value if str(serial).strip()
+                ]
                 return serials or None
             serials = [
                 serial.strip()

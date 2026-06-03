@@ -666,9 +666,7 @@ class DepreciationService(ListResponseMixin):
 
         schedules = list(
             db.scalars(
-                select(DepreciationSchedule).where(
-                    DepreciationSchedule.run_id == r_id
-                )
+                select(DepreciationSchedule).where(DepreciationSchedule.run_id == r_id)
             )
         )
         if not schedules:

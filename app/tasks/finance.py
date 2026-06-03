@@ -586,7 +586,9 @@ def process_fixed_asset_gl_reconciliation_package(
     )
 
     report_date = date.fromisoformat(as_of_date) if as_of_date else date.today()
-    organization_ids = [UUID(organization_id)] if organization_id else _list_active_organization_ids()
+    organization_ids = (
+        [UUID(organization_id)] if organization_id else _list_active_organization_ids()
+    )
     results: dict[str, Any] = {
         "organizations_checked": len(organization_ids),
         "balanced": 0,
@@ -606,7 +608,10 @@ def process_fixed_asset_gl_reconciliation_package(
                     submit_for_approval=submit_for_approval,
                 )
                 status = package.status.lower()
-                if package.status == FixedAssetGLReconciliationPackageService.STATUS_BALANCED:
+                if (
+                    package.status
+                    == FixedAssetGLReconciliationPackageService.STATUS_BALANCED
+                ):
                     results["balanced"] += 1
                 elif package.status == (
                     FixedAssetGLReconciliationPackageService.STATUS_PENDING_APPROVAL
@@ -707,13 +712,10 @@ def process_approved_fixed_asset_gl_reconciliation_drafts(
 
             for run in approved_runs:
                 try:
-                    journal = (
-                        FixedAssetGLReconciliationPackageService
-                        .create_draft_correction_journal(
-                            db,
-                            org_id,
-                            run.run_id,
-                        )
+                    journal = FixedAssetGLReconciliationPackageService.create_draft_correction_journal(
+                        db,
+                        org_id,
+                        run.run_id,
                     )
                     results["drafts_created"] += 1
                     results["journals"].append(
