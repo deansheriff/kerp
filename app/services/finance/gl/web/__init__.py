@@ -17,6 +17,8 @@ For backward compatibility, the original import path also works:
     from app.services.finance.gl.web import gl_web_service
 """
 
+import logging
+
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
@@ -49,6 +51,8 @@ from app.services.finance.gl.web.journal_web import JournalWebService
 from app.services.finance.gl.web.ledger_web import LedgerWebService, ledger_web_service
 from app.services.finance.gl.web.period_web import PeriodWebService
 from app.web.deps import WebAuthContext
+
+logger = logging.getLogger(__name__)
 
 
 class GLWebService(
@@ -274,15 +278,12 @@ class GLWebService(
         as a CSV response; large sets are queued to a worker and the requester
         is emailed a download link when ready (returns a 202 JSON payload).
         """
-        import logging
 
         from app.services.finance.gl.bulk import get_ledger_bulk_service
         from app.services.finance.rpt.async_exports import (
             INLINE_EXPORT_ROW_THRESHOLD,
             queue_background_export,
         )
-
-        logger = logging.getLogger(__name__)
 
         service = get_ledger_bulk_service(
             db,

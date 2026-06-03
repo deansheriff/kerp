@@ -336,7 +336,6 @@ def list_ledger(
 
 @router.get("/ledger/export")
 async def export_all_ledger(
-    request: Request,
     search: str = "",
     account_id: str = "",
     start_date: str = "",
@@ -352,7 +351,6 @@ async def export_all_ledger(
 
 @router.post("/ledger/export")
 async def export_or_queue_ledger(
-    request: Request,
     search: str = "",
     account_id: str = "",
     start_date: str = "",

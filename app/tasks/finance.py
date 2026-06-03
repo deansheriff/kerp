@@ -286,7 +286,7 @@ async def _build_list_export_response(
             status,
             start_date,
             end_date,
-            {"account_id": params.get("account_id") or ""},
+            {"account_id": params.get("account_id") or None},
         )
 
     if report_code == "AR_INVOICES":
