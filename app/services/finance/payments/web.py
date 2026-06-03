@@ -155,6 +155,7 @@ class PaymentWebService:
         active_intent = db.scalar(
             select(PaymentIntent)
             .where(
+                PaymentIntent.organization_id == organization_id,
                 PaymentIntent.source_type == "EXPENSE_CLAIM",
                 PaymentIntent.source_id == expense_claim.claim_id,
                 PaymentIntent.status.in_(active_statuses),
@@ -166,6 +167,7 @@ class PaymentWebService:
         latest_intent = db.scalar(
             select(PaymentIntent)
             .where(
+                PaymentIntent.organization_id == organization_id,
                 PaymentIntent.source_type == "EXPENSE_CLAIM",
                 PaymentIntent.source_id == expense_claim.claim_id,
             )

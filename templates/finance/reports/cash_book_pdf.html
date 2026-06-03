@@ -1,0 +1,65 @@
+{% extends "finance/reports/_pdf_base.html" %}
+
+{% block title %}Cash Book — {{ org_name }}{% endblock %}
+{% block page_size %}A4 landscape{% endblock %}
+{% block report_title %}Cash Book{% endblock %}
+{% block report_meta %}
+<p class="meta-line">{{ start_date }} to {{ end_date }} · {{ row_count }} movement(s)</p>
+{% endblock %}
+
+{% block report_body %}
+<table class="summary-grid">
+  <tr>
+    <td>
+      <p class="summary-label">Total Inflows</p>
+      <p class="summary-value text-emerald">{{ total_inflows }}</p>
+    </td>
+    <td>
+      <p class="summary-label">Total Outflows</p>
+      <p class="summary-value text-rose">{{ total_outflows }}</p>
+    </td>
+    <td>
+      <p class="summary-label">Net Movement</p>
+      <p class="summary-value">{{ net_movement }}</p>
+    </td>
+  </tr>
+</table>
+
+<table class="report-table">
+  <thead>
+    <tr>
+      <th style="width: 11%;">Date</th>
+      <th style="width: 9%;">Type</th>
+      <th style="width: 15%;">Reference</th>
+      <th>Party</th>
+      <th style="width: 12%;">Method</th>
+      <th class="num" style="width: 12%;">Inflow</th>
+      <th class="num" style="width: 12%;">Outflow</th>
+      <th class="num" style="width: 13%;">Running</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td class="nowrap">{{ row.date }}</td>
+      <td>{{ row.kind }}</td>
+      <td>{{ row.reference }}</td>
+      <td>{{ row.party }}</td>
+      <td>{{ row.method }}</td>
+      <td class="num">{{ row.inflow }}</td>
+      <td class="num">{{ row.outflow }}</td>
+      <td class="num">{{ row.running }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr class="total-row">
+      <td colspan="5">TOTAL</td>
+      <td class="num">{{ total_inflows }}</td>
+      <td class="num">{{ total_outflows }}</td>
+      <td class="num">{{ net_movement }}</td>
+    </tr>
+  </tfoot>
+</table>
+<p class="meta-line" style="margin-top: 12px;">{{ running_note }}</p>
+{% endblock %}

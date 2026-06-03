@@ -1,0 +1,948 @@
+"""Books of prime entry (day books) — context builders and CSV export.
+
+Day books present transactions in their book of original entry, in date
+order, with period subtotals — the auditor's chronological view that sits
+underneath the ledger. This module hosts each day book as it is added:
+
+* Sales Day Book — AR customer invoices (credit sales).
+
+VAT note: this organisation accounts for VAT on a **cash basis** (output VAT
+on AR receipts, input VAT on AP payments — see ``feedback_vat_cash_basis``).
+Day books are *invoice-dated*, so the VAT column here is a memo of the tax
+charged on the invoice and will NOT equal the VAT return for the period.
+Treat it as analytical, not as the return basis.
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from decimal import Decimal
+from typing import Any
+
+from app.models.finance.ap.supplier import Supplier
+from app.models.finance.ap.supplier_invoice import (
+    SupplierInvoice,
+    SupplierInvoiceStatus,
+)
+from app.models.finance.ap.supplier_payment import APPaymentStatus, SupplierPayment
+from app.models.finance.ar.customer import Customer
+from app.models.finance.ar.customer_payment import CustomerPayment
+from app.models.finance.ar.customer_payment import PaymentStatus as ARPaymentStatus
+from app.models.finance.ar.invoice import Invoice, InvoiceStatus, InvoiceType
+from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
+from app.services.common import coerce_uuid
+from app.services.finance.ap.invoice_query import (
+    build_invoice_query as build_supplier_invoice_query,
+)
+from app.services.finance.ap.payment_query import build_payment_query
+from app.services.finance.ar.invoice_query import build_invoice_query
+from app.services.finance.ar.receipt_query import build_receipt_query
+from app.services.finance.gl.journal_query import build_journal_query
+from app.services.finance.rpt.common import (
+    _build_csv,
+    _build_xlsx,
+    _format_currency,
+    _format_date,
+    _iso_date,
+    _parse_date,
+)
+
+# Column headers shared by the Sales Day Book CSV and Excel exports.
+_SALES_EXPORT_HEADERS = [
+    "Date",
+    "Invoice No",
+    "Customer",
+    "Reference",
+    "Currency",
+    "Status",
+    "Net",
+    "VAT",
+    "Gross",
+]
+# Index of the first numeric column (Net) — used for Excel cell typing.
+_SALES_NUMERIC_FROM = 6
+
+# Statuses excluded from a day book when no explicit status filter is given:
+# DRAFT has not been posted to the ledger; VOID has been reversed out.
+_SALES_EXCLUDED_STATUSES = (InvoiceStatus.DRAFT, InvoiceStatus.VOID)
+
+
+def _customer_name(invoice: Invoice) -> str:
+    customer = invoice.customer
+    if customer is None:
+        return ""
+    return customer.trading_name or customer.legal_name or ""
+
+
+def sales_day_book_context(
+    db: Any,
+    organization_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> dict[str, Any]:
+    """Build context for the Sales Day Book (AR invoices, chronological)."""
+    org_id = coerce_uuid(organization_id)
+
+    today = date.today()
+    from_date = _parse_date(start_date) or today.replace(day=1)
+    to_date = _parse_date(end_date) or today
+
+    query = build_invoice_query(
+        db=db,
+        organization_id=str(org_id),
+        status=status or None,
+        start_date=_iso_date(from_date),
+        end_date=_iso_date(to_date),
+    )
+    # A sales day book records sales invoices only — credit notes belong in
+    # the Sales Returns Day Book, and proformas are not real sales.
+    query = query.where(Invoice.invoice_type == InvoiceType.STANDARD)
+    if not status:
+        query = query.where(Invoice.status.notin_(_SALES_EXCLUDED_STATUSES))
+    query = query.order_by(Invoice.invoice_date, Invoice.invoice_number)
+
+    invoices = list(db.scalars(query).all())
+
+    rows: list[dict[str, Any]] = []
+    total_net = Decimal("0")
+    total_vat = Decimal("0")
+    total_gross = Decimal("0")
+    for inv in invoices:
+        net = inv.subtotal or Decimal("0")
+        vat = inv.tax_amount or Decimal("0")
+        gross = inv.total_amount or Decimal("0")
+        total_net += net
+        total_vat += vat
+        total_gross += gross
+        rows.append(
+            {
+                "invoice_date": _format_date(inv.invoice_date),
+                "invoice_date_iso": _iso_date(inv.invoice_date),
+                "invoice_number": inv.invoice_number,
+                "customer_name": _customer_name(inv),
+                "reference": inv.purpose or "",
+                "currency_code": inv.currency_code,
+                "status": inv.status.value if inv.status else "",
+                "net": _format_currency(net),
+                "net_raw": float(net),
+                "vat": _format_currency(vat),
+                "vat_raw": float(vat),
+                "gross": _format_currency(gross),
+                "gross_raw": float(gross),
+            }
+        )
+
+    return {
+        "rows": rows,
+        "row_count": len(rows),
+        "start_date": _format_date(from_date),
+        "start_date_iso": _iso_date(from_date),
+        "end_date": _format_date(to_date),
+        "end_date_iso": _iso_date(to_date),
+        "status": status or "",
+        "total_net": _format_currency(total_net),
+        "total_net_raw": float(total_net),
+        "total_vat": _format_currency(total_vat),
+        "total_vat_raw": float(total_vat),
+        "total_gross": _format_currency(total_gross),
+        "total_gross_raw": float(total_gross),
+        # VAT here is invoice-dated; the org accounts for VAT on a cash basis,
+        # so this is a memo figure, not the VAT return basis for the period.
+        "vat_basis_note": (
+            "VAT shown is the tax charged on invoices in this period (memo). "
+            "This organisation accounts for VAT on a cash basis, so it will "
+            "not equal the VAT return for the period."
+        ),
+    }
+
+
+def _sales_day_book_export_rows(ctx: dict[str, Any]) -> list[list[str]]:
+    """Flatten the Sales Day Book context into export rows + a totals line."""
+    rows: list[list[str]] = [
+        [
+            r["invoice_date_iso"],
+            r["invoice_number"],
+            r["customer_name"],
+            r["reference"],
+            r["currency_code"],
+            r["status"],
+            str(r["net_raw"]),
+            str(r["vat_raw"]),
+            str(r["gross_raw"]),
+        ]
+        for r in ctx["rows"]
+    ]
+    rows.append(
+        [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "TOTAL",
+            str(ctx["total_net_raw"]),
+            str(ctx["total_vat_raw"]),
+            str(ctx["total_gross_raw"]),
+        ]
+    )
+    return rows
+
+
+def export_sales_day_book_csv(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> str:
+    """Export the Sales Day Book as CSV (flat rows + totals line)."""
+    ctx = sales_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_csv(_SALES_EXPORT_HEADERS, _sales_day_book_export_rows(ctx))
+
+
+def export_sales_day_book_xlsx(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> bytes:
+    """Export the Sales Day Book as an Excel workbook."""
+    ctx = sales_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_xlsx(
+        _SALES_EXPORT_HEADERS,
+        _sales_day_book_export_rows(ctx),
+        sheet_name="Sales Day Book",
+        numeric_from=_SALES_NUMERIC_FROM,
+    )
+
+
+# ───────────────────────── Purchases Day Book ─────────────────────────
+
+_PURCHASES_EXCLUDED_STATUSES = (
+    SupplierInvoiceStatus.DRAFT,
+    SupplierInvoiceStatus.VOID,
+)
+
+_PURCHASES_EXPORT_HEADERS = [
+    "Date",
+    "Invoice No",
+    "Supplier Inv #",
+    "Supplier",
+    "Reference",
+    "Currency",
+    "Status",
+    "Net",
+    "VAT",
+    "WHT",
+    "Gross",
+]
+# Index of the first numeric column (Net).
+_PURCHASES_NUMERIC_FROM = 7
+
+
+def _supplier_name_map(db: Any, org_id: Any, supplier_ids: set[Any]) -> dict[str, str]:
+    """Batch-resolve supplier_id -> display name (no relationship on the model)."""
+    if not supplier_ids:
+        return {}
+    from sqlalchemy import select
+
+    rows = db.execute(
+        select(
+            Supplier.supplier_id,
+            Supplier.trading_name,
+            Supplier.legal_name,
+        ).where(
+            Supplier.organization_id == org_id,
+            Supplier.supplier_id.in_(supplier_ids),
+        )
+    ).all()
+    return {str(r[0]): (r[1] or r[2] or "") for r in rows}
+
+
+def purchases_day_book_context(
+    db: Any,
+    organization_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> dict[str, Any]:
+    """Build context for the Purchases Day Book (AP invoices, chronological)."""
+    org_id = coerce_uuid(organization_id)
+
+    today = date.today()
+    from_date = _parse_date(start_date) or today.replace(day=1)
+    to_date = _parse_date(end_date) or today
+
+    query = build_supplier_invoice_query(
+        db=db,
+        organization_id=str(org_id),
+        status=status or None,
+        start_date=_iso_date(from_date),
+        end_date=_iso_date(to_date),
+    )
+    if not status:
+        query = query.where(SupplierInvoice.status.notin_(_PURCHASES_EXCLUDED_STATUSES))
+    query = query.order_by(SupplierInvoice.invoice_date, SupplierInvoice.invoice_number)
+
+    invoices = list(db.scalars(query).all())
+    names = _supplier_name_map(db, org_id, {inv.supplier_id for inv in invoices})
+
+    rows: list[dict[str, Any]] = []
+    total_net = Decimal("0")
+    total_vat = Decimal("0")
+    total_wht = Decimal("0")
+    total_gross = Decimal("0")
+    for inv in invoices:
+        net = inv.subtotal or Decimal("0")
+        vat = inv.tax_amount or Decimal("0")
+        wht = inv.withholding_tax_amount or Decimal("0")
+        gross = inv.total_amount or Decimal("0")
+        total_net += net
+        total_vat += vat
+        total_wht += wht
+        total_gross += gross
+        rows.append(
+            {
+                "invoice_date": _format_date(inv.invoice_date),
+                "invoice_date_iso": _iso_date(inv.invoice_date),
+                "invoice_number": inv.invoice_number,
+                "supplier_invoice_number": inv.supplier_invoice_number or "",
+                "supplier_name": names.get(str(inv.supplier_id), ""),
+                "reference": inv.purpose or "",
+                "currency_code": inv.currency_code,
+                "status": inv.status.value if inv.status else "",
+                "net": _format_currency(net),
+                "net_raw": float(net),
+                "vat": _format_currency(vat),
+                "vat_raw": float(vat),
+                "wht": _format_currency(wht),
+                "wht_raw": float(wht),
+                "gross": _format_currency(gross),
+                "gross_raw": float(gross),
+            }
+        )
+
+    return {
+        "rows": rows,
+        "row_count": len(rows),
+        "start_date": _format_date(from_date),
+        "start_date_iso": _iso_date(from_date),
+        "end_date": _format_date(to_date),
+        "end_date_iso": _iso_date(to_date),
+        "status": status or "",
+        "total_net": _format_currency(total_net),
+        "total_net_raw": float(total_net),
+        "total_vat": _format_currency(total_vat),
+        "total_vat_raw": float(total_vat),
+        "total_wht": _format_currency(total_wht),
+        "total_wht_raw": float(total_wht),
+        "total_gross": _format_currency(total_gross),
+        "total_gross_raw": float(total_gross),
+        "vat_basis_note": (
+            "VAT shown is the input tax on invoices in this period (memo). "
+            "This organisation accounts for VAT on a cash basis, so it will "
+            "not equal the VAT return for the period."
+        ),
+    }
+
+
+def _purchases_day_book_export_rows(ctx: dict[str, Any]) -> list[list[str]]:
+    """Flatten the Purchases Day Book context into export rows + totals line."""
+    rows: list[list[str]] = [
+        [
+            r["invoice_date_iso"],
+            r["invoice_number"],
+            r["supplier_invoice_number"],
+            r["supplier_name"],
+            r["reference"],
+            r["currency_code"],
+            r["status"],
+            str(r["net_raw"]),
+            str(r["vat_raw"]),
+            str(r["wht_raw"]),
+            str(r["gross_raw"]),
+        ]
+        for r in ctx["rows"]
+    ]
+    rows.append(
+        [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "TOTAL",
+            str(ctx["total_net_raw"]),
+            str(ctx["total_vat_raw"]),
+            str(ctx["total_wht_raw"]),
+            str(ctx["total_gross_raw"]),
+        ]
+    )
+    return rows
+
+
+def export_purchases_day_book_csv(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> str:
+    """Export the Purchases Day Book as CSV."""
+    ctx = purchases_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_csv(_PURCHASES_EXPORT_HEADERS, _purchases_day_book_export_rows(ctx))
+
+
+def export_purchases_day_book_xlsx(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> bytes:
+    """Export the Purchases Day Book as an Excel workbook."""
+    ctx = purchases_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_xlsx(
+        _PURCHASES_EXPORT_HEADERS,
+        _purchases_day_book_export_rows(ctx),
+        sheet_name="Purchases Day Book",
+        numeric_from=_PURCHASES_NUMERIC_FROM,
+    )
+
+
+# ───────────────────────────── Cash Book ─────────────────────────────
+#
+# A combined chronological record of cash movements: AR receipts (inflows)
+# and AP payments (outflows). The "Running" column is the cumulative net
+# movement *within the selected period* (opens at 0) — it is not the absolute
+# bank balance, which would require an opening balance carried from prior
+# periods. ``amount`` is used as the cash figure (the value that hit the
+# bank, net of WHT), not the gross.
+
+# AR receipt statuses that did not result in cash (excluded by default).
+_RECEIPT_EXCLUDED_STATUSES = (
+    ARPaymentStatus.BOUNCED,
+    ARPaymentStatus.REVERSED,
+)
+# AP payment statuses that did not result in cash (excluded by default).
+_PAYMENT_EXCLUDED_STATUSES = (
+    APPaymentStatus.DRAFT,
+    APPaymentStatus.VOID,
+    APPaymentStatus.REJECTED,
+)
+
+_CASH_BOOK_EXPORT_HEADERS = [
+    "Date",
+    "Type",
+    "Reference",
+    "Party",
+    "Method",
+    "Currency",
+    "Inflow",
+    "Outflow",
+    "Running",
+]
+_CASH_BOOK_NUMERIC_FROM = 6
+
+
+def _customer_name_map(db: Any, org_id: Any, customer_ids: set[Any]) -> dict[str, str]:
+    """Batch-resolve customer_id -> display name."""
+    if not customer_ids:
+        return {}
+    from sqlalchemy import select
+
+    rows = db.execute(
+        select(
+            Customer.customer_id,
+            Customer.trading_name,
+            Customer.legal_name,
+        ).where(
+            Customer.organization_id == org_id,
+            Customer.customer_id.in_(customer_ids),
+        )
+    ).all()
+    return {str(r[0]): (r[1] or r[2] or "") for r in rows}
+
+
+def cash_book_context(
+    db: Any,
+    organization_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> dict[str, Any]:
+    """Build context for the Cash Book (receipts + payments, chronological)."""
+    org_id = coerce_uuid(organization_id)
+
+    today = date.today()
+    from_date = _parse_date(start_date) or today.replace(day=1)
+    to_date = _parse_date(end_date) or today
+    iso_from, iso_to = _iso_date(from_date), _iso_date(to_date)
+
+    receipts_q = build_receipt_query(
+        db=db, organization_id=str(org_id), start_date=iso_from, end_date=iso_to
+    ).where(CustomerPayment.status.notin_(_RECEIPT_EXCLUDED_STATUSES))
+    receipts = list(db.scalars(receipts_q).all())
+
+    payments_q = build_payment_query(
+        db=db, organization_id=str(org_id), start_date=iso_from, end_date=iso_to
+    ).where(SupplierPayment.status.notin_(_PAYMENT_EXCLUDED_STATUSES))
+    payments = list(db.scalars(payments_q).all())
+
+    cust_names = _customer_name_map(db, org_id, {r.customer_id for r in receipts})
+    supp_names = _supplier_name_map(db, org_id, {p.supplier_id for p in payments})
+
+    # Merge into one chronological stream. Each entry carries a sort key of
+    # (date, type) so receipts and payments on the same day order stably.
+    entries: list[dict[str, Any]] = []
+    for r in receipts:
+        entries.append(
+            {
+                "_date": r.payment_date,
+                "kind": "Receipt",
+                "reference": r.payment_number,
+                "party": cust_names.get(str(r.customer_id), ""),
+                "method": r.payment_method.value if r.payment_method else "",
+                "currency_code": r.currency_code,
+                "inflow_dec": r.amount or Decimal("0"),
+                "outflow_dec": Decimal("0"),
+            }
+        )
+    for p in payments:
+        entries.append(
+            {
+                "_date": p.payment_date,
+                "kind": "Payment",
+                "reference": p.payment_number,
+                "party": supp_names.get(str(p.supplier_id), ""),
+                "method": p.payment_method.value if p.payment_method else "",
+                "currency_code": p.currency_code,
+                "inflow_dec": Decimal("0"),
+                "outflow_dec": p.amount or Decimal("0"),
+            }
+        )
+    entries.sort(key=lambda e: (e["_date"], 0 if e["kind"] == "Receipt" else 1))
+
+    rows: list[dict[str, Any]] = []
+    total_in = Decimal("0")
+    total_out = Decimal("0")
+    running = Decimal("0")
+    for e in entries:
+        total_in += e["inflow_dec"]
+        total_out += e["outflow_dec"]
+        running += e["inflow_dec"] - e["outflow_dec"]
+        rows.append(
+            {
+                "date": _format_date(e["_date"]),
+                "date_iso": _iso_date(e["_date"]),
+                "kind": e["kind"],
+                "reference": e["reference"],
+                "party": e["party"],
+                "method": e["method"].replace("_", " ").title(),
+                "currency_code": e["currency_code"],
+                "inflow": _format_currency(e["inflow_dec"]) if e["inflow_dec"] else "",
+                "inflow_raw": float(e["inflow_dec"]),
+                "outflow": (
+                    _format_currency(e["outflow_dec"]) if e["outflow_dec"] else ""
+                ),
+                "outflow_raw": float(e["outflow_dec"]),
+                "running": _format_currency(running),
+                "running_raw": float(running),
+            }
+        )
+
+    net = total_in - total_out
+    return {
+        "rows": rows,
+        "row_count": len(rows),
+        "start_date": _format_date(from_date),
+        "start_date_iso": iso_from,
+        "end_date": _format_date(to_date),
+        "end_date_iso": iso_to,
+        "total_inflows": _format_currency(total_in),
+        "total_inflows_raw": float(total_in),
+        "total_outflows": _format_currency(total_out),
+        "total_outflows_raw": float(total_out),
+        "net_movement": _format_currency(net),
+        "net_movement_raw": float(net),
+        "running_note": (
+            "Running balance is the cumulative net cash movement for the "
+            "selected period (opens at zero); it is not the absolute bank "
+            "balance."
+        ),
+    }
+
+
+def _cash_book_export_rows(ctx: dict[str, Any]) -> list[list[str]]:
+    """Flatten the Cash Book context into export rows + totals line."""
+    rows: list[list[str]] = [
+        [
+            r["date_iso"],
+            r["kind"],
+            r["reference"],
+            r["party"],
+            r["method"],
+            r["currency_code"],
+            str(r["inflow_raw"]),
+            str(r["outflow_raw"]),
+            str(r["running_raw"]),
+        ]
+        for r in ctx["rows"]
+    ]
+    rows.append(
+        [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "TOTAL",
+            str(ctx["total_inflows_raw"]),
+            str(ctx["total_outflows_raw"]),
+            str(ctx["net_movement_raw"]),
+        ]
+    )
+    return rows
+
+
+def export_cash_book_csv(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> str:
+    """Export the Cash Book as CSV."""
+    ctx = cash_book_context(db, organization_id, start_date, end_date)
+    return _build_csv(_CASH_BOOK_EXPORT_HEADERS, _cash_book_export_rows(ctx))
+
+
+def export_cash_book_xlsx(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> bytes:
+    """Export the Cash Book as an Excel workbook."""
+    ctx = cash_book_context(db, organization_id, start_date, end_date)
+    return _build_xlsx(
+        _CASH_BOOK_EXPORT_HEADERS,
+        _cash_book_export_rows(ctx),
+        sheet_name="Cash Book",
+        numeric_from=_CASH_BOOK_NUMERIC_FROM,
+    )
+
+
+# ─────────────────────────── Journal day book ───────────────────────────
+#
+# The Journal proper: posted GL journal entries in date order, with debit and
+# credit control totals. Defaults to POSTED (the only GL-impacting status).
+
+_JOURNAL_EXPORT_HEADERS = [
+    "Date",
+    "Journal No",
+    "Description",
+    "Reference",
+    "Status",
+    "Debit",
+    "Credit",
+]
+_JOURNAL_NUMERIC_FROM = 5
+
+
+def journal_day_book_context(
+    db: Any,
+    organization_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> dict[str, Any]:
+    """Build context for the Journal day book (GL journal entries)."""
+    org_id = coerce_uuid(organization_id)
+
+    today = date.today()
+    from_date = _parse_date(start_date) or today.replace(day=1)
+    to_date = _parse_date(end_date) or today
+
+    # A day book records posted entries; default to POSTED when unfiltered.
+    effective_status = status or JournalStatus.POSTED.value
+    query = build_journal_query(
+        db=db,
+        organization_id=str(org_id),
+        status=effective_status,
+        start_date=_iso_date(from_date),
+        end_date=_iso_date(to_date),
+    ).order_by(JournalEntry.posting_date, JournalEntry.journal_number)
+
+    entries = list(db.scalars(query).all())
+
+    rows: list[dict[str, Any]] = []
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
+    for je in entries:
+        debit = je.total_debit or Decimal("0")
+        credit = je.total_credit or Decimal("0")
+        total_debit += debit
+        total_credit += credit
+        rows.append(
+            {
+                "posting_date": _format_date(je.posting_date),
+                "posting_date_iso": _iso_date(je.posting_date),
+                "journal_number": je.journal_number,
+                "description": je.description or "",
+                "reference": je.reference or "",
+                "status": je.status.value if je.status else "",
+                "debit": _format_currency(debit),
+                "debit_raw": float(debit),
+                "credit": _format_currency(credit),
+                "credit_raw": float(credit),
+            }
+        )
+
+    return {
+        "rows": rows,
+        "row_count": len(rows),
+        "start_date": _format_date(from_date),
+        "start_date_iso": _iso_date(from_date),
+        "end_date": _format_date(to_date),
+        "end_date_iso": _iso_date(to_date),
+        "status": status or "",
+        "total_debit": _format_currency(total_debit),
+        "total_debit_raw": float(total_debit),
+        "total_credit": _format_currency(total_credit),
+        "total_credit_raw": float(total_credit),
+        "is_balanced": total_debit == total_credit,
+    }
+
+
+def _journal_day_book_export_rows(ctx: dict[str, Any]) -> list[list[str]]:
+    """Flatten the Journal day book context into export rows + totals line."""
+    rows: list[list[str]] = [
+        [
+            r["posting_date_iso"],
+            r["journal_number"],
+            r["description"],
+            r["reference"],
+            r["status"],
+            str(r["debit_raw"]),
+            str(r["credit_raw"]),
+        ]
+        for r in ctx["rows"]
+    ]
+    rows.append(
+        [
+            "",
+            "",
+            "",
+            "",
+            "TOTAL",
+            str(ctx["total_debit_raw"]),
+            str(ctx["total_credit_raw"]),
+        ]
+    )
+    return rows
+
+
+def export_journal_day_book_csv(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> str:
+    """Export the Journal day book as CSV."""
+    ctx = journal_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_csv(_JOURNAL_EXPORT_HEADERS, _journal_day_book_export_rows(ctx))
+
+
+def export_journal_day_book_xlsx(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> bytes:
+    """Export the Journal day book as an Excel workbook."""
+    ctx = journal_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_xlsx(
+        _JOURNAL_EXPORT_HEADERS,
+        _journal_day_book_export_rows(ctx),
+        sheet_name="Journal",
+        numeric_from=_JOURNAL_NUMERIC_FROM,
+    )
+
+
+# ─────────────────────── Sales Returns Day Book ───────────────────────
+#
+# Returns inward: AR credit notes (Invoice rows with invoice_type CREDIT_NOTE).
+# Amounts are shown as positive magnitudes — the heading conveys they reduce
+# revenue/receivables.
+
+_SALES_RETURNS_EXPORT_HEADERS = [
+    "Date",
+    "Credit Note No",
+    "Customer",
+    "Reference",
+    "Currency",
+    "Status",
+    "Net",
+    "VAT",
+    "Gross",
+]
+_SALES_RETURNS_NUMERIC_FROM = 6
+
+
+def sales_returns_day_book_context(
+    db: Any,
+    organization_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> dict[str, Any]:
+    """Build context for the Sales Returns Day Book (AR credit notes)."""
+    org_id = coerce_uuid(organization_id)
+
+    today = date.today()
+    from_date = _parse_date(start_date) or today.replace(day=1)
+    to_date = _parse_date(end_date) or today
+
+    query = build_invoice_query(
+        db=db,
+        organization_id=str(org_id),
+        status=status or None,
+        start_date=_iso_date(from_date),
+        end_date=_iso_date(to_date),
+    ).where(Invoice.invoice_type == InvoiceType.CREDIT_NOTE)
+    if not status:
+        query = query.where(Invoice.status.notin_(_SALES_EXCLUDED_STATUSES))
+    query = query.order_by(Invoice.invoice_date, Invoice.invoice_number)
+
+    credit_notes = list(db.scalars(query).all())
+
+    rows: list[dict[str, Any]] = []
+    total_net = Decimal("0")
+    total_vat = Decimal("0")
+    total_gross = Decimal("0")
+    for cn in credit_notes:
+        net = cn.subtotal or Decimal("0")
+        vat = cn.tax_amount or Decimal("0")
+        gross = cn.total_amount or Decimal("0")
+        total_net += net
+        total_vat += vat
+        total_gross += gross
+        rows.append(
+            {
+                "invoice_date": _format_date(cn.invoice_date),
+                "invoice_date_iso": _iso_date(cn.invoice_date),
+                "invoice_number": cn.invoice_number,
+                "customer_name": _customer_name(cn),
+                "reference": cn.purpose or "",
+                "currency_code": cn.currency_code,
+                "status": cn.status.value if cn.status else "",
+                "net": _format_currency(net),
+                "net_raw": float(net),
+                "vat": _format_currency(vat),
+                "vat_raw": float(vat),
+                "gross": _format_currency(gross),
+                "gross_raw": float(gross),
+            }
+        )
+
+    return {
+        "rows": rows,
+        "row_count": len(rows),
+        "start_date": _format_date(from_date),
+        "start_date_iso": _iso_date(from_date),
+        "end_date": _format_date(to_date),
+        "end_date_iso": _iso_date(to_date),
+        "status": status or "",
+        "total_net": _format_currency(total_net),
+        "total_net_raw": float(total_net),
+        "total_vat": _format_currency(total_vat),
+        "total_vat_raw": float(total_vat),
+        "total_gross": _format_currency(total_gross),
+        "total_gross_raw": float(total_gross),
+        "vat_basis_note": (
+            "VAT shown is the tax on credit notes in this period (memo). "
+            "This organisation accounts for VAT on a cash basis, so it will "
+            "not equal the VAT return for the period."
+        ),
+    }
+
+
+def _sales_returns_export_rows(ctx: dict[str, Any]) -> list[list[str]]:
+    """Flatten the Sales Returns Day Book context into export rows + totals."""
+    rows: list[list[str]] = [
+        [
+            r["invoice_date_iso"],
+            r["invoice_number"],
+            r["customer_name"],
+            r["reference"],
+            r["currency_code"],
+            r["status"],
+            str(r["net_raw"]),
+            str(r["vat_raw"]),
+            str(r["gross_raw"]),
+        ]
+        for r in ctx["rows"]
+    ]
+    rows.append(
+        [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "TOTAL",
+            str(ctx["total_net_raw"]),
+            str(ctx["total_vat_raw"]),
+            str(ctx["total_gross_raw"]),
+        ]
+    )
+    return rows
+
+
+def export_sales_returns_day_book_csv(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> str:
+    """Export the Sales Returns Day Book as CSV."""
+    ctx = sales_returns_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_csv(_SALES_RETURNS_EXPORT_HEADERS, _sales_returns_export_rows(ctx))
+
+
+def export_sales_returns_day_book_xlsx(
+    organization_id: str,
+    db: Any,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+) -> bytes:
+    """Export the Sales Returns Day Book as an Excel workbook."""
+    ctx = sales_returns_day_book_context(
+        db, organization_id, start_date, end_date, status=status
+    )
+    return _build_xlsx(
+        _SALES_RETURNS_EXPORT_HEADERS,
+        _sales_returns_export_rows(ctx),
+        sheet_name="Sales Returns",
+        numeric_from=_SALES_RETURNS_NUMERIC_FROM,
+    )
