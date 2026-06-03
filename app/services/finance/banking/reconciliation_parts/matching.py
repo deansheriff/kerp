@@ -613,6 +613,83 @@ class ReconciliationMatchingService:
 
         return suggestions
 
+    def get_persisted_suggestions(
+        self,
+        db: Session,
+        organization_id: UUID,
+        reconciliation_id: UUID,
+    ) -> dict[UUID, MatchSuggestion]:
+        """Return suggestions PERSISTED by the Celery auto-engine.
+
+        The background engine writes ``bank_statement_line_matches`` rows with
+        ``match_state='suggested'`` using strategies richer than the live
+        workspace scorer (exact external reference, settlement windows, etc.).
+        These never set ``is_matched`` and must be human-confirmed. Surfacing
+        them in the workspace panel lets the accountant act on the engine's
+        work instead of it sitting invisible until re-scored live.
+
+        Keyed by statement_line_id; only still-unmatched lines in the
+        reconciliation's account + period are returned. The highest-scored
+        suggested row wins per statement line.
+        """
+        reconciliation = self._get_for_org(db, organization_id, reconciliation_id)  # type: ignore[attr-defined]
+
+        rows = db.execute(
+            select(BankStatementLineMatch, JournalEntryLine)
+            .join(
+                BankStatementLine,
+                BankStatementLine.line_id == BankStatementLineMatch.statement_line_id,
+            )
+            .join(
+                BankStatement,
+                BankStatement.statement_id == BankStatementLine.statement_id,
+            )
+            .join(
+                JournalEntryLine,
+                JournalEntryLine.line_id == BankStatementLineMatch.journal_line_id,
+            )
+            .where(
+                BankStatement.organization_id == organization_id,
+                BankStatement.bank_account_id == reconciliation.bank_account_id,
+                BankStatementLine.transaction_date >= reconciliation.period_start,
+                BankStatementLine.transaction_date <= reconciliation.period_end,
+                BankStatementLine.is_matched == False,  # noqa: E712
+                BankStatementLineMatch.match_state == "suggested",
+            )
+            .order_by(BankStatementLineMatch.match_score.desc().nullslast())
+        ).all()
+
+        suggestions: dict[UUID, MatchSuggestion] = {}
+        for match, gl_line in rows:
+            stmt_id = match.statement_line_id
+            if stmt_id in suggestions:
+                continue  # highest score already kept (ordered desc)
+
+            entry = getattr(gl_line, "journal_entry", None) or getattr(
+                gl_line, "entry", None
+            )
+            entry_id = getattr(entry, "entry_id", None) if entry else None
+            reason = match.match_reason
+            reason_text = (
+                reason.get("summary") or reason.get("reason")
+                if isinstance(reason, dict)
+                else (reason if isinstance(reason, str) else None)
+            )
+
+            suggestions[stmt_id] = MatchSuggestion(
+                statement_line_id=stmt_id,
+                journal_line_id=match.journal_line_id,
+                confidence=float(match.match_score or 0),
+                source_url=_build_source_url(
+                    match.source_type, match.source_id, entry_id
+                ),
+                amount_matched=True,
+                from_auto_engine=True,
+                match_reason=reason_text,
+            )
+
+        return suggestions
+
     def add_multi_match(
         self,
         db: Session,

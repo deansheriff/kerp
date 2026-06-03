@@ -307,10 +307,16 @@ class BankingReconciliationWebService:
             ReconciliationStatus.pending_review,
         ):
             try:
+                # Live workspace suggestions first, then overlay suggestions the
+                # Celery auto-engine already persisted (match_state='suggested') —
+                # the engine's strategy-based matches win per statement line.
                 raw_suggestions = recon_svc.get_match_suggestions(
                     db, org_id, reconciliation.reconciliation_id
                 )
-                for stmt_id, sug in raw_suggestions.items():
+                persisted = recon_svc.get_persisted_suggestions(
+                    db, org_id, reconciliation.reconciliation_id
+                )
+                for stmt_id, sug in {**raw_suggestions, **persisted}.items():
                     match_suggestions[str(stmt_id)] = {
                         "journal_line_id": str(sug.journal_line_id),
                         "confidence": round(sug.confidence, 1),
@@ -318,6 +324,8 @@ class BankingReconciliationWebService:
                         "payment_number": sug.payment_number or "",
                         "source_url": sug.source_url or "",
                         "amount_matched": sug.amount_matched,
+                        "from_auto_engine": sug.from_auto_engine,
+                        "match_reason": sug.match_reason or "",
                     }
             except Exception:
                 logger.exception("Failed to generate match suggestions")

@@ -289,6 +289,12 @@
                                     {{ sug.confidence }}% match
                                     {% if sug.counterparty_name %}<span class="font-medium">| {{ sug.counterparty_name }}</span>{% endif %}
                                 </span>
+                                {% if sug.from_auto_engine %}
+                                <span class="inline-flex items-center gap-1 mt-1 ml-1 text-xs rounded px-1.5 py-0.5 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                                      title="{{ sug.match_reason if sug.match_reason else 'Suggested by the automatic reconciliation engine' }}">
+                                    Auto-engine
+                                </span>
+                                {% endif %}
                                 {% if sug.source_url %}
                                 <a href="{{ sug.source_url }}" target="_blank" rel="noopener"
                                    class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"

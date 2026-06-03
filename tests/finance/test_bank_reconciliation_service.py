@@ -559,6 +559,57 @@ def test_auto_match_suggests_without_confirming():
     assert all(d.get("suggested") for d in result.match_details)
 
 
+def test_get_persisted_suggestions_maps_engine_rows():
+    """Persisted engine 'suggested' junction rows surface as MatchSuggestions,
+    highest score wins per statement line, and reasons are extracted."""
+    svc = BankReconciliationService()
+    db = MagicMock()
+
+    recon = _make_reconciliation()
+    recon.period_start = date(2024, 1, 1)
+    recon.period_end = date(2024, 1, 31)
+    recon.bank_account_id = uuid4()
+    db.get.return_value = recon
+
+    stmt_a = uuid4()
+    stmt_b = uuid4()
+    gl_hi, gl_lo, gl_b = uuid4(), uuid4(), uuid4()
+
+    def _row(stmt_id, jl_id, score, reason):
+        match = SimpleNamespace(
+            statement_line_id=stmt_id,
+            journal_line_id=jl_id,
+            match_score=Decimal(str(score)),
+            match_type="exact_external_reference",
+            match_reason=reason,
+            source_type="customer_payment",
+            source_id=uuid4(),
+        )
+        gl = SimpleNamespace(journal_entry=SimpleNamespace(entry_id=uuid4()))
+        return (match, gl)
+
+    # Ordered desc by score (as the query does): higher stmt_a row first
+    rows = [
+        _row(stmt_a, gl_hi, 92, {"summary": "Exact reference INV-100"}),
+        _row(stmt_a, gl_lo, 60, {"reason": "amount + date"}),
+        _row(stmt_b, gl_b, 75, "settlement window match"),
+    ]
+    db.execute.return_value.all.return_value = rows
+
+    out = svc.get_persisted_suggestions(
+        db, recon.organization_id, recon.reconciliation_id
+    )
+
+    assert set(out) == {stmt_a, stmt_b}
+    # Highest score wins for stmt_a
+    assert out[stmt_a].journal_line_id == gl_hi
+    assert out[stmt_a].confidence == 92.0
+    assert out[stmt_a].match_reason == "Exact reference INV-100"
+    assert out[stmt_a].from_auto_engine is True
+    # String reason passes through; dict 'reason' key honoured
+    assert out[stmt_b].match_reason == "settlement window match"
+
+
 def test_calculate_match_score():
     svc = BankReconciliationService()
     stmt = SimpleNamespace(
