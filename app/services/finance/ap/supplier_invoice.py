@@ -237,9 +237,15 @@ class SupplierInvoiceService(ListResponseMixin):
             else None
         )
 
+        raw_invoice_type = str(payload.get("invoice_type") or "STANDARD").upper()
+        try:
+            invoice_type = SupplierInvoiceType(raw_invoice_type)
+        except ValueError:
+            invoice_type = SupplierInvoiceType.STANDARD
+
         return SupplierInvoiceInput(
             supplier_id=require_uuid(payload.get("supplier_id"), "Supplier"),
-            invoice_type=SupplierInvoiceType.STANDARD,
+            invoice_type=invoice_type,
             invoice_date=invoice_date,
             received_date=received_date,
             due_date=due_date,

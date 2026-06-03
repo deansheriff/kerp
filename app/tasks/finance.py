@@ -321,6 +321,38 @@ async def _build_list_export_response(
             {"customer_id": params.get("customer_id") or ""},
         )
 
+    if report_code == "AP_INVOICES":
+        from app.services.finance.ap.invoice_bulk import get_ap_invoice_bulk_service
+
+        ap_invoice_service = get_ap_invoice_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await ap_invoice_service.export_all(
+            search,
+            status,
+            start_date,
+            end_date,
+            {"supplier_id": params.get("supplier_id") or ""},
+        )
+
+    if report_code == "AP_PAYMENTS":
+        from app.services.finance.ap.payment_bulk import get_ap_payment_bulk_service
+
+        ap_payment_service = get_ap_payment_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await ap_payment_service.export_all(
+            search,
+            status,
+            start_date,
+            end_date,
+            {"supplier_id": params.get("supplier_id") or ""},
+        )
+
     raise ValueError(f"Unsupported export report code: {report_code}")
 
 
@@ -414,6 +446,18 @@ def process_ar_invoices_export(instance_id: str) -> dict[str, Any]:
 def process_ar_receipts_export(instance_id: str) -> dict[str, Any]:
     """Generate a queued AR Receipts export and notify the requester."""
     return _process_list_export(instance_id, "AR_RECEIPTS")
+
+
+@shared_task
+def process_ap_invoices_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued AP Invoices export and notify the requester."""
+    return _process_list_export(instance_id, "AP_INVOICES")
+
+
+@shared_task
+def process_ap_payments_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued AP Payments export and notify the requester."""
+    return _process_list_export(instance_id, "AP_PAYMENTS")
 
 
 def _get_finance_recipients(

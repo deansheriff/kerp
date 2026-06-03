@@ -59,6 +59,20 @@ EXPORT_DEFINITIONS = {
         "task": "process_ar_receipts_export",
         "formats": {"CSV"},
     },
+    "AP_INVOICES": {
+        "download_base": "/finance/ap/invoices/exports",
+        "filename_prefix": "ap_invoices",
+        "label": "AP Invoices",
+        "task": "process_ap_invoices_export",
+        "formats": {"CSV"},
+    },
+    "AP_PAYMENTS": {
+        "download_base": "/finance/ap/payments/exports",
+        "filename_prefix": "ap_payments",
+        "label": "AP Payments",
+        "task": "process_ap_payments_export",
+        "formats": {"CSV"},
+    },
 }
 
 
