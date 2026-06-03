@@ -11,6 +11,7 @@ from app.services.finance.banking.web_parts.base import (
     BankReconciliation,
     BankStatement,
     BankStatementLine,
+    BankStatementLineMatch,
     Decimal,
     HTMLResponse,
     HTTPException,
@@ -30,6 +31,7 @@ from app.services.finance.banking.web_parts.base import (
     _account_view,
     _build_active_filters,
     _format_currency,
+    _format_date,
     _gl_line_view,
     _line_amount,
     _parse_date,
@@ -282,9 +284,73 @@ class BankingReconciliationWebService:
             except Exception:
                 logger.exception("Failed to generate match suggestions")
 
+        # Matched Items: derive from CONFIRMED junction rows for this account +
+        # period (the authoritative store) so matches made by the workspace OR
+        # the auto-engine both appear and can be viewed/unmatched. Fixes the
+        # "0 matches" bug where the view only read reconciliation.lines.
+        matched_rows = db.execute(
+            select(
+                BankStatementLineMatch,
+                BankStatementLine,
+                JournalEntryLine,
+            )
+            .join(
+                BankStatementLine,
+                BankStatementLine.line_id == BankStatementLineMatch.statement_line_id,
+            )
+            .join(
+                BankStatement,
+                BankStatement.statement_id == BankStatementLine.statement_id,
+            )
+            .join(
+                JournalEntryLine,
+                JournalEntryLine.line_id == BankStatementLineMatch.journal_line_id,
+            )
+            .where(
+                BankStatement.organization_id == org_id,
+                BankStatement.bank_account_id == reconciliation.bank_account_id,
+                BankStatementLine.transaction_date >= reconciliation.period_start,
+                BankStatementLine.transaction_date <= reconciliation.period_end,
+                BankStatementLineMatch.match_state == "confirmed",
+            )
+            .order_by(BankStatementLine.transaction_date)
+        ).all()
+
+        matched_items: list[dict] = []
+        for match, sl, jl in matched_rows:
+            gl_amount = (jl.debit_amount or Decimal("0")) - (
+                jl.credit_amount or Decimal("0")
+            )
+            matched_items.append(
+                {
+                    "match_id": str(match.match_id),
+                    "statement_line_id": str(sl.line_id),
+                    "transaction_date": _format_date(sl.transaction_date),
+                    "description": sl.description or "",
+                    "reference": sl.reference or "",
+                    "statement_amount": float(sl.signed_amount),
+                    "gl_amount": float(gl_amount),
+                    "difference": float(sl.signed_amount - gl_amount),
+                    "match_type": (match.match_type or "MANUAL").lower(),
+                    "match_group_id": (
+                        str(match.match_group_id) if match.match_group_id else None
+                    ),
+                    "source_type": match.source_type or "",
+                    "source_id": str(match.source_id) if match.source_id else None,
+                }
+            )
+
+        # Reconciling items (adjustments + outstanding) live on the recon lines.
+        reconciling_items = [
+            _reconciliation_line_view(line)
+            for line in reconciliation.lines
+            if line.is_adjustment or line.is_outstanding
+        ]
+
         return {
             "reconciliation": _reconciliation_view(reconciliation),
-            "lines": [_reconciliation_line_view(line) for line in reconciliation.lines],
+            "lines": matched_items,
+            "reconciling_items": reconciling_items,
             "unmatched_statement_lines": unmatched_statement_lines,
             "unmatched_gl_lines": unmatched_gl_lines,
             "match_suggestions": match_suggestions,
@@ -686,6 +752,113 @@ class BankingReconciliationWebService:
             raise
         except (ValueError, RuntimeError, KeyError) as e:
             logger.warning("Match creation failed: %s", e)
+            return JSONResponse(content={"detail": str(e)}, status_code=400)
+
+        return JSONResponse(content={"status": "ok"}, status_code=200)
+
+    async def reconciliation_unmatch_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        reconciliation_id: str,
+    ) -> Response:
+        """Reverse a confirmed match for a statement line (JSON body)."""
+        from app.services.finance.banking.bank_reconciliation import (
+            BankReconciliationService,
+        )
+
+        org_id = auth.organization_id
+        if org_id is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        body = await request.json()
+        svc = BankReconciliationService()
+        user_id = getattr(auth, "user_id", None) or getattr(auth, "person_id", None)
+
+        try:
+            svc.unmatch(
+                db=db,
+                organization_id=org_id,
+                reconciliation_id=UUID(reconciliation_id),
+                statement_line_id=UUID(str(body["statement_line_id"])),
+                created_by=user_id,
+            )
+            db.commit()
+        except HTTPException:
+            raise
+        except (ValueError, RuntimeError, KeyError) as e:
+            logger.warning("Unmatch failed: %s", e)
+            return JSONResponse(content={"detail": str(e)}, status_code=400)
+
+        return JSONResponse(content={"status": "ok"}, status_code=200)
+
+    async def reconciliation_reconciling_item_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        reconciliation_id: str,
+    ) -> Response:
+        """Add a reconciling item — adjustment or outstanding item (JSON body).
+
+        This is how a documented difference (bank charge, interest, FX, deposit
+        in transit, unpresented cheque) is booked so the reconciliation ties to
+        zero, instead of being absorbed into an inexact match.
+        """
+        from app.services.finance.banking.bank_reconciliation import (
+            BankReconciliationService,
+        )
+
+        org_id = auth.organization_id
+        if org_id is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        body = await request.json()
+        svc = BankReconciliationService()
+        user_id = getattr(auth, "user_id", None) or getattr(auth, "person_id", None)
+
+        try:
+            kind = str(body.get("kind", "adjustment"))
+            txn_date = _parse_date(body.get("transaction_date")) or date.today()
+            amount = Decimal(str(body["amount"]))
+            description = str(body.get("description") or "").strip()
+            if not description:
+                return JSONResponse(
+                    content={"detail": "Description is required"}, status_code=400
+                )
+            if amount == Decimal("0"):
+                return JSONResponse(
+                    content={"detail": "Amount must be non-zero"}, status_code=400
+                )
+
+            if kind == "outstanding":
+                svc.add_outstanding_item(
+                    db=db,
+                    organization_id=org_id,
+                    reconciliation_id=UUID(reconciliation_id),
+                    transaction_date=txn_date,
+                    amount=amount,
+                    description=description,
+                    outstanding_type=str(body.get("outstanding_type") or "deposit"),
+                    created_by=user_id,
+                )
+            else:
+                svc.add_adjustment(
+                    db=db,
+                    organization_id=org_id,
+                    reconciliation_id=UUID(reconciliation_id),
+                    transaction_date=txn_date,
+                    amount=amount,
+                    description=description,
+                    adjustment_type=str(body.get("adjustment_type") or "adjustment"),
+                    created_by=user_id,
+                )
+            db.commit()
+        except HTTPException:
+            raise
+        except (ValueError, RuntimeError, KeyError, TypeError) as e:
+            logger.warning("Add reconciling item failed: %s", e)
             return JSONResponse(content={"detail": str(e)}, status_code=400)
 
         return JSONResponse(content={"status": "ok"}, status_code=200)

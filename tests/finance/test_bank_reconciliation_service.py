@@ -358,7 +358,8 @@ def test_add_match_amount_mismatch_requires_force():
         )
 
     assert excinfo.value.status_code == 400
-    assert "Amount mismatch requires review" in excinfo.value.detail
+    # Exact-tie rule: any difference is blocked unless force_match is set.
+    assert "does not tie" in excinfo.value.detail
 
 
 def test_add_match_amount_mismatch_with_force():
@@ -398,6 +399,33 @@ def test_add_match_amount_mismatch_with_force():
 
     assert isinstance(recon_line, BankReconciliationLine)
     assert stmt_line.is_matched is True
+
+
+def test_unmatch_reverses_confirmed_match():
+    svc = BankReconciliationService()
+    db = MagicMock()
+    recon = _make_reconciliation(status=ReconciliationStatus.draft)
+    recon.total_matched = Decimal("50.00")
+    stmt_line = SimpleNamespace(
+        line_id=uuid4(),
+        is_matched=True,
+        matched_at=date(2024, 1, 1),
+        matched_by=None,
+    )
+    recon_line = SimpleNamespace(statement_amount=Decimal("50.00"))
+    db.get.side_effect = [recon, stmt_line]
+    db.scalars.return_value.all.return_value = [recon_line]
+
+    svc.unmatch(
+        db,
+        recon.organization_id,
+        recon.reconciliation_id,
+        stmt_line.line_id,
+    )
+
+    assert stmt_line.is_matched is False
+    assert recon.total_matched == Decimal("0.00")
+    db.delete.assert_called_once_with(recon_line)
 
 
 def test_add_adjustment_and_outstanding_items():
@@ -443,7 +471,7 @@ def test_add_adjustment_and_outstanding_items():
     assert recon.outstanding_payments == Decimal("15.00")
 
 
-def test_auto_match_exact_and_fuzzy():
+def test_auto_match_suggests_without_confirming():
     svc = BankReconciliationService()
     db = MagicMock()
 
@@ -515,9 +543,12 @@ def test_auto_match_exact_and_fuzzy():
     result = svc.auto_match(
         db, recon.organization_id, recon.reconciliation_id, tolerance=Decimal("0.02")
     )
+    # Suggest-only: auto_match ranks candidates but confirms NOTHING. Both lines
+    # stay unmatched and no match is created; they are surfaced as suggestions.
     assert result.matches_found == 2
-    assert result.matches_created == 2
-    assert result.unmatched_statement_lines == 0
+    assert result.matches_created == 0
+    assert result.unmatched_statement_lines == 2
+    assert all(d.get("suggested") for d in result.match_details)
 
 
 def test_calculate_match_score():
@@ -1146,7 +1177,7 @@ def test_add_multi_match_amount_mismatch() -> None:
         )
 
     assert excinfo.value.status_code == 400
-    assert "Amount mismatch" in excinfo.value.detail
+    assert "does not tie" in excinfo.value.detail
 
 
 def test_add_multi_match_invalid_status() -> None:
@@ -1169,8 +1200,8 @@ def test_add_multi_match_invalid_status() -> None:
     assert excinfo.value.status_code == 400
 
 
-def test_add_multi_match_within_tolerance() -> None:
-    """Multi-match succeeds when difference is within tolerance."""
+def test_add_multi_match_requires_exact_sum() -> None:
+    """Exact-tie: a split is rejected when sums differ at all (no tolerance)."""
     svc = BankReconciliationService()
     db = MagicMock()
 
@@ -1198,16 +1229,17 @@ def test_add_multi_match_within_tolerance() -> None:
     }
     db.get.side_effect = lambda _model, key: lookup.get(key)
 
-    lines = svc.add_multi_match(
-        db,
-        recon.organization_id,
-        recon.reconciliation_id,
-        statement_line_ids=[stmt.line_id],
-        journal_line_ids=[gl.line_id],
-        tolerance=Decimal("0.01"),
-    )
+    with pytest.raises(HTTPException) as excinfo:
+        svc.add_multi_match(
+            db,
+            recon.organization_id,
+            recon.reconciliation_id,
+            statement_line_ids=[stmt.line_id],
+            journal_line_ids=[gl.line_id],
+        )
 
-    assert len(lines) == 1
+    assert excinfo.value.status_code == 400
+    assert "does not tie" in excinfo.value.detail
 
 
 def test_add_multi_match_statement_not_found() -> None:

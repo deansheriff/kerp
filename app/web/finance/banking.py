@@ -706,6 +706,32 @@ async def reconciliation_multi_match(
     )
 
 
+@router.post("/reconciliations/{reconciliation_id}/unmatch")
+async def reconciliation_unmatch(
+    request: Request,
+    reconciliation_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Reverse a confirmed match for a statement line (JSON from Alpine.js fetch)."""
+    return await banking_web_service.reconciliation_unmatch_response(
+        request, auth, db, reconciliation_id
+    )
+
+
+@router.post("/reconciliations/{reconciliation_id}/reconciling-items")
+async def reconciliation_add_reconciling_item(
+    request: Request,
+    reconciliation_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Add a reconciling item (adjustment / outstanding) — JSON from Alpine.js."""
+    return await banking_web_service.reconciliation_reconciling_item_response(
+        request, auth, db, reconciliation_id
+    )
+
+
 @router.get("/reconciliations/{reconciliation_id}", response_class=HTMLResponse)
 def view_reconciliation(
     request: Request,

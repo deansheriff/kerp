@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from app.services.finance.banking.reconciliation_parts.base import (
     AutoMatchResult,
     BankAccount,
@@ -52,7 +54,9 @@ class ReconciliationMatchingService:
         cannot trace a bank movement back to its originating customer
         receipt / supplier payment / invoice without re-walking the GL.
         """
-        entry = gl_line.journal_entry
+        entry = getattr(gl_line, "journal_entry", None) or getattr(
+            gl_line, "entry", None
+        )
         if entry is None:
             return None, None
         # ``getattr`` with default lets test SimpleNamespace mocks omit these
@@ -125,11 +129,20 @@ class ReconciliationMatchingService:
             gl_line.credit_amount or Decimal("0")
         )
         difference = statement_amount - gl_amount
-        self._validate_amount_match(  # type: ignore[attr-defined]
-            statement_amount,
-            gl_amount,
-            force_match=force_match,
-        )
+        # Exact-tie rule: a confirmed match must tie to the kobo. Any residual
+        # (bank charge, interest, FX, error) must be booked as a reconciling
+        # item, never absorbed into the match. force_match is a deliberate
+        # supervisor override only.
+        if difference != Decimal("0") and not force_match:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot match: statement {statement_amount:,.2f} does not tie "
+                    f"to GL {gl_amount:,.2f} (difference {difference:,.2f}). Add a "
+                    "reconciling item (bank charge, interest, FX, etc.) for the "
+                    "difference instead of forcing an inexact match."
+                ),
+            )
 
         # Create reconciliation line
         recon_line = BankReconciliationLine(
@@ -175,6 +188,10 @@ class ReconciliationMatchingService:
                 is_primary=True,
                 source_type=source_type,
                 source_id=source_id,
+                match_type="MANUAL",
+                match_state="confirmed",
+                confirmed_at=now,
+                confirmed_by=created_by,
             )
         )
 
@@ -184,6 +201,71 @@ class ReconciliationMatchingService:
 
         db.flush()
         return recon_line
+
+    def unmatch(
+        self,
+        db: Session,
+        organization_id: UUID,
+        reconciliation_id: UUID,
+        statement_line_id: UUID,
+        created_by: UUID | None = None,
+    ) -> None:
+        """Reverse a confirmed match for a statement line (the whole split group).
+
+        Deletes the confirmed junction rows and any reconciliation line(s) for
+        the statement line, clears ``is_matched``, and re-derives the
+        difference. Keyed by statement line so it reverses matches made by the
+        workspace *or* the auto-engine (which has no reconciliation line).
+        """
+        reconciliation = self._get_for_org(db, organization_id, reconciliation_id)  # type: ignore[attr-defined]
+        if reconciliation.status not in [
+            ReconciliationStatus.draft,
+            ReconciliationStatus.pending_review,
+        ]:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot modify an approved/rejected reconciliation",
+            )
+
+        stmt_line = db.get(BankStatementLine, statement_line_id)
+        if not stmt_line:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Statement line {statement_line_id} not found",
+            )
+
+        # Reconciliation lines for this statement line (exclude adjustments /
+        # outstanding items — those are removed via the reconciling-items panel).
+        group_lines = list(
+            db.scalars(
+                select(BankReconciliationLine).where(
+                    BankReconciliationLine.reconciliation_id == reconciliation_id,
+                    BankReconciliationLine.statement_line_id == statement_line_id,
+                    BankReconciliationLine.is_adjustment.is_(False),
+                    BankReconciliationLine.is_outstanding.is_(False),
+                )
+            ).all()
+        )
+
+        db.execute(
+            delete(BankStatementLineMatch).where(
+                BankStatementLineMatch.statement_line_id == statement_line_id
+            )
+        )
+        stmt_line.is_matched = False
+        stmt_line.matched_at = None
+        stmt_line.matched_by = None
+
+        reversed_amount = Decimal("0")
+        for line in group_lines:
+            reversed_amount += abs(line.statement_amount or Decimal("0"))
+            db.delete(line)
+
+        reconciliation.total_matched -= reversed_amount
+        if reconciliation.total_matched < Decimal("0"):
+            reconciliation.total_matched = Decimal("0")
+        reconciliation.calculate_difference()
+        db.flush()
 
     def _get_unmatched_lines(
         self,
@@ -297,7 +379,12 @@ class ReconciliationMatchingService:
         tolerance: Decimal = Decimal("0.01"),
         created_by: UUID | None = None,
     ) -> AutoMatchResult:
-        """Automatically match statement lines to GL entries."""
+        """Generate ranked match SUGGESTIONS (suggest-only).
+
+        This never auto-confirms: it surfaces the best candidate per statement
+        line for a human to confirm via ``add_match`` (which enforces the exact
+        tie). ``matches_created`` is therefore always 0.
+        """
         reconciliation = self._get_for_org(db, organization_id, reconciliation_id)  # type: ignore[attr-defined]
 
         result = AutoMatchResult(
@@ -356,50 +443,21 @@ class ReconciliationMatchingService:
                     best_score = score
                     best_match = gl_line
 
-            if best_match and best_score >= 50:  # Minimum confidence threshold
+            # Suggest-only: NEVER auto-confirm a match. The score ranks a
+            # candidate for human review; confirmation happens via add_match,
+            # which enforces the exact (kobo) tie. The tolerance fallback above
+            # only widens *suggestions*, it never confirms.
+            if best_match and best_score >= 50:
                 result.matches_found += 1
-
-                # Create match
-                match_input = ReconciliationMatchInput(
-                    statement_line_id=stmt_line.line_id,
-                    journal_line_id=best_match.line_id,
-                    match_type=(
-                        ReconciliationMatchType.auto_exact
-                        if best_score >= 90
-                        else ReconciliationMatchType.auto_fuzzy
-                    ),
+                matched_gl_ids.add(best_match.line_id)
+                result.match_details.append(
+                    {
+                        "statement_line_id": str(stmt_line.line_id),
+                        "gl_line_id": str(best_match.line_id),
+                        "confidence": best_score,
+                        "suggested": True,
+                    }
                 )
-
-                try:
-                    recon_line = self.add_match(
-                        db,
-                        organization_id,
-                        reconciliation_id,
-                        match_input,
-                        created_by,
-                    )
-                    recon_line.match_confidence = Decimal(str(best_score))
-                    matched_gl_ids.add(best_match.line_id)
-                    result.matches_created += 1
-                    result.match_details.append(
-                        {
-                            "statement_line_id": str(stmt_line.line_id),
-                            "gl_line_id": str(best_match.line_id),
-                            "confidence": best_score,
-                        }
-                    )
-                except (HTTPException, ValueError, TypeError) as e:
-                    logger.warning(
-                        "Auto-match failed for line %s: %s",
-                        stmt_line.line_id,
-                        e,
-                    )
-                    result.match_details.append(
-                        {
-                            "statement_line_id": str(stmt_line.line_id),
-                            "error": str(e),
-                        }
-                    )
 
         # Count remaining unmatched
         result.unmatched_statement_lines = len(
@@ -563,49 +621,101 @@ class ReconciliationMatchingService:
             Decimal("0"),
         )
 
-        if abs(stmt_total - gl_total) > tolerance:
+        # Exact-tie rule: a split must tie to the kobo. Any residual is a
+        # reconciling item, never a tolerance allowance. (``tolerance`` retained
+        # for signature compatibility; no longer used to permit a mismatch.)
+        if stmt_total != gl_total:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Amount mismatch: statement total {stmt_total} "
-                    f"vs GL total {gl_total} "
-                    f"(difference {abs(stmt_total - gl_total)}, "
-                    f"tolerance {tolerance})"
+                    f"Cannot match: statement total {stmt_total:,.2f} does not tie "
+                    f"to GL total {gl_total:,.2f} (difference "
+                    f"{stmt_total - gl_total:,.2f}). Add a reconciling item for the "
+                    "difference instead of an inexact split."
                 ),
             )
 
-        # Create reconciliation lines for each pair
-        created_lines: _list[BankReconciliationLine] = []
-        for stmt_line in stmt_lines:
-            for gl_line in gl_lines_loaded:
-                stmt_amount = stmt_line.signed_amount
-                gl_amount = (gl_line.debit_amount or Decimal("0")) - (
-                    gl_line.credit_amount or Decimal("0")
-                )
+        # A split is one-to-many (one bank line ↔ many GL entries, e.g. a lump
+        # deposit covering several receipts) or many-to-one. True N:M is
+        # ambiguous — ask the user to match in smaller groups.
+        if len(stmt_lines) != 1 and len(gl_lines_loaded) != 1:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "A split must have a single bank line (matched to many GL "
+                    "entries) or a single GL entry (matched to many bank lines)."
+                ),
+            )
 
-                recon_line = BankReconciliationLine(
-                    reconciliation_id=reconciliation_id,
-                    match_type=ReconciliationMatchType.split,
+        now = datetime.now(tz=UTC)
+        group_id = uuid4()
+        created_lines: _list[BankReconciliationLine] = []
+        seen_stmt: set[UUID] = set()
+        seen_gl: set[UUID] = set()
+
+        pairs = (
+            [(stmt_lines[0], gl) for gl in gl_lines_loaded]
+            if len(stmt_lines) == 1
+            else [(sl, gl_lines_loaded[0]) for sl in stmt_lines]
+        )
+        for idx, (stmt_line, gl_line) in enumerate(pairs):
+            gl_amount = (gl_line.debit_amount or Decimal("0")) - (
+                gl_line.credit_amount or Decimal("0")
+            )
+            # Record each side's amount once so the group's recon lines sum to
+            # the true totals (no double counting from repeated anchors).
+            line_stmt_amount = (
+                stmt_line.signed_amount
+                if stmt_line.line_id not in seen_stmt
+                else Decimal("0")
+            )
+            line_gl_amount = (
+                gl_amount if gl_line.line_id not in seen_gl else Decimal("0")
+            )
+            seen_stmt.add(stmt_line.line_id)
+            seen_gl.add(gl_line.line_id)
+
+            recon_line = BankReconciliationLine(
+                reconciliation_id=reconciliation_id,
+                match_type=ReconciliationMatchType.split,
+                statement_line_id=stmt_line.line_id,
+                journal_line_id=gl_line.line_id,
+                transaction_date=stmt_line.transaction_date,
+                description=stmt_line.description,
+                reference=stmt_line.reference,
+                statement_amount=line_stmt_amount,
+                gl_amount=line_gl_amount,
+                difference=Decimal("0"),
+                is_cleared=True,
+                cleared_at=now,
+                notes=notes,
+                created_by=created_by,
+            )
+            db.add(recon_line)
+            created_lines.append(recon_line)
+
+            source_type, source_id = self._derive_match_source(gl_line)
+            db.add(
+                BankStatementLineMatch(
                     statement_line_id=stmt_line.line_id,
                     journal_line_id=gl_line.line_id,
-                    transaction_date=stmt_line.transaction_date,
-                    description=stmt_line.description,
-                    reference=stmt_line.reference,
-                    statement_amount=stmt_amount,
-                    gl_amount=gl_amount,
-                    difference=stmt_amount - gl_amount,
-                    is_cleared=True,
-                    cleared_at=datetime.utcnow(),
-                    notes=notes,
-                    created_by=created_by,
+                    matched_at=now,
+                    matched_by=created_by,
+                    is_primary=(idx == 0),
+                    source_type=source_type,
+                    source_id=source_id,
+                    match_type="SPLIT",
+                    match_state="confirmed",
+                    confirmed_at=now,
+                    confirmed_by=created_by,
+                    match_group_id=group_id,
                 )
-                db.add(recon_line)
-                created_lines.append(recon_line)
+            )
 
         # Mark statement lines as matched
         for stmt_line in stmt_lines:
             stmt_line.is_matched = True
-            stmt_line.matched_at = datetime.utcnow()
+            stmt_line.matched_at = now
             stmt_line.matched_by = created_by
 
         # Update reconciliation totals
@@ -1428,12 +1538,14 @@ class ReconciliationMatchingService:
         force_match: bool = False,
         source_type: str | None = None,
         source_id: UUID | None = None,
+        match_state: str = "confirmed",
     ) -> BankStatementLine:
         """Directly match a statement line to a GL journal line.
 
-        This sets the matching fields on the statement line without
-        requiring a reconciliation.  When a reconciliation is later
-        created, these pre-matched lines will already appear as matched.
+        ``match_state='confirmed'`` (human action) sets ``is_matched`` and is
+        validated for an exact tie. ``match_state='suggested'`` (auto-engine)
+        only records a candidate junction row — it does NOT set ``is_matched``
+        and is not amount-validated, because suggestions are never auto-applied.
         """
         stmt_line = db.get(BankStatementLine, statement_line_id)
         if not stmt_line:
@@ -1460,7 +1572,11 @@ class ReconciliationMatchingService:
         # Idempotency: this exact pair already exists.
         # Keep statement flags in sync in case of legacy/stale states.
         if isinstance(existing_match, BankStatementLineMatch):
-            if not stmt_line.is_matched:
+            # Heal stale is_matched for any existing match that isn't an explicit
+            # suggestion (None/legacy rows are treated as confirmed).
+            if not stmt_line.is_matched and (
+                getattr(existing_match, "match_state", None) != "suggested"
+            ):
                 stmt_line.is_matched = True
                 stmt_line.matched_at = existing_match.matched_at
                 stmt_line.matched_by = existing_match.matched_by
@@ -1474,7 +1590,7 @@ class ReconciliationMatchingService:
             )
             return stmt_line
 
-        if stmt_line.is_matched:
+        if stmt_line.is_matched and match_state != "suggested":
             raise HTTPException(
                 status_code=400,
                 detail="Statement line is already matched",
@@ -1502,24 +1618,27 @@ class ReconciliationMatchingService:
         gl_amount = (gl_line.debit_amount or Decimal("0")) - (
             gl_line.credit_amount or Decimal("0")
         )
-        self._validate_amount_match(  # type: ignore[attr-defined]
-            statement_amount,
-            gl_amount,
-            force_match=force_match,
-        )
-
-        # Mark as matched
         now = datetime.now(tz=UTC)
-        stmt_line.is_matched = True
-        stmt_line.matched_at = now
-        stmt_line.matched_by = matched_by
+        is_suggestion = match_state == "suggested"
 
-        # Remove any stale junction rows first (idempotent cleanup)
-        db.execute(
-            delete(BankStatementLineMatch).where(
-                BankStatementLineMatch.statement_line_id == statement_line_id
+        if not is_suggestion:
+            # Confirmed matches must tie exactly and mark the line matched.
+            # Suggestions are recorded without validation and never set
+            # is_matched (a human confirms them later).
+            self._validate_amount_match(  # type: ignore[attr-defined]
+                statement_amount,
+                gl_amount,
+                force_match=force_match,
             )
-        )
+            stmt_line.is_matched = True
+            stmt_line.matched_at = now
+            stmt_line.matched_by = matched_by
+            # Remove any stale junction rows first (idempotent cleanup)
+            db.execute(
+                delete(BankStatementLineMatch).where(
+                    BankStatementLineMatch.statement_line_id == statement_line_id
+                )
+            )
 
         # Fall back to deriving source from the linked journal entry when the
         # caller did not pass an explicit override (most callers don't).
@@ -1534,12 +1653,16 @@ class ReconciliationMatchingService:
             is_primary=True,
             source_type=source_type,
             source_id=source_id,
+            match_state=match_state,
+            confirmed_at=now if not is_suggestion else None,
+            confirmed_by=matched_by if not is_suggestion else None,
         )
         db.add(match_row)
 
-        # Update statement counters
-        statement.matched_lines = (statement.matched_lines or 0) + 1
-        statement.unmatched_lines = max((statement.unmatched_lines or 0) - 1, 0)
+        # Update statement counters only when a match is actually confirmed.
+        if not is_suggestion:
+            statement.matched_lines = (statement.matched_lines or 0) + 1
+            statement.unmatched_lines = max((statement.unmatched_lines or 0) - 1, 0)
 
         db.flush()
 
