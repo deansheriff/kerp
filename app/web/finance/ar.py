@@ -41,6 +41,7 @@ def list_customers(
     search: str | None = None,
     status: str | None = None,
     parent_customer_id: str | None = None,
+    show_subs: bool = False,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=25, le=200),
     sort: str | None = None,
@@ -60,6 +61,7 @@ def list_customers(
         sort_dir=sort_dir,
         limit=limit,
         parent_customer_id=parent_customer_id,
+        show_subs=show_subs,
     )
 
 

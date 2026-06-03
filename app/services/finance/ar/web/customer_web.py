@@ -84,8 +84,16 @@ class CustomerWebService:
         sort_dir: str | None = None,
         limit: int = 50,
         parent_customer_id: str | None = None,
+        show_subs: bool = False,
     ) -> dict:
-        """Get context for customer listing page."""
+        """Get context for customer listing page.
+
+        By default the list is *collapsed*: only top-level accounts (resellers
+        and standalones) are shown, with each parent's balance rolled up across
+        its sub-accounts and the sub-accounts available to expand inline. The
+        flat list (every customer, including sub-accounts) is shown when the
+        caller searches, drills into a specific parent, or sets ``show_subs``.
+        """
         logger.debug(
             "list_customers_context: org=%s search=%r status=%s page=%d",
             organization_id,
@@ -101,12 +109,16 @@ class CustomerWebService:
         if sort_dir_norm not in {"asc", "desc"}:
             sort_dir_norm = "asc"
 
+        # Collapse to top-level accounts unless searching, drilling into a
+        # specific parent, or explicitly asked to show sub-accounts flat.
+        collapsed = not show_subs and not search and not parent_customer_id
         query = build_customer_query(
             db=db,
             organization_id=organization_id,
             search=search,
             status=status,
             parent_customer_id=parent_customer_id,
+            top_level_only=collapsed,
         )
 
         count_subq = query.with_only_columns(Customer.customer_id).subquery()
@@ -178,18 +190,67 @@ class CustomerWebService:
             ).all()
             child_count_map = {row.parent_customer_id: row.cnt for row in child_counts}
 
-        customers_view = [
-            customer_list_view(
+        # Roll up family balances and load sub-accounts for inline expansion
+        # (collapsed view only): each displayed parent shows its own balance
+        # plus the sum of its sub-accounts, and carries the sub-account rows.
+        sub_accounts_map: dict[UUID, list[dict]] = {}
+        family_balance_map: dict[UUID, Decimal] = {}
+        if collapsed:
+            parent_ids_on_page = [
+                cid for cid in customer_ids if child_count_map.get(cid, 0) > 0
+            ]
+            if parent_ids_on_page:
+                children = db.scalars(
+                    select(Customer)
+                    .where(
+                        Customer.organization_id == org_id,
+                        Customer.parent_customer_id.in_(parent_ids_on_page),
+                    )
+                    .order_by(Customer.legal_name)
+                ).all()
+                for child in children:
+                    pid = child.parent_customer_id
+                    if pid is None:
+                        continue
+                    child_bal = balance_map.get(child.customer_id, Decimal("0"))
+                    sub_accounts_map.setdefault(pid, []).append(
+                        {
+                            "customer_id": child.customer_id,
+                            "customer_code": child.customer_code,
+                            "customer_name": customer_display_name(child),
+                            "is_active": child.is_active,
+                            "balance": format_currency(child_bal, child.currency_code),
+                        }
+                    )
+                    family_balance_map[pid] = (
+                        family_balance_map.get(pid, Decimal("0")) + child_bal
+                    )
+                for pid in parent_ids_on_page:
+                    family_balance_map[pid] = family_balance_map.get(
+                        pid, Decimal("0")
+                    ) + balance_map.get(pid, Decimal("0"))
+
+        customers_view = []
+        for customer in customers:
+            cid = customer.customer_id
+            is_parent = child_count_map.get(cid, 0) > 0
+            display_balance = (
+                family_balance_map.get(cid, balance_map.get(cid, Decimal("0")))
+                if collapsed and is_parent
+                else balance_map.get(cid, Decimal("0"))
+            )
+            view = customer_list_view(
                 customer,
-                balance_map.get(customer.customer_id, Decimal("0")),
+                display_balance,
                 creator_names.get(customer.created_by_user_id)
                 if customer.created_by_user_id
                 else None,
-                balance_trends.get(customer.customer_id),
-                child_count=child_count_map.get(customer.customer_id, 0),
+                balance_trends.get(cid),
+                child_count=child_count_map.get(cid, 0),
             )
-            for customer in customers
-        ]
+            view["is_parent"] = is_parent
+            view["sub_accounts"] = sub_accounts_map.get(cid, [])
+            customers_view.append(view)
 
         total_pages = max(1, (total_count + limit - 1) // limit)
 
@@ -210,6 +271,8 @@ class CustomerWebService:
             "active_filters": active_filters,
             "sort": sort or "",
             "sort_dir": sort_dir_norm,
+            "collapsed": collapsed,
+            "show_subs": show_subs,
         }
 
     @staticmethod
@@ -620,6 +683,7 @@ class CustomerWebService:
         sort_dir: str | None = None,
         parent_customer_id: str | None = None,
         limit: int = 50,
+        show_subs: bool = False,
     ) -> HTMLResponse:
         """Render customer list page."""
         context = base_context(request, auth, "Customers", "ar")
@@ -634,6 +698,7 @@ class CustomerWebService:
                 sort=sort,
                 sort_dir=sort_dir,
                 parent_customer_id=parent_customer_id,
+                show_subs=show_subs,
             )
         )
         return templates.TemplateResponse(request, "finance/ar/customers.html", context)
