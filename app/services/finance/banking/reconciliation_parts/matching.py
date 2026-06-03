@@ -371,12 +371,47 @@ class ReconciliationMatchingService:
                 pairs.append((None, None))
         return resolve_payment_metadata_batch(db, pairs)
 
+    def _resolve_suggestion_policy(
+        self, db: Session, organization_id: UUID
+    ) -> tuple[float, Decimal]:
+        """Resolve the ``(suggest_threshold, amount_tolerance)`` to use when
+        ranking match suggestions, from the org's ``ReconciliationPolicyProfile``.
+
+        Keeps the workspace suggestion floor and amount window aligned with the
+        same policy the Celery auto-engine honours, instead of hardcoded magic
+        numbers. These values only decide *which suggestions surface* and *how
+        wide* the amount window is — they NEVER confirm a match (confirmation
+        always enforces an exact kobo tie via ``add_match``). Resolution is
+        best-effort: if the policy can't be loaded we fall back to the dataclass
+        defaults (70 / ₦0.01).
+        """
+        from app.services.finance.banking.auto_reconciliation_parts.base import (
+            AutoMatchDefaults,
+        )
+        from app.services.finance.banking.reconciliation_policy_service import (
+            reconciliation_policy_service,
+        )
+
+        try:
+            policy = reconciliation_policy_service.resolve(
+                db, organization_id, legacy_config=AutoMatchDefaults()
+            )
+        except Exception:
+            logger.warning(
+                "Could not resolve reconciliation policy for org %s; "
+                "using default suggestion thresholds",
+                organization_id,
+                exc_info=True,
+            )
+            return 70.0, Decimal("0.01")
+        return float(policy.suggest_threshold), policy.amount_tolerance
+
     def auto_match(
         self,
         db: Session,
         organization_id: UUID,
         reconciliation_id: UUID,
-        tolerance: Decimal = Decimal("0.01"),
+        tolerance: Decimal | None = None,
         created_by: UUID | None = None,
     ) -> AutoMatchResult:
         """Generate ranked match SUGGESTIONS (suggest-only).
@@ -384,8 +419,18 @@ class ReconciliationMatchingService:
         This never auto-confirms: it surfaces the best candidate per statement
         line for a human to confirm via ``add_match`` (which enforces the exact
         tie). ``matches_created`` is therefore always 0.
+
+        The suggestion floor and amount tolerance come from the org's
+        ``ReconciliationPolicyProfile`` (``suggest_threshold`` / ``amount_tolerance``)
+        unless ``tolerance`` is passed explicitly.
         """
         reconciliation = self._get_for_org(db, organization_id, reconciliation_id)  # type: ignore[attr-defined]
+
+        suggest_threshold, policy_tolerance = self._resolve_suggestion_policy(
+            db, organization_id
+        )
+        if tolerance is None:
+            tolerance = policy_tolerance
 
         result = AutoMatchResult(
             matches_found=0,
@@ -447,7 +492,7 @@ class ReconciliationMatchingService:
             # candidate for human review; confirmation happens via add_match,
             # which enforces the exact (kobo) tie. The tolerance fallback above
             # only widens *suggestions*, it never confirms.
-            if best_match and best_score >= 50:
+            if best_match and best_score >= suggest_threshold:
                 result.matches_found += 1
                 matched_gl_ids.add(best_match.line_id)
                 result.match_details.append(
@@ -473,12 +518,14 @@ class ReconciliationMatchingService:
         db: Session,
         organization_id: UUID,
         reconciliation_id: UUID,
-        min_confidence: float = 30.0,
+        min_confidence: float | None = None,
     ) -> dict[UUID, MatchSuggestion]:
         """Get best match suggestion per unmatched statement line.
 
         Returns a dict keyed by statement_line_id.  Read-only — does NOT
-        create any matches.
+        create any matches. When ``min_confidence`` is not given, the
+        suggestion floor and amount tolerance come from the org's
+        ``ReconciliationPolicyProfile``.
         """
         reconciliation = self._get_for_org(db, organization_id, reconciliation_id)  # type: ignore[attr-defined]
         statement_lines, gl_lines = self._get_unmatched_lines(
@@ -487,6 +534,12 @@ class ReconciliationMatchingService:
 
         if not statement_lines or not gl_lines:
             return {}
+
+        policy_threshold, tolerance = self._resolve_suggestion_policy(
+            db, organization_id
+        )
+        if min_confidence is None:
+            min_confidence = policy_threshold
 
         gl_metadata = self._resolve_gl_metadata(db, gl_lines)
 
@@ -499,7 +552,6 @@ class ReconciliationMatchingService:
             gl_by_amount.setdefault(amount, []).append(gl_line)
 
         suggestions: dict[UUID, MatchSuggestion] = {}
-        tolerance = Decimal("0.01")
 
         # Phase 1: compute best candidate + score for every statement line
         _Candidate = tuple[BankStatementLine, JournalEntryLine, float, bool]
@@ -900,7 +952,7 @@ class ReconciliationMatchingService:
         db: Session,
         organization_id: UUID,
         statement_id: UUID,
-        min_confidence: float = 30.0,
+        min_confidence: float | None = None,
         date_buffer_days: int = 7,
     ) -> dict[UUID, MatchSuggestion]:
         """Get best GL transaction match per unmatched statement line.
@@ -911,13 +963,21 @@ class ReconciliationMatchingService:
         reconciliation is created.
 
         Returns a dict keyed by statement_line_id.  Read-only — does NOT
-        create any matches.
+        create any matches. When ``min_confidence`` is not given, the
+        suggestion floor and amount tolerance come from the org's
+        ``ReconciliationPolicyProfile``.
         """
         from datetime import timedelta
 
         statement = db.get(BankStatement, statement_id)
         if not statement or statement.organization_id != organization_id:
             return {}
+
+        policy_threshold, policy_tolerance = self._resolve_suggestion_policy(
+            db, organization_id
+        )
+        if min_confidence is None:
+            min_confidence = policy_threshold
 
         bank_account = statement.bank_account
         if not bank_account or not bank_account.gl_account_id:
@@ -984,7 +1044,7 @@ class ReconciliationMatchingService:
             gl_by_amount.setdefault(amount, []).append(gl_line)
 
         suggestions: dict[UUID, MatchSuggestion] = {}
-        tolerance = Decimal("0.01")
+        tolerance = policy_tolerance
 
         # Phase 1: compute best candidate + score for every statement line
         _Candidate = tuple[BankStatementLine, JournalEntryLine, float, bool]

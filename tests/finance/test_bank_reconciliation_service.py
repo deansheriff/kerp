@@ -540,9 +540,17 @@ def test_auto_match_suggests_without_confirming():
 
     db.get.side_effect = _get
 
-    result = svc.auto_match(
-        db, recon.organization_id, recon.reconciliation_id, tolerance=Decimal("0.02")
-    )
+    # Suggestion floor + tolerance are policy-driven; pin them so the fuzzy
+    # (score-50) candidate also surfaces and the test is deterministic.
+    with patch.object(
+        svc, "_resolve_suggestion_policy", return_value=(40.0, Decimal("0.02"))
+    ):
+        result = svc.auto_match(
+            db,
+            recon.organization_id,
+            recon.reconciliation_id,
+            tolerance=Decimal("0.02"),
+        )
     # Suggest-only: auto_match ranks candidates but confirms NOTHING. Both lines
     # stay unmatched and no match is created; they are surfaced as suggestions.
     assert result.matches_found == 2
