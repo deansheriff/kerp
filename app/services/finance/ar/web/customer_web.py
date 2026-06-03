@@ -26,6 +26,7 @@ from app.services.audit_info import get_audit_service
 from app.services.common import coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.finance.ar.customer import CustomerInput, customer_service
+from app.services.finance.ar.customer_family import CustomerFamilyResolver
 from app.services.finance.ar.web.base import (
     calculate_customer_balance_trends,
     customer_detail_view,
@@ -328,6 +329,22 @@ class CustomerWebService:
             InvoiceStatus.OVERDUE,
         ]
 
+        # Consolidated account family: a reseller/parent rolls up its
+        # sub-accounts; a standalone customer or sub-account is just itself
+        # (family_ids == [self]), so the rest of this builder is unchanged for
+        # non-parents while parents transparently aggregate the whole family.
+        family_resolver = CustomerFamilyResolver(db)
+        family_ids = family_resolver.family_ids(org_id, customer.customer_id)
+        is_consolidated = len(family_ids) > 1
+        attribution = (
+            family_resolver.attribution_map(org_id, family_ids)
+            if is_consolidated
+            else {}
+        )
+
+        def _sub_account(cid: UUID) -> str:
+            return attribution.get(cid, {}).get("code", "") if is_consolidated else ""
+
         balance = db.scalar(
             select(
                 func.coalesce(
@@ -336,7 +353,7 @@ class CustomerWebService:
                 )
             ).where(
                 Invoice.organization_id == org_id,
-                Invoice.customer_id == customer.customer_id,
+                Invoice.customer_id.in_(family_ids),
                 Invoice.status.in_(open_statuses),
             )
         ) or Decimal("0")
@@ -345,12 +362,12 @@ class CustomerWebService:
 
         today = date.today()
 
-        # All invoices (all statuses)
+        # All invoices (all statuses) across the account family
         all_invoices_query = db.scalars(
             select(Invoice)
             .where(
                 Invoice.organization_id == org_id,
-                Invoice.customer_id == customer.customer_id,
+                Invoice.customer_id.in_(family_ids),
             )
             .order_by(Invoice.invoice_date.desc())
             .limit(20)
@@ -374,6 +391,7 @@ class CustomerWebService:
                         inv.due_date < today
                         and inv.status not in {InvoiceStatus.PAID, InvoiceStatus.VOID}
                     ),
+                    "sub_account": _sub_account(inv.customer_id),
                 }
             )
 
@@ -382,7 +400,7 @@ class CustomerWebService:
             select(CustomerPayment)
             .where(
                 CustomerPayment.organization_id == org_id,
-                CustomerPayment.customer_id == customer.customer_id,
+                CustomerPayment.customer_id.in_(family_ids),
             )
             .order_by(CustomerPayment.payment_date.desc())
             .limit(20)
@@ -401,6 +419,7 @@ class CustomerWebService:
                         if r.payment_method
                         else "-"
                     ),
+                    "sub_account": _sub_account(r.customer_id),
                     "reference": r.reference or "-",
                     "status": r.status.value if r.status else "-",
                 }
@@ -411,7 +430,7 @@ class CustomerWebService:
             select(Quote)
             .where(
                 Quote.organization_id == org_id,
-                Quote.customer_id == customer.customer_id,
+                Quote.customer_id.in_(family_ids),
             )
             .order_by(Quote.quote_date.desc())
             .limit(20)
@@ -431,6 +450,7 @@ class CustomerWebService:
                         else "-"
                     ),
                     "status": q.status.value if q.status else "-",
+                    "sub_account": _sub_account(q.customer_id),
                 }
             )
 
@@ -439,7 +459,7 @@ class CustomerWebService:
             select(SalesOrder)
             .where(
                 SalesOrder.organization_id == org_id,
-                SalesOrder.customer_id == customer.customer_id,
+                SalesOrder.customer_id.in_(family_ids),
             )
             .order_by(SalesOrder.order_date.desc())
             .limit(20)
@@ -458,6 +478,7 @@ class CustomerWebService:
                         else "-"
                     ),
                     "status": so.status.value if so.status else "-",
+                    "sub_account": _sub_account(so.customer_id),
                 }
             )
 
@@ -495,6 +516,29 @@ class CustomerWebService:
             str(customer.default_tax_code_id) if customer.default_tax_code_id else None
         )
 
+        # Per-member open balances, so the consolidated view can show each
+        # sub-account's balance and the parent's own contribution.
+        sub_balance_map: dict[UUID, Decimal] = {}
+        if is_consolidated:
+            sub_balance_map = {
+                row.customer_id: row.balance
+                for row in db.execute(
+                    select(
+                        Invoice.customer_id,
+                        func.coalesce(
+                            func.sum(Invoice.total_amount - Invoice.amount_paid),
+                            0,
+                        ).label("balance"),
+                    )
+                    .where(
+                        Invoice.organization_id == org_id,
+                        Invoice.customer_id.in_(family_ids),
+                        Invoice.status.in_(open_statuses),
+                    )
+                    .group_by(Invoice.customer_id)
+                ).all()
+            }
+
         # Load child (sub-account) customers
         child_customers_view: list[dict] = []
         children = db.scalars(
@@ -507,14 +551,18 @@ class CustomerWebService:
             .limit(100)
         ).all()
         for child in children:
+            child_balance = sub_balance_map.get(child.customer_id, Decimal("0"))
             child_customers_view.append(
                 {
                     "customer_id": child.customer_id,
                     "customer_code": child.customer_code,
                     "customer_name": customer_display_name(child),
                     "is_active": child.is_active,
+                    "balance": format_currency(child_balance, customer.currency_code),
                 }
             )
+
+        own_balance = sub_balance_map.get(customer.customer_id, Decimal("0"))
 
         return {
             "customer": customer_view,
@@ -524,6 +572,11 @@ class CustomerWebService:
             "sales_orders": sales_orders_view,
             "attachments": attachments_view,
             "child_customers": child_customers_view,
+            # Consolidated-account metadata (parent rolling up its sub-accounts)
+            "is_consolidated": is_consolidated,
+            "family_count": len(family_ids),
+            "consolidated_balance": format_currency(balance, customer.currency_code),
+            "own_balance": format_currency(own_balance, customer.currency_code),
         }
 
     @staticmethod
