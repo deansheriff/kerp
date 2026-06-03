@@ -249,9 +249,12 @@ class CustomerPaymentService(ListResponseMixin):
                 raise ValidationError("Allocation total exceeds payment amount")
 
             for alloc in input.allocations:
-                # Lock the invoice row to prevent over-allocation race condition
+                # Lock the invoice row to prevent over-allocation race condition.
+                # Select only the PK so the FOR UPDATE does not pull in the
+                # lazy="joined" customer (Postgres rejects FOR UPDATE on the
+                # nullable side of that outer join).
                 db.execute(
-                    select(Invoice)
+                    select(Invoice.invoice_id)
                     .where(Invoice.invoice_id == coerce_uuid(alloc.invoice_id))
                     .with_for_update()
                 )
@@ -1028,9 +1031,12 @@ class CustomerPaymentService(ListResponseMixin):
                 raise ValidationError("Allocation total exceeds payment amount")
 
             for alloc in input.allocations:
-                # Lock the invoice row to prevent over-allocation race condition
+                # Lock the invoice row to prevent over-allocation race condition.
+                # Select only the PK so the FOR UPDATE does not pull in the
+                # lazy="joined" customer (Postgres rejects FOR UPDATE on the
+                # nullable side of that outer join).
                 db.execute(
-                    select(Invoice)
+                    select(Invoice.invoice_id)
                     .where(Invoice.invoice_id == coerce_uuid(alloc.invoice_id))
                     .with_for_update()
                 )
