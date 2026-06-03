@@ -12,7 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -910,6 +910,30 @@ class CustomerWebService:
         )
         return templates.TemplateResponse(
             request, "finance/ar/customer_statement.html", context
+        )
+
+    def customer_statement_pdf_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        customer_id: str,
+    ) -> Response:
+        """Render the (consolidated) statement of account as a PDF download."""
+        from app.services.finance.rpt.pdf import ReportPDFService
+
+        org_id = str(auth.organization_id)
+        ctx = self.consolidated_statement_context(db, org_id, customer_id)
+        if not ctx.get("customer"):
+            raise HTTPException(status_code=404, detail="Customer not found")
+        pdf_bytes = ReportPDFService(db).render("customer_statement", org_id, ctx)
+        code = ctx["customer"].get("customer_code", "account")
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="statement_{code}.pdf"'
+            },
         )
 
     def customer_edit_form_response(

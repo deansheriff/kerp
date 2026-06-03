@@ -109,6 +109,19 @@ def customer_statement(
     return ar_web_service.customer_statement_response(request, auth, db, customer_id)
 
 
+@router.get("/customers/{customer_id}/statement/pdf")
+def customer_statement_pdf(
+    request: Request,
+    customer_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Download the statement of account as a PDF."""
+    return ar_web_service.customer_statement_pdf_response(
+        request, auth, db, customer_id
+    )
+
+
 @router.get(
     "/customers/{customer_id}/consolidated-payment", response_class=HTMLResponse
 )

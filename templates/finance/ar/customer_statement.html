@@ -36,9 +36,14 @@
         <a href="/finance/ar/customers/{{ customer.customer_id }}" class="btn btn-secondary btn-sm">
             {{ icon_svg("chevron-right", "h-4 w-4 rotate-180") }} Back to customer
         </a>
-        <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">
-            {{ icon_svg("document", "h-4 w-4") }} Print / Save as PDF
-        </button>
+        <div class="flex items-center gap-2">
+            <a href="/finance/ar/customers/{{ customer.customer_id }}/statement/pdf" class="btn btn-secondary btn-sm">
+                {{ icon_svg("download", "h-4 w-4") }} Download PDF
+            </a>
+            <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">
+                {{ icon_svg("document", "h-4 w-4") }} Print
+            </button>
+        </div>
     </div>
 
     <div class="card statement-doc p-6 sm:p-8">
