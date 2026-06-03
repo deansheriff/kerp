@@ -121,13 +121,15 @@ def test_create_package_with_variance_submits_approval_request():
 
     assert run.status == FixedAssetGLReconciliationPackageService.STATUS_PENDING_APPROVAL
     assert run.approval_request_id == approval_request_id
-    assert run.total_variance_abs == Decimal("100.00")
+    assert run.total_variance_abs == Decimal("50.00")
     assert db.add.call_count == 2
+    exception = db.add.call_args_list[1].args[0]
+    assert exception.variance_amount == Decimal("50.00")
     check_workflow.assert_called_once_with(
         db,
         org_id,
         FA_GL_RECONCILIATION_DOCUMENT_TYPE,
-        document_amount=Decimal("100.00"),
+        document_amount=Decimal("50.00"),
         currency_code=None,
     )
     submit_for_approval.assert_called_once()

@@ -305,6 +305,25 @@ class FixedAssetGLReconciliationPackageService:
     STATUS_DRAFT_CREATED = "DRAFT_CREATED"
 
     @staticmethod
+    def _actionable_total_variance(totals: dict[str, object]) -> Decimal:
+        """Return independent GL variances that require correction.
+
+        NBV variance is derived from cost less accumulated depreciation, so
+        counting it with the underlying variances overstates the approval amount.
+        """
+        return (
+            Decimal(str(totals["cost_variance"])).copy_abs()
+            + Decimal(str(totals["accumulated_depreciation_variance"])).copy_abs()
+        )
+
+    @staticmethod
+    def _actionable_row_variance(row: dict[str, object]) -> Decimal:
+        return (
+            Decimal(str(row["cost_variance"])).copy_abs()
+            + Decimal(str(row["accumulated_depreciation_variance"])).copy_abs()
+        )
+
+    @staticmethod
     def create_package(
         db: Session,
         organization_id: UUID,
@@ -324,9 +343,7 @@ class FixedAssetGLReconciliationPackageService:
         totals = context["totals"]
         report_date = date.fromisoformat(str(context["as_of"]))
         total_variance_abs = (
-            Decimal(str(totals["cost_variance"])).copy_abs()
-            + Decimal(str(totals["accumulated_depreciation_variance"])).copy_abs()
-            + Decimal(str(totals["nbv_variance"])).copy_abs()
+            FixedAssetGLReconciliationPackageService._actionable_total_variance(totals)
         )
         is_balanced = bool(context["is_balanced"])
 
@@ -374,7 +391,10 @@ class FixedAssetGLReconciliationPackageService:
                         )
                     ),
                     category_codes=str(row.get("category_codes") or ""),
-                    variance_amount=Decimal(str(row["nbv_variance"])),
+                    variance_amount=(
+                        FixedAssetGLReconciliationPackageService
+                        ._actionable_row_variance(row)
+                    ),
                     evidence_payload=(
                         FixedAssetGLReconciliationPackageService._row_payload(row)
                     ),
