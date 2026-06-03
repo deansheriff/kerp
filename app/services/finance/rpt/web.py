@@ -34,12 +34,15 @@ from app.services.finance.rpt.day_books import (
     export_journal_day_book_xlsx,
     export_purchases_day_book_csv,
     export_purchases_day_book_xlsx,
+    export_purchases_returns_day_book_csv,
+    export_purchases_returns_day_book_xlsx,
     export_sales_day_book_csv,
     export_sales_day_book_xlsx,
     export_sales_returns_day_book_csv,
     export_sales_returns_day_book_xlsx,
     journal_day_book_context,
     purchases_day_book_context,
+    purchases_returns_day_book_context,
     sales_day_book_context,
     sales_returns_day_book_context,
 )
@@ -426,6 +429,40 @@ class ReportsWebService:
         )
         return templates.TemplateResponse(
             request, "finance/reports/sales_returns_day_book.html", context
+        )
+
+    def purchases_returns_day_book_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        start_date: str | None,
+        end_date: str | None,
+        status: str | None,
+        db: Session,
+    ) -> HTMLResponse:
+        from app.services.common_filters import build_active_filters
+        from app.web.deps import base_context
+
+        context = base_context(request, auth, "Purchases Returns Day Book", "reports")
+        context.update(
+            purchases_returns_day_book_context(
+                db,
+                str(auth.organization_id),
+                start_date=start_date,
+                end_date=end_date,
+                status=status,
+            )
+        )
+        context["active_filters"] = build_active_filters(
+            params={
+                "start_date": start_date,
+                "end_date": end_date,
+                "status": status,
+            },
+            labels={"start_date": "From", "end_date": "To", "status": "Status"},
+        )
+        return templates.TemplateResponse(
+            request, "finance/reports/purchases_returns_day_book.html", context
         )
 
     def general_ledger_response(
@@ -945,6 +982,32 @@ class ReportsWebService:
             organization_id, db, start_date, end_date, status=status
         )
 
+    def export_purchases_returns_day_book_csv(
+        self,
+        organization_id: str,
+        db: Session,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        status: str | None = None,
+    ) -> str:
+        """Export the Purchases Returns Day Book as CSV."""
+        return export_purchases_returns_day_book_csv(
+            organization_id, db, start_date, end_date, status=status
+        )
+
+    def export_purchases_returns_day_book_xlsx(
+        self,
+        organization_id: str,
+        db: Session,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        status: str | None = None,
+    ) -> bytes:
+        """Export the Purchases Returns Day Book as an Excel workbook."""
+        return export_purchases_returns_day_book_xlsx(
+            organization_id, db, start_date, end_date, status=status
+        )
+
     def export_balance_sheet_csv(
         self,
         organization_id: str,
@@ -1115,6 +1178,20 @@ class ReportsWebService:
             db, organization_id, start_date=start_date, end_date=end_date, status=status
         )
         return self._render_pdf("sales_returns_day_book", organization_id, db, ctx)
+
+    def export_purchases_returns_day_book_pdf(
+        self,
+        organization_id: str,
+        db: Session,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        status: str | None = None,
+    ) -> bytes:
+        """Export the Purchases Returns Day Book as PDF."""
+        ctx = purchases_returns_day_book_context(
+            db, organization_id, start_date=start_date, end_date=end_date, status=status
+        )
+        return self._render_pdf("purchases_returns_day_book", organization_id, db, ctx)
 
     def export_balance_sheet_pdf(
         self,
