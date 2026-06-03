@@ -736,12 +736,13 @@ async def reconciliation_add_reconciling_item(
 def view_reconciliation(
     request: Request,
     reconciliation_id: str,
+    matched_page: int = Query(1, ge=1),
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db_for_org),
 ):
     """Reconciliation workspace page."""
     return banking_web_service.reconciliation_detail_response(
-        request, auth, db, reconciliation_id
+        request, auth, db, reconciliation_id, matched_page=matched_page
     )
 
 

@@ -457,7 +457,7 @@
     <div class="card">
         <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
             <h3 class="font-medium text-slate-900 dark:text-white">Matched Items</h3>
-            <p class="text-xs text-slate-500">{{ lines | length }} confirmed match(es)</p>
+            <p class="text-xs text-slate-500">{{ matched_total }} confirmed match(es){% if matched_pages > 1 %} · page {{ matched_page }} of {{ matched_pages }}{% endif %}</p>
         </div>
         <div class="table-container">
             <table class="table">
@@ -499,6 +499,19 @@
                 </tbody>
             </table>
         </div>
+        {% if matched_pages > 1 %}
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-700 text-sm">
+            <span class="text-slate-500 dark:text-slate-400">Showing {{ ((matched_page - 1) * matched_page_size) + 1 }}–{{ [matched_page * matched_page_size, matched_total] | min }} of {{ matched_total }}</span>
+            <div class="flex gap-2">
+                {% if matched_page > 1 %}
+                <a href="?matched_page={{ matched_page - 1 }}" class="btn btn-secondary btn-sm">Previous</a>
+                {% endif %}
+                {% if matched_page < matched_pages %}
+                <a href="?matched_page={{ matched_page + 1 }}" class="btn btn-secondary btn-sm">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Reconciling Items (adjustments + outstanding items that book the difference) -->

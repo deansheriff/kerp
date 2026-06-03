@@ -49,6 +49,9 @@ from app.services.finance.banking.web_parts.base import (
     templates,
 )
 
+# Page size for the Matched Items table on the reconciliation detail page.
+_MATCHED_PAGE_SIZE = 100
+
 
 class BankingReconciliationWebService:
     """Banking web service methods for reconciliations."""
@@ -178,6 +181,7 @@ class BankingReconciliationWebService:
         db: Session,
         organization_id: str,
         reconciliation_id: str,
+        matched_page: int = 1,
     ) -> dict:
         from app.services.finance.banking.bank_reconciliation import (
             bank_reconciliation_service as recon_svc,
@@ -288,7 +292,7 @@ class BankingReconciliationWebService:
         # period (the authoritative store) so matches made by the workspace OR
         # the auto-engine both appear and can be viewed/unmatched. Fixes the
         # "0 matches" bug where the view only read reconciliation.lines.
-        matched_rows = db.execute(
+        matched_base = (
             select(
                 BankStatementLineMatch,
                 BankStatementLine,
@@ -313,7 +317,20 @@ class BankingReconciliationWebService:
                 BankStatementLine.transaction_date <= reconciliation.period_end,
                 BankStatementLineMatch.match_state == "confirmed",
             )
-            .order_by(BankStatementLine.transaction_date)
+        )
+        # Paginate: a fully-reconciled account can have thousands of matches;
+        # rendering them all at once times the page out.
+        matched_total = (
+            db.scalar(select(func.count()).select_from(matched_base.subquery())) or 0
+        )
+        matched_pages = max(
+            1, (matched_total + _MATCHED_PAGE_SIZE - 1) // _MATCHED_PAGE_SIZE
+        )
+        matched_page = min(max(1, matched_page), matched_pages)
+        matched_rows = db.execute(
+            matched_base.order_by(BankStatementLine.transaction_date)
+            .limit(_MATCHED_PAGE_SIZE)
+            .offset((matched_page - 1) * _MATCHED_PAGE_SIZE)
         ).all()
 
         matched_items: list[dict] = []
@@ -356,6 +373,10 @@ class BankingReconciliationWebService:
             "match_suggestions": match_suggestions,
             "statement_line_amounts": statement_line_amounts,
             "gl_line_amounts": gl_line_amounts,
+            "matched_total": matched_total,
+            "matched_page": matched_page,
+            "matched_pages": matched_pages,
+            "matched_page_size": _MATCHED_PAGE_SIZE,
         }
 
     @staticmethod
@@ -514,6 +535,7 @@ class BankingReconciliationWebService:
         auth: WebAuthContext,
         db: Session,
         reconciliation_id: str,
+        matched_page: int = 1,
     ) -> HTMLResponse:
         context = base_context(request, auth, "Bank Reconciliation", "banking", db=db)
         context.update(
@@ -521,6 +543,7 @@ class BankingReconciliationWebService:
                 db,
                 str(auth.organization_id),
                 reconciliation_id,
+                matched_page=matched_page,
             )
         )
         return templates.TemplateResponse(
