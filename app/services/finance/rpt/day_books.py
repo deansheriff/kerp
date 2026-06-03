@@ -25,19 +25,16 @@ from app.models.finance.ap.supplier_invoice import (
     SupplierInvoiceStatus,
     SupplierInvoiceType,
 )
-from app.models.finance.ap.supplier_payment import APPaymentStatus, SupplierPayment
-from app.models.finance.ar.customer import Customer
-from app.models.finance.ar.customer_payment import CustomerPayment
-from app.models.finance.ar.customer_payment import PaymentStatus as ARPaymentStatus
 from app.models.finance.ar.invoice import Invoice, InvoiceStatus, InvoiceType
+from app.models.finance.gl.account import Account
+from app.models.finance.gl.account_category import AccountCategory
 from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
+from app.models.finance.gl.journal_entry_line import JournalEntryLine
 from app.services.common import coerce_uuid
 from app.services.finance.ap.invoice_query import (
     build_invoice_query as build_supplier_invoice_query,
 )
-from app.services.finance.ap.payment_query import build_payment_query
 from app.services.finance.ar.invoice_query import build_invoice_query
-from app.services.finance.ar.receipt_query import build_receipt_query
 from app.services.finance.gl.journal_query import build_journal_query
 from app.services.finance.rpt.common import (
     _build_csv,
@@ -287,6 +284,10 @@ def purchases_day_book_context(
         start_date=_iso_date(from_date),
         end_date=_iso_date(to_date),
     )
+    # A purchases day book records purchase invoices only — supplier credit
+    # notes belong in the Purchases Returns Day Book, and debit notes are extra
+    # charges, not credit purchases.
+    query = query.where(SupplierInvoice.invoice_type == SupplierInvoiceType.STANDARD)
     if not status:
         query = query.where(SupplierInvoice.status.notin_(_PURCHASES_EXCLUDED_STATUSES))
     query = query.order_by(SupplierInvoice.invoice_date, SupplierInvoice.invoice_number)
@@ -424,56 +425,53 @@ def export_purchases_day_book_xlsx(
 
 # ───────────────────────────── Cash Book ─────────────────────────────
 #
-# A combined chronological record of cash movements: AR receipts (inflows)
-# and AP payments (outflows). The "Running" column is the cumulative net
-# movement *within the selected period* (opens at 0) — it is not the absolute
-# bank balance, which would require an opening balance carried from prior
-# periods. ``amount`` is used as the cash figure (the value that hit the
-# bank, net of WHT), not the gross.
-
-# AR receipt statuses that did not result in cash (excluded by default).
-_RECEIPT_EXCLUDED_STATUSES = (
-    ARPaymentStatus.BOUNCED,
-    ARPaymentStatus.REVERSED,
-)
-# AP payment statuses that did not result in cash (excluded by default).
-_PAYMENT_EXCLUDED_STATUSES = (
-    APPaymentStatus.DRAFT,
-    APPaymentStatus.VOID,
-    APPaymentStatus.REJECTED,
-)
+# A true cash book: every posting to a cash or bank GL account (account
+# categories BANK and CASH, incl. petty cash) within the period — so it
+# captures bank charges, interest, transfers and manual cash journals, not
+# just AR receipts / AP payments. For a cash/bank (asset) account a DEBIT is
+# money in (inflow) and a CREDIT is money out (outflow). Opening and closing
+# balances are shown per account. Figures are in the functional (presentation)
+# currency so multi-currency accounts total consistently.
 
 _CASH_BOOK_EXPORT_HEADERS = [
     "Date",
-    "Type",
-    "Reference",
-    "Party",
-    "Method",
-    "Currency",
+    "Account",
+    "Journal No",
+    "Description",
     "Inflow",
     "Outflow",
-    "Running",
 ]
-_CASH_BOOK_NUMERIC_FROM = 6
+_CASH_BOOK_NUMERIC_FROM = 4
+
+# Account categories that constitute "cash and cash equivalents".
+_CASH_BANK_CATEGORY_CODES = ("BANK", "CASH")
 
 
-def _customer_name_map(db: Any, org_id: Any, customer_ids: set[Any]) -> dict[str, str]:
-    """Batch-resolve customer_id -> display name."""
-    if not customer_ids:
-        return {}
+def _cash_bank_accounts(db: Any, org_id: Any) -> dict[Any, dict[str, str]]:
+    """Return cash/bank GL accounts -> {code, name, label}, keyed by account_id."""
     from sqlalchemy import select
 
     rows = db.execute(
         select(
-            Customer.customer_id,
-            Customer.trading_name,
-            Customer.legal_name,
-        ).where(
-            Customer.organization_id == org_id,
-            Customer.customer_id.in_(customer_ids),
+            Account.account_id,
+            Account.account_code,
+            Account.account_name,
         )
+        .join(AccountCategory, Account.category_id == AccountCategory.category_id)
+        .where(
+            Account.organization_id == org_id,
+            AccountCategory.category_code.in_(_CASH_BANK_CATEGORY_CODES),
+        )
+        .order_by(Account.account_code)
     ).all()
-    return {str(r[0]): (r[1] or r[2] or "") for r in rows}
+    return {
+        r[0]: {
+            "code": r[1] or "",
+            "name": r[2] or "",
+            "label": f"{r[1]} · {r[2]}" if r[1] else (r[2] or ""),
+        }
+        for r in rows
+    }
 
 
 def cash_book_context(
@@ -482,121 +480,150 @@ def cash_book_context(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, Any]:
-    """Build context for the Cash Book (receipts + payments, chronological)."""
+    """Build context for the Cash Book (all postings to cash/bank GL accounts)."""
+    from sqlalchemy import func, select
+
     org_id = coerce_uuid(organization_id)
 
     today = date.today()
     from_date = _parse_date(start_date) or today.replace(day=1)
     to_date = _parse_date(end_date) or today
-    iso_from, iso_to = _iso_date(from_date), _iso_date(to_date)
 
-    receipts_q = build_receipt_query(
-        db=db, organization_id=str(org_id), start_date=iso_from, end_date=iso_to
-    ).where(CustomerPayment.status.notin_(_RECEIPT_EXCLUDED_STATUSES))
-    receipts = list(db.scalars(receipts_q).all())
+    accounts = _cash_bank_accounts(db, org_id)
+    acct_ids = list(accounts.keys())
 
-    payments_q = build_payment_query(
-        db=db, organization_id=str(org_id), start_date=iso_from, end_date=iso_to
-    ).where(SupplierPayment.status.notin_(_PAYMENT_EXCLUDED_STATUSES))
-    payments = list(db.scalars(payments_q).all())
-
-    cust_names = _customer_name_map(db, org_id, {r.customer_id for r in receipts})
-    supp_names = _supplier_name_map(db, org_id, {p.supplier_id for p in payments})
-
-    # Merge into one chronological stream. Each entry carries a sort key of
-    # (date, type) so receipts and payments on the same day order stably.
-    entries: list[dict[str, Any]] = []
-    for r in receipts:
-        entries.append(
-            {
-                "_date": r.payment_date,
-                "kind": "Receipt",
-                "reference": r.payment_number,
-                "party": cust_names.get(str(r.customer_id), ""),
-                "method": r.payment_method.value if r.payment_method else "",
-                "currency_code": r.currency_code,
-                "inflow_dec": r.amount or Decimal("0"),
-                "outflow_dec": Decimal("0"),
-            }
-        )
-    for p in payments:
-        entries.append(
-            {
-                "_date": p.payment_date,
-                "kind": "Payment",
-                "reference": p.payment_number,
-                "party": supp_names.get(str(p.supplier_id), ""),
-                "method": p.payment_method.value if p.payment_method else "",
-                "currency_code": p.currency_code,
-                "inflow_dec": Decimal("0"),
-                "outflow_dec": p.amount or Decimal("0"),
-            }
-        )
-    entries.sort(key=lambda e: (e["_date"], 0 if e["kind"] == "Receipt" else 1))
-
+    openings: dict[Any, Decimal] = {aid: Decimal("0") for aid in acct_ids}
+    period_in: dict[Any, Decimal] = {aid: Decimal("0") for aid in acct_ids}
+    period_out: dict[Any, Decimal] = {aid: Decimal("0") for aid in acct_ids}
     rows: list[dict[str, Any]] = []
-    total_in = Decimal("0")
-    total_out = Decimal("0")
-    running = Decimal("0")
-    for e in entries:
-        total_in += e["inflow_dec"]
-        total_out += e["outflow_dec"]
-        running += e["inflow_dec"] - e["outflow_dec"]
-        rows.append(
+
+    if acct_ids:
+        # Opening balance per account = net (debit - credit) of all posted
+        # lines before the period start.
+        opening_rows = db.execute(
+            select(
+                JournalEntryLine.account_id,
+                func.coalesce(func.sum(JournalEntryLine.debit_amount_functional), 0),
+                func.coalesce(func.sum(JournalEntryLine.credit_amount_functional), 0),
+            )
+            .join(
+                JournalEntry,
+                JournalEntry.journal_entry_id == JournalEntryLine.journal_entry_id,
+            )
+            .where(
+                JournalEntry.organization_id == org_id,
+                JournalEntry.status == JournalStatus.POSTED,
+                JournalEntry.posting_date < from_date,
+                JournalEntryLine.account_id.in_(acct_ids),
+            )
+            .group_by(JournalEntryLine.account_id)
+        ).all()
+        for aid, dr, cr in opening_rows:
+            openings[aid] = (dr or Decimal("0")) - (cr or Decimal("0"))
+
+        # Period detail — one row per cash/bank posting line.
+        detail = db.execute(
+            select(
+                JournalEntry.posting_date,
+                JournalEntry.journal_number,
+                JournalEntry.description,
+                JournalEntryLine.account_id,
+                JournalEntryLine.debit_amount_functional,
+                JournalEntryLine.credit_amount_functional,
+            )
+            .join(
+                JournalEntry,
+                JournalEntry.journal_entry_id == JournalEntryLine.journal_entry_id,
+            )
+            .where(
+                JournalEntry.organization_id == org_id,
+                JournalEntry.status == JournalStatus.POSTED,
+                JournalEntry.posting_date >= from_date,
+                JournalEntry.posting_date <= to_date,
+                JournalEntryLine.account_id.in_(acct_ids),
+            )
+            .order_by(JournalEntry.posting_date, JournalEntry.journal_number)
+        ).all()
+        for posting_date, jnum, desc, aid, dr, cr in detail:
+            inflow = dr or Decimal("0")
+            outflow = cr or Decimal("0")
+            period_in[aid] += inflow
+            period_out[aid] += outflow
+            rows.append(
+                {
+                    "date": _format_date(posting_date),
+                    "date_iso": _iso_date(posting_date),
+                    "account": accounts[aid]["label"],
+                    "journal_number": jnum,
+                    "description": desc or "",
+                    "inflow": _format_currency(inflow) if inflow else "",
+                    "inflow_raw": float(inflow),
+                    "outflow": _format_currency(outflow) if outflow else "",
+                    "outflow_raw": float(outflow),
+                }
+            )
+
+    # Per-account summary (opening, inflows, outflows, closing).
+    accounts_summary: list[dict[str, Any]] = []
+    total_open = total_in = total_out = total_close = Decimal("0")
+    for aid in acct_ids:
+        opening = openings[aid]
+        inflow = period_in[aid]
+        outflow = period_out[aid]
+        closing = opening + inflow - outflow
+        total_open += opening
+        total_in += inflow
+        total_out += outflow
+        total_close += closing
+        accounts_summary.append(
             {
-                "date": _format_date(e["_date"]),
-                "date_iso": _iso_date(e["_date"]),
-                "kind": e["kind"],
-                "reference": e["reference"],
-                "party": e["party"],
-                "method": e["method"].replace("_", " ").title(),
-                "currency_code": e["currency_code"],
-                "inflow": _format_currency(e["inflow_dec"]) if e["inflow_dec"] else "",
-                "inflow_raw": float(e["inflow_dec"]),
-                "outflow": (
-                    _format_currency(e["outflow_dec"]) if e["outflow_dec"] else ""
-                ),
-                "outflow_raw": float(e["outflow_dec"]),
-                "running": _format_currency(running),
-                "running_raw": float(running),
+                "account": accounts[aid]["label"],
+                "opening": _format_currency(opening),
+                "opening_raw": float(opening),
+                "inflows": _format_currency(inflow),
+                "inflows_raw": float(inflow),
+                "outflows": _format_currency(outflow),
+                "outflows_raw": float(outflow),
+                "closing": _format_currency(closing),
+                "closing_raw": float(closing),
             }
         )
 
-    net = total_in - total_out
     return {
         "rows": rows,
         "row_count": len(rows),
+        "accounts_summary": accounts_summary,
+        "account_count": len(acct_ids),
         "start_date": _format_date(from_date),
-        "start_date_iso": iso_from,
+        "start_date_iso": _iso_date(from_date),
         "end_date": _format_date(to_date),
-        "end_date_iso": iso_to,
+        "end_date_iso": _iso_date(to_date),
+        "total_opening": _format_currency(total_open),
+        "total_opening_raw": float(total_open),
         "total_inflows": _format_currency(total_in),
         "total_inflows_raw": float(total_in),
         "total_outflows": _format_currency(total_out),
         "total_outflows_raw": float(total_out),
-        "net_movement": _format_currency(net),
-        "net_movement_raw": float(net),
-        "running_note": (
-            "Running balance is the cumulative net cash movement for the "
-            "selected period (opens at zero); it is not the absolute bank "
-            "balance."
+        "total_closing": _format_currency(total_close),
+        "total_closing_raw": float(total_close),
+        "basis_note": (
+            "Covers every posting to cash and bank GL accounts (categories "
+            "Bank and Cash, including petty cash). Figures are in the "
+            "functional/presentation currency."
         ),
     }
 
 
 def _cash_book_export_rows(ctx: dict[str, Any]) -> list[list[str]]:
-    """Flatten the Cash Book context into export rows + totals line."""
+    """Flatten the Cash Book detail into export rows + totals line."""
     rows: list[list[str]] = [
         [
             r["date_iso"],
-            r["kind"],
-            r["reference"],
-            r["party"],
-            r["method"],
-            r["currency_code"],
+            r["account"],
+            r["journal_number"],
+            r["description"],
             str(r["inflow_raw"]),
             str(r["outflow_raw"]),
-            str(r["running_raw"]),
         ]
         for r in ctx["rows"]
     ]
@@ -605,12 +632,9 @@ def _cash_book_export_rows(ctx: dict[str, Any]) -> list[list[str]]:
             "",
             "",
             "",
-            "",
-            "",
             "TOTAL",
             str(ctx["total_inflows_raw"]),
             str(ctx["total_outflows_raw"]),
-            str(ctx["net_movement_raw"]),
         ]
     )
     return rows
@@ -643,10 +667,19 @@ def export_cash_book_xlsx(
     )
 
 
-# ─────────────────────────── Journal day book ───────────────────────────
+# ─────────────────────────── Journal (Proper) ───────────────────────────
 #
-# The Journal proper: posted GL journal entries in date order, with debit and
-# credit control totals. Defaults to POSTED (the only GL-impacting status).
+# The Journal Proper: posted GL journals in date order with debit/credit
+# control totals, EXCLUDING entries that already belong to another book of
+# prime entry — anything touching a cash/bank account (Cash Book) and the
+# trade-invoice documents (Sales/Purchases & their returns books). What
+# remains is genuine "other" entries: accruals, depreciation, reclasses,
+# opening/closing entries, corrections. The full unfiltered journal listing
+# lives at /finance/gl/journals.
+
+# Trade-invoice source_document_type values represented in the Sales,
+# Purchases and returns day books (so excluded from the Journal Proper).
+_JOURNAL_PROPER_EXCLUDED_SOURCES = ("INVOICE", "SUPPLIER_INVOICE")
 
 _JOURNAL_EXPORT_HEADERS = [
     "Date",
@@ -674,6 +707,8 @@ def journal_day_book_context(
     from_date = _parse_date(start_date) or today.replace(day=1)
     to_date = _parse_date(end_date) or today
 
+    from sqlalchemy import or_, select
+
     # A day book records posted entries; default to POSTED when unfiltered.
     effective_status = status or JournalStatus.POSTED.value
     query = build_journal_query(
@@ -682,7 +717,28 @@ def journal_day_book_context(
         status=effective_status,
         start_date=_iso_date(from_date),
         end_date=_iso_date(to_date),
-    ).order_by(JournalEntry.posting_date, JournalEntry.journal_number)
+    )
+
+    # Journal *Proper*: exclude entries that belong to another book of prime
+    # entry so the six books stay a clean partition (no double-counting).
+    #  - any journal touching a cash/bank account -> Cash Book
+    #  - trade-invoice-sourced journals -> Sales/Purchases (& returns) books
+    cash_bank_ids = list(_cash_bank_accounts(db, org_id).keys())
+    if cash_bank_ids:
+        cash_journal_ids = (
+            select(JournalEntryLine.journal_entry_id)
+            .where(JournalEntryLine.account_id.in_(cash_bank_ids))
+            .distinct()
+        )
+        query = query.where(JournalEntry.journal_entry_id.notin_(cash_journal_ids))
+    query = query.where(
+        or_(
+            JournalEntry.source_document_type.is_(None),
+            JournalEntry.source_document_type.notin_(_JOURNAL_PROPER_EXCLUDED_SOURCES),
+        )
+    )
+
+    query = query.order_by(JournalEntry.posting_date, JournalEntry.journal_number)
 
     entries = list(db.scalars(query).all())
 
@@ -722,6 +778,11 @@ def journal_day_book_context(
         "total_credit": _format_currency(total_credit),
         "total_credit_raw": float(total_credit),
         "is_balanced": total_debit == total_credit,
+        "scope_note": (
+            "Journal Proper — excludes entries already in the Cash Book "
+            "(cash/bank postings) and the Sales/Purchases day books (trade "
+            "invoices). For every posted journal, see the GL journal listing."
+        ),
     }
 
 
