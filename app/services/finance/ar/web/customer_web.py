@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, Request, UploadFile
@@ -643,6 +644,161 @@ class CustomerWebService:
         }
 
     @staticmethod
+    def consolidated_statement_context(
+        db: Session,
+        organization_id: str,
+        customer_id: str,
+    ) -> dict:
+        """Build a statement of account for a customer / consolidated family.
+
+        Lists every charge (invoice) and credit (payment) in date order with a
+        running balance, attributed by sub-account when consolidated, plus an
+        aging summary across the whole family. The running total of charges
+        less credits is the closing balance.
+        """
+        from datetime import date
+
+        org_id = coerce_uuid(organization_id)
+        customer = None
+        try:
+            customer = customer_service.get(db, org_id, customer_id)
+        except Exception:
+            customer = None
+        if not customer or customer.organization_id != org_id:
+            return {"customer": None, "transactions": [], "is_consolidated": False}
+
+        resolver = CustomerFamilyResolver(db)
+        family_ids = resolver.family_ids(org_id, customer.customer_id)
+        is_consolidated = len(family_ids) > 1
+        attribution = (
+            resolver.attribution_map(org_id, family_ids) if is_consolidated else {}
+        )
+
+        def _sub(cid: UUID) -> str:
+            return attribution.get(cid, {}).get("code", "") if is_consolidated else ""
+
+        statement_statuses = [
+            InvoiceStatus.POSTED,
+            InvoiceStatus.PARTIALLY_PAID,
+            InvoiceStatus.OVERDUE,
+            InvoiceStatus.PAID,
+        ]
+        invoices = list(
+            db.scalars(
+                select(Invoice)
+                .where(
+                    Invoice.organization_id == org_id,
+                    Invoice.customer_id.in_(family_ids),
+                    Invoice.status.in_(statement_statuses),
+                )
+                .order_by(Invoice.invoice_date)
+            ).all()
+        )
+        payments = list(
+            db.scalars(
+                select(CustomerPayment)
+                .where(
+                    CustomerPayment.organization_id == org_id,
+                    CustomerPayment.customer_id.in_(family_ids),
+                )
+                .order_by(CustomerPayment.payment_date)
+            ).all()
+        )
+
+        # Interleave charges and credits chronologically (invoices before
+        # payments on the same day) and accumulate a running balance.
+        events: list[tuple[date, int, str, Any]] = []
+        for inv in invoices:
+            events.append((inv.invoice_date, 0, "invoice", inv))
+        for pmt in payments:
+            events.append((pmt.payment_date, 1, "payment", pmt))
+        events.sort(key=lambda e: (e[0], e[1]))
+
+        ccy = customer.currency_code
+        running = Decimal("0")
+        total_charges = Decimal("0")
+        total_credits = Decimal("0")
+        transactions: list[dict] = []
+        for _, _, kind, obj in events:
+            if kind == "invoice":
+                charge = obj.total_amount or Decimal("0")
+                running += charge
+                total_charges += charge
+                transactions.append(
+                    {
+                        "date": format_date(obj.invoice_date),
+                        "type": "Invoice",
+                        "reference": obj.invoice_number,
+                        "sub_account": _sub(obj.customer_id),
+                        "charge": format_currency(charge, ccy),
+                        "credit": "",
+                        "balance": format_currency(running, ccy),
+                    }
+                )
+            else:
+                credit = obj.amount or Decimal("0")
+                running -= credit
+                total_credits += credit
+                transactions.append(
+                    {
+                        "date": format_date(obj.payment_date),
+                        "type": "Payment",
+                        "reference": obj.payment_number,
+                        "sub_account": _sub(obj.customer_id),
+                        "charge": "",
+                        "credit": format_currency(credit, ccy),
+                        "balance": format_currency(running, ccy),
+                    }
+                )
+
+        closing_balance = running
+
+        # Aging on open invoices (by due date), aggregated across the family.
+        today = date.today()
+        open_statuses = {
+            InvoiceStatus.POSTED,
+            InvoiceStatus.PARTIALLY_PAID,
+            InvoiceStatus.OVERDUE,
+        }
+        buckets = {
+            "current": Decimal("0"),
+            "d30": Decimal("0"),
+            "d60": Decimal("0"),
+            "d90": Decimal("0"),
+            "d90p": Decimal("0"),
+        }
+        for inv in invoices:
+            if inv.status not in open_statuses:
+                continue
+            bal = (inv.total_amount or Decimal("0")) - (inv.amount_paid or Decimal("0"))
+            if bal <= 0:
+                continue
+            days = (today - inv.due_date).days if inv.due_date else 0
+            if days <= 0:
+                buckets["current"] += bal
+            elif days <= 30:
+                buckets["d30"] += bal
+            elif days <= 60:
+                buckets["d60"] += bal
+            elif days <= 90:
+                buckets["d90"] += bal
+            else:
+                buckets["d90p"] += bal
+
+        return {
+            "customer": customer_detail_view(customer, closing_balance),
+            "is_consolidated": is_consolidated,
+            "family_count": len(family_ids),
+            "statement_date": format_date(today),
+            "transactions": transactions,
+            "total_charges": format_currency(total_charges, ccy),
+            "total_credits": format_currency(total_credits, ccy),
+            "closing_balance": format_currency(closing_balance, ccy),
+            "currency_code": ccy,
+            "aging": {k: format_currency(v, ccy) for k, v in buckets.items()},
+        }
+
+    @staticmethod
     def delete_customer(
         db: Session,
         organization_id: str,
@@ -734,6 +890,26 @@ class CustomerWebService:
         )
         return templates.TemplateResponse(
             request, "finance/ar/customer_detail.html", context
+        )
+
+    def customer_statement_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        customer_id: str,
+    ) -> HTMLResponse:
+        """Render a (consolidated) statement of account."""
+        context = base_context(request, auth, "Statement of Account", "ar")
+        context.update(
+            self.consolidated_statement_context(
+                db,
+                str(auth.organization_id),
+                customer_id,
+            )
+        )
+        return templates.TemplateResponse(
+            request, "finance/ar/customer_statement.html", context
         )
 
     def customer_edit_form_response(

@@ -18,6 +18,11 @@
 {% block header_actions %}
 {% if customer %}
 <div class="flex items-center gap-2">
+    <a href="/finance/ar/customers/{{ customer.customer_id }}/statement"
+       class="btn btn-secondary">
+        {{ icon_svg("document", "h-4 w-4") }}
+        {{ 'Consolidated Statement' if is_consolidated else 'Statement' }}
+    </a>
     <a href="/finance/ar/customers/{{ customer.customer_id }}/edit"
        class="btn btn-secondary">
         {{ icon_svg("edit", "h-4 w-4") }}

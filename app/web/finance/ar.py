@@ -98,6 +98,17 @@ def view_customer(
     return ar_web_service.customer_detail_response(request, auth, db, customer_id)
 
 
+@router.get("/customers/{customer_id}/statement", response_class=HTMLResponse)
+def customer_statement(
+    request: Request,
+    customer_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Consolidated statement of account."""
+    return ar_web_service.customer_statement_response(request, auth, db, customer_id)
+
+
 @router.get("/customers/{customer_id}/edit", response_class=HTMLResponse)
 def edit_customer_form(
     request: Request,
