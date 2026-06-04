@@ -22,7 +22,13 @@ from app.models.people.payroll.salary_assignment import SalaryStructureAssignmen
 from app.models.people.payroll.salary_component import SalaryComponent
 from app.models.people.payroll.salary_slip import SalarySlip
 from app.models.people.payroll.salary_structure import PayrollFrequency, SalaryStructure
-from app.services.common import coerce_uuid
+from app.services.common import (
+    PaginationParams,
+    apply_search,
+    coerce_uuid,
+    paginate,
+    pagination_context,
+)
 from app.services.people.payroll.payroll_service import PayrollService
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
@@ -70,44 +76,31 @@ class StructureWebService:
         """Render salary structures list page."""
         org_id = coerce_uuid(auth.organization_id)
         per_page = DEFAULT_PAGE_SIZE
-        offset = (page - 1) * per_page
 
-        conditions: list[Any] = [SalaryStructure.organization_id == org_id]
-
-        if search:
-            conditions.append(
-                SalaryStructure.structure_name.ilike(f"%{search}%")
-                | SalaryStructure.structure_code.ilike(f"%{search}%")
-            )
-
-        total = (
-            db.scalar(
-                select(func.count(SalaryStructure.structure_id)).where(*conditions)
-            )
-            or 0
+        query = select(SalaryStructure).where(SalaryStructure.organization_id == org_id)
+        query = apply_search(
+            query,
+            search,
+            SalaryStructure.structure_name,
+            SalaryStructure.structure_code,
         )
-        structures = db.scalars(
-            select(SalaryStructure)
-            .where(*conditions)
-            .order_by(SalaryStructure.structure_name)
-            .offset(offset)
-            .limit(per_page)
-        ).all()
-        total_pages = (total + per_page - 1) // per_page
+
+        result = paginate(
+            db,
+            query.order_by(SalaryStructure.structure_name),
+            PaginationParams.from_page(page, per_page),
+        )
 
         context = base_context(request, auth, "Salary Structures", "payroll", db=db)
         context["request"] = request
         context.update(
             {
-                "structures": structures,
+                "structures": result.items,
                 "search": search or "",
-                "page": page,
-                "total_pages": total_pages,
-                "total_count": total,
-                "total": total,
-                "limit": per_page,
-                "has_prev": page > 1,
-                "has_next": page < total_pages,
+                "total": result.total,
+                "has_prev": result.has_prev,
+                "has_next": result.has_next,
+                **pagination_context(result),
             }
         )
         return templates.TemplateResponse(
