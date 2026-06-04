@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings as app_settings
 from app.db import SessionLocal, get_auth_db_session
+from app.db.session_context import allow_cross_org, prime_session
 from app.models.auth import ApiKey, SessionStatus
 from app.models.auth import Session as AuthSession
 from app.models.person import Person
@@ -553,14 +554,15 @@ def require_user_auth(
             session = _validate_session_sso(session_uuid, person_uuid, now, auth_db)
         else:
             # SSO provider or non-SSO mode - validate against local database
-            session = db.scalar(
-                select(AuthSession)
-                .where(AuthSession.id == session_uuid)
-                .where(AuthSession.person_id == person_uuid)
-                .where(AuthSession.status == SessionStatus.active)
-                .where(AuthSession.revoked_at.is_(None))
-                .where(AuthSession.expires_at > now)
-            )
+            with allow_cross_org(db):
+                session = db.scalar(
+                    select(AuthSession)
+                    .where(AuthSession.id == session_uuid)
+                    .where(AuthSession.person_id == person_uuid)
+                    .where(AuthSession.status == SessionStatus.active)
+                    .where(AuthSession.revoked_at.is_(None))
+                    .where(AuthSession.expires_at > now)
+                )
 
         if not session:
             raise HTTPException(status_code=401, detail="Unauthorized")
@@ -734,7 +736,8 @@ def require_tenant_auth(
             auth_db.close()
 
     # Look up the user's organization (or use default if single-org mode)
-    person = db.get(Person, person_uuid)
+    with allow_cross_org(db):
+        person = db.get(Person, person_uuid)
     organization_id = person.organization_id if person else None
 
     # Single-org mode: use default org if configured
@@ -746,6 +749,7 @@ def require_tenant_auth(
 
     # Set RLS context if user has an organization
     if organization_id:
+        prime_session(db, organization_id)
         set_current_organization_sync(db, organization_id)
         if request is not None:
             request.state.organization_id = str(organization_id)

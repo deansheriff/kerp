@@ -4,7 +4,7 @@ from contextlib import nullcontext
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session_context import allow_cross_org
@@ -411,12 +411,26 @@ class DomainSettings(ListResponseMixin):
     def get_by_key(self, db: Session, key: str) -> DomainSetting:
         if not self.domain:
             raise HTTPException(status_code=400, detail="Setting domain is required")
-        setting = db.scalar(
-            select(DomainSetting).where(
-                DomainSetting.domain == self.domain,
-                DomainSetting.key == key,
-            )
+        org_id = db.info.get("organization_id")
+        stmt = select(DomainSetting).where(
+            DomainSetting.domain == self.domain,
+            DomainSetting.key == key,
+            DomainSetting.is_active.is_(True),
         )
+        if org_id:
+            stmt = stmt.where(
+                or_(
+                    DomainSetting.organization_id == org_id,
+                    DomainSetting.organization_id.is_(None),
+                )
+            ).order_by(
+                case((DomainSetting.organization_id == org_id, 0), else_=1),
+                DomainSetting.updated_at.desc(),
+            )
+        else:
+            stmt = stmt.order_by(DomainSetting.updated_at.desc())
+        with allow_cross_org(db):
+            setting = db.scalar(stmt.limit(1))
         if not setting:
             raise HTTPException(status_code=404, detail="Setting not found")
         return setting
