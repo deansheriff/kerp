@@ -19,7 +19,7 @@ from app.models.finance.gl.account import Account
 from app.models.finance.gl.fiscal_period import FiscalPeriod, PeriodStatus
 from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus, JournalType
 from app.models.finance.gl.journal_entry_line import JournalEntryLine
-from app.services.common import coerce_uuid
+from app.services.common import PaginationParams, coerce_uuid, paginate
 from app.services.common_filters import build_active_filters
 from app.services.finance.common.sorting import apply_sort
 from app.services.finance.gl.journal import JournalService
@@ -65,7 +65,6 @@ class JournalWebService:
             status,
             page,
         )
-        offset = (page - 1) * limit
         from app.services.finance.gl.journal_query import build_journal_query
 
         query = build_journal_query(
@@ -77,7 +76,6 @@ class JournalWebService:
             end_date=end_date,
         )
 
-        total_count = db.scalar(select(func.count()).select_from(query.subquery())) or 0
         column_map = {
             "entry_date": JournalEntry.entry_date,
             "journal_number": JournalEntry.journal_number,
@@ -87,7 +85,9 @@ class JournalWebService:
         query = apply_sort(
             query, sort, sort_dir, column_map, default=JournalEntry.created_at.desc()
         )
-        entries = list(db.scalars(query.limit(limit).offset(offset)).all())
+        result = paginate(db, query, PaginationParams.from_page(page, limit))
+        total_count = result.total
+        entries = result.items
         stats_query = build_journal_query(
             db=db,
             organization_id=organization_id,
@@ -149,7 +149,7 @@ class JournalWebService:
                 }
             )
 
-        total_pages = max(1, (total_count + limit - 1) // limit)
+        total_pages = result.total_pages
         active_filters = build_active_filters(
             params={
                 "status": status,
