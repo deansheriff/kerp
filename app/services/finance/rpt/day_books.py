@@ -31,6 +31,7 @@ from app.models.finance.gl.account_category import AccountCategory
 from app.models.finance.gl.journal_entry import JournalEntry, JournalStatus
 from app.models.finance.gl.journal_entry_line import JournalEntryLine
 from app.services.common import coerce_uuid
+from app.services.finance.common.source_types import INVOICE_JOURNAL_SOURCE_TYPES
 from app.services.finance.ap.invoice_query import (
     build_invoice_query as build_supplier_invoice_query,
 )
@@ -151,6 +152,19 @@ def sales_day_book_context(
             "VAT shown is the tax charged on invoices in this period (memo). "
             "This organisation accounts for VAT on a cash basis, so it will "
             "not equal the VAT return for the period."
+        ),
+        # Document-grain basis: these rows summarise the AR sub-ledger by
+        # invoice date, whereas the general ledger posts by posting date. The
+        # two won't tie line-for-line — period totals can differ at period
+        # boundaries, and the ledger splits each invoice across control,
+        # revenue and (deferred) VAT accounts. Use the GL trial balance /
+        # control-account reconciliation for the ledger view.
+        "gl_recon_note": (
+            "Document basis: rows come from the AR sub-ledger by invoice date "
+            "and summarise each invoice as issued. The general ledger posts by "
+            "posting date and splits each invoice across receivables, revenue "
+            "and VAT accounts, so these totals will not tie line-for-line to "
+            "GL postings — reconcile via the trial balance / AR control account."
         ),
     }
 
@@ -350,6 +364,14 @@ def purchases_day_book_context(
             "VAT shown is the input tax on invoices in this period (memo). "
             "This organisation accounts for VAT on a cash basis, so it will "
             "not equal the VAT return for the period."
+        ),
+        "gl_recon_note": (
+            "Document basis: rows come from the AP sub-ledger by invoice date "
+            "and summarise each supplier invoice as recorded. The general "
+            "ledger posts by posting date and splits each invoice across "
+            "payables, expense/asset, VAT and WHT accounts, so these totals "
+            "will not tie line-for-line to GL postings — reconcile via the "
+            "trial balance / AP control account."
         ),
     }
 
@@ -677,9 +699,20 @@ def export_cash_book_xlsx(
 # opening/closing entries, corrections. The full unfiltered journal listing
 # lives at /finance/gl/journals.
 
-# Trade-invoice source_document_type values represented in the Sales,
-# Purchases and returns day books (so excluded from the Journal Proper).
-_JOURNAL_PROPER_EXCLUDED_SOURCES = ("INVOICE", "SUPPLIER_INVOICE")
+# Source document types whose journals already belong to another book of prime
+# entry, so they are kept out of the Journal Proper:
+#  - INVOICE / SUPPLIER_INVOICE      -> the trade invoice itself (Sales /
+#    Purchases & their returns day books).
+#  - *_INVOICE_VAT_DEFERRAL          -> the cash-basis VAT leg companion to each
+#    invoice (output VAT deferred at invoice time, reclassed on receipt — see
+#    feedback_vat_cash_basis). A mechanical byproduct of a document already in
+#    the Sales/Purchases day books (where that VAT is shown against the
+#    invoice), not a genuine adjusting entry, so it does not belong in the
+#    Journal Proper. The complete journal-grain record remains at
+#    /finance/gl/journals.
+# Sourced from the shared constant so the posting layer and this report cannot
+# drift apart (see app/services/finance/common/source_types.py).
+_JOURNAL_PROPER_EXCLUDED_SOURCES = INVOICE_JOURNAL_SOURCE_TYPES
 
 _JOURNAL_EXPORT_HEADERS = [
     "Date",
@@ -779,9 +812,12 @@ def journal_day_book_context(
         "total_credit_raw": float(total_credit),
         "is_balanced": total_debit == total_credit,
         "scope_note": (
-            "Journal Proper — excludes entries already in the Cash Book "
-            "(cash/bank postings) and the Sales/Purchases day books (trade "
-            "invoices). For every posted journal, see the GL journal listing."
+            "Journal Proper — genuine adjusting entries (accruals, "
+            "depreciation, reclasses, opening/closing, corrections). Excludes "
+            "entries already in the Cash Book (cash/bank postings), the "
+            "Sales/Purchases day books (trade invoices), and the cash-basis "
+            "VAT deferral legs companion to those invoices. For every posted "
+            "journal, see the GL journal listing at /finance/gl/journals."
         ),
     }
 
