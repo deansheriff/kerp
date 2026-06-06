@@ -32,58 +32,10 @@ def banking_landing(
     return templates.TemplateResponse(request, "finance/banking/index.html", context)
 
 
-@router.get("/settings", response_class=HTMLResponse)
-def auto_match_settings(
-    request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db_for_org),
-) -> HTMLResponse:
-    """Auto-match rules settings page."""
-    from app.services.finance.settings_web import settings_web_service
-    from app.web.deps import base_context, templates
-
-    context = base_context(request, auth, "Auto-Match Rules", "banking", db=db)
-    context.update(
-        settings_web_service.get_auto_match_settings_context(db, auth.organization_id)
-    )
-    if request.query_params.get("saved"):
-        context["saved"] = True
-    return templates.TemplateResponse(
-        request, "finance/banking/auto_match_settings.html", context
-    )
-
-
-@router.post("/settings")
-async def update_auto_match_settings(
-    request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
-    db: Session = Depends(get_db_for_org),
-) -> Response:
-    """Save auto-match rules settings."""
-    from app.services.finance.settings_web import settings_web_service
-    from app.web.deps import base_context, templates
-
-    form = await request.form()
-    data = dict(form)
-
-    ok, error = settings_web_service.update_auto_match_settings(
-        db, auth.organization_id, data
-    )
-    if ok:
-        db.commit()
-        return RedirectResponse(
-            url="/finance/banking/settings?saved=1", status_code=303
-        )
-
-    # Re-render with error
-    context = base_context(request, auth, "Auto-Match Rules", "banking", db=db)
-    context.update(
-        settings_web_service.get_auto_match_settings_context(db, auth.organization_id)
-    )
-    context["error"] = error
-    return templates.TemplateResponse(
-        request, "finance/banking/auto_match_settings.html", context
-    )
+# Auto-match rules settings page was removed on 2026-05-15 when the
+# banking.automatch_* DomainSettings keys were sunset.  The canonical
+# config now lives on ``banking.reconciliation_policy_profile``; a future
+# admin UI for that will live elsewhere.
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -754,16 +706,51 @@ async def reconciliation_multi_match(
     )
 
 
-@router.get("/reconciliations/{reconciliation_id}", response_class=HTMLResponse)
-def view_reconciliation(
+@router.post("/reconciliations/{reconciliation_id}/unmatch")
+async def reconciliation_unmatch(
     request: Request,
     reconciliation_id: str,
     auth: WebAuthContext = Depends(require_finance_access),
     db: Session = Depends(get_db_for_org),
 ):
+    """Reverse a confirmed match for a statement line (JSON from Alpine.js fetch)."""
+    return await banking_web_service.reconciliation_unmatch_response(
+        request, auth, db, reconciliation_id
+    )
+
+
+@router.post("/reconciliations/{reconciliation_id}/reconciling-items")
+async def reconciliation_add_reconciling_item(
+    request: Request,
+    reconciliation_id: str,
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Add a reconciling item (adjustment / outstanding) — JSON from Alpine.js."""
+    return await banking_web_service.reconciliation_reconciling_item_response(
+        request, auth, db, reconciliation_id
+    )
+
+
+@router.get("/reconciliations/{reconciliation_id}", response_class=HTMLResponse)
+def view_reconciliation(
+    request: Request,
+    reconciliation_id: str,
+    matched_page: int = Query(1, ge=1),
+    stmt_page: int = Query(1, ge=1),
+    gl_page: int = Query(1, ge=1),
+    auth: WebAuthContext = Depends(require_finance_access),
+    db: Session = Depends(get_db_for_org),
+):
     """Reconciliation workspace page."""
     return banking_web_service.reconciliation_detail_response(
-        request, auth, db, reconciliation_id
+        request,
+        auth,
+        db,
+        reconciliation_id,
+        matched_page=matched_page,
+        stmt_page=stmt_page,
+        gl_page=gl_page,
     )
 
 

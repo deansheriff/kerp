@@ -27,6 +27,7 @@ from app.models.finance.ap.supplier import Supplier
 from app.models.finance.ap.supplier_invoice import (
     SupplierInvoice,
     SupplierInvoiceStatus,
+    SupplierInvoiceType,
 )
 from app.models.finance.ap.supplier_invoice_line import SupplierInvoiceLine
 from app.models.finance.ap.supplier_invoice_line_tax import SupplierInvoiceLineTax
@@ -95,6 +96,7 @@ class InvoiceWebService:
         limit: int = 50,
         sort: str | None = None,
         sort_dir: str | None = None,
+        invoice_type: SupplierInvoiceType | None = None,
     ) -> dict:
         """Get context for invoice listing page."""
         logger.debug(
@@ -120,6 +122,9 @@ class InvoiceWebService:
             start_date=start_date,
             end_date=end_date,
         )
+
+        if invoice_type is not None:
+            base_stmt = base_stmt.where(SupplierInvoice.invoice_type == invoice_type)
 
         total_count = (
             db.scalar(select(func.count()).select_from(base_stmt.subquery())) or 0
@@ -286,6 +291,7 @@ class InvoiceWebService:
         from app.models.finance.tax.tax_code import TaxCode
         from app.models.fixed_assets.asset_category import AssetCategory
         from app.models.inventory.item import Item
+        from app.models.inventory.warehouse import Warehouse
 
         logger.debug(
             "invoice_form_context: org=%s supplier_id=%s po_id=%s",
@@ -400,15 +406,35 @@ class InvoiceWebService:
                 if item.last_purchase_cost
                 else 0,
                 "uom": item.base_uom,
+                "track_inventory": bool(item.track_inventory),
+                "track_lots": bool(item.track_lots),
+                "track_serial_numbers": bool(item.track_serial_numbers),
             }
             for item in db.scalars(
                 select(Item)
                 .where(
                     Item.organization_id == org_id,
-                    Item.is_active == True,
-                    Item.is_purchaseable == True,
+                    Item.is_active.is_(True),
+                    Item.is_purchaseable.is_(True),
                 )
                 .order_by(Item.item_code)
+            ).all()
+        ]
+
+        warehouses_list = [
+            {
+                "warehouse_id": str(warehouse.warehouse_id),
+                "warehouse_code": warehouse.warehouse_code,
+                "warehouse_name": warehouse.warehouse_name,
+            }
+            for warehouse in db.scalars(
+                select(Warehouse)
+                .where(
+                    Warehouse.organization_id == org_id,
+                    Warehouse.is_active.is_(True),
+                    Warehouse.is_receiving.is_(True),
+                )
+                .order_by(Warehouse.warehouse_code)
             ).all()
         ]
 
@@ -458,6 +484,7 @@ class InvoiceWebService:
             "expense_accounts": expense_accounts,
             "asset_accounts": asset_accounts,
             "items_list": items_list,
+            "warehouses_list": warehouses_list,
             "tax_codes": tax_codes,
             "wht_codes": wht_codes,
             "asset_categories": asset_categories,
@@ -821,6 +848,73 @@ class InvoiceWebService:
             request, "finance/ap/invoice_form.html", context
         )
 
+    def list_credit_notes_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        search: str | None,
+        supplier_id: str | None,
+        status: str | None,
+        start_date: str | None,
+        end_date: str | None,
+        page: int,
+        db: Session,
+        limit: int = 50,
+        sort: str | None = None,
+        sort_dir: str | None = None,
+    ) -> HTMLResponse:
+        """Render the supplier credit notes list (AP credit notes)."""
+        context = base_context(request, auth, "Supplier Credit Notes", "ap")
+        context.update(
+            self.list_invoices_context(
+                db,
+                str(auth.organization_id),
+                search=search,
+                supplier_id=supplier_id,
+                status=status,
+                start_date=start_date,
+                end_date=end_date,
+                page=page,
+                limit=limit,
+                sort=sort,
+                sort_dir=sort_dir,
+                invoice_type=SupplierInvoiceType.CREDIT_NOTE,
+            )
+        )
+        context.update(
+            {
+                "list_title": "Supplier Credit Notes",
+                "new_url": "/finance/ap/credit-notes/new",
+                "new_label": "New Credit Note",
+                "export_url": "/finance/ap/invoices/export",
+                "empty_title": "No supplier credit notes",
+                "empty_desc": "Raise a supplier credit note to record a purchase return.",
+            }
+        )
+        return templates.TemplateResponse(request, "finance/ap/invoices.html", context)
+
+    def credit_note_new_form_response(
+        self,
+        request: Request,
+        auth: WebAuthContext,
+        supplier_id: str | None,
+        db: Session,
+    ) -> HTMLResponse:
+        """Render the new supplier credit note form (reuses the invoice form)."""
+        context = base_context(request, auth, "New Supplier Credit Note", "ap")
+        context.update(
+            self.invoice_form_context(
+                db,
+                str(auth.organization_id),
+                supplier_id=supplier_id,
+            )
+        )
+        context["is_credit_note"] = True
+        context["default_invoice_type"] = SupplierInvoiceType.CREDIT_NOTE.value
+        return templates.TemplateResponse(
+            request, "finance/ap/invoice_form.html", context
+        )
+
     @staticmethod
     def _duplicate_invoice_context(
         db: Session,
@@ -940,11 +1034,16 @@ class InvoiceWebService:
                     "unit_price": line.unit_price,
                     "tax_code_id": line.tax_code_id,
                     "tax_amount": line.tax_amount,
+                    "receipt_warehouse_id": line.receipt_warehouse_id,
+                    "receipt_reference": line.receipt_reference,
+                    "receipt_serial_numbers": line.receipt_serial_numbers,
+                    "receipt_auto_generate_serials": line.receipt_auto_generate_serials,
                     "cost_center_id": line.cost_center_id,
                     "project_id": line.project_id,
                 }
                 for line in lines
             ],
+            "auto_create_inventory_receipt": invoice.auto_create_inventory_receipt,
         }
 
         return templates.TemplateResponse(

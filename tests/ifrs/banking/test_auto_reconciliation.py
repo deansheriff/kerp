@@ -28,7 +28,6 @@ from app.models.finance.payments.payment_intent import (
 )
 from app.services.finance.banking.auto_reconciliation import (
     AMOUNT_TOLERANCE,
-    AutoMatchConfig,
     AutoMatchResult,
     AutoReconciliationService,
 )
@@ -37,17 +36,6 @@ from tests.ifrs.banking.conftest import (
     MockBankStatement,
     MockBankStatementLine,
 )
-
-
-@pytest.fixture(autouse=True)
-def _mock_load_config() -> object:
-    """Patch _load_config to return defaults without hitting the DB."""
-    with patch.object(
-        AutoReconciliationService,
-        "_load_config",
-        return_value=AutoMatchConfig(),
-    ):
-        yield
 
 
 @pytest.fixture(autouse=True)
@@ -473,6 +461,7 @@ class TestPaymentIntentMatching:
             force_match=True,
             source_type="PAYMENT_INTENT",
             source_id=intent.intent_id,
+            match_state="suggested",
         )
 
     def test_happy_path_reference_in_description(
@@ -1006,6 +995,7 @@ class TestSplynxPaymentMatching:
             force_match=True,
             source_type="CUSTOMER_PAYMENT",
             source_id=pmt.payment_id,
+            match_state="suggested",
         )
 
     def test_splynx_ref_in_description(

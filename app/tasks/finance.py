@@ -72,21 +72,29 @@ def _notify_export_result(
     action_url: str | None = None,
 ) -> None:
     """Create an in-app notification and send a direct email for an export."""
+    # Capture identifiers as plain values BEFORE committing. db.commit() expires
+    # every ORM attribute, and the org-scoped session's RLS GUC (SET LOCAL) is
+    # reset on commit — so any post-commit attribute access would reload the row
+    # under an unprimed session and RLS would hide it (ObjectDeletedError).
+    org_id = instance.organization_id
+    recipient_id = instance.generated_by_user_id
+    entity_id = instance.instance_id
+
     NotificationService().create(
         db,
-        organization_id=instance.organization_id,
-        recipient_id=instance.generated_by_user_id,
+        organization_id=org_id,
+        recipient_id=recipient_id,
         entity_type=EntityType.SYSTEM,
-        entity_id=instance.instance_id,
+        entity_id=entity_id,
         notification_type=NotificationType.INFO,
         title=title,
         message=message,
         action_url=action_url,
     )
     db.commit()
-    prime_tenant_context(db, instance.organization_id)
+    prime_tenant_context(db, org_id)
 
-    recipient = db.get(Person, instance.generated_by_user_id)
+    recipient = db.get(Person, recipient_id)
     if not recipient or not recipient.email:
         return
 
@@ -106,7 +114,7 @@ def _notify_export_result(
         body_html=body_html,
         body_text=body_text,
         module=EmailModule.FINANCE,
-        organization_id=instance.organization_id,
+        organization_id=org_id,
     )
 
 
@@ -219,6 +227,7 @@ def _response_body_bytes(response: Any) -> bytes:
 def _export_action_url(report_code: str, instance_id: UUID) -> str:
     bases = {
         "GL_JOURNALS": "/finance/gl/journals/exports",
+        "GL_LEDGER": "/finance/gl/ledger/exports",
         "AR_INVOICES": "/finance/ar/invoices/exports",
         "AR_RECEIPTS": "/finance/ar/receipts/exports",
     }
@@ -228,6 +237,7 @@ def _export_action_url(report_code: str, instance_id: UUID) -> str:
 def _export_label(report_code: str) -> str:
     return {
         "GL_JOURNALS": "GL Journals",
+        "GL_LEDGER": "Ledger Transactions",
         "AR_INVOICES": "AR Invoices",
         "AR_RECEIPTS": "AR Receipts",
     }[report_code]
@@ -236,6 +246,7 @@ def _export_label(report_code: str) -> str:
 def _export_filename_prefix(report_code: str) -> str:
     return {
         "GL_JOURNALS": "gl_journals",
+        "GL_LEDGER": "gl_ledger",
         "AR_INVOICES": "ar_invoices",
         "AR_RECEIPTS": "ar_receipts",
     }[report_code]
@@ -261,6 +272,22 @@ async def _build_list_export_response(
             instance.generated_by_user_id,
         )
         return await journal_service.export_all(search, status, start_date, end_date)
+
+    if report_code == "GL_LEDGER":
+        from app.services.finance.gl.bulk import get_ledger_bulk_service
+
+        ledger_service = get_ledger_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await ledger_service.export_all(
+            search,
+            status,
+            start_date,
+            end_date,
+            {"account_id": params.get("account_id") or None},
+        )
 
     if report_code == "AR_INVOICES":
         from app.services.finance.ar.invoice_bulk import get_ar_invoice_bulk_service
@@ -292,6 +319,38 @@ async def _build_list_export_response(
             start_date,
             end_date,
             {"customer_id": params.get("customer_id") or ""},
+        )
+
+    if report_code == "AP_INVOICES":
+        from app.services.finance.ap.invoice_bulk import get_ap_invoice_bulk_service
+
+        ap_invoice_service = get_ap_invoice_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await ap_invoice_service.export_all(
+            search,
+            status,
+            start_date,
+            end_date,
+            {"supplier_id": params.get("supplier_id") or ""},
+        )
+
+    if report_code == "AP_PAYMENTS":
+        from app.services.finance.ap.payment_bulk import get_ap_payment_bulk_service
+
+        ap_payment_service = get_ap_payment_bulk_service(
+            db,
+            instance.organization_id,
+            instance.generated_by_user_id,
+        )
+        return await ap_payment_service.export_all(
+            search,
+            status,
+            start_date,
+            end_date,
+            {"supplier_id": params.get("supplier_id") or ""},
         )
 
     raise ValueError(f"Unsupported export report code: {report_code}")
@@ -372,6 +431,12 @@ def process_gl_journals_export(instance_id: str) -> dict[str, Any]:
 
 
 @shared_task
+def process_gl_ledger_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued Ledger Transactions export and notify the requester."""
+    return _process_list_export(instance_id, "GL_LEDGER")
+
+
+@shared_task
 def process_ar_invoices_export(instance_id: str) -> dict[str, Any]:
     """Generate a queued AR Invoices export and notify the requester."""
     return _process_list_export(instance_id, "AR_INVOICES")
@@ -381,6 +446,18 @@ def process_ar_invoices_export(instance_id: str) -> dict[str, Any]:
 def process_ar_receipts_export(instance_id: str) -> dict[str, Any]:
     """Generate a queued AR Receipts export and notify the requester."""
     return _process_list_export(instance_id, "AR_RECEIPTS")
+
+
+@shared_task
+def process_ap_invoices_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued AP Invoices export and notify the requester."""
+    return _process_list_export(instance_id, "AP_INVOICES")
+
+
+@shared_task
+def process_ap_payments_export(instance_id: str) -> dict[str, Any]:
+    """Generate a queued AP Payments export and notify the requester."""
+    return _process_list_export(instance_id, "AP_PAYMENTS")
 
 
 def _get_finance_recipients(
@@ -433,6 +510,8 @@ def process_monthly_depreciation_runs(
         "organizations_checked": 0,
         "runs_calculated": 0,
         "runs_posted": 0,
+        "runs_reconciled": 0,
+        "runs_requiring_review": 0,
         "skipped": 0,
         "errors": [],
     }
@@ -466,6 +545,12 @@ def process_monthly_depreciation_runs(
                 )
                 if outcome["status"] == "posted":
                     results["runs_posted"] += 1
+                    reconciliation = outcome.get("gl_reconciliation")
+                    if isinstance(reconciliation, dict):
+                        if reconciliation.get("is_reconciled"):
+                            results["runs_reconciled"] += 1
+                        else:
+                            results["runs_requiring_review"] += 1
                 elif outcome["status"] == "calculated":
                     results["runs_calculated"] += 1
                 else:
@@ -486,13 +571,222 @@ def process_monthly_depreciation_runs(
 
     logger.info(
         "Monthly FA depreciation automation complete: orgs=%d, calculated=%d, "
-        "posted=%d, skipped=%d, errors=%d",
+        "posted=%d, reconciled=%d, review=%d, skipped=%d, errors=%d",
         results["organizations_checked"],
         results["runs_calculated"],
         results["runs_posted"],
+        results["runs_reconciled"],
+        results["runs_requiring_review"],
         results["skipped"],
         len(results["errors"]),
     )
+    return results
+
+
+@shared_task
+def process_depreciation_gl_reconciliation(
+    organization_id: str,
+    run_id: str,
+) -> dict[str, Any]:
+    """Auto-match a posted fixed-asset depreciation run against its GL journal."""
+    from app.services.fixed_assets.reconciliation import (
+        FixedAssetDepreciationReconciliationService,
+    )
+
+    org_id = UUID(organization_id)
+    with session_for_org(org_id) as db:
+        try:
+            result = FixedAssetDepreciationReconciliationService.reconcile_run(
+                db,
+                org_id,
+                UUID(run_id),
+            )
+            db.commit()
+            return {"success": True, **result.as_dict()}
+        except Exception as exc:
+            db.rollback()
+            logger.exception(
+                "FA depreciation GL reconciliation failed for run %s in org %s",
+                run_id,
+                organization_id,
+            )
+            return {
+                "success": False,
+                "organization_id": organization_id,
+                "run_id": run_id,
+                "error": str(exc),
+            }
+
+
+@shared_task
+def process_fixed_asset_gl_reconciliation_package(
+    organization_id: str | None = None,
+    as_of_date: str | None = None,
+    submit_for_approval: bool = True,
+) -> dict[str, Any]:
+    """Create FA GL reconciliation packages; variances require approval."""
+    from app.services.fixed_assets.reconciliation import (
+        FixedAssetGLReconciliationPackageService,
+    )
+
+    report_date = date.fromisoformat(as_of_date) if as_of_date else date.today()
+    organization_ids = (
+        [UUID(organization_id)] if organization_id else _list_active_organization_ids()
+    )
+    results: dict[str, Any] = {
+        "organizations_checked": len(organization_ids),
+        "balanced": 0,
+        "pending_approval": 0,
+        "approval_not_configured": 0,
+        "errors": [],
+        "runs": [],
+    }
+
+    for org_id in organization_ids:
+        with session_for_org(org_id) as db:
+            try:
+                package = FixedAssetGLReconciliationPackageService.create_package(
+                    db,
+                    org_id,
+                    as_of=report_date,
+                    submit_for_approval=submit_for_approval,
+                )
+                status = package.status.lower()
+                if (
+                    package.status
+                    == FixedAssetGLReconciliationPackageService.STATUS_BALANCED
+                ):
+                    results["balanced"] += 1
+                elif package.status == (
+                    FixedAssetGLReconciliationPackageService.STATUS_PENDING_APPROVAL
+                ):
+                    results["pending_approval"] += 1
+                else:
+                    results["approval_not_configured"] += 1
+
+                results["runs"].append(
+                    {
+                        "organization_id": str(org_id),
+                        "run_id": str(package.run_id),
+                        "status": package.status,
+                        "as_of": package.as_of_date.isoformat(),
+                        "approval_request_id": (
+                            str(package.approval_request_id)
+                            if package.approval_request_id
+                            else None
+                        ),
+                        "total_variance_abs": str(package.total_variance_abs),
+                    }
+                )
+                logger.info(
+                    "FA GL reconciliation package %s for org %s finished as %s",
+                    package.run_id,
+                    org_id,
+                    status,
+                )
+            except Exception as exc:
+                db.rollback()
+                logger.exception(
+                    "FA GL reconciliation package failed for org %s", org_id
+                )
+                results["errors"].append(
+                    {"organization_id": str(org_id), "error": str(exc)}
+                )
+
+    return results
+
+
+@shared_task
+def process_approved_fixed_asset_gl_reconciliation_drafts(
+    organization_id: str | None = None,
+) -> dict[str, Any]:
+    """Create draft FA GL correction journals for approved reconciliation packages."""
+    from app.models.finance.audit.approval_request import (
+        ApprovalRequest,
+        ApprovalRequestStatus,
+    )
+    from app.models.fixed_assets.gl_reconciliation import (
+        FixedAssetGLReconciliationRun,
+    )
+    from app.services.fixed_assets.reconciliation import (
+        FA_GL_RECONCILIATION_DOCUMENT_TYPE,
+        FixedAssetGLReconciliationPackageService,
+    )
+
+    organization_ids = (
+        [UUID(organization_id)] if organization_id else _list_active_organization_ids()
+    )
+    results: dict[str, Any] = {
+        "organizations_checked": len(organization_ids),
+        "drafts_created": 0,
+        "skipped": 0,
+        "errors": [],
+        "journals": [],
+    }
+
+    for org_id in organization_ids:
+        with session_for_org(org_id) as db:
+            approved_runs = list(
+                db.execute(
+                    select(FixedAssetGLReconciliationRun)
+                    .join(
+                        ApprovalRequest,
+                        ApprovalRequest.request_id
+                        == FixedAssetGLReconciliationRun.approval_request_id,
+                    )
+                    .where(
+                        FixedAssetGLReconciliationRun.organization_id == org_id,
+                        FixedAssetGLReconciliationRun.proposed_journal_entry_id.is_(
+                            None
+                        ),
+                        FixedAssetGLReconciliationRun.status
+                        == FixedAssetGLReconciliationPackageService.STATUS_PENDING_APPROVAL,
+                        ApprovalRequest.organization_id == org_id,
+                        ApprovalRequest.document_type
+                        == FA_GL_RECONCILIATION_DOCUMENT_TYPE,
+                        ApprovalRequest.status == ApprovalRequestStatus.APPROVED,
+                    )
+                    .order_by(FixedAssetGLReconciliationRun.created_at.asc())
+                ).scalars()
+            )
+
+            if not approved_runs:
+                results["skipped"] += 1
+                continue
+
+            for run in approved_runs:
+                try:
+                    journal = FixedAssetGLReconciliationPackageService.create_draft_correction_journal(
+                        db,
+                        org_id,
+                        run.run_id,
+                    )
+                    results["drafts_created"] += 1
+                    results["journals"].append(
+                        {
+                            "organization_id": str(org_id),
+                            "run_id": str(run.run_id),
+                            "journal_entry_id": str(journal.journal_entry_id),
+                            "journal_number": journal.journal_number,
+                            "status": journal.status.value
+                            if hasattr(journal.status, "value")
+                            else str(journal.status),
+                        }
+                    )
+                except Exception as exc:
+                    db.rollback()
+                    logger.exception(
+                        "Approved FA GL reconciliation draft failed for run %s",
+                        run.run_id,
+                    )
+                    results["errors"].append(
+                        {
+                            "organization_id": str(org_id),
+                            "run_id": str(run.run_id),
+                            "error": str(exc),
+                        }
+                    )
+
     return results
 
 

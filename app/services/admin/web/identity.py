@@ -22,7 +22,7 @@ from app.models.people.hr.employee import Employee, EmployeeStatus
 from app.models.person import Person, PersonStatus
 from app.models.rbac import Permission, PersonRole, Role, RolePermission
 from app.services.auth_flow import hash_password
-from app.services.common import coerce_uuid
+from app.services.common import PaginationParams, coerce_uuid, paginate
 from app.services.formatters import format_datetime as _format_datetime
 
 from .common import (
@@ -42,6 +42,16 @@ def _admin_web_facade():
     return import_module("app.services.admin.web")
 
 
+def _datetime_after(value: datetime | None, compare_to: datetime) -> bool:
+    if value is None:
+        return False
+    if value.tzinfo is None and compare_to.tzinfo is not None:
+        compare_to = compare_to.replace(tzinfo=None)
+    elif value.tzinfo is not None and compare_to.tzinfo is None:
+        value = value.replace(tzinfo=None)
+    return value > compare_to
+
+
 class AdminIdentityMixin:
     @staticmethod
     def users_context(
@@ -51,7 +61,7 @@ class AdminIdentityMixin:
         page: int,
         limit: int = DEFAULT_PAGE_SIZE,
     ) -> dict:
-        offset = (page - 1) * limit
+        now = datetime.now(UTC)
         conditions = []
         search_value = search.strip() if search else ""
         if search_value:
@@ -69,21 +79,16 @@ class AdminIdentityMixin:
         if status_enum:
             conditions.append(Person.status == status_enum)
 
-        total = db.scalar(select(func.count(Person.id)).where(*conditions)) or 0
-        total_pages = max(1, (total + limit - 1) // limit)
-        persons = list(
-            db.scalars(
-                select(Person)
-                .where(*conditions)
-                .order_by(Person.created_at.desc())
-                .offset(offset)
-                .limit(limit)
-            ).all()
-        )
+        stmt = select(Person).where(*conditions).order_by(Person.created_at.desc())
+        result = paginate(db, stmt, PaginationParams.from_page(page, limit))
+        total = result.total
+        total_pages = result.total_pages
+        persons = list(result.items)
 
         person_ids = [p.id for p in persons]
         person_roles_map: dict[UUID, list[str]] = {}
         last_active_map: dict[UUID, str] = {}
+        credential_map: dict[UUID, dict] = {}
         if person_ids:
             person_roles = db.execute(
                 select(PersonRole.person_id, Role.name)
@@ -104,12 +109,63 @@ class AdminIdentityMixin:
                     if formatted_last_seen is not None:
                         last_active_map[person_id] = formatted_last_seen
 
+            credentials = db.execute(
+                select(
+                    UserCredential.person_id,
+                    UserCredential.is_active,
+                    UserCredential.failed_login_attempts,
+                    UserCredential.locked_until,
+                ).where(
+                    UserCredential.person_id.in_(person_ids),
+                    UserCredential.provider == AuthProvider.local,
+                )
+            ).all()
+            for (
+                person_id,
+                credential_is_active,
+                failed_login_attempts,
+                locked_until,
+            ) in credentials:
+                credential_map[person_id] = {
+                    "is_active": credential_is_active,
+                    "failed_login_attempts": failed_login_attempts or 0,
+                    "locked_until": locked_until,
+                }
+
         users = []
         for person in persons:
             name = person.name or person.email or "Unknown"
             initials = (
                 "".join(word[0].upper() for word in name.split()[:2]) if name else "?"
             )
+            credential = credential_map.get(person.id)
+            locked_until = credential.get("locked_until") if credential else None
+            failed_login_attempts = (
+                int(credential.get("failed_login_attempts") or 0) if credential else 0
+            )
+            credential_active = bool(credential and credential.get("is_active"))
+            is_locked = bool(
+                _datetime_after(locked_until, now) or failed_login_attempts >= 5
+            )
+            person_active = person.status == PersonStatus.active and bool(
+                person.is_active
+            )
+            account_is_active = person_active and credential_active and not is_locked
+            if account_is_active:
+                account_status_label = "Active"
+                account_status_reason = "Account can sign in"
+            elif is_locked:
+                account_status_label = "Inactive"
+                account_status_reason = "Locked after failed login attempts"
+            elif not credential:
+                account_status_label = "Inactive"
+                account_status_reason = "No local login credential"
+            elif not credential_active:
+                account_status_label = "Inactive"
+                account_status_reason = "Login credential is inactive"
+            else:
+                account_status_label = "Inactive"
+                account_status_reason = "User profile is inactive"
             users.append(
                 {
                     "id": str(person.id),
@@ -119,6 +175,15 @@ class AdminIdentityMixin:
                     "initials": initials,
                     "email_verified": person.email_verified,
                     "status": person.status.value if person.status else "active",
+                    "account_is_active": account_is_active,
+                    "account_status_label": account_status_label,
+                    "account_status_reason": account_status_reason,
+                    "can_activate_account": bool(
+                        credential
+                        and not account_is_active
+                        and person.status != PersonStatus.archived
+                    ),
+                    "failed_login_attempts": failed_login_attempts,
                     "roles": person_roles_map.get(person.id, []),
                     "last_active": last_active_map.get(person.id),
                     "created_at": person.created_at.strftime("%b %d, %Y")
@@ -169,6 +234,34 @@ class AdminIdentityMixin:
                     UserCredential.provider == AuthProvider.local,
                 )
             )
+            now = datetime.now(UTC)
+            failed_login_attempts = (
+                credential.failed_login_attempts if credential else 0
+            )
+            locked_until = credential.locked_until if credential else None
+            credential_active = bool(credential and credential.is_active)
+            is_locked = bool(
+                _datetime_after(locked_until, now) or failed_login_attempts >= 5
+            )
+            person_active = person.status == PersonStatus.active and bool(
+                person.is_active
+            )
+            account_is_active = person_active and credential_active and not is_locked
+            if account_is_active:
+                account_status_label = "Active"
+                account_status_reason = "Account can sign in"
+            elif is_locked:
+                account_status_label = "Inactive"
+                account_status_reason = "Locked after failed login attempts"
+            elif not credential:
+                account_status_label = "Inactive"
+                account_status_reason = "No local login credential"
+            elif not credential_active:
+                account_status_label = "Inactive"
+                account_status_reason = "Login credential is inactive"
+            else:
+                account_status_label = "Inactive"
+                account_status_reason = "User profile is inactive"
             user_roles = list(
                 db.scalars(
                     select(Role)
@@ -192,6 +285,16 @@ class AdminIdentityMixin:
                 "must_change_password": credential.must_change_password
                 if credential
                 else False,
+                "account_is_active": account_is_active,
+                "account_status_label": account_status_label,
+                "account_status_reason": account_status_reason,
+                "can_activate_account": bool(
+                    credential
+                    and not account_is_active
+                    and person.status != PersonStatus.archived
+                ),
+                "failed_login_attempts": failed_login_attempts,
+                "locked_until": locked_until,
                 "role_ids": [str(role.id) for role in user_roles],
             }
 
@@ -214,6 +317,14 @@ class AdminIdentityMixin:
             "organization_id": payload.get("organization_id"),
             "username": payload.get("username"),
             "must_change_password": _parse_flag(payload.get("must_change_password")),
+            "account_is_active": payload.get("account_is_active", False),
+            "account_status_label": payload.get("account_status_label", "Inactive"),
+            "account_status_reason": payload.get(
+                "account_status_reason", "Account status unavailable"
+            ),
+            "can_activate_account": payload.get("can_activate_account", False),
+            "failed_login_attempts": payload.get("failed_login_attempts", 0),
+            "locked_until": payload.get("locked_until"),
             "role_ids": role_ids,
         }
 
@@ -492,6 +603,46 @@ class AdminIdentityMixin:
             return f"Failed to delete user: {str(exc)}"
 
     @staticmethod
+    def activate_user_account(db: Session, user_id: str) -> str | None:
+        person = db.get(Person, coerce_uuid(user_id))
+        if not person:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        try:
+            person.status = PersonStatus.active
+            person.is_active = True
+
+            credential = db.scalar(
+                select(UserCredential).where(
+                    UserCredential.person_id == person.id,
+                    UserCredential.provider == AuthProvider.local,
+                )
+            )
+            if credential:
+                credential.is_active = True
+                credential.failed_login_attempts = 0
+                credential.locked_until = None
+
+            db.commit()
+            _admin_web_facade().fire_audit_event(
+                db=db,
+                organization_id=person.organization_id,
+                table_schema="auth",
+                table_name="user",
+                record_id=str(person.id),
+                action=AuditAction.UPDATE,
+                new_values={
+                    "status": PersonStatus.active.value,
+                    "is_active": True,
+                    "credential_unlocked": bool(credential),
+                },
+            )
+            return None
+        except Exception as exc:
+            db.rollback()
+            return f"Failed to activate user: {str(exc)}"
+
+    @staticmethod
     def roles_context(
         db: Session,
         search: str | None,
@@ -499,7 +650,6 @@ class AdminIdentityMixin:
         page: int,
         limit: int = DEFAULT_PAGE_SIZE,
     ) -> dict:
-        offset = (page - 1) * limit
         conditions = []
         search_value = search.strip() if search else ""
         if search_value:
@@ -528,18 +678,10 @@ class AdminIdentityMixin:
         status_flag = _parse_status_filter(status)
         if status_flag is not None:
             role_conditions.append(Role.is_active == status_flag)
-        total_count = (
-            db.scalar(select(func.count(Role.id)).where(*role_conditions)) or 0
-        )
-        roles = list(
-            db.scalars(
-                select(Role)
-                .where(*role_conditions)
-                .order_by(Role.name)
-                .limit(limit)
-                .offset(offset)
-            ).all()
-        )
+        stmt = select(Role).where(*role_conditions).order_by(Role.name)
+        result = paginate(db, stmt, PaginationParams.from_page(page, limit))
+        total_count = result.total
+        roles = list(result.items)
         role_ids = [role.id for role in roles]
         permission_counts: dict[UUID, int] = {}
         member_counts: dict[UUID, int] = {}

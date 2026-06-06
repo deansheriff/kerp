@@ -799,6 +799,9 @@ class AuthFlow(ListResponseMixin):
             raise HTTPException(
                 status_code=400, detail="Invalid auth provider"
             ) from exc
+        if not username:
+            raise HTTPException(status_code=401, detail="Wrong username")
+
         credential = db.scalar(
             select(UserCredential)
             .where(UserCredential.username == username)
@@ -806,7 +809,7 @@ class AuthFlow(ListResponseMixin):
             .where(UserCredential.is_active.is_(True))
         )
         if not credential:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            raise HTTPException(status_code=401, detail="Wrong username")
 
         now = _now()
         if credential.locked_until and credential.locked_until > now:
@@ -825,7 +828,13 @@ class AuthFlow(ListResponseMixin):
                 AuditAction.INSERT,
                 new_values={"username": username, "reason": "invalid_password"},
             )
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            detail = "Wrong password"
+            if credential.failed_login_attempts == 3:
+                detail = (
+                    "Wrong password. This is your third failed attempt. "
+                    "You have 2 more attempts before your account is locked."
+                )
+            raise HTTPException(status_code=401, detail=detail)
 
         if credential.must_change_password:
             raise HTTPException(
