@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings as app_settings
+from app.db.multi_tenant import allow_cross_org
 from app.models.auth import (
     AuthProvider,
     MFAMethod,
@@ -91,12 +92,16 @@ def _truncate_user_agent(value: str | None, max_len: int = 512) -> str | None:
 def _setting_value(db: Session | None, key: str) -> str | None:
     if db is None:
         return None
-    setting = db.scalar(
-        select(DomainSetting)
-        .where(DomainSetting.domain == SettingDomain.auth)
-        .where(DomainSetting.key == key)
-        .where(DomainSetting.is_active.is_(True))
-    )
+    # DomainSetting is org-scoped but auth settings (JWT algorithm, secret, TTLs,
+    # cookie config) are system-wide configuration, not per-tenant data.
+    # allow_cross_org bypasses the org filter for this read-only lookup.
+    with allow_cross_org(db):
+        setting = db.scalar(
+            select(DomainSetting)
+            .where(DomainSetting.domain == SettingDomain.auth)
+            .where(DomainSetting.key == key)
+            .where(DomainSetting.is_active.is_(True))
+        )
     if not setting:
         return None
     if setting.value_text:
