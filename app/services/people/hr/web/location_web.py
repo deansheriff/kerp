@@ -212,24 +212,59 @@ class LocationWebService:
 
         org_id = coerce_uuid(auth.organization_id)
         svc = OrganizationService(db, org_id)
-        svc.create_location(
-            location_code=location_code,
-            location_name=location_name,
-            location_type=_parse_location_type(location_type),
-            address_line_1=address_line_1 or None,
-            address_line_2=address_line_2 or None,
-            city=city or None,
-            state_province=state_province or None,
-            postal_code=postal_code or None,
-            country_code=country_code or None,
-            latitude=latitude,
-            longitude=longitude,
-            geofence_radius_m=geofence_radius_m,
-            geofence_enabled=geofence_enabled,
-            geofence_polygon=None,
-            is_active=is_active,
-        )
-        db.commit()
+        try:
+            svc.create_location(
+                location_code=location_code,
+                location_name=location_name,
+                location_type=_parse_location_type(location_type),
+                address_line_1=address_line_1 or None,
+                address_line_2=address_line_2 or None,
+                city=city or None,
+                state_province=state_province or None,
+                postal_code=postal_code or None,
+                country_code=country_code or None,
+                latitude=latitude,
+                longitude=longitude,
+                geofence_radius_m=geofence_radius_m,
+                geofence_enabled=geofence_enabled,
+                geofence_polygon=None,
+                is_active=is_active,
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to create location")
+            error_msg = "Failed to create branch."
+            exc_str = str(getattr(exc, "orig", exc))
+            if "uq_location_code" in exc_str:
+                error_msg = f"Branch code '{location_code}' already exists."
+            context = {
+                **base_context(request, auth, "New Branch", "locations"),
+                "location": SimpleNamespace(
+                    location_code=location_code,
+                    location_name=location_name,
+                    location_type=location_type or None,
+                    address_line_1=address_line_1 or None,
+                    address_line_2=address_line_2 or None,
+                    city=city or None,
+                    state_province=state_province or None,
+                    postal_code=postal_code or None,
+                    country_code=country_code or None,
+                    latitude=latitude,
+                    longitude=longitude,
+                    geofence_radius_m=geofence_radius_m,
+                    geofence_enabled=geofence_enabled,
+                    is_active=is_active,
+                ),
+                "location_types": [t.value for t in LocationType],
+                "errors": errors,
+                "error": error_msg,
+            }
+            return templates.TemplateResponse(
+                request,
+                "people/hr/location_form.html",
+                context,
+            )
 
         return RedirectResponse(
             url="/people/hr/locations?success=Record+saved+successfully",

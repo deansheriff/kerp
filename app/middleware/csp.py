@@ -37,7 +37,7 @@ def _update_script_src(policy: str) -> str:
 
     if not seen_script and not seen_script_elem:
         updated.append(
-            "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net"
+            "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://static.cloudflareinsights.com"
         )
 
     return _join_directives(updated)
@@ -53,10 +53,10 @@ def add_unsafe_eval_to_csp(policy: str | None) -> str:
     """Relax CSP for the server-rendered Alpine UI unless disabled via env."""
     if not _allow_unsafe_script():
         # Return policy unchanged (or a safe default if missing).
-        return policy or "script-src 'self' https://cdn.jsdelivr.net"
+        return policy or "script-src 'self' https://cdn.jsdelivr.net https://static.cloudflareinsights.com"
     if not policy:
         return (
-            "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net"
+            "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://static.cloudflareinsights.com"
         )
     if "'unsafe-eval'" in policy and "'unsafe-inline'" in policy:
         return policy
