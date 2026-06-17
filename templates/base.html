@@ -248,51 +248,7 @@
         </div>
         {% endif %}
 
-        {% set current_path = request.url.path if request is defined else "" %}
-        {% if user and user.is_authenticated and not current_path.startswith("/collaboration") %}
-        <div x-data="{ chatOpen: false }" @keydown.escape.window="chatOpen = false">
-            <a href="/collaboration"
-               class="fixed bottom-24 right-5 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-sky-600 text-white shadow-xl shadow-sky-600/25 transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 lg:hidden"
-               aria-label="Open chat">
-                {{ icon_svg("chat", "h-6 w-6") }}
-            </a>
-            <button type="button"
-                    @click="chatOpen = !chatOpen"
-                    class="fixed bottom-24 right-5 z-40 hidden h-14 w-14 items-center justify-center rounded-full bg-sky-600 text-white shadow-xl shadow-sky-600/25 transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 lg:inline-flex"
-                    :aria-expanded="chatOpen.toString()"
-                    aria-controls="collaboration-chat-pane"
-                    aria-label="Toggle chat">
-                {{ icon_svg("chat", "h-6 w-6") }}
-            </button>
-            <aside id="collaboration-chat-pane"
-                   x-show="chatOpen"
-                   x-cloak
-                   x-transition:enter="transition ease-out duration-200"
-                   x-transition:enter-start="translate-x-8 opacity-0"
-                   x-transition:enter-end="translate-x-0 opacity-100"
-                   x-transition:leave="transition ease-in duration-150"
-                   x-transition:leave-start="translate-x-0 opacity-100"
-                   x-transition:leave-end="translate-x-8 opacity-0"
-                   class="fixed bottom-6 right-5 top-20 z-50 hidden w-[27rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 dark:border-slate-800 dark:bg-slate-950 lg:flex lg:flex-col"
-                   aria-label="Collaboration chat">
-                <div class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-                    <div>
-                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Collaboration</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Chat with colleagues</p>
-                    </div>
-                    <button type="button"
-                            @click="chatOpen = false"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200"
-                            aria-label="Close chat">
-                        {{ icon_svg("x", "h-5 w-5") }}
-                    </button>
-                </div>
-                <iframe src="/collaboration?compact=1"
-                        title="Collaboration chat"
-                        class="min-h-0 flex-1 border-0 bg-white dark:bg-slate-950"></iframe>
-            </aside>
-        </div>
-        {% endif %}
+        {% include "partials/_collaboration_launcher.html" %}
     </div>
     {% endblock %}
 
