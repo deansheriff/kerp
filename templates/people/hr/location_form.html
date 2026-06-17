@@ -38,6 +38,7 @@
                         <input type="text" name="location_code" id="location_code"
                             value="{{ location.location_code if location else '' }}"
                             required
+                            maxlength="20"
                             class="form-input w-full {% if errors.location_code %}border-red-500{% endif %}">
                         {% if errors.location_code %}
                         <p class="text-sm text-red-500 mt-1">{{ errors.location_code }}</p>
@@ -48,6 +49,7 @@
                         <input type="text" name="location_name" id="location_name"
                             value="{{ location.location_name if location else '' }}"
                             required
+                            maxlength="100"
                             class="form-input w-full {% if errors.location_name %}border-red-500{% endif %}">
                         {% if errors.location_name %}
                         <p class="text-sm text-red-500 mt-1">{{ errors.location_name }}</p>
@@ -72,13 +74,21 @@
                         <label for="address_line_1" class="form-label">Address Line 1</label>
                         <input type="text" name="address_line_1" id="address_line_1"
                             value="{{ location.address_line_1 if location else '' }}"
-                            class="form-input w-full">
+                            maxlength="255"
+                            class="form-input w-full {% if errors.address_line_1 %}border-red-500{% endif %}">
+                        {% if errors.address_line_1 %}
+                        <p class="text-sm text-red-500 mt-1">{{ errors.address_line_1 }}</p>
+                        {% endif %}
                     </div>
                     <div>
                         <label for="address_line_2" class="form-label">Address Line 2</label>
                         <input type="text" name="address_line_2" id="address_line_2"
                             value="{{ location.address_line_2 if location else '' }}"
-                            class="form-input w-full">
+                            maxlength="255"
+                            class="form-input w-full {% if errors.address_line_2 %}border-red-500{% endif %}">
+                        {% if errors.address_line_2 %}
+                        <p class="text-sm text-red-500 mt-1">{{ errors.address_line_2 }}</p>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -87,13 +97,21 @@
                         <label for="city" class="form-label">City</label>
                         <input type="text" name="city" id="city"
                             value="{{ location.city if location else '' }}"
-                            class="form-input w-full">
+                            maxlength="100"
+                            class="form-input w-full {% if errors.city %}border-red-500{% endif %}">
+                        {% if errors.city %}
+                        <p class="text-sm text-red-500 mt-1">{{ errors.city }}</p>
+                        {% endif %}
                     </div>
                     <div>
                         <label for="state_province" class="form-label">State/Province</label>
                         <input type="text" name="state_province" id="state_province"
                             value="{{ location.state_province if location else '' }}"
-                            class="form-input w-full">
+                            maxlength="100"
+                            class="form-input w-full {% if errors.state_province %}border-red-500{% endif %}">
+                        {% if errors.state_province %}
+                        <p class="text-sm text-red-500 mt-1">{{ errors.state_province }}</p>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -102,13 +120,21 @@
                         <label for="postal_code" class="form-label">Postal Code</label>
                         <input type="text" name="postal_code" id="postal_code"
                             value="{{ location.postal_code if location else '' }}"
-                            class="form-input w-full">
+                            maxlength="20"
+                            class="form-input w-full {% if errors.postal_code %}border-red-500{% endif %}">
+                        {% if errors.postal_code %}
+                        <p class="text-sm text-red-500 mt-1">{{ errors.postal_code }}</p>
+                        {% endif %}
                     </div>
                     <div>
                         <label for="country_code" class="form-label">Country Code</label>
                         <input type="text" name="country_code" id="country_code"
                             value="{{ location.country_code if location else '' }}"
-                            class="form-input w-full" placeholder="US">
+                            maxlength="2"
+                            class="form-input w-full uppercase {% if errors.country_code %}border-red-500{% endif %}" placeholder="NG">
+                        {% if errors.country_code %}
+                        <p class="text-sm text-red-500 mt-1">{{ errors.country_code }}</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>

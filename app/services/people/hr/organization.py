@@ -1075,6 +1075,18 @@ class OrganizationService:
 
         return paginate(self.db, stmt, pagination)
 
+    def get_location_by_code(self, code: str) -> Location | None:
+        """Get a location by code within the current organization."""
+        normalized_code = code.strip()
+        if not normalized_code:
+            return None
+        return self.db.scalar(
+            select(Location).where(
+                Location.organization_id == self.organization_id,
+                Location.location_code == normalized_code,
+            )
+        )
+
     def get_location(self, location_id: uuid.UUID) -> Location:
         location = self.db.scalar(
             select(Location).where(
@@ -1105,6 +1117,16 @@ class OrganizationService:
         geofence_polygon: str | None = None,
         is_active: bool | None = None,
     ) -> Location:
+        location_code = location_code.strip()
+        location_name = location_name.strip()
+
+        if not location_code:
+            raise ValidationError("Branch code is required")
+        if not location_name:
+            raise ValidationError("Branch name is required")
+        if self.get_location_by_code(location_code):
+            raise ValidationError(f"Branch code '{location_code}' already exists.")
+
         location = Location(
             organization_id=self.organization_id,
             location_code=location_code,
@@ -1134,6 +1156,14 @@ class OrganizationService:
         update_data: dict,
     ) -> Location:
         location = self.get_location(location_id)
+        if "location_code" in update_data and update_data["location_code"]:
+            location_code = str(update_data["location_code"]).strip()
+            existing = self.get_location_by_code(location_code)
+            if existing and existing.location_id != location.location_id:
+                raise ValidationError(f"Branch code '{location_code}' already exists.")
+            update_data["location_code"] = location_code
+        if "location_name" in update_data and update_data["location_name"]:
+            update_data["location_name"] = str(update_data["location_name"]).strip()
         for key, value in update_data.items():
             if hasattr(location, key):
                 setattr(location, key, value)
@@ -1141,6 +1171,7 @@ class OrganizationService:
             location.updated_at = datetime.now(UTC)
         if hasattr(location, "updated_by_id"):
             location.updated_by_id = self.principal.id if self.principal else None
+        self.db.flush()
         self.db.refresh(location)
         return location
 

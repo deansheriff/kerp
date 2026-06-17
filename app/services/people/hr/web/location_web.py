@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.finance.core_org.location import LocationType
 from app.services.common import PaginationParams, coerce_uuid, pagination_context
 from app.services.people.hr import OrganizationService
+from app.services.people.hr.errors import ValidationError
 from app.services.people.hr.web.constants import DEFAULT_PAGE_SIZE
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
@@ -43,6 +44,42 @@ def _parse_location_type(value: Any) -> LocationType | None:
         return LocationType(str(value).upper())
     except ValueError:
         return None
+
+
+def _validate_length(
+    errors: dict[str, str],
+    key: str,
+    value: str,
+    max_length: int,
+    label: str,
+) -> None:
+    """Validate a text field against the database column length."""
+    if value and len(value) > max_length:
+        errors[key] = f"{label} must be {max_length} characters or fewer"
+
+
+def _validate_location_text_fields(
+    errors: dict[str, str],
+    *,
+    location_code: str,
+    location_name: str,
+    address_line_1: str,
+    address_line_2: str,
+    city: str,
+    state_province: str,
+    postal_code: str,
+    country_code: str,
+) -> None:
+    """Validate branch form fields before SQLAlchemy reaches the database."""
+    _validate_length(errors, "location_code", location_code, 20, "Branch code")
+    _validate_length(errors, "location_name", location_name, 100, "Branch name")
+    _validate_length(errors, "address_line_1", address_line_1, 255, "Address line 1")
+    _validate_length(errors, "address_line_2", address_line_2, 255, "Address line 2")
+    _validate_length(errors, "city", city, 100, "City")
+    _validate_length(errors, "state_province", state_province, 100, "State/Province")
+    _validate_length(errors, "postal_code", postal_code, 20, "Postal code")
+    if country_code and len(country_code) != 2:
+        errors["country_code"] = "Country code must be a 2-letter ISO code, e.g. NG"
 
 
 class LocationWebService:
@@ -149,6 +186,7 @@ class LocationWebService:
         state_province = LocationWebService._form_str(form, "state_province")
         postal_code = LocationWebService._form_str(form, "postal_code")
         country_code = LocationWebService._form_str(form, "country_code")
+        country_code = country_code.upper()
         latitude_value = LocationWebService._form_str(form, "latitude")
         longitude_value = LocationWebService._form_str(form, "longitude")
         radius_value = LocationWebService._form_str(form, "geofence_radius_m")
@@ -160,6 +198,17 @@ class LocationWebService:
             errors["location_code"] = "Required"
         if not location_name:
             errors["location_name"] = "Required"
+        _validate_location_text_fields(
+            errors,
+            location_code=location_code,
+            location_name=location_name,
+            address_line_1=address_line_1,
+            address_line_2=address_line_2,
+            city=city,
+            state_province=state_province,
+            postal_code=postal_code,
+            country_code=country_code,
+        )
 
         latitude: float | None = None
         longitude: float | None = None
@@ -170,16 +219,25 @@ class LocationWebService:
                 latitude = float(Decimal(latitude_value))
             except (InvalidOperation, ValueError):
                 errors["latitude"] = "Invalid latitude"
+            else:
+                if latitude < -90 or latitude > 90:
+                    errors["latitude"] = "Latitude must be between -90 and 90"
         if longitude_value:
             try:
                 longitude = float(Decimal(longitude_value))
             except (InvalidOperation, ValueError):
                 errors["longitude"] = "Invalid longitude"
+            else:
+                if longitude < -180 or longitude > 180:
+                    errors["longitude"] = "Longitude must be between -180 and 180"
         if radius_value:
             try:
                 geofence_radius_m = int(radius_value)
             except (TypeError, ValueError):
                 errors["geofence_radius_m"] = "Invalid radius"
+            else:
+                if geofence_radius_m < 0:
+                    errors["geofence_radius_m"] = "Radius cannot be negative"
 
         if errors:
             context = {
@@ -202,7 +260,7 @@ class LocationWebService:
                 ),
                 "location_types": [t.value for t in LocationType],
                 "errors": errors,
-                "error": "Location code and name are required.",
+                "error": "Please correct the highlighted branch fields.",
             }
             return templates.TemplateResponse(
                 request,
@@ -231,12 +289,45 @@ class LocationWebService:
                 is_active=is_active,
             )
             db.commit()
+        except ValidationError as exc:
+            db.rollback()
+            error_msg = str(exc)
+            context = {
+                **base_context(request, auth, "New Branch", "locations"),
+                "location": SimpleNamespace(
+                    location_code=location_code,
+                    location_name=location_name,
+                    location_type=location_type or None,
+                    address_line_1=address_line_1 or None,
+                    address_line_2=address_line_2 or None,
+                    city=city or None,
+                    state_province=state_province or None,
+                    postal_code=postal_code or None,
+                    country_code=country_code or None,
+                    latitude=latitude,
+                    longitude=longitude,
+                    geofence_radius_m=geofence_radius_m,
+                    geofence_enabled=geofence_enabled,
+                    is_active=is_active,
+                ),
+                "location_types": [t.value for t in LocationType],
+                "errors": errors,
+                "error": error_msg,
+            }
+            return templates.TemplateResponse(
+                request,
+                "people/hr/location_form.html",
+                context,
+            )
         except Exception as exc:
             db.rollback()
             logger.exception("Failed to create location")
             error_msg = "Failed to create branch."
             exc_str = str(getattr(exc, "orig", exc))
-            if "uq_location_code" in exc_str:
+            if "uq_location_code" in exc_str or (
+                "duplicate key" in exc_str.lower()
+                and "location_code" in exc_str.lower()
+            ):
                 error_msg = f"Branch code '{location_code}' already exists."
             context = {
                 **base_context(request, auth, "New Branch", "locations"),
@@ -291,6 +382,7 @@ class LocationWebService:
         state_province = LocationWebService._form_str(form, "state_province")
         postal_code = LocationWebService._form_str(form, "postal_code")
         country_code = LocationWebService._form_str(form, "country_code")
+        country_code = country_code.upper()
         latitude_value = LocationWebService._form_str(form, "latitude")
         longitude_value = LocationWebService._form_str(form, "longitude")
         radius_value = LocationWebService._form_str(form, "geofence_radius_m")
@@ -302,6 +394,17 @@ class LocationWebService:
             errors["location_code"] = "Required"
         if not location_name:
             errors["location_name"] = "Required"
+        _validate_location_text_fields(
+            errors,
+            location_code=location_code,
+            location_name=location_name,
+            address_line_1=address_line_1,
+            address_line_2=address_line_2,
+            city=city,
+            state_province=state_province,
+            postal_code=postal_code,
+            country_code=country_code,
+        )
 
         latitude: float | None = None
         longitude: float | None = None
@@ -312,16 +415,25 @@ class LocationWebService:
                 latitude = float(Decimal(latitude_value))
             except (InvalidOperation, ValueError):
                 errors["latitude"] = "Invalid latitude"
+            else:
+                if latitude < -90 or latitude > 90:
+                    errors["latitude"] = "Latitude must be between -90 and 90"
         if longitude_value:
             try:
                 longitude = float(Decimal(longitude_value))
             except (InvalidOperation, ValueError):
                 errors["longitude"] = "Invalid longitude"
+            else:
+                if longitude < -180 or longitude > 180:
+                    errors["longitude"] = "Longitude must be between -180 and 180"
         if radius_value:
             try:
                 geofence_radius_m = int(radius_value)
             except (TypeError, ValueError):
                 errors["geofence_radius_m"] = "Invalid radius"
+            else:
+                if geofence_radius_m < 0:
+                    errors["geofence_radius_m"] = "Radius cannot be negative"
 
         org_id = coerce_uuid(auth.organization_id)
         svc = OrganizationService(db, org_id)
@@ -357,7 +469,7 @@ class LocationWebService:
                 ),
                 "location_types": [t.value for t in LocationType],
                 "errors": errors,
-                "error": "Location code and name are required.",
+                "error": "Please correct the highlighted branch fields.",
             }
             return templates.TemplateResponse(
                 request,
@@ -365,26 +477,62 @@ class LocationWebService:
                 context,
             )
 
-        svc.update_location(
-            coerce_uuid(location_id),
-            {
-                "location_code": location_code,
-                "location_name": location_name,
-                "location_type": _parse_location_type(location_type),
-                "address_line_1": address_line_1 or None,
-                "address_line_2": address_line_2 or None,
-                "city": city or None,
-                "state_province": state_province or None,
-                "postal_code": postal_code or None,
-                "country_code": country_code or None,
-                "latitude": latitude,
-                "longitude": longitude,
-                "geofence_radius_m": geofence_radius_m,
-                "geofence_enabled": geofence_enabled,
-                "is_active": is_active,
-            },
-        )
-        db.commit()
+        try:
+            svc.update_location(
+                coerce_uuid(location_id),
+                {
+                    "location_code": location_code,
+                    "location_name": location_name,
+                    "location_type": _parse_location_type(location_type),
+                    "address_line_1": address_line_1 or None,
+                    "address_line_2": address_line_2 or None,
+                    "city": city or None,
+                    "state_province": state_province or None,
+                    "postal_code": postal_code or None,
+                    "country_code": country_code or None,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "geofence_radius_m": geofence_radius_m,
+                    "geofence_enabled": geofence_enabled,
+                    "is_active": is_active,
+                },
+            )
+            db.commit()
+        except ValidationError as exc:
+            db.rollback()
+            context = {
+                **base_context(request, auth, "Edit Branch", "locations"),
+                "location": SimpleNamespace(
+                    location_id=location.location_id,
+                    location_code=location_code or location.location_code,
+                    location_name=location_name or location.location_name,
+                    location_type=location_type
+                    or (
+                        location.location_type.value if location.location_type else None
+                    ),
+                    address_line_1=address_line_1 or location.address_line_1,
+                    address_line_2=address_line_2 or location.address_line_2,
+                    city=city or location.city,
+                    state_province=state_province or location.state_province,
+                    postal_code=postal_code or location.postal_code,
+                    country_code=country_code or location.country_code,
+                    latitude=latitude if latitude_value else location.latitude,
+                    longitude=longitude if longitude_value else location.longitude,
+                    geofence_radius_m=geofence_radius_m
+                    if radius_value
+                    else location.geofence_radius_m,
+                    geofence_enabled=geofence_enabled,
+                    is_active=is_active,
+                ),
+                "location_types": [t.value for t in LocationType],
+                "errors": errors,
+                "error": str(exc),
+            }
+            return templates.TemplateResponse(
+                request,
+                "people/hr/location_form.html",
+                context,
+            )
 
         return RedirectResponse(
             url="/people/hr/locations?success=Record+saved+successfully",
