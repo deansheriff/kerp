@@ -13,9 +13,17 @@ COPY templates ./templates
 RUN npm run build:css
 
 # Stage 2: Python application
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -28,13 +36,8 @@ RUN apt-get update \
         fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install poetry && poetry config virtualenvs.create false
-
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --only main --no-interaction --no-ansi
-# WeasyPrint 62.x expects pydyf.Stream.transform; pin a compatible pydyf.
-RUN pip install --no-cache-dir "pydyf==0.11.0"
-RUN pip install --no-cache-dir python-multipart
+COPY requirements.txt ./
+RUN python -m pip install --retries 10 --timeout 120 -r requirements.txt
 
 COPY . .
 
