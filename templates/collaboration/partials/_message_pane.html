@@ -1,0 +1,97 @@
+<!-- Panel: Message pane partial (loaded via HTMX into slide-over) -->
+<div class="flex h-full flex-col" x-data="{
+    msgContent: '',
+    sending: false,
+    convId: '{{ conversation_id }}',
+    async sendMsg() {
+        if (!this.msgContent.trim()) return;
+        this.sending = true;
+        const fd = new FormData();
+        fd.append('content', this.msgContent.trim());
+        try {
+            const r = await fetch('/collaboration/api/conversations/' + this.convId + '/messages', {method: 'POST', body: fd});
+            if (r.ok) {
+                this.msgContent = '';
+                htmx.ajax('GET', '/collaboration/panel/conversation/' + this.convId, {target: this.$el.parentElement, swap: 'innerHTML'});
+            }
+        } catch {}
+        this.sending = false;
+    }
+}">
+    <!-- Messages -->
+    <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2.5" id="panel-messages" x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)">
+        {% for msg in messages %}
+        <div class="flex gap-2.5 {% if msg.is_own %}flex-row-reverse{% endif %}">
+            {% if not msg.is_own %}
+            <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                {{ msg.sender_initials }}
+            </div>
+            {% endif %}
+            <div class="max-w-[80%]">
+                {% if not msg.is_own %}
+                <p class="mb-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">{{ msg.sender_name }}</p>
+                {% endif %}
+
+                {% if msg.is_deleted %}
+                <div class="rounded-xl bg-slate-50 px-3 py-1.5 text-xs italic text-slate-400 dark:bg-slate-800/50">
+                    Message deleted
+                </div>
+                {% else %}
+                <div class="rounded-2xl px-3 py-2 text-sm
+                    {% if msg.is_own %}bg-indigo-500 text-white{% else %}bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200{% endif %}">
+                    {% if msg.content %}
+                    <p class="whitespace-pre-wrap break-words text-[13px]">{{ msg.content }}</p>
+                    {% endif %}
+                    {% for att in msg.attachments %}
+                    <a href="{{ att.download_url }}" target="_blank"
+                       class="mt-1 flex items-center gap-1.5 text-[11px] underline
+                       {% if msg.is_own %}text-indigo-200{% else %}text-indigo-600 dark:text-indigo-400{% endif %}">
+                        📎 {{ att.file_name }}
+                    </a>
+                    {% endfor %}
+                </div>
+                <div class="mt-0.5 text-[9px] text-slate-400 {% if msg.is_own %}text-right{% endif %}">
+                    {{ msg.created_at[:16] | replace('T', ' ') if msg.created_at }}
+                    {% if msg.is_edited %} · edited{% endif %}
+                </div>
+                {% if msg.reactions %}
+                <div class="mt-0.5 flex flex-wrap gap-0.5 {% if msg.is_own %}justify-end{% endif %}">
+                    {% for emoji, users in msg.reactions.items() %}
+                    <span class="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] dark:border-slate-700 dark:bg-slate-800">
+                        {{ emoji }} {{ users | length }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-10 text-center">
+            <svg class="h-8 w-8 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+            <p class="mt-2 text-xs text-slate-400 dark:text-slate-500">No messages yet. Say hello!</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Input -->
+    <div class="border-t border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
+        <form @submit.prevent="sendMsg()" class="flex items-end gap-2">
+            <textarea x-model="msgContent"
+                      @keydown.enter.prevent="if (!$event.shiftKey) sendMsg()"
+                      rows="1" placeholder="Type a message..."
+                      class="input w-full resize-none text-sm"
+                      style="min-height: 36px; max-height: 80px;"
+                      @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"></textarea>
+            <button type="submit" :disabled="sending || !msgContent.trim()"
+                    class="rounded-lg bg-indigo-500 p-2 text-white transition hover:bg-indigo-600 disabled:opacity-50">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+            </button>
+        </form>
+    </div>
+</div>

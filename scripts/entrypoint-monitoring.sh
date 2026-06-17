@@ -49,6 +49,14 @@ if is_web_command "$1"; then
       seed_admin_user || exit 1
       ;;
   esac
+
+  # Run database migrations automatically on startup
+  echo "Running database migrations..."
+  if python -m alembic upgrade heads; then
+    echo "Migrations completed."
+  else
+    echo "WARNING: Migrations failed (non-fatal, continuing startup)."
+  fi
 fi
 
 exec "$@"

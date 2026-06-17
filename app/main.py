@@ -104,6 +104,7 @@ from app.web.profile import router as profile_web_router
 from app.web.projects import router as projects_web_router
 from app.web.public_sector import router as public_sector_web_router
 from app.web.settings import router as module_settings_web_router
+from app.web.collaboration import router as collaboration_web_router
 from app.web.support import router as support_web_router
 from app.web.workflow_tasks import router as workflow_tasks_web_router
 from app.web_home import router as web_home_router
@@ -857,6 +858,11 @@ if is_module_enabled("coach"):
 if is_module_enabled("public_sector"):
     _include_api_router(ipsas_router, dependencies=[Depends(require_tenant_auth)])
     app.include_router(public_sector_web_router)
+
+# ---------------------------------------------------------------------------
+# Collaboration module (always enabled)
+# ---------------------------------------------------------------------------
+app.include_router(collaboration_web_router)
 
 # Authenticated file downloads (S3-backed)
 app.include_router(files_router)  # /files/* (avatars, resumes, attachments, etc.)

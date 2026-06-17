@@ -1,0 +1,122 @@
+{% extends "modules/base_modules.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}New Group Chat{% endblock %}
+{% block back_fallback %}/collaboration{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="flex items-center gap-1.5 text-sm" aria-label="Breadcrumb">
+    <a href="/collaboration" class="text-slate-500 hover:text-slate-700 dark:text-slate-400">Collaboration</a>
+    <span class="text-slate-300 dark:text-slate-600">/</span>
+    <span class="text-slate-700 dark:text-slate-300">New Group</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl px-4 py-8 sm:px-6" x-data="{
+    name: '',
+    description: '',
+    members: [],
+    search: '',
+    results: [],
+    loading: false,
+    searchEmployees() {
+        if (this.search.length < 2) { this.results = []; return; }
+        this.loading = true;
+        fetch('/collaboration/api/employees?q=' + encodeURIComponent(this.search))
+            .then(r => r.json())
+            .then(d => { this.results = d.employees || []; this.loading = false; })
+            .catch(() => { this.loading = false; });
+    },
+    addMember(emp) {
+        if (!this.members.find(m => m.person_id === emp.person_id)) {
+            this.members.push(emp);
+        }
+        this.search = '';
+        this.results = [];
+    },
+    removeMember(pid) {
+        this.members = this.members.filter(m => m.person_id !== pid);
+    }
+}">
+    <div class="card overflow-hidden">
+        <div class="border-b border-slate-200 bg-gradient-to-r from-purple-50 to-indigo-50 px-6 py-4 dark:border-slate-700 dark:from-purple-950/20 dark:to-indigo-950/20">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Create Group Chat</h2>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Start a group conversation with your team members.</p>
+        </div>
+
+        <form method="POST" action="/collaboration/groups" class="p-6 space-y-6">
+            <!-- Group Name -->
+            <div>
+                <label for="group-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Group Name <span class="text-red-500">*</span></label>
+                <input type="text" id="group-name" name="name" x-model="name" required
+                       placeholder="e.g. Marketing Team, Project Alpha"
+                       class="input mt-1.5 w-full">
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label for="group-desc" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
+                <textarea id="group-desc" name="description" x-model="description" rows="2"
+                          placeholder="What's this group about?"
+                          class="input mt-1.5 w-full"></textarea>
+            </div>
+
+            <!-- Member Search -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Add Members</label>
+                <input type="text" x-model="search" @input.debounce.300ms="searchEmployees()"
+                       placeholder="Search employees by name or email..."
+                       class="input mt-1.5 w-full">
+
+                <!-- Search Results -->
+                <div x-show="results.length > 0" class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                    <template x-for="emp in results" :key="emp.person_id">
+                        <button type="button" @click="addMember(emp)"
+                                class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400"
+                                 x-text="emp.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()"></div>
+                            <div>
+                                <span class="text-sm font-medium text-slate-900 dark:text-white" x-text="emp.name"></span>
+                                <span class="ml-2 text-xs text-slate-500 dark:text-slate-400" x-text="emp.email"></span>
+                            </div>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Selected Members -->
+            <div x-show="members.length > 0">
+                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Selected Members (<span x-text="members.length"></span>)
+                </label>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="member in members" :key="member.person_id">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                            <span x-text="member.name"></span>
+                            <button type="button" @click="removeMember(member.person_id)"
+                                    class="rounded-full p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </span>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Hidden field with member IDs -->
+            <input type="hidden" name="member_ids" :value="members.map(m => m.person_id).join(',')">
+
+            <!-- Submit -->
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <a href="/collaboration" class="btn btn-secondary">Cancel</a>
+                <button type="submit" :disabled="!name.trim()" class="btn btn-primary">
+                    {{ icon_svg("user-group", "h-4 w-4 mr-1.5") }}
+                    Create Group
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

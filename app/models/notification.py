@@ -42,6 +42,8 @@ class EntityType(str, enum.Enum):
     SUBLEDGER = "SUBLEDGER"
     # HR/Discipline entity type
     DISCIPLINE = "DISCIPLINE"
+    # Collaboration module
+    COLLABORATION = "COLLABORATION"
 
 
 class NotificationType(str, enum.Enum):

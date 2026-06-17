@@ -1,0 +1,372 @@
+{% extends "modules/base_modules.html" %}
+{% from "components/macros.html" import icon_svg %}
+
+{% block page_title %}{{ conversation_name }}{% endblock %}
+{% block back_fallback %}/collaboration{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="flex items-center gap-1.5 text-sm" aria-label="Breadcrumb">
+    <a href="/collaboration" class="text-slate-500 hover:text-slate-700 dark:text-slate-400">Collaboration</a>
+    <span class="text-slate-300 dark:text-slate-600">/</span>
+    <span class="text-slate-700 dark:text-slate-300">{{ conversation_name }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-6xl px-4 py-6 sm:px-6" x-data="chatApp()" x-init="init()">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-4" style="height: calc(100vh - 10rem);">
+        <!-- Sidebar: Conversations -->
+        <div class="hidden lg:block lg:col-span-1">
+            <div class="card h-full overflow-hidden">
+                <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Conversations</h3>
+                </div>
+                <div class="divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800" style="max-height: calc(100vh - 16rem);">
+                    {% for conv in conversations %}
+                    <a href="/collaboration/c/{{ conv.conversation_id }}"
+                       class="flex items-center gap-3 px-3 py-2.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/50
+                       {% if conv.conversation_id == conversation_id %}bg-indigo-50/60 dark:bg-indigo-900/20{% endif %}">
+                        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold
+                            {% if conv.type == 'DIRECT' %}bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400
+                            {% elif conv.type == 'CHANNEL' %}bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400
+                            {% else %}bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400{% endif %}">
+                            {{ conv.name[:2] | upper }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="truncate text-xs font-medium text-slate-900 dark:text-white">{{ conv.name }}</span>
+                                {% if conv.unread_count > 0 %}
+                                <span class="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-500 px-1 text-[9px] font-bold text-white">
+                                    {{ conv.unread_count }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="lg:col-span-2">
+            <div class="card flex h-full flex-col overflow-hidden">
+                <!-- Chat Header -->
+                <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 text-sm font-semibold text-indigo-600 dark:from-indigo-900/40 dark:to-purple-900/40 dark:text-indigo-400">
+                            {{ conversation_name[:2] | upper }}
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900 dark:text-white">{{ conversation_name }}</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                {{ conversation_type }}
+                                · {{ members | length }} member{{ 's' if members | length != 1 }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div id="messages-container" class="flex-1 overflow-y-auto px-4 py-4 space-y-3" style="max-height: calc(100vh - 22rem);">
+                    {% if has_more %}
+                    <div class="text-center">
+                        <button @click="loadMore()" class="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400">
+                            Load older messages...
+                        </button>
+                    </div>
+                    {% endif %}
+
+                    {% for msg in messages %}
+                    <div class="group flex gap-3 {% if msg.is_own %}flex-row-reverse{% endif %}"
+                         id="msg-{{ msg.message_id }}">
+                        {% if not msg.is_own %}
+                        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                            {{ msg.sender_initials }}
+                        </div>
+                        {% endif %}
+                        <div class="max-w-[75%] {% if msg.is_own %}text-right{% endif %}">
+                            {% if not msg.is_own %}
+                            <p class="mb-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                {{ msg.sender_name }}
+                            </p>
+                            {% endif %}
+
+                            {% if msg.is_deleted %}
+                            <div class="rounded-xl bg-slate-50 px-3.5 py-2 text-sm italic text-slate-400 dark:bg-slate-800/50 dark:text-slate-500">
+                                This message was deleted
+                            </div>
+                            {% else %}
+                            <!-- Quoted message -->
+                            {% if msg.quoted_content %}
+                            <div class="mb-1 rounded-lg border-l-2 border-indigo-300 bg-indigo-50/50 px-3 py-1.5 text-xs dark:border-indigo-700 dark:bg-indigo-900/20">
+                                <span class="font-medium text-indigo-600 dark:text-indigo-400">{{ msg.quoted_content.sender_name }}</span>
+                                <p class="mt-0.5 text-slate-600 dark:text-slate-400">{{ msg.quoted_content.content[:100] }}</p>
+                            </div>
+                            {% endif %}
+
+                            <div class="inline-block rounded-2xl px-3.5 py-2 text-sm
+                                {% if msg.is_own %}bg-indigo-500 text-white{% else %}bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100{% endif %}
+                                {% if msg.is_pinned %}ring-2 ring-amber-300 dark:ring-amber-600{% endif %}">
+                                {% if msg.content %}
+                                <p class="whitespace-pre-wrap break-words">{{ msg.content }}</p>
+                                {% endif %}
+
+                                <!-- Attachments -->
+                                {% for att in msg.attachments %}
+                                <a href="{{ att.download_url }}" target="_blank"
+                                   class="mt-1 flex items-center gap-2 rounded-lg p-1.5 text-xs transition
+                                   {% if msg.is_own %}bg-indigo-400/30 hover:bg-indigo-400/50 text-indigo-100{% else %}bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300{% endif %}">
+                                    <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                    </svg>
+                                    <span class="truncate">{{ att.file_name }}</span>
+                                </a>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Meta row -->
+                            <div class="mt-0.5 flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 {% if msg.is_own %}justify-end{% endif %}">
+                                <span>{{ msg.created_at[:16] | replace('T', ' ') if msg.created_at }}</span>
+                                {% if msg.is_edited %}<span>(edited)</span>{% endif %}
+                                {% if msg.is_pinned %}<span class="text-amber-500">📌 pinned</span>{% endif %}
+                            </div>
+
+                            <!-- Reactions -->
+                            {% if msg.reactions %}
+                            <div class="mt-1 flex flex-wrap gap-1 {% if msg.is_own %}justify-end{% endif %}">
+                                {% for emoji, users in msg.reactions.items() %}
+                                <button @click="toggleReaction('{{ msg.message_id }}', '{{ emoji }}')"
+                                        class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/30">
+                                    <span>{{ emoji }}</span>
+                                    <span class="text-slate-500 dark:text-slate-400">{{ users | length }}</span>
+                                </button>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            <!-- Actions (visible on hover) -->
+                            <div class="mt-0.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 {% if msg.is_own %}justify-end{% endif %}">
+                                <button @click="toggleReaction('{{ msg.message_id }}', '👍')"
+                                        class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300" title="React">👍</button>
+                                <button @click="quoteMessage('{{ msg.message_id }}', '{{ msg.sender_name }}', '{{ msg.content[:50] | e }}')"
+                                        class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300" title="Quote">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                    </svg>
+                                </button>
+                                <button @click="pinMessage('{{ msg.message_id }}')"
+                                        class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300" title="Pin">📌</button>
+                                {% if msg.is_own %}
+                                <button @click="deleteMessage('{{ msg.message_id }}')"
+                                        class="rounded p-1 text-slate-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400" title="Delete">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Quote Preview -->
+                <div x-show="quotedMessageId" x-transition
+                     class="border-t border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs">
+                            <span class="font-medium text-indigo-600 dark:text-indigo-400">Replying to <span x-text="quotedSender"></span></span>
+                            <p class="mt-0.5 text-slate-500 dark:text-slate-400" x-text="quotedPreview"></p>
+                        </div>
+                        <button @click="quotedMessageId = null; quotedSender = ''; quotedPreview = ''"
+                                class="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+                    <form @submit.prevent="sendMessage()" class="flex items-end gap-2">
+                        <div class="flex-1">
+                            <textarea x-model="messageContent" x-ref="messageInput"
+                                      @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
+                                      rows="1"
+                                      placeholder="Type a message..."
+                                      class="input w-full resize-none text-sm"
+                                      style="min-height: 38px; max-height: 120px;"
+                                      @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"></textarea>
+                        </div>
+                        <!-- File upload -->
+                        <label class="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                            </svg>
+                            <input type="file" x-ref="fileInput" @change="handleFileSelect()" multiple class="hidden"
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.zip,.csv,.txt">
+                        </label>
+                        <button type="submit"
+                                :disabled="sending"
+                                class="rounded-lg bg-indigo-500 p-2 text-white transition hover:bg-indigo-600 disabled:opacity-50">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                            </svg>
+                        </button>
+                    </form>
+                    <!-- File previews -->
+                    <div x-show="selectedFiles.length > 0" class="mt-2 flex flex-wrap gap-2">
+                        <template x-for="(file, idx) in selectedFiles" :key="idx">
+                            <div class="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
+                                <span class="max-w-[120px] truncate text-slate-600 dark:text-slate-300" x-text="file.name"></span>
+                                <button @click="selectedFiles.splice(idx, 1)" class="text-slate-400 hover:text-red-500">×</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Members Sidebar -->
+        <div class="hidden lg:block lg:col-span-1">
+            <div class="card overflow-hidden">
+                <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Members</h3>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ members | length }} member{{ 's' if members | length != 1 }}</p>
+                </div>
+                <div class="divide-y divide-slate-100 dark:divide-slate-800" style="max-height: calc(100vh - 16rem); overflow-y: auto;">
+                    {% for member in members %}
+                    <div class="flex items-center gap-3 px-4 py-2.5">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                            {{ member.name[:2] | upper }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-slate-900 dark:text-white">
+                                {{ member.name }}
+                                {% if member.is_self %}<span class="text-xs text-slate-400">(you)</span>{% endif %}
+                            </p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ member.role }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function chatApp() {
+    return {
+        messageContent: '',
+        sending: false,
+        selectedFiles: [],
+        quotedMessageId: null,
+        quotedSender: '',
+        quotedPreview: '',
+        conversationId: '{{ conversation_id }}',
+        ws: null,
+
+        init() {
+            this.scrollToBottom();
+            this.connectWebSocket();
+        },
+
+        scrollToBottom() {
+            this.$nextTick(() => {
+                const container = document.getElementById('messages-container');
+                if (container) container.scrollTop = container.scrollHeight;
+            });
+        },
+
+        connectWebSocket() {
+            try {
+                const token = document.cookie.split(';').find(c => c.trim().startsWith('access_token='));
+                if (!token) return;
+                const tokenValue = token.split('=')[1];
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                this.ws = new WebSocket(`${protocol}//${location.host}/collaboration/ws?token=${tokenValue}`);
+                this.ws.onmessage = (e) => {
+                    try {
+                        const event = JSON.parse(e.data);
+                        if (event.type === 'new_message' && event.conversation_id === this.conversationId) {
+                            location.reload();
+                        }
+                    } catch {}
+                };
+                this.ws.onerror = () => {};
+                this.ws.onclose = () => {
+                    setTimeout(() => this.connectWebSocket(), 5000);
+                };
+            } catch {}
+        },
+
+        async sendMessage() {
+            const content = this.messageContent.trim();
+            if (!content && this.selectedFiles.length === 0) return;
+            this.sending = true;
+
+            const formData = new FormData();
+            formData.append('content', content);
+            if (this.quotedMessageId) formData.append('quoted_message_id', this.quotedMessageId);
+            for (const file of this.selectedFiles) formData.append('files', file);
+
+            try {
+                const resp = await fetch(`/collaboration/api/conversations/${this.conversationId}/messages`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (resp.ok) {
+                    this.messageContent = '';
+                    this.selectedFiles = [];
+                    this.quotedMessageId = null;
+                    this.quotedSender = '';
+                    this.quotedPreview = '';
+                    this.$refs.messageInput.style.height = 'auto';
+                    location.reload();
+                }
+            } catch {}
+            this.sending = false;
+        },
+
+        handleFileSelect() {
+            const input = this.$refs.fileInput;
+            if (input.files) {
+                for (const f of input.files) this.selectedFiles.push(f);
+            }
+            input.value = '';
+        },
+
+        quoteMessage(msgId, sender, preview) {
+            this.quotedMessageId = msgId;
+            this.quotedSender = sender;
+            this.quotedPreview = preview;
+            this.$refs.messageInput.focus();
+        },
+
+        async toggleReaction(msgId, emoji) {
+            await fetch(`/collaboration/api/messages/${msgId}/react`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({emoji}),
+            });
+            location.reload();
+        },
+
+        async pinMessage(msgId) {
+            await fetch(`/collaboration/api/messages/${msgId}/pin`, {method: 'POST'});
+            location.reload();
+        },
+
+        async deleteMessage(msgId) {
+            if (!confirm('Delete this message?')) return;
+            await fetch(`/collaboration/api/messages/${msgId}`, {method: 'DELETE'});
+            location.reload();
+        },
+    };
+}
+</script>
+{% endblock %}
