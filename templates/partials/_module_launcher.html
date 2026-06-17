@@ -19,6 +19,9 @@
 {% endif %}
 {% set launcher_modules = [] %}
 {% set launcher_modules = launcher_modules + [{"key": "home", "label": "Home", "href": "/", "icon": "/static/favicon.svg"}] %}
+{% if user and user.is_authenticated %}
+  {% set launcher_modules = launcher_modules + [{"key": "collaboration", "label": "Collaboration", "href": "/collaboration", "icon": "/static/img/illustrations/module-people.png", "accent": "bg-sky-500"}] %}
+{% endif %}
 
 {% if "fixed_assets" in modules %}
   {% set launcher_modules = launcher_modules + [{"key": "fixed_assets", "label": "Asset Management", "href": "/fixed-assets", "icon": "/static/img/illustrations/module-inventory.png", "accent": "bg-emerald-500"}] %}

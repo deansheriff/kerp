@@ -196,6 +196,10 @@
                                     {{ icon_svg("user", "h-4 w-4") }}
                                     Profile
                                 </a>
+                                <a href="/collaboration" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+                                    {{ icon_svg("chat", "h-4 w-4") }}
+                                    Collaboration
+                                </a>
                                 {% if "self_service" in accessible_modules | default([], true) %}
                                 <a href="/people/self" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
                                     {{ icon_svg("clipboard", "h-4 w-4") }}

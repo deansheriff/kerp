@@ -810,6 +810,7 @@ def base_context(
             "procurement": "procurement",
             "settings": "settings",
             "coach": "coach",
+            "collaboration": "people",
             "expense": "expense",
             "finance": "finance",
         }
@@ -836,6 +837,8 @@ def base_context(
                 contextual_module = "settings"
             elif path.startswith("/coach"):
                 contextual_module = "coach"
+            elif path.startswith("/collaboration"):
+                contextual_module = "people"
             elif path.startswith("/fixed-assets"):
                 contextual_module = "fixed_assets"
 

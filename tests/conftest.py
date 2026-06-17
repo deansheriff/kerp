@@ -94,6 +94,7 @@ _test_engine = create_engine(
             "perf": None,
             "pm": None,
             "support": None,
+            "collab": None,
             "automation": None,
         }
     },
@@ -361,6 +362,12 @@ from app.models.auth import (  # noqa: E402
 )
 from app.models.coach.insight import CoachInsight  # noqa: E402
 from app.models.coach.report import CoachReport  # noqa: E402
+from app.models.collaboration import (  # noqa: E402
+    Conversation,
+    ConversationAttachment,
+    ConversationMessage,
+    ConversationParticipant,
+)
 from app.models.domain_settings import (  # noqa: E402
     DomainSetting,
     DomainSettingHistory,
@@ -398,6 +405,10 @@ SQLITE_COMPATIBLE_TABLES = [
     PersonRole.__table__,
     CoachInsight.__table__,
     CoachReport.__table__,
+    Conversation.__table__,
+    ConversationParticipant.__table__,
+    ConversationMessage.__table__,
+    ConversationAttachment.__table__,
     OrgMetricSnapshot.__table__,
     AuditEvent.__table__,
     DomainSetting.__table__,

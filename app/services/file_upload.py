@@ -610,6 +610,54 @@ def get_support_attachment_upload() -> FileUploadService:
     return FileUploadService(_support_attachment_config())
 
 
+def _collaboration_attachment_config() -> FileUploadConfig:
+    return FileUploadConfig(
+        base_dir="/app/uploads/collaboration",
+        allowed_content_types=frozenset(
+            {
+                "image/jpeg",
+                "image/png",
+                "image/gif",
+                "image/webp",
+                "application/pdf",
+                "text/plain",
+                "text/csv",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/zip",
+            }
+        ),
+        allowed_extensions=frozenset(
+            {
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".gif",
+                ".webp",
+                ".pdf",
+                ".txt",
+                ".csv",
+                ".doc",
+                ".docx",
+                ".xls",
+                ".xlsx",
+                ".zip",
+            }
+        ),
+        max_size_bytes=10 * 1024 * 1024,
+        compute_checksum=True,
+        require_magic_bytes=True,
+        s3_prefix="collaboration",
+    )
+
+
+def get_collaboration_attachment_upload() -> FileUploadService:
+    """Get collaboration/chat attachment upload service."""
+    return FileUploadService(_collaboration_attachment_config())
+
+
 def get_form_attachment_upload() -> FileUploadService:
     """Get generic form attachment upload service."""
     return FileUploadService(_form_attachment_config())

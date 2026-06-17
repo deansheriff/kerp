@@ -85,6 +85,7 @@ from app.web.auth import router as auth_web_router
 from app.web.careers import router as careers_web_router
 from app.web.careers import short_router as careers_short_web_router
 from app.web.coach import router as coach_web_router
+from app.web.collaboration import router as collaboration_web_router
 from app.web.csrf import csrf_middleware
 from app.web.finance import automation_router as automation_web_router
 from app.web.finance import expense_router as expense_web_router
@@ -699,6 +700,7 @@ app.include_router(auth_web_router)
 app.include_router(admin_web_router)
 app.include_router(profile_web_router)
 app.include_router(notifications_web_router)
+app.include_router(collaboration_web_router)
 app.include_router(workflow_tasks_web_router)
 app.include_router(careers_api_router, prefix="/api/v1")
 app.include_router(careers_web_router)

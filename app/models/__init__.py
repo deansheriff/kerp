@@ -1,6 +1,7 @@
 # Finance Models - 111 tables across 16 schemas
 import app.models.analytics as analytics  # noqa: F401
 import app.models.coach as coach  # noqa: F401
+import app.models.collaboration as collaboration  # noqa: F401
 import app.models.fleet as fleet  # noqa: F401
 import app.models.finance as finance  # noqa: F401
 import app.models.forms as forms  # noqa: F401
@@ -32,6 +33,14 @@ from app.models.batch_operation import (  # noqa: F401
     BatchOperation,
     BatchOperationStatus,
     BatchOperationType,
+)
+from app.models.collaboration import (  # noqa: F401
+    Conversation,
+    ConversationAttachment,
+    ConversationMessage,
+    ConversationParticipant,
+    ConversationType,
+    ParticipantRole,
 )
 from app.models.domain_settings import (  # noqa: F401
     DomainSetting,

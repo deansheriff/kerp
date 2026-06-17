@@ -11,6 +11,7 @@ from app.db import Base
 MODEL_MODULES = (
     "app.models.audit",
     "app.models.auth",
+    "app.models.collaboration",
     "app.models.domain_settings",
     "app.models.finance",
     "app.models.finance.ipsas",
