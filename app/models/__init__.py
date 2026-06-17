@@ -34,14 +34,7 @@ from app.models.batch_operation import (  # noqa: F401
     BatchOperationStatus,
     BatchOperationType,
 )
-from app.models.collaboration import (  # noqa: F401
-    Conversation,
-    ConversationAttachment,
-    ConversationMessage,
-    ConversationParticipant,
-    ConversationType,
-    ParticipantRole,
-)
+
 from app.models.domain_settings import (  # noqa: F401
     DomainSetting,
     SettingDomain,
