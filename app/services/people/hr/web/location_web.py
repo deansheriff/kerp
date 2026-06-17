@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import nullcontext
 from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
 from typing import Any
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.db.session_context import allow_cross_org
+from app.models.finance.core_org.location import Location
 from app.models.finance.core_org.location import LocationType
+from app.models.finance.core_org.organization import Organization
+from app.rls import bypass_rls_sync
 from app.services.common import PaginationParams, coerce_uuid, pagination_context
 from app.services.people.hr import OrganizationService
 from app.services.people.hr.errors import ValidationError
@@ -82,8 +88,56 @@ def _validate_location_text_fields(
         errors["country_code"] = "Country code must be a 2-letter ISO code, e.g. NG"
 
 
+def _optional_rls_bypass(db: Session):
+    """Bypass database RLS where supported; SQLite tests do not support SET LOCAL."""
+    if db.get_bind().dialect.name == "postgresql":
+        return bypass_rls_sync(db)
+    return nullcontext()
+
+
 class LocationWebService:
     """Web service for location (branch) routes."""
+
+    @staticmethod
+    def _active_organization_options(db: Session) -> list[dict[str, str]]:
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            organizations = db.scalars(
+                select(Organization)
+                .where(Organization.is_active.is_(True))
+                .order_by(Organization.legal_name.asc())
+            ).all()
+        return [
+            {
+                "id": str(org.organization_id),
+                "name": org.legal_name or org.trading_name or org.organization_code,
+            }
+            for org in organizations
+        ]
+
+    @staticmethod
+    def _list_locations_cross_org(
+        db: Session,
+        *,
+        search: str | None,
+        organization_id: str | None,
+        pagination: PaginationParams,
+    ):
+        stmt = select(Location)
+        if organization_id:
+            stmt = stmt.where(Location.organization_id == coerce_uuid(organization_id))
+        if search:
+            search_term = f"%{search}%"
+            stmt = stmt.where(
+                or_(
+                    Location.location_code.ilike(search_term),
+                    Location.location_name.ilike(search_term),
+                )
+            )
+        stmt = stmt.order_by(Location.location_name.asc())
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            from app.services.common import paginate
+
+            return paginate(db, stmt, pagination)
 
     @staticmethod
     def _form_str(form: Any, key: str) -> str:
@@ -98,21 +152,47 @@ class LocationWebService:
         auth: WebAuthContext,
         db: Session,
         search: str | None,
+        organization_id: str | None,
         page: int,
     ) -> HTMLResponse:
-        org_id = coerce_uuid(auth.organization_id)
-        svc = OrganizationService(db, org_id)
-
         limit = DEFAULT_PAGE_SIZE
-        result = svc.list_locations(
-            search=search,
-            pagination=PaginationParams.from_page(page, limit),
-        )
+        pagination = PaginationParams.from_page(page, limit)
+        organization_options: list[dict[str, str]] = []
+        organization_names: dict[str, str] = {}
+        selected_organization_id = ""
+        show_organization_filter = bool(auth.is_admin)
+
+        if auth.is_admin:
+            organization_options = LocationWebService._active_organization_options(db)
+            organization_names = {
+                item["id"]: item["name"] for item in organization_options
+            }
+            selected_organization_id = organization_id or "all"
+            result = LocationWebService._list_locations_cross_org(
+                db,
+                search=search,
+                organization_id=None
+                if selected_organization_id == "all"
+                else selected_organization_id,
+                pagination=pagination,
+            )
+        else:
+            org_id = coerce_uuid(auth.organization_id)
+            svc = OrganizationService(db, org_id)
+            selected_organization_id = str(org_id)
+            result = svc.list_locations(
+                search=search,
+                pagination=pagination,
+            )
 
         context = {
             **base_context(request, auth, "Branches", "locations"),
             "locations": result.items,
             "search": search or "",
+            "organization_options": organization_options,
+            "organization_names": organization_names,
+            "selected_organization_id": selected_organization_id,
+            "show_organization_filter": show_organization_filter,
             "total": result.total,
             "has_prev": result.has_prev,
             "has_next": result.has_next,

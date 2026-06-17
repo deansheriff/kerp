@@ -30,6 +30,7 @@ class CollaborationWebService:
         conversation_id: str | None = None,
         search: str | None = None,
         people_search: str | None = None,
+        compact: bool = False,
     ):
         """Render the collaboration inbox."""
         service = CollaborationService(db)
@@ -79,9 +80,11 @@ class CollaborationWebService:
                 "people": people,
                 "search": search or "",
                 "people_search": people_search or "",
+                "compact": compact,
             }
         )
-        return templates.TemplateResponse(request, "collaboration/index.html", context)
+        template = "collaboration/compact.html" if compact else "collaboration/index.html"
+        return templates.TemplateResponse(request, template, context)
 
     def create_direct_response(
         self,
@@ -90,6 +93,7 @@ class CollaborationWebService:
         db: Session,
         *,
         other_person_id: str,
+        compact: bool = False,
     ) -> RedirectResponse:
         """Create or open a direct conversation."""
         service = CollaborationService(db)
@@ -100,13 +104,13 @@ class CollaborationWebService:
                 other_person_id,
             )
             return RedirectResponse(
-                url=f"/collaboration?conversation_id={conversation.conversation_id}",
+                url=self._conversation_url(conversation.conversation_id, compact),
                 status_code=303,
             )
         except Exception as exc:
             db.rollback()
             logger.exception("Failed to create direct conversation")
-            return self._error_redirect(str(exc))
+            return self._error_redirect(str(exc), compact=compact)
 
     def create_group_response(
         self,
@@ -117,6 +121,7 @@ class CollaborationWebService:
         title: str,
         participant_ids: list[str],
         description: str | None = None,
+        compact: bool = False,
     ) -> RedirectResponse:
         """Create a group conversation."""
         service = CollaborationService(db)
@@ -129,13 +134,13 @@ class CollaborationWebService:
                 description=description,
             )
             return RedirectResponse(
-                url=f"/collaboration?conversation_id={conversation.conversation_id}",
+                url=self._conversation_url(conversation.conversation_id, compact),
                 status_code=303,
             )
         except Exception as exc:
             db.rollback()
             logger.exception("Failed to create group conversation")
-            return self._error_redirect(str(exc))
+            return self._error_redirect(str(exc), compact=compact)
 
     async def add_message_response(
         self,
@@ -146,6 +151,7 @@ class CollaborationWebService:
         conversation_id: str,
         body: str,
         files: list[UploadFile] | None = None,
+        compact: bool = False,
     ) -> RedirectResponse:
         """Post a message to a conversation."""
         service = CollaborationService(db)
@@ -158,13 +164,17 @@ class CollaborationWebService:
                 files=files,
             )
             return RedirectResponse(
-                url=f"/collaboration?conversation_id={conversation_id}",
+                url=self._conversation_url(conversation_id, compact),
                 status_code=303,
             )
         except Exception as exc:
             db.rollback()
             logger.exception("Failed to add collaboration message")
-            return self._error_redirect(str(exc), conversation_id=conversation_id)
+            return self._error_redirect(
+                str(exc),
+                conversation_id=conversation_id,
+                compact=compact,
+            )
 
     def download_attachment_response(
         self,
@@ -208,14 +218,23 @@ class CollaborationWebService:
         message: str,
         *,
         conversation_id: str | None = None,
+        compact: bool = False,
     ) -> RedirectResponse:
-        url = f"/collaboration?error={quote(message)}"
+        compact_part = "&compact=1" if compact else ""
+        url = f"/collaboration?error={quote(message)}{compact_part}"
         if conversation_id:
             url = (
                 f"/collaboration?conversation_id={conversation_id}"
-                f"&error={quote(message)}"
+                f"&error={quote(message)}{compact_part}"
             )
         return RedirectResponse(url=url, status_code=303)
+
+    @staticmethod
+    def _conversation_url(conversation_id, compact: bool = False) -> str:
+        url = f"/collaboration?conversation_id={conversation_id}"
+        if compact:
+            url += "&compact=1"
+        return url
 
 
 collaboration_web_service = CollaborationWebService()

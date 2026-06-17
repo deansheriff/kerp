@@ -18,6 +18,7 @@ def inbox(
     conversation_id: str | None = Query(default=None),
     search: str | None = Query(default=None),
     people_search: str | None = Query(default=None),
+    compact: bool = Query(default=False),
     auth: WebAuthContext = Depends(require_web_auth),
     db: Session = Depends(get_db_for_org),
 ):
@@ -29,6 +30,7 @@ def inbox(
         conversation_id=conversation_id,
         search=search,
         people_search=people_search,
+        compact=compact,
     )
 
 
@@ -36,6 +38,7 @@ def inbox(
 def create_direct(
     request: Request,
     other_person_id: str = Form(...),
+    compact: bool = Query(default=False),
     auth: WebAuthContext = Depends(require_web_auth),
     db: Session = Depends(get_db_for_org),
 ):
@@ -45,6 +48,7 @@ def create_direct(
         auth,
         db,
         other_person_id=other_person_id,
+        compact=compact,
     )
 
 
@@ -54,6 +58,7 @@ def create_group(
     title: str = Form(...),
     participant_ids: list[str] = Form(default=[]),
     description: str | None = Form(default=None),
+    compact: bool = Query(default=False),
     auth: WebAuthContext = Depends(require_web_auth),
     db: Session = Depends(get_db_for_org),
 ):
@@ -65,6 +70,7 @@ def create_group(
         title=title,
         participant_ids=participant_ids,
         description=description,
+        compact=compact,
     )
 
 
@@ -74,6 +80,7 @@ async def add_message(
     conversation_id: str,
     body: str = Form(default=""),
     files: list[UploadFile] = File(default=None),
+    compact: bool = Query(default=False),
     auth: WebAuthContext = Depends(require_web_auth),
     db: Session = Depends(get_db_for_org),
 ):
@@ -85,6 +92,7 @@ async def add_message(
         conversation_id=conversation_id,
         body=body,
         files=files,
+        compact=compact,
     )
 
 

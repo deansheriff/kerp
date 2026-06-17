@@ -1,0 +1,173 @@
+{% from "components/macros.html" import icon_svg %}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% set csrf_value = csrf_token if csrf_token is defined else request.state.csrf_token %}
+    <meta name="csrf-token" content="{{ csrf_value | default('', true) }}">
+    <link href="/static/css/fonts.css" rel="stylesheet">
+    <link href="/static/css/app.css?v=20260319c" rel="stylesheet">
+    <script defer src="/static/js/vendor/alpine-collapse.js"></script>
+    <script defer src="/static/js/vendor/alpine.js"></script>
+    <title>Chat</title>
+</head>
+<body class="h-full bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+    <main class="flex h-screen min-h-0 flex-col">
+        {% if request.query_params.get("error") %}
+        <div class="border-b border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+            {{ request.query_params.get("error") }}
+        </div>
+        {% endif %}
+
+        <header class="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h1 class="text-sm font-semibold text-slate-900 dark:text-white">Team Chat</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Direct and group messages</p>
+                </div>
+                <a href="/collaboration" target="_top" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900">
+                    Open
+                    {{ icon_svg("external-link", "h-3.5 w-3.5") }}
+                </a>
+            </div>
+        </header>
+
+        <section class="border-b border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/50">
+            <form method="get" action="/collaboration" class="flex gap-2">
+                <input type="hidden" name="compact" value="1">
+                <label for="compact-people-search" class="sr-only">Find colleague</label>
+                <input id="compact-people-search" name="people_search" value="{{ people_search }}" class="form-input h-9 text-sm" placeholder="Find colleague">
+                {% if selected_conversation_id %}
+                <input type="hidden" name="conversation_id" value="{{ selected_conversation_id }}">
+                {% endif %}
+                <button type="submit" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                    {{ icon_svg("search", "h-4 w-4") }}
+                </button>
+            </form>
+            {% if people_search %}
+            <div class="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                {% for person in people[:6] %}
+                <form method="post" action="/collaboration/direct?compact=1">
+                    {{ request.state.csrf_form | safe }}
+                    <input type="hidden" name="other_person_id" value="{{ person.id }}">
+                    <button type="submit" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white dark:hover:bg-slate-950">
+                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
+                            {{ person.name.split()[0][0] if person.name else "U" }}{{ person.name.split()[1][0] if person.name and person.name.split()|length > 1 else "" }}
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block truncate font-medium text-slate-800 dark:text-slate-100">{{ person.name }}</span>
+                            <span class="block truncate text-xs text-slate-500">{{ person.email }}</span>
+                        </span>
+                    </button>
+                </form>
+                {% else %}
+                <p class="px-2 py-2 text-xs text-slate-500 dark:text-slate-400">No colleagues found.</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="border-b border-slate-200 dark:border-slate-800">
+            <div class="flex gap-2 overflow-x-auto px-3 py-2">
+                {% for conversation in conversations[:8] %}
+                <a href="/collaboration?compact=1&conversation_id={{ conversation.conversation_id }}"
+                   class="min-w-36 rounded-lg border px-3 py-2 text-xs transition {% if selected_conversation_id == conversation.conversation_id %}border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200{% else %}border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300{% endif %}">
+                    <span class="block truncate font-semibold">{{ conversation.title }}</span>
+                    <span class="mt-1 block truncate text-[11px] opacity-75">{{ conversation.last_message }}</span>
+                </a>
+                {% else %}
+                <p class="px-1 py-2 text-xs text-slate-500 dark:text-slate-400">Search for a colleague to start chatting.</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% if selected_conversation %}
+        <section class="flex min-h-0 flex-1 flex-col">
+            <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+                <p class="text-xs font-semibold uppercase tracking-wide text-sky-600 dark:text-sky-300">{{ selected_conversation.conversation_type.value | replace("_", " ") | title }}</p>
+                <h2 class="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                    {% if selected_conversation.title %}
+                        {{ selected_conversation.title }}
+                    {% else %}
+                        {% for participant in selected_conversation.participants %}
+                            {% if participant.person_id != auth.person_id and participant.person %}{{ participant.person.name }}{% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </h2>
+            </div>
+
+            <div class="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50 px-3 py-4 dark:bg-slate-950">
+                {% for message in messages %}
+                <div class="flex {% if message.is_own %}justify-end{% else %}justify-start{% endif %}">
+                    <div class="max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm {% if message.is_own %}bg-sky-600 text-white{% else %}bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800{% endif %}">
+                        <div class="mb-1 flex items-center gap-2 text-[11px] {% if message.is_own %}text-sky-100{% else %}text-slate-400{% endif %}">
+                            <span class="font-medium">{{ message.sender_name }}</span>
+                            <span>{{ message.created_at.strftime("%H:%M") if message.created_at else "" }}</span>
+                        </div>
+                        <p class="whitespace-pre-wrap">{{ message.body }}</p>
+                        {% if message.attachments %}
+                        <div class="mt-2 space-y-1">
+                            {% for attachment in message.attachments %}
+                            <a href="{{ attachment.download_url }}" target="_top" class="flex items-center gap-2 rounded-md px-2 py-1 text-xs {% if message.is_own %}bg-white/10 text-white{% else %}bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200{% endif %}">
+                                {{ icon_svg("paperclip", "h-3.5 w-3.5") }}
+                                <span class="truncate">{{ attachment.filename }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="flex h-full items-center justify-center text-center">
+                    <p class="text-sm text-slate-500 dark:text-slate-400">No messages yet.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <form method="post" enctype="multipart/form-data" action="/collaboration/{{ selected_conversation.conversation_id }}/messages?compact=1" class="border-t border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                {{ request.state.csrf_form | safe }}
+                <label for="compact-message-body" class="sr-only">Message</label>
+                <textarea id="compact-message-body" name="body" rows="2" class="form-input resize-none text-sm" placeholder="Write a message"></textarea>
+                <div class="mt-2 flex items-center justify-between gap-2">
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900">
+                        {{ icon_svg("paperclip", "h-4 w-4") }}
+                        <span>Attach</span>
+                        <input type="file" name="files" multiple class="sr-only">
+                    </label>
+                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-700">
+                        {{ icon_svg("paper-airplane", "h-4 w-4") }}
+                        Send
+                    </button>
+                </div>
+            </form>
+        </section>
+        {% else %}
+        <section class="flex flex-1 items-center justify-center px-6 text-center">
+            <div>
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-200">
+                    {{ icon_svg("chat", "h-6 w-6") }}
+                </div>
+                <p class="mt-3 text-sm font-semibold text-slate-900 dark:text-white">Start a conversation</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Search for a colleague above.</p>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+    <script>
+        (function() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            const token = meta ? meta.getAttribute('content') : '';
+            if (!token) return;
+            document.querySelectorAll('form[method="post"]').forEach(function(form) {
+                if (form.querySelector('input[name="csrf_token"]')) return;
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = token;
+                form.appendChild(input);
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -19,6 +19,7 @@ router = APIRouter()
 def list_locations(
     request: Request,
     search: str | None = None,
+    organization_id: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db_for_org),
@@ -29,6 +30,7 @@ def list_locations(
         auth=auth,
         db=db,
         search=search,
+        organization_id=organization_id,
         page=page,
     )
 

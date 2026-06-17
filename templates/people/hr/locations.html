@@ -22,6 +22,34 @@
 
 {% block content %}
 <div class="space-y-6">
+    {% if show_organization_filter %}
+    <form method="get" action="/people/hr/locations" class="card p-4">
+        <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)_auto] md:items-end">
+            <div>
+                <label for="branch-search" class="form-label">Search</label>
+                <input id="branch-search" type="search" name="search" value="{{ search }}" class="form-input w-full" placeholder="Search branches">
+            </div>
+            <div>
+                <label for="organization_id" class="form-label">Organization</label>
+                <select id="organization_id" name="organization_id" class="form-input w-full">
+                    <option value="all" {{ 'selected' if selected_organization_id == 'all' }}>All organizations</option>
+                    {% for org in organization_options %}
+                    <option value="{{ org.id }}" {{ 'selected' if selected_organization_id == org.id }}>{{ org.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-secondary">
+                {{ icon_svg("filter", "h-4 w-4") }}
+                Apply
+            </button>
+        </div>
+        <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            Branches are tenant-scoped. Admins can view all organizations here; HR users only see their own organization.
+        </p>
+    </form>
+    {% endif %}
+
+    {% if not show_organization_filter %}
     {% call(filter_attrs) compact_filters(
         base_url="/people/hr/locations",
         active_filters=active_filters | default([]),
@@ -30,6 +58,7 @@
         search_placeholder="Search locations..."
     ) %}
     {% endcall %}
+    {% endif %}
 
     <div id="results-container">
     {% if locations %}
@@ -44,6 +73,9 @@
                     <div>
                         <h3 class="font-semibold text-slate-900 dark:text-white">{{ loc.location_name }}</h3>
                         <p class="text-xs font-mono text-slate-500 dark:text-slate-400">{{ loc.location_code }}</p>
+                        {% if show_organization_filter %}
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ organization_names.get(loc.organization_id | string, "Unknown organization") }}</p>
+                        {% endif %}
                     </div>
                 </div>
                 {% if loc.is_active %}
