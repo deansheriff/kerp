@@ -30,7 +30,8 @@ def _load_bank_rows() -> list[tuple[str, str]]:
         )
 
     rows: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
+    seen_names: set[str] = set()
+    seen_sort_codes: set[str] = set()
     with csv_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         for raw in reader:
@@ -38,10 +39,11 @@ def _load_bank_rows() -> list[tuple[str, str]]:
             bank_sort_code = (raw.get("Bank Sort Code") or "").strip()
             if not bank_name or not bank_sort_code:
                 continue
-            key = (bank_name.lower(), bank_sort_code)
-            if key in seen:
+            bank_name_key = bank_name.lower()
+            if bank_name_key in seen_names or bank_sort_code in seen_sort_codes:
                 continue
-            seen.add(key)
+            seen_names.add(bank_name_key)
+            seen_sort_codes.add(bank_sort_code)
             rows.append((bank_name, bank_sort_code))
     return rows
 

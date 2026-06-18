@@ -6,6 +6,11 @@
     activeConvName: '',
     unreadCount: 0,
     pollInterval: null,
+    dmPickerOpen: false,
+    dmSearch: '',
+    dmResults: [],
+    dmLoading: false,
+    dmError: '',
     init() {
         this.fetchUnread();
         this.pollInterval = setInterval(() => this.fetchUnread(), 30000);
@@ -30,6 +35,39 @@
     goBack() {
         this.collabView = 'inbox';
         this.activeConvId = null;
+    },
+    searchDmPeople() {
+        this.dmError = '';
+        if (this.dmSearch.trim().length < 2) {
+            this.dmResults = [];
+            this.dmLoading = false;
+            return;
+        }
+        this.dmLoading = true;
+        fetch('/collaboration/api/employees?q=' + encodeURIComponent(this.dmSearch.trim()))
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(d => { this.dmResults = d.employees || []; this.dmLoading = false; })
+            .catch(() => { this.dmLoading = false; this.dmError = 'Search failed'; });
+    },
+    startDirectMessage(personId, name) {
+        const body = new FormData();
+        body.append('person_id', personId);
+        const csrf = document.querySelector('meta[name=&quot;csrf-token&quot;]')?.content;
+        const headers = csrf ? {'X-CSRF-Token': csrf} : {};
+        fetch('/collaboration/api/conversations/direct', {
+            method: 'POST',
+            body,
+            headers,
+            credentials: 'same-origin'
+        })
+            .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
+            .then(d => {
+                this.dmPickerOpen = false;
+                this.dmSearch = '';
+                this.dmResults = [];
+                this.openConversation(d.conversation_id, name || d.name || 'Direct Message');
+            })
+            .catch(e => { this.dmError = e.error || 'Could not start conversation'; });
     }
 }" x-cloak>
 
@@ -113,6 +151,14 @@
             <div x-show="collabView === 'inbox'" class="flex h-full flex-col">
                 <!-- Quick Actions -->
                 <div class="flex items-center gap-2 border-b border-slate-100 px-4 py-2 dark:border-slate-800">
+                    <button type="button"
+                            @click="dmPickerOpen = !dmPickerOpen; if (dmPickerOpen) { $nextTick(() => $refs.dmSearchInput && $refs.dmSearchInput.focus()) }"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-400">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        New DM
+                    </button>
                     <a href="/collaboration/new-group"
                        class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-400">
                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,6 +173,37 @@
                         </svg>
                         Search
                     </a>
+                </div>
+                <div x-show="dmPickerOpen"
+                     x-transition
+                     class="border-b border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/40">
+                    <label for="collab-dm-search" class="sr-only">Find employee</label>
+                    <input id="collab-dm-search"
+                           x-ref="dmSearchInput"
+                           type="search"
+                           x-model="dmSearch"
+                           @input.debounce.250ms="searchDmPeople()"
+                           autocomplete="off"
+                           placeholder="Find employee"
+                           class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-indigo-500 dark:focus:ring-indigo-900/40">
+                    <div class="mt-2 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                         x-show="dmSearch.trim().length >= 2">
+                        <div x-show="dmLoading" class="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">Searching...</div>
+                        <div x-show="!dmLoading && dmError" x-text="dmError" class="px-3 py-3 text-sm text-rose-600 dark:text-rose-300"></div>
+                        <div x-show="!dmLoading && !dmError && dmResults.length === 0" class="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">No employees found.</div>
+                        <template x-for="emp in dmResults" :key="emp.person_id">
+                            <button type="button"
+                                    @click="startDirectMessage(emp.person_id, emp.name)"
+                                    class="flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800">
+                                <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+                                      x-text="emp.name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?'"></span>
+                                <span class="min-w-0">
+                                    <span class="block truncate text-sm font-medium text-slate-900 dark:text-white" x-text="emp.name"></span>
+                                    <span class="block truncate text-xs text-slate-500 dark:text-slate-400" x-text="emp.email"></span>
+                                </span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
                 <!-- Conversation List (HTMX) -->
                 <div class="flex-1 overflow-y-auto"

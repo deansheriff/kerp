@@ -116,15 +116,24 @@ def panel_messages(
 @router.post("/api/conversations/direct", response_class=JSONResponse)
 def api_create_direct(
     request: Request,
-    person_id: str = Form(...),
+    person_id: str | None = Form(None),
+    other_person_id: str | None = Form(None),
+    target_person_id: str | None = Form(None),
     auth: WebAuthContext = Depends(require_web_auth),
     db: Session = Depends(get_db_for_org),
 ):
     """Create or fetch an existing DM conversation."""
     try:
         org_id = coerce_uuid(auth.organization_id)
+        current_person_id = coerce_uuid(auth.person_id)
+        target = person_id or other_person_id or target_person_id
+        if not target:
+            return JSONResponse({"error": "Select a person to message."}, status_code=400)
+        target_id = coerce_uuid(target)
+        if target_id == current_person_id:
+            return JSONResponse({"error": "Choose another person to message."}, status_code=400)
         conv = ConversationService.create_direct(
-            db, org_id, coerce_uuid(auth.person_id), coerce_uuid(person_id)
+            db, org_id, current_person_id, target_id
         )
         db.commit()
         return JSONResponse(
@@ -134,6 +143,54 @@ def api_create_direct(
         db.rollback()
         logger.exception("Failed to create DM")
         return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@router.post("/direct", response_class=RedirectResponse)
+def create_direct(
+    request: Request,
+    person_id: str | None = Form(None),
+    other_person_id: str | None = Form(None),
+    target_person_id: str | None = Form(None),
+    compact: bool = Query(False),
+    auth: WebAuthContext = Depends(require_web_auth),
+    db: Session = Depends(get_db_for_org),
+):
+    """Create or fetch a direct message from normal form submissions."""
+    target = person_id or other_person_id or target_person_id
+    fallback = "/collaboration?compact=1" if compact else "/collaboration"
+    error_sep = "&" if "?" in fallback else "?"
+    if not target:
+        return RedirectResponse(
+            url=f"{fallback}{error_sep}error=missing_person", status_code=303
+        )
+
+    try:
+        org_id = coerce_uuid(auth.organization_id)
+        current_person_id = coerce_uuid(auth.person_id)
+        target_id = coerce_uuid(target)
+        if target_id == current_person_id:
+            return RedirectResponse(
+                url=f"{fallback}{error_sep}error=self_message", status_code=303
+            )
+
+        conv = ConversationService.create_direct(
+            db, org_id, current_person_id, target_id
+        )
+        db.commit()
+        if compact:
+            return RedirectResponse(
+                url=f"/collaboration?compact=1&conversation_id={conv.conversation_id}",
+                status_code=303,
+            )
+        return RedirectResponse(
+            url=f"/collaboration/c/{conv.conversation_id}", status_code=303
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to create DM")
+        return RedirectResponse(
+            url=f"{fallback}{error_sep}error=creation_failed", status_code=303
+        )
 
 
 @router.post("/groups", response_class=RedirectResponse)
@@ -313,11 +370,18 @@ def api_search_employees(
 ):
     """Search employees for member picker."""
     from app.models.person import Person
+    from app.models.person import PersonStatus
 
     org_id = coerce_uuid(auth.organization_id)
+    person_id = coerce_uuid(auth.person_id)
     query = (
         db.query(Person)
-        .filter(Person.organization_id == org_id)
+        .filter(
+            Person.organization_id == org_id,
+            Person.id != person_id,
+            Person.is_active.is_(True),
+            Person.status == PersonStatus.active,
+        )
     )
     if q:
         like = f"%{q}%"
@@ -326,13 +390,13 @@ def api_search_employees(
             | (Person.last_name.ilike(like))
             | (Person.email.ilike(like))
         )
-    people = query.limit(20).all()
+    people = query.order_by(Person.first_name, Person.last_name).limit(20).all()
     return JSONResponse(
         {
             "employees": [
                 {
                     "person_id": str(p.id),
-                    "name": f"{p.first_name} {p.last_name}",
+                    "name": p.name,
                     "email": p.email,
                 }
                 for p in people
