@@ -14,7 +14,11 @@
 {% endblock %}
 
 {% block header_actions %}
-<a href="/people/hr/locations/new" class="btn btn-primary group">
+{% set new_branch_href = "/people/hr/locations/new" %}
+{% if show_organization_filter and selected_organization_id and selected_organization_id != "all" %}
+    {% set new_branch_href = "/people/hr/locations/new?organization_id=" ~ selected_organization_id %}
+{% endif %}
+<a href="{{ new_branch_href }}" class="btn btn-primary group">
     {{ icon_svg("plus", "h-4 w-4 mr-1.5 transition-transform group-hover:rotate-90") }}
     New Branch
 </a>

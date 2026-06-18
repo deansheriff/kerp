@@ -45,6 +45,7 @@ def new_location_form(
     return location_web_service.new_location_form_response(
         request=request,
         auth=auth,
+        db=db,
     )
 
 

@@ -32,6 +32,22 @@
                 <h3 class="font-medium text-slate-900 dark:text-white">Branch Details</h3>
             </div>
             <div class="card-body space-y-4">
+                {% if show_organization_field %}
+                <div>
+                    <label for="organization_id" class="form-label required">Organization</label>
+                    <select name="organization_id" id="organization_id"
+                        required
+                        class="form-input w-full {% if errors.organization_id %}border-red-500{% endif %}">
+                        {% for org in organization_options %}
+                        <option value="{{ org.id }}" {{ 'selected' if selected_organization_id == org.id }}>{{ org.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.organization_id %}
+                    <p class="text-sm text-red-500 mt-1">{{ errors.organization_id }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="location_code" class="form-label required">Branch Code</label>

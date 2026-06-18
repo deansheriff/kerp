@@ -147,6 +147,38 @@ class LocationWebService:
         return str(value).strip()
 
     @staticmethod
+    def _branch_form_org_context(
+        db: Session,
+        auth: WebAuthContext,
+        *,
+        selected_organization_id: str | None = None,
+    ) -> dict[str, Any]:
+        selected = selected_organization_id or (
+            str(auth.organization_id) if auth.organization_id else ""
+        )
+        context: dict[str, Any] = {
+            "show_organization_field": bool(auth.is_admin),
+            "organization_options": [],
+            "selected_organization_id": selected,
+        }
+        if auth.is_admin:
+            context["organization_options"] = (
+                LocationWebService._active_organization_options(db)
+            )
+        return context
+
+    @staticmethod
+    def _target_organization_id_from_form(
+        form: Any,
+        auth: WebAuthContext,
+    ) -> Any:
+        if auth.is_admin:
+            selected = LocationWebService._form_str(form, "organization_id")
+            if selected:
+                return coerce_uuid(selected)
+        return coerce_uuid(auth.organization_id)
+
+    @staticmethod
     def list_locations_response(
         request: Request,
         auth: WebAuthContext,
@@ -208,9 +240,18 @@ class LocationWebService:
     def new_location_form_response(
         request: Request,
         auth: WebAuthContext,
+        db: Session,
     ) -> HTMLResponse:
+        selected_organization_id = request.query_params.get("organization_id")
+        if selected_organization_id == "all":
+            selected_organization_id = None
         context = {
             **base_context(request, auth, "New Branch", "locations"),
+            **LocationWebService._branch_form_org_context(
+                db,
+                auth,
+                selected_organization_id=selected_organization_id,
+            ),
             "location": None,
             "location_types": [t.value for t in LocationType],
             "errors": {},
@@ -257,6 +298,14 @@ class LocationWebService:
         if form is None:
             form = await request.form()
 
+        try:
+            org_id = LocationWebService._target_organization_id_from_form(form, auth)
+        except Exception:
+            org_id = coerce_uuid(auth.organization_id)
+            organization_error = "Invalid organization"
+        else:
+            organization_error = ""
+
         location_code = LocationWebService._form_str(form, "location_code")
         location_name = LocationWebService._form_str(form, "location_name")
         location_type = LocationWebService._form_str(form, "location_type")
@@ -278,6 +327,8 @@ class LocationWebService:
             errors["location_code"] = "Required"
         if not location_name:
             errors["location_name"] = "Required"
+        if organization_error:
+            errors["organization_id"] = organization_error
         _validate_location_text_fields(
             errors,
             location_code=location_code,
@@ -322,6 +373,11 @@ class LocationWebService:
         if errors:
             context = {
                 **base_context(request, auth, "New Branch", "locations"),
+                **LocationWebService._branch_form_org_context(
+                    db,
+                    auth,
+                    selected_organization_id=str(org_id),
+                ),
                 "location": SimpleNamespace(
                     location_code=location_code,
                     location_name=location_name,
@@ -348,7 +404,6 @@ class LocationWebService:
                 context,
             )
 
-        org_id = coerce_uuid(auth.organization_id)
         svc = OrganizationService(db, org_id)
         try:
             svc.create_location(
@@ -374,6 +429,11 @@ class LocationWebService:
             error_msg = str(exc)
             context = {
                 **base_context(request, auth, "New Branch", "locations"),
+                **LocationWebService._branch_form_org_context(
+                    db,
+                    auth,
+                    selected_organization_id=str(org_id),
+                ),
                 "location": SimpleNamespace(
                     location_code=location_code,
                     location_name=location_name,
@@ -411,6 +471,11 @@ class LocationWebService:
                 error_msg = f"Branch code '{location_code}' already exists."
             context = {
                 **base_context(request, auth, "New Branch", "locations"),
+                **LocationWebService._branch_form_org_context(
+                    db,
+                    auth,
+                    selected_organization_id=str(org_id),
+                ),
                 "location": SimpleNamespace(
                     location_code=location_code,
                     location_name=location_name,
@@ -437,8 +502,14 @@ class LocationWebService:
                 context,
             )
 
+        success_url = "/people/hr/locations?success=Record+saved+successfully"
+        if auth.is_admin:
+            success_url = (
+                f"/people/hr/locations?organization_id={org_id}"
+                "&success=Record+saved+successfully"
+            )
         return RedirectResponse(
-            url="/people/hr/locations?success=Record+saved+successfully",
+            url=success_url,
             status_code=303,
         )
 

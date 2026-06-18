@@ -1,8 +1,28 @@
 """Collaboration models."""
 
-import app.models.collaboration.conversation as _conv  # noqa: F401
-import app.models.collaboration.participant as _part  # noqa: F401
-import app.models.collaboration.message as _msg  # noqa: F401
-import app.models.collaboration.attachment as _att  # noqa: F401
-import app.models.collaboration.mention as _men  # noqa: F401
-import app.models.collaboration.reaction as _react  # noqa: F401
+from app.models.collaboration.attachment import MessageAttachment
+from app.models.collaboration.conversation import Conversation, ConversationType
+from app.models.collaboration.mention import MessageMention
+from app.models.collaboration.message import Message, MessageType
+from app.models.collaboration.participant import (
+    ConversationParticipant,
+    ParticipantRole,
+)
+from app.models.collaboration.reaction import MessageReaction
+
+ConversationAttachment = MessageAttachment
+ConversationMessage = Message
+
+__all__ = [
+    "Conversation",
+    "ConversationAttachment",
+    "ConversationMessage",
+    "ConversationParticipant",
+    "ConversationType",
+    "Message",
+    "MessageAttachment",
+    "MessageMention",
+    "MessageReaction",
+    "MessageType",
+    "ParticipantRole",
+]
