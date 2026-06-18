@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -27,6 +28,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.db.session_context import allow_cross_org
 from app.models.audit import AuditActorType, AuditEvent
 from app.models.auth import AuthProvider, SessionStatus, UserCredential
 from app.models.auth import Session as AuthSession
@@ -40,6 +42,7 @@ from app.services.audit_dispatcher import fire_audit_event
 from app.services.auth_flow import hash_password
 from app.services.common import coerce_uuid
 from app.services.formatters import format_datetime as _format_datetime
+from app.rls import bypass_rls_sync
 from app.templates import templates
 from app.web.deps import WebAuthContext, resolve_brand_context
 
@@ -50,6 +53,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PAGE_SIZE = 20
 DEFAULT_NEW_LOCAL_PASSWORD = "Dotmac@123"  # noqa: S105  # nosec B105
+
+
+def _optional_rls_bypass(db: Session):
+    if db.get_bind().dialect.name == "postgresql":
+        return bypass_rls_sync(db)
+    return nullcontext()
 _ORG_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _UUID_SEGMENT_PATTERN = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
@@ -3325,7 +3334,8 @@ class AdminWebService:
         auth_or_redirect = self._require_admin_web_auth(request, auth)
         if isinstance(auth_or_redirect, RedirectResponse):
             return auth_or_redirect
-        context = self.users_context(db, search, status, page)
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            context = self.users_context(db, search, status, page)
         return self._render_admin_template(
             request,
             db,
@@ -3346,7 +3356,8 @@ class AdminWebService:
         auth_or_redirect = self._require_admin_web_auth(request, auth)
         if isinstance(auth_or_redirect, RedirectResponse):
             return auth_or_redirect
-        context = self.user_form_context(db)
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            context = self.user_form_context(db)
         context.update({"error": None, "success": None})
         return self._render_admin_template(
             request,
@@ -3380,24 +3391,26 @@ class AdminWebService:
         auth_or_redirect = self._require_admin_web_auth(request, auth)
         if isinstance(auth_or_redirect, RedirectResponse):
             return auth_or_redirect
-        _, error = self.create_user(
-            db=db,
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            username=username,
-            organization_id=organization_id,
-            password=password,
-            password_confirm=password_confirm,
-            display_name=display_name,
-            phone=phone,
-            status=status,
-            must_change_password=must_change_password,
-            role_ids=roles,
-        )
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            _, error = self.create_user(
+                db=db,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                username=username,
+                organization_id=organization_id,
+                password=password,
+                password_confirm=password_confirm,
+                display_name=display_name,
+                phone=phone,
+                status=status,
+                must_change_password=must_change_password,
+                role_ids=roles,
+            )
 
         if error:
-            context = self.user_form_context(db)
+            with allow_cross_org(db), _optional_rls_bypass(db):
+                context = self.user_form_context(db)
             context["user_data"] = self.user_data_from_payload(
                 {
                     "first_name": first_name,
@@ -3446,7 +3459,8 @@ class AdminWebService:
         auth_or_redirect = self._require_admin_web_auth(request, auth)
         if isinstance(auth_or_redirect, RedirectResponse):
             return auth_or_redirect
-        context = self.user_form_context(db, user_id)
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            context = self.user_form_context(db, user_id)
         context.update({"error": None, "success": None})
         title = f"Edit User - {context['user_data']['first_name']} {context['user_data']['last_name']}"
         return self._render_admin_template(
@@ -3483,26 +3497,28 @@ class AdminWebService:
         auth_or_redirect = self._require_admin_web_auth(request, auth)
         if isinstance(auth_or_redirect, RedirectResponse):
             return auth_or_redirect
-        _, error = self.update_user(
-            db=db,
-            user_id=user_id,
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            username=username,
-            organization_id=organization_id,
-            password=password,
-            password_confirm=password_confirm,
-            display_name=display_name,
-            phone=phone,
-            status=status,
-            must_change_password=must_change_password,
-            email_verified=email_verified,
-            role_ids=roles,
-        )
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            _, error = self.update_user(
+                db=db,
+                user_id=user_id,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                username=username,
+                organization_id=organization_id,
+                password=password,
+                password_confirm=password_confirm,
+                display_name=display_name,
+                phone=phone,
+                status=status,
+                must_change_password=must_change_password,
+                email_verified=email_verified,
+                role_ids=roles,
+            )
 
         if error:
-            context = self.user_form_context(db)
+            with allow_cross_org(db), _optional_rls_bypass(db):
+                context = self.user_form_context(db)
             context["user_data"] = self.user_data_from_payload(
                 {
                     "first_name": first_name,

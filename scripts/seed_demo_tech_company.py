@@ -33,6 +33,7 @@ from app.models.fleet.enums import (
     VehicleType,
 )
 from app.models.fleet.vehicle import Vehicle
+from app.models.auth import AuthProvider, UserCredential
 from app.models.people.attendance.shift_type import ShiftType
 from app.models.people.hr import (
     Department,
@@ -55,6 +56,10 @@ def _env_bool(name: str, default: bool = True) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _admin_username() -> str:
+    return os.getenv("ADMIN_USERNAME", "admin")
 
 
 def _demo_org_id() -> uuid.UUID:
@@ -124,6 +129,25 @@ def _ensure_demo_org() -> uuid.UUID:
             org.is_active = True
         db.commit()
     return org_id
+
+
+def _attach_admin_to_demo_org(org_id: uuid.UUID) -> None:
+    if not _env_bool("DEMO_ATTACH_ADMIN_TO_ORG", True):
+        return
+    with cross_org_session() as db:
+        credential = db.scalar(
+            select(UserCredential).where(
+                UserCredential.provider == AuthProvider.local,
+                UserCredential.username == _admin_username(),
+            )
+        )
+        person = db.get(Person, credential.person_id) if credential else None
+        if person is None:
+            return
+        person.organization_id = org_id
+        person.is_active = True
+        person.status = PersonStatus.active
+        db.commit()
 
 
 def _get_or_create_by_code(db, model_cls, code_field: str, code: str, **values):
@@ -508,6 +532,7 @@ def main() -> None:
         return
 
     org_id = _ensure_demo_org()
+    _attach_admin_to_demo_org(org_id)
     with session_for_org(org_id) as db:
         locations = _seed_locations(db)
         departments = _seed_departments(db)
