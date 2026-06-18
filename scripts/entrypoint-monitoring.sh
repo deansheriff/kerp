@@ -86,6 +86,29 @@ seed_demo_data() {
   return 1
 }
 
+seed_sherpackage_data() {
+  retries="${SEED_SHERPACKAGE_RETRIES:-3}"
+  delay="${SEED_SHERPACKAGE_RETRY_DELAY_SECONDS:-5}"
+  attempt=1
+
+  while [ "$attempt" -le "$retries" ]; do
+    echo "Seeding Sherpackage organization data (attempt $attempt/$retries)..."
+    if python "$APP_ROOT/scripts/seed_sherpackage.py"; then
+      echo "Sherpackage seed completed."
+      return 0
+    fi
+
+    attempt=$((attempt + 1))
+    if [ "$attempt" -le "$retries" ]; then
+      echo "Sherpackage seed failed; retrying in ${delay}s..."
+      sleep "$delay"
+    fi
+  done
+
+  echo "Sherpackage seed failed after $retries attempts."
+  return 1
+}
+
 if is_web_command "$1"; then
   run_migrations || exit 1
 
@@ -104,6 +127,15 @@ if is_web_command "$1"; then
       ;;
     *)
       seed_demo_data || exit 1
+      ;;
+  esac
+
+  case "${SEED_SHERPACKAGE_ON_START:-true}" in
+    false|False|FALSE|0|no|No|NO|off|Off|OFF)
+      echo "Sherpackage seed skipped."
+      ;;
+    *)
+      seed_sherpackage_data || exit 1
       ;;
   esac
 
