@@ -86,6 +86,7 @@ def collaboration_search(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/panel/inbox", response_class=HTMLResponse)
 @router.get("/panel/conversations", response_class=HTMLResponse)
 def panel_conversations(
     request: Request,
@@ -93,7 +94,7 @@ def panel_conversations(
     db: Session = Depends(get_db_for_org),
 ):
     """HTMX partial: conversation list for the slide-over panel."""
-    return collab_web_service.panel_conversation_list(request, auth, db)
+    return collab_web_service.panel_inbox(request, auth, db)
 
 
 @router.get("/panel/conversation/{conversation_id}", response_class=HTMLResponse)
@@ -104,7 +105,7 @@ def panel_messages(
     db: Session = Depends(get_db_for_org),
 ):
     """HTMX partial: messages pane for the slide-over panel."""
-    return collab_web_service.panel_message_pane(request, conversation_id, auth, db)
+    return collab_web_service.panel_conversation(request, conversation_id, auth, db)
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +339,19 @@ def api_search_employees(
             ]
         }
     )
+
+
+@router.get("/api/unread-count", response_class=JSONResponse)
+def api_unread_count(
+    request: Request,
+    auth: WebAuthContext = Depends(require_web_auth),
+    db: Session = Depends(get_db_for_org),
+):
+    """Return total unread collaboration messages for the current person."""
+    org_id = coerce_uuid(auth.organization_id)
+    person_id = coerce_uuid(auth.person_id)
+    unread = ConversationService.get_total_unread(db, org_id, person_id)
+    return JSONResponse({"unread": unread})
 
 
 # ---------------------------------------------------------------------------
