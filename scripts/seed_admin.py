@@ -22,6 +22,7 @@ import argparse
 import os
 import sys
 import uuid
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,9 +34,11 @@ from dotenv import load_dotenv
 from sqlalchemy import select
 
 from app.db import SessionLocal
+from app.db.session_context import allow_cross_org
 from app.models.auth import AuthProvider, UserCredential
 from app.models.person import Person, PersonStatus
 from app.models.rbac import Permission, PersonRole, Role, RolePermission
+from app.rls import bypass_rls_sync
 from app.services.auth_flow import hash_password
 from scripts.seed_rbac import DEFAULT_PERMISSIONS, DEFAULT_ROLES
 
@@ -55,6 +58,12 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _optional_rls_bypass(db):
+    if db.get_bind().dialect.name == "postgresql":
+        return bypass_rls_sync(db)
+    return nullcontext()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -214,76 +223,77 @@ def main(
         # allows queries against org-scoped models (e.g. Person).
         db.info["organization_id"] = organization_id
 
-        credential = db.scalar(
-            select(UserCredential)
-            .where(UserCredential.provider == AuthProvider.local)
-            .where(UserCredential.username == args.username)
-        )
-        person = db.get(Person, credential.person_id) if credential else None
-        if person is None:
-            person = db.scalar(select(Person).where(Person.email == args.email))
-
-        if not person:
-            person = Person(
-                organization_id=organization_id,
-                first_name=args.first_name,
-                last_name=args.last_name,
-                email=args.email,
-                email_verified=True,
-                is_active=True,
-                status=PersonStatus.active,
+        with allow_cross_org(db), _optional_rls_bypass(db):
+            credential = db.scalar(
+                select(UserCredential)
+                .where(UserCredential.provider == AuthProvider.local)
+                .where(UserCredential.username == args.username)
             )
-            db.add(person)
-            db.flush()
-            print(f"Created person: {person.email}")
-        else:
-            person.organization_id = person.organization_id or organization_id
-            person.first_name = args.first_name
-            person.last_name = args.last_name
-            person.email = args.email
-            person.email_verified = True
-            person.is_active = True
-            person.status = PersonStatus.active
-            print(f"Person ready: {person.email}")
+            person = db.get(Person, credential.person_id) if credential else None
+            if person is None:
+                person = db.scalar(select(Person).where(Person.email == args.email))
 
-        credential = db.scalar(
-            select(UserCredential)
-            .where(UserCredential.person_id == person.id)
-            .where(UserCredential.provider == AuthProvider.local)
-        )
-        if not credential:
-            credential = UserCredential(
-                person_id=person.id,
-                provider=AuthProvider.local,
-                username=args.username,
-                password_hash=hash_password(args.password),
-                must_change_password=args.force_reset,
-                password_updated_at=datetime.now(timezone.utc),
-                failed_login_attempts=0,
-                locked_until=None,
-                is_active=True,
+            if not person:
+                person = Person(
+                    organization_id=organization_id,
+                    first_name=args.first_name,
+                    last_name=args.last_name,
+                    email=args.email,
+                    email_verified=True,
+                    is_active=True,
+                    status=PersonStatus.active,
+                )
+                db.add(person)
+                db.flush()
+                print(f"Created person: {person.email}")
+            else:
+                person.organization_id = person.organization_id or organization_id
+                person.first_name = args.first_name
+                person.last_name = args.last_name
+                person.email = args.email
+                person.email_verified = True
+                person.is_active = True
+                person.status = PersonStatus.active
+                print(f"Person ready: {person.email}")
+
+            credential = db.scalar(
+                select(UserCredential)
+                .where(UserCredential.person_id == person.id)
+                .where(UserCredential.provider == AuthProvider.local)
             )
-            db.add(credential)
-            db.flush()
-            print(f"Created credential: {args.username}")
-        else:
-            credential.username = args.username
-            if not args.preserve_existing_password:
-                credential.password_hash = hash_password(args.password)
-                credential.password_updated_at = datetime.now(timezone.utc)
-                print(f"Reset password for credential: {args.username}")
-            credential.must_change_password = args.force_reset
-            credential.failed_login_attempts = 0
-            credential.locked_until = None
-            credential.is_active = True
-            print(f"Credential ready: {credential.username}")
+            if not credential:
+                credential = UserCredential(
+                    person_id=person.id,
+                    provider=AuthProvider.local,
+                    username=args.username,
+                    password_hash=hash_password(args.password),
+                    must_change_password=args.force_reset,
+                    password_updated_at=datetime.now(timezone.utc),
+                    failed_login_attempts=0,
+                    locked_until=None,
+                    is_active=True,
+                )
+                db.add(credential)
+                db.flush()
+                print(f"Created credential: {args.username}")
+            else:
+                credential.username = args.username
+                if not args.preserve_existing_password:
+                    credential.password_hash = hash_password(args.password)
+                    credential.password_updated_at = datetime.now(timezone.utc)
+                    print(f"Reset password for credential: {args.username}")
+                credential.must_change_password = args.force_reset
+                credential.failed_login_attempts = 0
+                credential.locked_until = None
+                credential.is_active = True
+                print(f"Credential ready: {credential.username}")
 
-        if not args.skip_rbac:
-            admin_role = setup_rbac(db)
-            ensure_person_role(db, person.id, admin_role.id)
-            print(f"Assigned admin role to: {person.email}")
+            if not args.skip_rbac:
+                admin_role = setup_rbac(db)
+                ensure_person_role(db, person.id, admin_role.id)
+                print(f"Assigned admin role to: {person.email}")
 
-        db.commit()
+            db.commit()
         print("\nAdmin user ready with full permissions")
         print(f"  Username: {args.username}")
         print(f"  Email: {args.email}")

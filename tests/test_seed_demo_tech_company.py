@@ -10,11 +10,13 @@ from scripts import seed_demo_tech_company
 def test_demo_seed_attaches_admin_to_demo_org(db_session, monkeypatch):
     original_org_id = uuid4()
     demo_org_id = uuid4()
+    email = f"demo-admin-{uuid4().hex}@example.com"
+    username = f"demo-admin-{uuid4().hex}"
     person = Person(
         organization_id=original_org_id,
         first_name="Admin",
         last_name="User",
-        email="admin@example.com",
+        email=email,
         is_active=True,
         status=PersonStatus.active,
     )
@@ -24,7 +26,7 @@ def test_demo_seed_attaches_admin_to_demo_org(db_session, monkeypatch):
         UserCredential(
             person_id=person.id,
             provider=AuthProvider.local,
-            username="admin",
+            username=username,
             password_hash=hash_password("admin123"),
             is_active=True,
         )
@@ -39,7 +41,7 @@ def test_demo_seed_attaches_admin_to_demo_org(db_session, monkeypatch):
         seed_demo_tech_company, "cross_org_session", fake_cross_org_session
     )
     monkeypatch.delenv("DEMO_ATTACH_ADMIN_TO_ORG", raising=False)
-    monkeypatch.setenv("ADMIN_USERNAME", "admin")
+    monkeypatch.setenv("ADMIN_USERNAME", username)
 
     seed_demo_tech_company._attach_admin_to_demo_org(demo_org_id)
 
