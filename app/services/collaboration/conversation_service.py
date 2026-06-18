@@ -57,10 +57,13 @@ class ConversationService:
         if existing:
             return existing
 
+        now = datetime.utcnow()
         conv = Conversation(
             organization_id=org_id,
             conversation_type=ConversationType.DIRECT,
             created_by_id=person_a_id,
+            created_at=now,
+            updated_at=now,
         )
         db.add(conv)
         db.flush()
@@ -84,12 +87,15 @@ class ConversationService:
         member_ids: list[uuid.UUID],
     ) -> Conversation:
         """Create a GROUP conversation."""
+        now = datetime.utcnow()
         conv = Conversation(
             organization_id=org_id,
             conversation_type=ConversationType.GROUP,
             name=name,
             description=description,
             created_by_id=creator_id,
+            created_at=now,
+            updated_at=now,
         )
         db.add(conv)
         db.flush()
@@ -123,6 +129,7 @@ class ConversationService:
         member_ids: list[uuid.UUID] | None = None,
     ) -> Conversation:
         """Create a CHANNEL linked to an ERP record."""
+        now = datetime.utcnow()
         conv = Conversation(
             organization_id=org_id,
             conversation_type=ConversationType.CHANNEL,
@@ -130,6 +137,8 @@ class ConversationService:
             created_by_id=creator_id,
             linked_entity_type=linked_entity_type,
             linked_entity_id=linked_entity_id,
+            created_at=now,
+            updated_at=now,
         )
         db.add(conv)
         db.flush()

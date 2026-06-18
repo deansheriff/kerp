@@ -46,6 +46,41 @@ def test_direct_message_form_route_accepts_existing_person_field_names(monkeypat
     assert calls["committed"] is True
 
 
+def test_direct_conversation_creation_sets_updated_at():
+    from app.models.collaboration import ConversationParticipant
+    from app.services.collaboration.conversation_service import ConversationService
+
+    class FakeDb:
+        def __init__(self):
+            self.added = []
+
+        def scalar(self, _stmt):
+            return None
+
+        def add(self, item):
+            self.added.append(item)
+
+        def flush(self):
+            pass
+
+    db = FakeDb()
+    org_id = uuid4()
+    actor_id = uuid4()
+    target_id = uuid4()
+
+    conversation = ConversationService.create_direct(db, org_id, actor_id, target_id)
+
+    assert conversation.created_at is not None
+    assert conversation.updated_at is not None
+    participants = [
+        item for item in db.added if isinstance(item, ConversationParticipant)
+    ]
+    assert {participant.person_id for participant in participants} == {
+        actor_id,
+        target_id,
+    }
+
+
 def test_collaboration_panel_has_direct_message_employee_picker():
     template = (
         Path(__file__).resolve().parents[1]
