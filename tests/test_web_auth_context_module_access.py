@@ -1,3 +1,4 @@
+from pathlib import Path
 from uuid import UUID
 
 from app.web.deps import WebAuthContext
@@ -13,6 +14,66 @@ def test_hr_manager_has_people_module_access():
     )
     assert auth.has_module_access("people") is True
     assert auth.has_module_access("hr") is True  # alias
+
+
+def test_finance_manager_role_exposes_finance_modules_without_scopes():
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=UUID("00000000-0000-0000-0000-000000000002"),
+        organization_id=UUID("00000000-0000-0000-0000-000000000001"),
+        roles=["finance_manager"],
+        scopes=[],
+    )
+
+    assert auth.has_module_access("finance") is True
+    assert auth.has_module_access("fixed_assets") is True
+
+
+def test_operations_manager_role_exposes_operations_modules_without_scopes():
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=UUID("00000000-0000-0000-0000-000000000002"),
+        organization_id=UUID("00000000-0000-0000-0000-000000000001"),
+        roles=["operations_manager"],
+        scopes=[],
+    )
+
+    for module in [
+        "fleet",
+        "inventory",
+        "procurement",
+        "projects",
+        "settings",
+        "support",
+    ]:
+        assert auth.has_module_access(module) is True
+
+
+def test_module_access_infers_from_permission_scope_prefixes():
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=UUID("00000000-0000-0000-0000-000000000002"),
+        organization_id=UUID("00000000-0000-0000-0000-000000000001"),
+        roles=[],
+        scopes=["gl:journals:read", "fleet:vehicles:create", "settings:read"],
+    )
+
+    assert auth.has_module_access("finance") is True
+    assert auth.has_module_access("fleet") is True
+    assert auth.has_module_access("settings") is True
+
+
+def test_collaboration_panel_does_not_eager_load_null_conversation():
+    template = (
+        Path(__file__).resolve().parents[1]
+        / "templates"
+        / "partials"
+        / "_collab_panel.html"
+    ).read_text()
+
+    assert "conversation/null" not in template
+    assert ":hx-get=\"'/collaboration/panel/conversation/' + activeConvId\"" not in template
+    assert "if (activeConvId && collabView === 'conversation')" in template
 
 
 def test_authenticated_admin_without_org_has_no_module_navigation():

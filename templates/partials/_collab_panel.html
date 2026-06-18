@@ -142,8 +142,6 @@
             <!-- Conversation View -->
             <div x-show="collabView === 'conversation'" class="flex h-full flex-col">
                 <div class="flex-1 overflow-y-auto"
-                     :hx-get="'/collaboration/panel/conversation/' + activeConvId"
-                     hx-trigger="load"
                      hx-swap="innerHTML"
                      x-effect="if (activeConvId && collabView === 'conversation') { htmx.ajax('GET', '/collaboration/panel/conversation/' + activeConvId, {target: $el, swap: 'innerHTML'}) }">
                     <div class="flex items-center justify-center py-12">

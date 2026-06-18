@@ -1028,46 +1028,133 @@ class WebAuthContext:
             return []
 
         modules = []
-        scopes_set = set(self.scopes)
+        scopes_set = {s.strip().lower() for s in self.scopes if s and s.strip()}
         roles_set = {r.strip().lower() for r in self.roles if r and r.strip()}
 
-        has_fixed_assets_scope = any(
-            scope == "fa"
-            or scope == "fixed_assets"
-            or scope.startswith("fa:")
-            or scope.startswith("fixed_assets:")
-            for scope in scopes_set
-        )
+        def _has_scope_for(*roots: str) -> bool:
+            return any(
+                scope == root or scope.startswith(f"{root}:")
+                for scope in scopes_set
+                for root in roots
+            )
 
-        if self.is_admin or "finance:access" in scopes_set:
+        has_fixed_assets_scope = _has_scope_for("fa", "fixed_assets")
+        finance_roles = {
+            "finance_director",
+            "finance_manager",
+            "senior_accountant",
+            "accountant",
+            "junior_accountant",
+            "finance_viewer",
+            "ap_clerk",
+            "ar_clerk",
+            "tax_specialist",
+            "auditor",
+        }
+        people_roles = {
+            "hr_manager",
+            "hr_director",
+            "hr_officer",
+            "hr_assistant",
+            "hr_viewer",
+            "payroll_admin",
+            "payroll_manager",
+            "payroll_officer",
+            "payroll_approver",
+            "recruiter",
+            "training_manager",
+            "department_manager",
+            "employee",
+        }
+        expense_roles = {
+            "expense_admin",
+            "expense_approver",
+            "expense_processor",
+            "expense_reviewer",
+            "expense_reimburser",
+            "department_manager",
+        }
+        operations_roles = {"operations_manager"}
+        support_roles = {"operations_manager", "support_agent"}
+        project_roles = {"operations_manager", "support_agent", "department_manager"}
+        settings_roles = {"operator", "operations_manager"}
+
+        if (
+            self.is_admin
+            or _has_scope_for(
+                "finance",
+                "gl",
+                "ar",
+                "ap",
+                "banking",
+                "tax",
+                "lease",
+                "cons",
+                "reports",
+                "rpt",
+                "payments",
+                "ipsas",
+            )
+            or roles_set.intersection(finance_roles)
+        ):
             modules.append("finance")
         # HR/People: allow either scope-based access or named HR roles.
         # Role names come from JWT claims (Role.name in DB, e.g. "hr_manager").
         if (
             self.is_admin
-            or "hr:access" in scopes_set
-            or roles_set.intersection(
-                {"hr_manager", "hr_director", "payroll_admin", "payroll_approver"}
-            )
+            or _has_scope_for("hr", "people", "payroll")
+            or roles_set.intersection(people_roles)
         ):
             modules.append("people")
-        if self.is_admin or "inventory:access" in scopes_set:
+        if (
+            self.is_admin
+            or _has_scope_for("inventory")
+            or roles_set.intersection({"inventory_manager", *operations_roles})
+        ):
             modules.append("inventory")
-        if self.is_admin or "fleet:access" in scopes_set:
+        if (
+            self.is_admin
+            or _has_scope_for("fleet")
+            or roles_set.intersection(operations_roles)
+        ):
             modules.append("fleet")
-        if self.is_admin or "support:access" in scopes_set:
+        if (
+            self.is_admin
+            or _has_scope_for("support")
+            or roles_set.intersection(support_roles)
+        ):
             modules.append("support")
-        if self.is_admin or "procurement:access" in scopes_set:
+        if (
+            self.is_admin
+            or _has_scope_for("procurement")
+            or roles_set.intersection(operations_roles)
+        ):
             modules.append("procurement")
-        if self.is_admin or "projects:access" in scopes_set:
+        if (
+            self.is_admin
+            or _has_scope_for("projects")
+            or roles_set.intersection(project_roles)
+        ):
             modules.append("projects")
-        if self.is_admin or "settings:access" in scopes_set:
+        if (
+            self.is_admin
+            or _has_scope_for("settings")
+            or roles_set.intersection(settings_roles)
+        ):
             modules.append("settings")
-        if self.is_admin or "expense:access" in scopes_set:
+        if (
+            self.is_admin
+            or _has_scope_for("expense")
+            or roles_set.intersection(expense_roles)
+        ):
             modules.append("expense")
-        if self.is_admin or has_fixed_assets_scope:
+        if (
+            self.is_admin
+            or has_fixed_assets_scope
+            or roles_set.intersection(finance_roles)
+        ):
             modules.append("fixed_assets")
-        if self.is_admin or "discipline:access" in scopes_set:
+        if self.is_admin or _has_scope_for("discipline"):
             modules.append("discipline")
         if self.is_admin or scopes_set.intersection(
             {
@@ -1079,9 +1166,9 @@ class WebAuthContext:
             }
         ):
             modules.append("coach")
-        if self.is_admin or "public_sector:access" in scopes_set:
+        if self.is_admin or _has_scope_for("public_sector"):
             modules.append("public_sector")
-        if "self:access" in scopes_set:
+        if _has_scope_for("self"):
             modules.append("self_service")
 
         # Filter by deployment-level enabled modules.
