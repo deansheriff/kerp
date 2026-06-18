@@ -126,15 +126,15 @@ def _ensure_demo_org() -> uuid.UUID:
     return org_id
 
 
-def _get_or_create_by_code(db, model, code_field: str, code: str, **values):
+def _get_or_create_by_code(db, model_cls, code_field: str, code: str, **values):
     instance = db.scalar(
-        select(model).where(
-            model.organization_id == db.info["organization_id"],
-            getattr(model, code_field) == code,
+        select(model_cls).where(
+            model_cls.organization_id == db.info["organization_id"],
+            getattr(model_cls, code_field) == code,
         )
     )
     if instance is None:
-        instance = model(
+        instance = model_cls(
             organization_id=db.info["organization_id"],
             **{code_field: code},
             **values,
