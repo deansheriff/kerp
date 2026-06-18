@@ -72,6 +72,7 @@ from app.services.people.hr.employee_filter_engine import (
 )
 from app.services.people.hr.org_resolver import OrgResolver
 from app.services.people.hr.web.constants import DEFAULT_PAGE_SIZE, DROPDOWN_LIMIT
+from app.services.people.hr.web.location_web import LocationWebService
 from app.services.recent_activity import get_recent_activity_for_record
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
@@ -2721,9 +2722,16 @@ class HRWebService:
         search: str | None = None,
         page: int = 1,
         is_active: bool | None = None,
+        organization_id: str | None = None,
     ) -> HTMLResponse:
         """Render department list page."""
-        org_id = coerce_uuid(auth.organization_id)
+        org_options: list[dict[str, str]] = []
+        selected_org_id = str(auth.organization_id) if auth.organization_id else ""
+        if auth.is_admin:
+            org_options = LocationWebService._active_organization_options(db)
+            if organization_id:
+                selected_org_id = organization_id
+        org_id = coerce_uuid(selected_org_id)
         svc = OrganizationService(db, org_id)
 
         filters = DepartmentFilters(search=search, is_active=is_active)
@@ -2752,6 +2760,9 @@ class HRWebService:
             "limit": pagination.limit,
             "has_prev": result.has_prev,
             "has_next": result.has_next,
+            "show_organization_filter": bool(auth.is_admin),
+            "organization_options": org_options,
+            "selected_organization_id": selected_org_id,
         }
 
         return templates.TemplateResponse(
@@ -2766,9 +2777,13 @@ class HRWebService:
         auth: WebAuthContext,
         db: Session,
         department_id: str | None = None,
+        selected_organization_id: str | None = None,
     ) -> HTMLResponse:
         """Render department form (new or edit)."""
-        org_id = coerce_uuid(auth.organization_id)
+        selected_org_id = selected_organization_id or (
+            str(auth.organization_id) if auth.organization_id else ""
+        )
+        org_id = coerce_uuid(selected_org_id)
         svc = OrganizationService(db, org_id)
         emp_svc = EmployeeService(db, org_id)
 
@@ -2796,6 +2811,11 @@ class HRWebService:
         title = "Edit Department" if department else "New Department"
         context = {
             **base_context(request, auth, title, "departments"),
+            **LocationWebService._branch_form_org_context(
+                db,
+                auth,
+                selected_organization_id=selected_org_id,
+            ),
             "department": department,
             "parent_options": parent_options,
             "employee_options": employee_options,
@@ -2858,9 +2878,16 @@ class HRWebService:
         search: str | None = None,
         page: int = 1,
         limit: int = DEFAULT_PAGE_SIZE,
+        organization_id: str | None = None,
     ) -> HTMLResponse:
         """Render designation list page."""
-        org_id = coerce_uuid(auth.organization_id)
+        org_options: list[dict[str, str]] = []
+        selected_org_id = str(auth.organization_id) if auth.organization_id else ""
+        if auth.is_admin:
+            org_options = LocationWebService._active_organization_options(db)
+            if organization_id:
+                selected_org_id = organization_id
+        org_id = coerce_uuid(selected_org_id)
         svc = OrganizationService(db, org_id)
         page_size = limit if limit in {25, 50, 100, 200} else DEFAULT_PAGE_SIZE
 
@@ -2879,6 +2906,9 @@ class HRWebService:
             "limit": pagination.limit,
             "has_prev": result.has_prev,
             "has_next": result.has_next,
+            "show_organization_filter": bool(auth.is_admin),
+            "organization_options": org_options,
+            "selected_organization_id": selected_org_id,
         }
 
         return templates.TemplateResponse(
@@ -2893,9 +2923,13 @@ class HRWebService:
         auth: WebAuthContext,
         db: Session,
         designation_id: str | None = None,
+        selected_organization_id: str | None = None,
     ) -> HTMLResponse:
         """Render designation form (new or edit)."""
-        org_id = coerce_uuid(auth.organization_id)
+        selected_org_id = selected_organization_id or (
+            str(auth.organization_id) if auth.organization_id else ""
+        )
+        org_id = coerce_uuid(selected_org_id)
         svc = OrganizationService(db, org_id)
 
         designation = None
@@ -2905,6 +2939,11 @@ class HRWebService:
         title = "Edit Designation" if designation else "New Designation"
         context = {
             **base_context(request, auth, title, "designations"),
+            **LocationWebService._branch_form_org_context(
+                db,
+                auth,
+                selected_organization_id=selected_org_id,
+            ),
             "designation": designation,
             "errors": {},
         }

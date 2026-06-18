@@ -9,6 +9,7 @@ from calendar import month_name
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -893,6 +894,7 @@ class FleetWebService:
                 "assignment_types": list(AssignmentType),
                 "locations": [],
                 "employees": [],
+                "suppliers": [],
                 "vehicle": None,
             }
         org_id = coerce_uuid(organization_id)
@@ -903,6 +905,7 @@ class FleetWebService:
             "assignment_types": list(AssignmentType),
             "locations": self._get_locations(org_id),
             "employees": self._get_employees(org_id),
+            "suppliers": [],
             "vehicle": None,
         }
 
@@ -1563,7 +1566,9 @@ class FleetWebService:
         from app.schemas.fleet.vehicle import VehicleCreate
         from app.services.fleet.vehicle_service import VehicleService
 
-        form = await request.form()
+        form = getattr(request.state, "csrf_form", None)
+        if form is None:
+            form = await request.form()
         org_id = coerce_uuid(organization_id)
         try:
             reg_number = str(form.get("registration_number", ""))
@@ -1576,9 +1581,13 @@ class FleetWebService:
                 make=str(form.get("make", "")),
                 model=str(form.get("model", "")),
                 year=int(str(form.get("year", "2024"))),
-                vehicle_type=VehicleType(str(form.get("vehicle_type", "sedan"))),
-                fuel_type=FuelType(str(form.get("fuel_type", "petrol"))),
-                ownership_type=OwnershipType(str(form.get("ownership_type", "owned"))),
+                vehicle_type=VehicleType(
+                    str(form.get("vehicle_type", "SEDAN")).upper()
+                ),
+                fuel_type=FuelType(str(form.get("fuel_type", "PETROL")).upper()),
+                ownership_type=OwnershipType(
+                    str(form.get("ownership_type", "OWNED")).upper()
+                ),
                 color=str(form.get("color", "")) or None,
                 vin=str(form.get("vin_number", "")) or None,
                 engine_number=str(form.get("engine_number", "")) or None,
@@ -1608,16 +1617,17 @@ class FleetWebService:
                 notes=str(form.get("notes", "")) or None,
             )
             svc = VehicleService(db, org_id)
-            vehicle = svc.create(data)
+            svc.create(data)
             db.commit()
             return RedirectResponse(
-                url=f"/fleet/vehicles/{vehicle.vehicle_id}",
+                url="/fleet/vehicles?success=Vehicle+created+successfully",
                 status_code=303,
             )
-        except (ValueError, RuntimeError) as exc:
+        except Exception as exc:
+            db.rollback()
             logger.warning("Vehicle creation failed: %s", exc)
             return RedirectResponse(
-                url=f"/fleet/vehicles/new?error={exc}",
+                url=f"/fleet/vehicles/new?error={quote(str(exc))}",
                 status_code=303,
             )
 

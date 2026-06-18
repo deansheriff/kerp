@@ -14,7 +14,11 @@
 {% endblock %}
 
 {% block header_actions %}
-<a href="/people/hr/departments/new" class="btn btn-primary group">
+{% set new_department_href = "/people/hr/departments/new" %}
+{% if show_organization_filter and selected_organization_id %}
+    {% set new_department_href = "/people/hr/departments/new?organization_id=" ~ selected_organization_id %}
+{% endif %}
+<a href="{{ new_department_href }}" class="btn btn-primary group">
     {{ icon_svg("plus", "h-4 w-4 mr-1.5 transition-transform group-hover:rotate-90") }}
     New Department
 </a>
@@ -29,6 +33,16 @@
         search=search,
         search_placeholder="Search departments..."
     ) %}
+        {% if show_organization_filter %}
+        <div>
+            <label class="form-label text-xs" for="filter-organization_id">Organization</label>
+            <select id="filter-organization_id" name="organization_id" class="form-select w-full" aria-label="Organization" {{ filter_attrs | safe }}>
+                {% for org in organization_options %}
+                <option value="{{ org.id }}" {{ 'selected' if selected_organization_id == org.id }}>{{ org.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
         {{ filter_select_field("is_active", "Status", is_active, [{"value": "true", "label": "Active"}, {"value": "false", "label": "Inactive"}], filter_attrs) }}
     {% endcall %}
 
@@ -91,7 +105,8 @@
         total_pages=total_pages,
         total_count=total_count,
         limit=limit,
-        search=search
+        search=search,
+        filters={"is_active": is_active, "organization_id": selected_organization_id if show_organization_filter else ""}
     ) }}
 
     {% else %}
@@ -104,7 +119,7 @@
         <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto">
             Departments help organize your workforce. Create your first department to get started.
         </p>
-        <a href="/people/hr/departments/new" class="btn btn-primary">
+        <a href="{{ new_department_href }}" class="btn btn-primary">
             {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
             Create Department
         </a>

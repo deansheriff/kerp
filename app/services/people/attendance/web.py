@@ -29,6 +29,7 @@ from app.models.people.hr.employee import Employee, EmployeeStatus
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.people.attendance import AttendanceService
+from app.services.people.hr.web.location_web import LocationWebService
 from app.templates import templates
 from app.web.deps import WebAuthContext, base_context
 
@@ -231,6 +232,7 @@ class AttendanceWebService:
                 "page": result.page,
                 "total_pages": result.total_pages,
                 "total": result.total,
+                "limit": result.limit,
                 "has_prev": result.has_prev,
                 "has_next": result.has_next,
                 "success": success,
@@ -333,9 +335,18 @@ class AttendanceWebService:
         search: str | None,
         is_active: str | None,
         page: int,
+        organization_id: str | None = None,
     ) -> HTMLResponse:
         """Shift type list page."""
-        org_id = coerce_uuid(auth.organization_id)
+        organization_options: list[dict[str, str]] = []
+        selected_organization_id = (
+            str(auth.organization_id) if auth.organization_id else ""
+        )
+        if auth.is_admin:
+            organization_options = LocationWebService._active_organization_options(db)
+            if organization_id:
+                selected_organization_id = organization_id
+        org_id = coerce_uuid(selected_organization_id)
         pagination = PaginationParams.from_page(page, per_page=20)
         svc = AttendanceService(db)
 
@@ -378,6 +389,9 @@ class AttendanceWebService:
                 "total": result.total,
                 "has_prev": result.has_prev,
                 "has_next": result.has_next,
+                "show_organization_filter": bool(auth.is_admin),
+                "organization_options": organization_options,
+                "selected_organization_id": selected_organization_id,
             }
         )
         return templates.TemplateResponse(
@@ -532,7 +546,15 @@ class AttendanceWebService:
         db: Session,
     ) -> HTMLResponse:
         """New shift type form."""
+        selected_org_id = request.query_params.get("organization_id")
         context = base_context(request, auth, "New Shift Type", "attendance", db=db)
+        context.update(
+            LocationWebService._branch_form_org_context(
+                db,
+                auth,
+                selected_organization_id=selected_org_id,
+            )
+        )
         context["request"] = request
         context["form_data"] = {}
         context["form_action"] = "/people/attendance/shifts/new"
@@ -577,7 +599,7 @@ class AttendanceWebService:
         is_active = AttendanceWebService._get_form_str(form, "is_active")
 
         svc = AttendanceService(db)
-        org_id = coerce_uuid(auth.organization_id)
+        org_id = LocationWebService._target_organization_id_from_form(form, auth)
 
         form_data = {
             "shift_code": shift_code,
@@ -594,10 +616,18 @@ class AttendanceWebService:
             "overtime_threshold_hours": overtime_threshold_hours,
             "break_duration_minutes": break_duration_minutes,
             "is_active": is_active,
+            "organization_id": str(org_id),
         }
 
         if not shift_code or not shift_name or not start_time or not end_time:
             context = base_context(request, auth, "New Shift Type", "attendance", db=db)
+            context.update(
+                LocationWebService._branch_form_org_context(
+                    db,
+                    auth,
+                    selected_organization_id=str(org_id),
+                )
+            )
             context["request"] = request
             context["form_data"] = form_data
             context["form_action"] = "/people/attendance/shifts/new"
@@ -646,13 +676,23 @@ class AttendanceWebService:
                 is_active=AttendanceWebService._parse_bool(is_active, False),
             )
             db.commit()
+            redirect_url = "/people/attendance/shifts?success=Record+saved+successfully"
+            if auth.is_admin:
+                redirect_url = f"{redirect_url}&organization_id={org_id}"
             return RedirectResponse(
-                url="/people/attendance/shifts?success=Record+saved+successfully",
+                url=redirect_url,
                 status_code=303,
             )
         except Exception as exc:
             db.rollback()
             context = base_context(request, auth, "New Shift Type", "attendance", db=db)
+            context.update(
+                LocationWebService._branch_form_org_context(
+                    db,
+                    auth,
+                    selected_organization_id=str(org_id),
+                )
+            )
             context["request"] = request
             context["form_data"] = form_data
             context["form_action"] = "/people/attendance/shifts/new"

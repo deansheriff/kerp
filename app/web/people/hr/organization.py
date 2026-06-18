@@ -23,6 +23,7 @@ from app.services.people.hr import (
 )
 from app.services.people.hr.web import hr_web_service
 from app.services.people.hr.web.employee_web import DROPDOWN_LIMIT
+from app.services.people.hr.web.location_web import LocationWebService
 from app.templates import templates
 from app.web.deps import get_db_for_org, WebAuthContext, base_context, require_hr_access
 
@@ -39,6 +40,20 @@ def _form_str(form: Any, key: str) -> str:
     return str(value).strip()
 
 
+def _target_organization_id_from_form(form: Any, auth: WebAuthContext):
+    if auth.is_admin:
+        selected = _form_str(form, "organization_id")
+        if selected:
+            return coerce_uuid(selected)
+    return coerce_uuid(auth.organization_id)
+
+
+def _org_redirect_param(auth: WebAuthContext, org_id: Any) -> str:
+    if auth.is_admin and org_id:
+        return f"&organization_id={org_id}"
+    return ""
+
+
 # =============================================================================
 # Departments
 # =============================================================================
@@ -49,6 +64,7 @@ def list_departments(
     request: Request,
     search: str | None = None,
     is_active: str | None = None,
+    organization_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db_for_org),
@@ -71,6 +87,7 @@ def list_departments(
         search,
         page,
         filter_is_active,
+        organization_id,
     )
 
 
@@ -81,7 +98,10 @@ def new_department_form(
     db: Session = Depends(get_db_for_org),
 ):
     """New department form page."""
-    return hr_web_service.department_form_response(request, auth, db)
+    selected_org_id = request.query_params.get("organization_id")
+    return hr_web_service.department_form_response(
+        request, auth, db, selected_organization_id=selected_org_id
+    )
 
 
 @router.get("/departments/{department_id}/edit", response_class=HTMLResponse)
@@ -132,7 +152,7 @@ async def create_department(
     is_active = _parse_bool(form.get("is_active"), True)
 
     if not department_code or not department_name:
-        org_id = coerce_uuid(auth.organization_id)
+        org_id = _target_organization_id_from_form(form, auth)
         svc = OrganizationService(db, org_id, auth.principal)
         all_depts = svc.list_departments(
             DepartmentFilters(is_active=True),
@@ -140,6 +160,9 @@ async def create_department(
         ).items
         context = {
             **base_context(request, auth, "New Department", "departments"),
+            **LocationWebService._branch_form_org_context(
+                db, auth, selected_organization_id=str(org_id)
+            ),
             "department": SimpleNamespace(
                 department_code=department_code,
                 department_name=department_name,
@@ -164,7 +187,7 @@ async def create_department(
             context,
         )
 
-    org_id = coerce_uuid(auth.organization_id)
+    org_id = _target_organization_id_from_form(form, auth)
     svc = OrganizationService(db, org_id)
 
     data = DepartmentCreateData(
@@ -181,7 +204,11 @@ async def create_department(
     svc.create_department(data)
 
     return RedirectResponse(
-        url="/people/hr/departments?success=Record+saved+successfully", status_code=303
+        url=(
+            "/people/hr/departments?success=Record+saved+successfully"
+            f"{_org_redirect_param(auth, org_id)}"
+        ),
+        status_code=303,
     )
 
 
@@ -272,6 +299,7 @@ async def update_department(
 def list_designations(
     request: Request,
     search: str | None = None,
+    organization_id: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=200),
     auth: WebAuthContext = Depends(require_hr_access),
@@ -279,7 +307,7 @@ def list_designations(
 ):
     """Designation list page."""
     return hr_web_service.list_designations_response(
-        request, auth, db, search, page, limit
+        request, auth, db, search, page, limit, organization_id
     )
 
 
@@ -290,7 +318,10 @@ def new_designation_form(
     db: Session = Depends(get_db_for_org),
 ):
     """New designation form page."""
-    return hr_web_service.designation_form_response(request, auth, db)
+    selected_org_id = request.query_params.get("organization_id")
+    return hr_web_service.designation_form_response(
+        request, auth, db, selected_organization_id=selected_org_id
+    )
 
 
 @router.get("/designations/{designation_id}/edit", response_class=HTMLResponse)
@@ -321,8 +352,12 @@ async def create_designation(
     is_active = _parse_bool(form.get("is_active"), True)
 
     if not designation_code or not designation_name:
+        org_id = _target_organization_id_from_form(form, auth)
         context = {
             **base_context(request, auth, "New Designation", "designations"),
+            **LocationWebService._branch_form_org_context(
+                db, auth, selected_organization_id=str(org_id)
+            ),
             "designation": SimpleNamespace(
                 designation_code=designation_code,
                 designation_name=designation_name,
@@ -341,7 +376,7 @@ async def create_designation(
             context,
         )
 
-    org_id = coerce_uuid(auth.organization_id)
+    org_id = _target_organization_id_from_form(form, auth)
     svc = OrganizationService(db, org_id)
 
     data = DesignationCreateData(
@@ -354,7 +389,10 @@ async def create_designation(
     svc.create_designation(data)
 
     return RedirectResponse(
-        url="/people/hr/designations?success=Record+created+successfully",
+        url=(
+            "/people/hr/designations?success=Record+created+successfully"
+            f"{_org_redirect_param(auth, org_id)}"
+        ),
         status_code=303,
     )
 

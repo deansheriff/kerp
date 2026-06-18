@@ -102,7 +102,7 @@
                     <div>
                         <label for="vin_number" class="form-label">VIN/Chassis Number</label>
                         <input aria-label="1HGBH41JXMN109186" type="text" id="vin_number" name="vin_number"
-                               value="{{ vehicle.vin_number if vehicle else '' }}"
+                               value="{{ vehicle.vin if vehicle else '' }}"
                                placeholder="1HGBH41JXMN109186"
                                class="form-input font-mono">
                     </div>
@@ -125,7 +125,7 @@
                     <div>
                         <label for="current_odometer_km" class="form-label">Current Odometer (km)</label>
                         <input type="number" id="current_odometer_km" name="current_odometer_km"
-                               value="{{ vehicle.current_odometer_km if vehicle else 0 }}"
+                               value="{{ vehicle.current_odometer if vehicle else 0 }}"
                                min="0" step="1"
                                class="form-input">
                     </div>
@@ -161,7 +161,7 @@
                     <div>
                         <label for="acquisition_date" class="form-label">Acquisition Date</label>
                         <input type="date" id="acquisition_date" name="acquisition_date"
-                               value="{{ vehicle.acquisition_date.strftime('%Y-%m-%d') if vehicle and vehicle.acquisition_date else '' }}"
+                               value="{{ vehicle.purchase_date.strftime('%Y-%m-%d') if vehicle and vehicle.purchase_date else '' }}"
                                class="form-input">
                     </div>
                 </div>
@@ -193,7 +193,7 @@
                         <select id="supplier_id" name="supplier_id" class="form-select">
                             <option value="">Select supplier...</option>
                             {% for supplier in suppliers %}
-                            <option value="{{ supplier.supplier_id }}" {{ 'selected' if vehicle and vehicle.supplier_id == supplier.supplier_id else '' }}>
+                            <option value="{{ supplier.supplier_id }}" {{ 'selected' if vehicle and vehicle.vendor_id == supplier.supplier_id else '' }}>
                                 {{ supplier.supplier_name }}
                             </option>
                             {% endfor %}

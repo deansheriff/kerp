@@ -82,6 +82,7 @@ def attendance_shifts(
     request: Request,
     search: str | None = None,
     is_active: str | None = None,
+    organization_id: str | None = None,
     page: int = Query(default=1, ge=1),
     auth: WebAuthContext = Depends(require_hr_access),
     db: Session = Depends(get_db_for_org),
@@ -94,6 +95,7 @@ def attendance_shifts(
         search=search,
         is_active=is_active,
         page=page,
+        organization_id=organization_id,
     )
 
 

@@ -14,7 +14,11 @@
 {% endblock %}
 
 {% block header_actions %}
-<a href="/people/hr/designations/new" class="btn btn-primary">
+{% set new_designation_href = "/people/hr/designations/new" %}
+{% if show_organization_filter and selected_organization_id %}
+    {% set new_designation_href = "/people/hr/designations/new?organization_id=" ~ selected_organization_id %}
+{% endif %}
+<a href="{{ new_designation_href }}" class="btn btn-primary">
     {{ icon_svg("plus", "h-4 w-4 mr-1.5") }}
     New Designation
 </a>
@@ -29,6 +33,16 @@
         search=search,
         search_placeholder="Search designations..."
     ) %}
+        {% if show_organization_filter %}
+        <div>
+            <label class="form-label text-xs" for="filter-organization_id">Organization</label>
+            <select id="filter-organization_id" name="organization_id" class="form-select w-full" aria-label="Organization" {{ filter_attrs | safe }}>
+                {% for org in organization_options %}
+                <option value="{{ org.id }}" {{ 'selected' if selected_organization_id == org.id }}>{{ org.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
     {% endcall %}
 
     <div id="results-container">
@@ -78,7 +92,7 @@
                     <tr>
                         <td colspan="5" class="text-center py-8 text-slate-500">
                             No designations found.
-                            <a href="/people/hr/designations/new" class="text-teal-600 hover:text-teal-700">Create your first designation</a>
+                            <a href="{{ new_designation_href }}" class="text-teal-600 hover:text-teal-700">Create your first designation</a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -92,7 +106,8 @@
             total_pages=total_pages,
             total_count=total_count,
             limit=limit,
-            search=search
+            search=search,
+            filters={"organization_id": selected_organization_id if show_organization_filter else ""}
         ) }}
     </div>
     </div>{# /results-container #}

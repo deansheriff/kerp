@@ -29,6 +29,16 @@
 
     <form method="post" action="{{ form_action | default('/people/attendance/shifts/new') }}" class="card p-6 space-y-6">
         {{ request.state.csrf_form | safe }}
+        {% if show_organization_field and not is_edit %}
+        <div>
+            <label for="organization_id" class="form-label">Organization <span class="text-rose-500">*</span></label>
+            <select id="organization_id" name="organization_id" required class="form-select">
+                {% for org in organization_options %}
+                <option value="{{ org.id }}" {{ 'selected' if selected_organization_id == org.id }}>{{ org.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="form-label">Shift Code <span class="text-rose-500">*</span></label>
