@@ -23,6 +23,16 @@ def _table_exists(connection, table_name, schema="collab"):
     return table_name in insp.get_table_names(schema=schema)
 
 
+def _column_exists(connection, table_name, column_name, schema="collab"):
+    """Check if a column exists in the given table."""
+    insp = sa_inspect(connection)
+    if table_name not in insp.get_table_names(schema=schema):
+        return False
+    return column_name in {
+        column["name"] for column in insp.get_columns(table_name, schema=schema)
+    }
+
+
 def upgrade() -> None:
     # Create schema
     op.execute("CREATE SCHEMA IF NOT EXISTS collab")
@@ -87,9 +97,32 @@ def upgrade() -> None:
             sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
             schema="collab",
         )
+    else:
+        op.execute(
+            "ALTER TABLE collab.conversation "
+            "ADD COLUMN IF NOT EXISTS name VARCHAR(255)"
+        )
+        if _column_exists(conn, "conversation", "title"):
+            op.execute(
+                "UPDATE collab.conversation SET name = title "
+                "WHERE name IS NULL AND title IS NOT NULL"
+            )
+        op.execute(
+            "ALTER TABLE collab.conversation "
+            "ADD COLUMN IF NOT EXISTS avatar_key VARCHAR(500)"
+        )
+        op.execute(
+            "ALTER TABLE collab.conversation "
+            "ADD COLUMN IF NOT EXISTS linked_entity_type VARCHAR(80)"
+        )
+        op.execute(
+            "ALTER TABLE collab.conversation "
+            "ADD COLUMN IF NOT EXISTS linked_entity_id UUID"
+        )
     op.execute("CREATE INDEX IF NOT EXISTS ix_collab_conv_org ON collab.conversation (organization_id)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_collab_conv_org_type ON collab.conversation (organization_id, conversation_type)")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_collab_conv_linked ON collab.conversation (linked_entity_type, linked_entity_id)")
+    if _column_exists(conn, "conversation", "linked_entity_type") and _column_exists(conn, "conversation", "linked_entity_id"):
+        op.execute("CREATE INDEX IF NOT EXISTS ix_collab_conv_linked ON collab.conversation (linked_entity_type, linked_entity_id)")
 
     # conversation_participant
     if not _table_exists(conn, "conversation_participant"):
@@ -113,6 +146,24 @@ def upgrade() -> None:
             sa.Column("unread_count", sa.Integer, nullable=False, server_default="0"),
             sa.UniqueConstraint("conversation_id", "person_id", name="uq_collab_participant"),
             schema="collab",
+        )
+    else:
+        if _column_exists(conn, "conversation_participant", "organization_id"):
+            op.execute(
+                "ALTER TABLE collab.conversation_participant "
+                "ALTER COLUMN organization_id DROP NOT NULL"
+            )
+        op.execute(
+            "ALTER TABLE collab.conversation_participant "
+            "ADD COLUMN IF NOT EXISTS left_at TIMESTAMPTZ"
+        )
+        op.execute(
+            "ALTER TABLE collab.conversation_participant "
+            "ADD COLUMN IF NOT EXISTS last_read_message_id UUID"
+        )
+        op.execute(
+            "ALTER TABLE collab.conversation_participant "
+            "ADD COLUMN IF NOT EXISTS unread_count INTEGER NOT NULL DEFAULT 0"
         )
     op.execute("CREATE INDEX IF NOT EXISTS ix_collab_part_conv ON collab.conversation_participant (conversation_id)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_collab_part_person ON collab.conversation_participant (person_id)")
