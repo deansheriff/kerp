@@ -1013,11 +1013,17 @@ class FleetWebService:
             context.update(
                 {
                     "maintenance_records": [],
-                    "statuses": [s.value for s in MaintenanceStatus],
-                    "maintenance_types": [t.value for t in MaintenanceType],
+                    "records": [],
+                    "vehicles": [],
+                    "statuses": list(MaintenanceStatus),
+                    "maintenance_types": list(MaintenanceType),
+                    "status": status,
+                    "maintenance_type": maintenance_type,
+                    "vehicle_id": vehicle_id,
                     "current_status": status,
                     "current_maintenance_type": maintenance_type,
                     "current_vehicle_id": vehicle_id,
+                    "limit": limit,
                 }
             )
             return context
@@ -1034,6 +1040,10 @@ class FleetWebService:
             maintenance_type=type_filter,
             params=params,
         )
+        records = result.items
+        vehicles = VehicleService(self.db, org_id).list_vehicles(
+            params=PaginationParams(offset=0, limit=500)
+        ).items
 
         active_filters = build_active_filters(
             params={
@@ -1043,14 +1053,21 @@ class FleetWebService:
             }
         )
         return {
-            "maintenance_records": result.items,
+            "maintenance_records": records,
+            "records": records,
+            "vehicles": vehicles,
             "total": result.total,
+            "limit": result.limit,
+            "offset": result.offset,
             "page": result.page,
             "total_pages": result.total_pages,
             "has_next": result.has_next,
             "has_prev": result.has_prev,
-            "statuses": [s.value for s in MaintenanceStatus],
-            "maintenance_types": [t.value for t in MaintenanceType],
+            "statuses": list(MaintenanceStatus),
+            "maintenance_types": list(MaintenanceType),
+            "status": status,
+            "maintenance_type": maintenance_type,
+            "vehicle_id": vehicle_id,
             "current_status": status,
             "current_maintenance_type": maintenance_type,
             "current_vehicle_id": vehicle_id,

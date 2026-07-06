@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -117,6 +118,25 @@ def _stub_salary_structure_lookup(
     return salary_structure
 
 
+def test_employee_update_permission_helper_allows_update_permission(person):
+    auth = _make_auth(person.id, person.organization_id, ["hr:employees:update"])
+
+    assert HRWebService._can_update_employee(auth)
+
+
+def test_employee_templates_gate_edit_links_on_update_permission():
+    root = Path(__file__).resolve().parents[3]
+    detail_template = (
+        root / "templates" / "people" / "hr" / "employee_detail.html"
+    ).read_text()
+    list_template = (
+        root / "templates" / "people" / "hr" / "employees.html"
+    ).read_text()
+
+    assert "{% if can_update_employee %}" in detail_template
+    assert list_template.count("{% if can_update_employee %}") >= 2
+
+
 @pytest.mark.asyncio
 async def test_update_employee_response_updates_linked_person_with_people_write(
     db_session, person, monkeypatch
@@ -221,13 +241,14 @@ async def test_update_employee_response_uses_request_form_when_csrf_state_is_htm
 
 
 @pytest.mark.asyncio
-async def test_update_employee_response_keeps_linked_person_read_only_without_people_write(
+async def test_update_employee_response_rejects_without_update_permission(
     db_session, person, monkeypatch
 ):
     service = HRWebService()
     employee_id = uuid4()
     employee = SimpleNamespace(employee_id=employee_id, person_id=person.id)
     original_email = person.email
+    captured: dict[str, object] = {}
 
     monkeypatch.setattr(
         "app.services.people.hr.web.employee_web.EmployeeService.get_employee",
@@ -235,7 +256,7 @@ async def test_update_employee_response_keeps_linked_person_read_only_without_pe
     )
     monkeypatch.setattr(
         "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
-        lambda self, _employee_id, _data: employee,
+        lambda self, _employee_id, _data: captured.setdefault("updated", True),
     )
     monkeypatch.setattr(
         HRWebService,
@@ -261,6 +282,8 @@ async def test_update_employee_response_keeps_linked_person_read_only_without_pe
 
     stored = db_session.get(Person, person.id)
     assert response.status_code == 303
+    assert response.headers["location"].endswith("?error=not_authorized")
+    assert "updated" not in captured
     assert stored is not None
     assert stored.first_name == person.first_name
     assert stored.email == original_email
@@ -745,7 +768,7 @@ async def test_update_employee_response_persists_nysc_dates(
             "nysc_end_date": "2026-11-10",
         }
     )
-    auth = _make_auth(person.id, person.organization_id, [])
+    auth = _make_auth(person.id, person.organization_id, ["hr:employees:update"])
 
     response = await service.update_employee_response(
         request=request,
@@ -792,7 +815,7 @@ async def test_update_employee_response_ignores_terminal_status_from_edit_form(
     )
 
     request = _make_request({"status": "TERMINATED"})
-    auth = _make_auth(person.id, person.organization_id, [])
+    auth = _make_auth(person.id, person.organization_id, ["hr:employees:update"])
 
     response = await service.update_employee_response(
         request=request,
@@ -840,7 +863,7 @@ async def test_update_employee_response_does_not_reload_employee_after_commit(
     )
 
     request = _make_request({})
-    auth = _make_auth(person.id, person.organization_id, [])
+    auth = _make_auth(person.id, person.organization_id, ["hr:employees:update"])
 
     response = await service.update_employee_response(
         request=request,
@@ -890,7 +913,7 @@ async def test_update_employee_response_requires_nysc_dates_for_nysc_designation
             "nysc_end_date": "",
         }
     )
-    auth = _make_auth(person.id, person.organization_id, [])
+    auth = _make_auth(person.id, person.organization_id, ["hr:employees:update"])
 
     response = await service.update_employee_response(
         request=request,

@@ -14,10 +14,12 @@
 {% endblock %}
 
 {% block header_actions %}
+{% if can_update_employee %}
 <a href="/people/hr/employees/{{ employee.employee_id }}/edit" class="btn btn-secondary">
     {{ icon_svg("edit", "h-4 w-4 mr-1.5") }}
     Edit
 </a>
+{% endif %}
 {% if user and user.is_admin %}
 <form method="post" action="/people/hr/employees/bulk-delete" class="inline-block">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

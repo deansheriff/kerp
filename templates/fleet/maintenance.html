@@ -31,7 +31,7 @@
                     {{ icon_svg("clock") }}
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ records|selectattr('status', 'equalto', 'scheduled')|list|length }}</p>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ records|selectattr('status', 'equalto', 'SCHEDULED')|list|length }}</p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">Scheduled</p>
                 </div>
             </div>
@@ -42,7 +42,7 @@
                     {{ icon_svg("cog") }}
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ records|selectattr('status', 'equalto', 'in_progress')|list|length }}</p>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ records|selectattr('status', 'equalto', 'IN_PROGRESS')|list|length }}</p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">In Progress</p>
                 </div>
             </div>
@@ -53,7 +53,7 @@
                     {{ icon_svg("check-circle") }}
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ records|selectattr('status', 'equalto', 'completed')|list|length }}</p>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white font-display">{{ records|selectattr('status', 'equalto', 'COMPLETED')|list|length }}</p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">Completed</p>
                 </div>
             </div>
@@ -81,7 +81,7 @@
             <select aria-label="Filter by status" name="status" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Status</option>
                 {% for s in statuses %}
-                <option value="{{ s.value }}" {{ 'selected' if status == s.value else '' }}>{{ s.value | replace('_', ' ') | title }}</option>
+                <option value="{{ s.value }}" {{ 'selected' if current_status == s.value else '' }}>{{ s.value | replace('_', ' ') | title }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -89,7 +89,7 @@
             <select aria-label="Filter by maintenance type" name="maintenance_type" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Types</option>
                 {% for mt in maintenance_types %}
-                <option value="{{ mt.value }}" {{ 'selected' if maintenance_type == mt.value else '' }}>{{ mt.value | replace('_', ' ') | title }}</option>
+                <option value="{{ mt.value }}" {{ 'selected' if current_maintenance_type == mt.value else '' }}>{{ mt.value | replace('_', ' ') | title }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -97,7 +97,7 @@
             <select aria-label="Filter by vehicle" name="vehicle_id" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Vehicles</option>
                 {% for v in vehicles %}
-                <option value="{{ v.vehicle_id }}" {{ 'selected' if vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
+                <option value="{{ v.vehicle_id }}" {{ 'selected' if current_vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -121,11 +121,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for record in records %}
+                    {% for record in maintenance_records %}
                     <tr class="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td>
                             <a href="/fleet/vehicles/{{ record.vehicle_id }}" class="font-mono text-sm font-semibold text-teal-600 hover:text-teal-700 dark:text-teal-400">
-                                {{ record.vehicle.registration_number }}
+                                {{ record.vehicle.registration_number if record.vehicle else record.vehicle_id }}
                             </a>
                         </td>
                         <td>
@@ -150,7 +150,7 @@
                         </td>
                         <td>{{ status_badge(record.status, 'sm') }}</td>
                         <td class="text-right">
-                            {{ action_buttons(view_href="/fleet/maintenance/" ~ record.record_id) }}
+                            {{ action_buttons(view_href="/fleet/maintenance/" ~ record.maintenance_id) }}
                         </td>
                     </tr>
                     {% else %}

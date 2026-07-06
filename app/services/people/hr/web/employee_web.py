@@ -505,6 +505,11 @@ class HRWebService:
             ]
         )
 
+    @staticmethod
+    def _can_update_employee(auth: WebAuthContext) -> bool:
+        """Return True when the user can update employee records."""
+        return auth.has_any_permission(["people:write", "hr:employees:update"])
+
     def list_employees_response(
         self,
         request: Request,
@@ -708,6 +713,7 @@ class HRWebService:
             "success": success,
             "error": error,
             "active_filters": active_filters,
+            "can_update_employee": self._can_update_employee(auth),
         }
 
         return templates.TemplateResponse(
@@ -1424,6 +1430,12 @@ class HRWebService:
     ) -> RedirectResponse | HTMLResponse:
         """Handle employee update form submission."""
         org_id = coerce_uuid(auth.organization_id)
+        if not self._can_update_employee(auth):
+            return RedirectResponse(
+                url=f"/people/hr/employees/{employee_id}?error=not_authorized",
+                status_code=303,
+            )
+
         svc = EmployeeService(db, org_id)
         employee = svc.get_employee(coerce_uuid(employee_id))
 
@@ -2277,6 +2289,7 @@ class HRWebService:
             "assigned_assets": assigned_assets,
             "can_view_assigned_assets": can_view_assigned_assets,
             "can_manage_final_payroll": self._can_manage_final_payroll(auth),
+            "can_update_employee": self._can_update_employee(auth),
         }
 
     def employee_detail_response(
@@ -2571,9 +2584,15 @@ class HRWebService:
         error: str | None = None,
         form_data: dict | None = None,
         errors: dict | None = None,
-    ) -> HTMLResponse:
+    ) -> HTMLResponse | RedirectResponse:
         """Render edit employee form."""
         org_id = coerce_uuid(auth.organization_id)
+        if not self._can_update_employee(auth):
+            return RedirectResponse(
+                url=f"/people/hr/employees/{employee_id}?error=not_authorized",
+                status_code=303,
+            )
+
         svc = EmployeeService(db, org_id)
         org_svc = OrganizationService(db, org_id)
 
@@ -2685,6 +2704,7 @@ class HRWebService:
             **base_context(request, auth, "Edit Employee", "employees"),
             "employee": employee,
             "person": person,
+            "can_update_employee": self._can_update_employee(auth),
             "can_edit_person": self._can_edit_employee_person(auth),
             "can_edit_tax": auth.has_permission("people:write"),
             "departments": departments,
