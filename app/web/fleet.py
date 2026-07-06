@@ -61,6 +61,30 @@ def _can_update_maintenance(auth: WebAuthContext) -> bool:
     )
 
 
+def _can_create_fuel(auth: WebAuthContext) -> bool:
+    return auth.has_permission("fleet:fuel:create") or _has_fleet_role(
+        auth, "operations_manager", "fleet_manager"
+    )
+
+
+def _can_update_fuel(auth: WebAuthContext) -> bool:
+    return auth.has_permission("fleet:fuel:update") or _has_fleet_role(
+        auth, "operations_manager", "fleet_manager"
+    )
+
+
+def _can_create_document(auth: WebAuthContext) -> bool:
+    return auth.has_permission("fleet:documents:create") or _has_fleet_role(
+        auth, "operations_manager", "fleet_manager"
+    )
+
+
+def _can_update_document(auth: WebAuthContext) -> bool:
+    return auth.has_permission("fleet:documents:update") or _has_fleet_role(
+        auth, "operations_manager", "fleet_manager"
+    )
+
+
 # =============================================================================
 # Dashboard
 # =============================================================================
@@ -680,6 +704,8 @@ def fuel_list(
 ):
     """List fuel log entries."""
     context = base_context(request, auth, "Fuel Logs", "fleet", db=db)
+    context["can_create_fuel"] = _can_create_fuel(auth)
+    context["can_update_fuel"] = _can_update_fuel(auth)
     web_service = FleetWebService(db)
     context.update(
         web_service.fuel_list_context(
@@ -700,6 +726,8 @@ def fuel_new(
     db: Session = Depends(get_db_for_org),
 ):
     """New fuel log entry form."""
+    if not _can_create_fuel(auth):
+        return RedirectResponse(url="/fleet/fuel?error=not_authorized", status_code=303)
     context = base_context(request, auth, "Record Fuel Purchase", "fleet", db=db)
     web_service = FleetWebService(db)
     context.update(
@@ -715,8 +743,48 @@ async def fuel_create(
     db: Session = Depends(get_db_for_org),
 ):
     """Create fuel log from form submission."""
+    if not _can_create_fuel(auth):
+        return RedirectResponse(url="/fleet/fuel?error=not_authorized", status_code=303)
     web_service = FleetWebService(db)
     return await web_service.create_entity_response(request, auth, db, "fuel")
+
+
+@router.get("/fuel/{log_id}/edit", response_class=HTMLResponse)
+def fuel_edit(
+    request: Request,
+    log_id: UUID,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Edit fuel log entry form."""
+    if not _can_update_fuel(auth):
+        return RedirectResponse(url="/fleet/fuel?error=not_authorized", status_code=303)
+    context = base_context(request, auth, "Edit Fuel Log", "fleet", db=db)
+    web_service = FleetWebService(db)
+    try:
+        context.update(web_service.fuel_form_context(auth.organization_id, log_id=log_id))
+        return templates.TemplateResponse(request, "fleet/fuel_form.html", context)
+    except NotFoundError:
+        return RedirectResponse(url="/fleet/fuel?error=not_found", status_code=303)
+
+
+@router.post("/fuel/{log_id}/edit")
+async def fuel_update(
+    request: Request,
+    log_id: UUID,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Handle fuel log updates."""
+    if not _can_update_fuel(auth):
+        return RedirectResponse(url="/fleet/fuel?error=not_authorized", status_code=303)
+    web_service = FleetWebService(db)
+    return await web_service.update_fuel_response(
+        request,
+        auth.organization_id,
+        log_id,
+        db,
+    )
 
 
 @router.get("/expense-claims/search")
@@ -926,6 +994,8 @@ def document_list(
 ):
     """List documents."""
     context = base_context(request, auth, "Documents", "fleet", db=db)
+    context["can_create_document"] = _can_create_document(auth)
+    context["can_update_document"] = _can_update_document(auth)
     web_service = FleetWebService(db)
     context.update(
         web_service.document_list_context(
@@ -949,6 +1019,10 @@ def document_new(
     db: Session = Depends(get_db_for_org),
 ):
     """New document form."""
+    if not _can_create_document(auth):
+        return RedirectResponse(
+            url="/fleet/documents?error=not_authorized", status_code=303
+        )
     context = base_context(request, auth, "Add Document", "fleet", db=db)
     web_service = FleetWebService(db)
     context.update(
@@ -964,8 +1038,60 @@ async def document_create(
     db: Session = Depends(get_db_for_org),
 ):
     """Create document from form submission."""
+    if not _can_create_document(auth):
+        return RedirectResponse(
+            url="/fleet/documents?error=not_authorized", status_code=303
+        )
     web_service = FleetWebService(db)
     return await web_service.create_entity_response(request, auth, db, "document")
+
+
+@router.get("/documents/{document_id}/edit", response_class=HTMLResponse)
+def document_edit(
+    request: Request,
+    document_id: UUID,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Edit vehicle document form."""
+    if not _can_update_document(auth):
+        return RedirectResponse(
+            url=f"/fleet/documents/{document_id}?error=not_authorized",
+            status_code=303,
+        )
+    context = base_context(request, auth, "Edit Document", "fleet", db=db)
+    web_service = FleetWebService(db)
+    try:
+        context.update(
+            web_service.document_form_context(
+                auth.organization_id, document_id=document_id
+            )
+        )
+        return templates.TemplateResponse(request, "fleet/document_form.html", context)
+    except NotFoundError:
+        return RedirectResponse(url="/fleet/documents?error=not_found", status_code=303)
+
+
+@router.post("/documents/{document_id}/edit")
+async def document_update(
+    request: Request,
+    document_id: UUID,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Handle vehicle document updates."""
+    if not _can_update_document(auth):
+        return RedirectResponse(
+            url=f"/fleet/documents/{document_id}?error=not_authorized",
+            status_code=303,
+        )
+    web_service = FleetWebService(db)
+    return await web_service.update_document_response(
+        request,
+        auth.organization_id,
+        document_id,
+        db,
+    )
 
 
 @router.get("/documents/{document_id}", response_class=HTMLResponse)
@@ -977,6 +1103,7 @@ def document_detail(
 ):
     """Document detail view."""
     context = base_context(request, auth, "Document Details", "fleet", db=db)
+    context["can_update_document"] = _can_update_document(auth)
     web_service = FleetWebService(db)
     try:
         context.update(

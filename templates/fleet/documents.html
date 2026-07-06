@@ -15,10 +15,12 @@
 {% endblock %}
 
 {% block header_actions %}
+{% if can_create_document %}
 <a href="/fleet/documents/new" class="btn btn-primary">
     {{ icon_svg("plus", "h-4 w-4 mr-2") }}
     Add Document
 </a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -81,7 +83,7 @@
             <select aria-label="Filter by document type" name="document_type" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Types</option>
                 {% for dt in document_types %}
-                <option value="{{ dt }}" {{ 'selected' if document_type == dt else '' }}>{{ dt | replace('_', ' ') | title }}</option>
+                <option value="{{ dt }}" {{ 'selected' if current_type == dt else '' }}>{{ dt | replace('_', ' ') | title }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -89,7 +91,7 @@
             <select aria-label="Filter by vehicle" name="vehicle_id" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Vehicles</option>
                 {% for v in vehicles %}
-                <option value="{{ v.vehicle_id }}" {{ 'selected' if vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
+                <option value="{{ v.vehicle_id }}" {{ 'selected' if current_vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -152,7 +154,7 @@
                         <td class="text-right">
                             {{ action_buttons(
                                 view_href="/fleet/documents/" ~ doc.document_id,
-                                edit_href="/fleet/documents/" ~ doc.document_id ~ "/edit"
+                                edit_href=("/fleet/documents/" ~ doc.document_id ~ "/edit") if can_update_document else none
                             ) }}
                         </td>
                     </tr>
@@ -165,10 +167,12 @@
                                 </div>
                                 <h3 class="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-1">No documents</h3>
                                 <p class="text-sm text-slate-500 dark:text-slate-400">Add your first vehicle document</p>
+                                {% if can_create_document %}
                                 <a href="/fleet/documents/new" class="btn btn-primary mt-4">
                                     {{ icon_svg("plus", "h-4 w-4 mr-2") }}
                                     Add Document
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

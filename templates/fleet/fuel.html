@@ -15,10 +15,12 @@
 {% endblock %}
 
 {% block header_actions %}
+{% if can_create_fuel %}
 <a href="/fleet/fuel/new" class="btn btn-primary">
     {{ icon_svg("plus", "h-4 w-4 mr-2") }}
     Record Fuel
 </a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -36,7 +38,7 @@
             <select aria-label="Filter by vehicle" name="vehicle_id" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Vehicles</option>
                 {% for v in vehicles %}
-                <option value="{{ v.vehicle_id }}" {{ 'selected' if vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
+                <option value="{{ v.vehicle_id }}" {{ 'selected' if current_vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -61,10 +63,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for log in logs %}
+                    {% for log in fuel_logs %}
                     <tr class="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td class="text-sm text-slate-600 dark:text-slate-300">
-                            {{ log.fuel_date | format_date }}
+                            {{ log.log_date | format_date }}
                         </td>
                         <td>
                             <a href="/fleet/vehicles/{{ log.vehicle_id }}" class="font-mono text-sm font-semibold text-teal-600 hover:text-teal-700 dark:text-teal-400">
@@ -84,10 +86,12 @@
                             {{ "{:,.0f}".format(log.odometer_km) }} km
                         </td>
                         <td class="text-sm text-slate-600 dark:text-slate-300">
-                            {{ log.fuel_station or '-' }}
+                            {{ log.station_name or '-' }}
                         </td>
                         <td class="text-right">
-                            {{ action_buttons(edit_href="/fleet/fuel/" ~ log.fuel_log_id ~ "/edit") }}
+                            {{ action_buttons(
+                                edit_href=("/fleet/fuel/" ~ log.fuel_log_id ~ "/edit") if can_update_fuel else none
+                            ) }}
                         </td>
                     </tr>
                     {% else %}
@@ -99,10 +103,12 @@
                                 </div>
                                 <h3 class="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-1">No fuel records</h3>
                                 <p class="text-sm text-slate-500 dark:text-slate-400">Record your first fuel purchase</p>
+                                {% if can_create_fuel %}
                                 <a href="/fleet/fuel/new" class="btn btn-primary mt-4">
                                     {{ icon_svg("plus", "h-4 w-4 mr-2") }}
                                     Record Fuel
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

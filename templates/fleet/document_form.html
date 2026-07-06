@@ -1,7 +1,7 @@
 {% extends "modules/base_modules.html" %}
 {% from "components/macros.html" import icon_svg %}
 
-{% block page_title %}Add Document{% endblock %}
+{% block page_title %}{{ 'Edit Document' if is_edit else 'Add Document' }}{% endblock %}
 
 {% block breadcrumbs %}
 <nav class="text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
@@ -9,14 +9,14 @@
         <li><a href="/fleet" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Fleet</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/fleet" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Fleet</a></li>
         <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <a href="/fleet/documents" class="hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Documents</a></li>
-        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">Add</span></li>
+        <li class="flex items-center gap-2">{{ icon_svg("chevron-right", "h-4 w-4") }} <span class="font-medium text-slate-900 dark:text-white" aria-current="page">{{ 'Edit' if is_edit else 'Add' }}</span></li>
     </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
-    <form method="POST" action="/fleet/documents/new" class="space-y-6">
+    <form method="POST" action="{{ form_action }}" class="space-y-6">
         {{ request.state.csrf_form | safe }}
         <!-- Vehicle & Type -->
         <div class="card">
@@ -27,7 +27,7 @@
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <label for="vehicle_id" class="form-label">Vehicle <span class="text-rose-500">*</span></label>
-                        <select id="vehicle_id" name="vehicle_id" required class="form-select">
+                        <select id="vehicle_id" name="vehicle_id" required class="form-select" {% if is_edit %}disabled{% endif %}>
                             <option value="">Select vehicle...</option>
                             {% for v in vehicles %}
                             <option value="{{ v.vehicle_id }}" {{ 'selected' if selected_vehicle_id and selected_vehicle_id|string == v.vehicle_id|string else '' }}>
@@ -41,7 +41,7 @@
                         <select id="document_type" name="document_type" required class="form-select">
                             <option value="">Select type...</option>
                             {% for dt in document_types %}
-                            <option value="{{ dt }}">{{ dt | replace('_', ' ') | title }}</option>
+                            <option value="{{ dt }}" {{ 'selected' if selected_document_type == dt else '' }}>{{ dt | replace('_', ' ') | title }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -52,12 +52,14 @@
                         <label for="document_number" class="form-label">Document Number</label>
                         <input aria-label="Policy/certificate number" type="text" id="document_number" name="document_number"
                                placeholder="Policy/certificate number"
+                               value="{{ document.document_number if document and document.document_number else '' }}"
                                class="form-input font-mono">
                     </div>
                     <div>
                         <label for="description" class="form-label">Description <span class="text-rose-500">*</span></label>
                         <input aria-label="Brief description" type="text" id="description" name="description" required
                                placeholder="Brief description"
+                               value="{{ document.description if document else '' }}"
                                class="form-input">
                     </div>
                 </div>
@@ -73,11 +75,11 @@
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <label for="issue_date" class="form-label">Issue Date</label>
-                        <input type="date" id="issue_date" name="issue_date" class="form-input">
+                        <input type="date" id="issue_date" name="issue_date" class="form-input" value="{{ document.issue_date.isoformat() if document and document.issue_date else '' }}">
                     </div>
                     <div>
                         <label for="expiry_date" class="form-label">Expiry Date</label>
-                        <input type="date" id="expiry_date" name="expiry_date" class="form-input">
+                        <input type="date" id="expiry_date" name="expiry_date" class="form-input" value="{{ document.expiry_date.isoformat() if document and document.expiry_date else '' }}">
                     </div>
                 </div>
 
@@ -86,12 +88,14 @@
                         <label for="provider_name" class="form-label">Provider / Issuing Authority</label>
                         <input aria-label="Insurance company, authority name" type="text" id="provider_name" name="provider_name"
                                placeholder="Insurance company, authority name"
+                               value="{{ document.provider_name if document and document.provider_name else '' }}"
                                class="form-input">
                     </div>
                     <div>
                         <label for="policy_number" class="form-label">Policy Number</label>
                         <input aria-label="Insurance policy number" type="text" id="policy_number" name="policy_number"
                                placeholder="Insurance policy number"
+                               value="{{ document.policy_number if document and document.policy_number else '' }}"
                                class="form-input font-mono">
                     </div>
                 </div>
@@ -101,12 +105,14 @@
                         <label for="coverage_amount" class="form-label">Coverage Amount</label>
                         <input aria-label="0.00" type="number" id="coverage_amount" name="coverage_amount"
                                min="0" step="0.01" placeholder="0.00"
+                               value="{{ document.coverage_amount if document and document.coverage_amount is not none else '' }}"
                                class="form-input">
                     </div>
                     <div>
                         <label for="premium_amount" class="form-label">Premium Amount</label>
                         <input aria-label="0.00" type="number" id="premium_amount" name="premium_amount"
                                min="0" step="0.01" placeholder="0.00"
+                               value="{{ document.premium_amount if document and document.premium_amount is not none else '' }}"
                                class="form-input">
                     </div>
                 </div>
@@ -114,7 +120,7 @@
                 <div>
                     <label for="reminder_days_before" class="form-label">Reminder Days Before Expiry</label>
                     <input type="number" id="reminder_days_before" name="reminder_days_before"
-                           value="30" min="1" max="365"
+                           value="{{ document.reminder_days_before if document else 30 }}" min="1" max="365"
                            class="form-input w-32">
                 </div>
             </div>
@@ -128,7 +134,7 @@
             <div class="p-4">
                 <textarea aria-label="Additional notes..." id="notes" name="notes" rows="3"
                           placeholder="Additional notes..."
-                          class="form-textarea"></textarea>
+                          class="form-textarea">{{ document.notes if document and document.notes else '' }}</textarea>
             </div>
         </div>
 
@@ -137,7 +143,7 @@
             <a href="/fleet/documents" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-primary">
                 {{ icon_svg("check", "h-4 w-4 mr-2") }}
-                Add Document
+                {{ 'Save Document' if is_edit else 'Add Document' }}
             </button>
         </div>
     </form>

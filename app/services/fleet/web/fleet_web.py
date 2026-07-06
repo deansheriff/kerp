@@ -1167,14 +1167,18 @@ class FleetWebService:
             context.update(
                 {
                     "fuel_logs": [],
+                    "logs": [],
+                    "vehicles": [],
                     "monthly_summary": [],
                     "fuel_types": [f.value for f in FuelType],
+                    "vehicle_id": vehicle_id,
                     "current_vehicle_id": vehicle_id,
                 }
             )
             return context
         org_id = coerce_uuid(organization_id)
         service = FuelService(self.db, org_id)
+        vehicle_service = VehicleService(self.db, org_id)
 
         params = PaginationParams(offset=offset, limit=limit)
         result = service.list_logs(
@@ -1184,12 +1188,18 @@ class FleetWebService:
 
         # Get monthly summary
         monthly_summary = service.get_monthly_summary(vehicle_id=vehicle_id)
+        vehicles = vehicle_service.list_vehicles(
+            include_disposed=False,
+            params=PaginationParams(limit=200),
+        ).items
 
         active_filters = build_active_filters(
             params={"vehicle_id": str(vehicle_id) if vehicle_id else None}
         )
         return {
             "fuel_logs": result.items,
+            "logs": result.items,
+            "vehicles": vehicles,
             "total": result.total,
             "page": result.page,
             "total_pages": result.total_pages,
@@ -1197,6 +1207,7 @@ class FleetWebService:
             "has_prev": result.has_prev,
             "monthly_summary": monthly_summary[:6],
             "fuel_types": [f.value for f in FuelType],
+            "vehicle_id": vehicle_id,
             "current_vehicle_id": vehicle_id,
             "active_filters": active_filters,
         }
@@ -1206,16 +1217,25 @@ class FleetWebService:
         organization_id: UUID,
         *,
         vehicle_id: UUID | None = None,
+        log_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """Build context for fuel log create form."""
+        """Build context for fuel log create/edit form."""
         if not self._fleet_tables_ready():
             return {
                 "vehicles": [],
                 "fuel_types": [f.value for f in FuelType],
                 "selected_vehicle_id": vehicle_id,
+                "selected_fuel_type": "",
+                "log": None,
+                "form_action": "/fleet/fuel/new",
+                "is_edit": False,
             }
         org_id = coerce_uuid(organization_id)
         vehicle_service = VehicleService(self.db, org_id)
+        log = None
+        if log_id:
+            log = FuelService(self.db, org_id).get_or_raise(coerce_uuid(log_id))
+            vehicle_id = log.vehicle_id
 
         vehicles_result = vehicle_service.list_vehicles(
             status=VehicleStatus.ACTIVE,
@@ -1226,6 +1246,16 @@ class FleetWebService:
             "vehicles": vehicles_result.items,
             "fuel_types": [f.value for f in FuelType],
             "selected_vehicle_id": vehicle_id,
+            "selected_fuel_type": log.fuel_type.value
+            if log and getattr(log.fuel_type, "value", None)
+            else str(log.fuel_type)
+            if log and log.fuel_type
+            else "",
+            "log": log,
+            "form_action": f"/fleet/fuel/{log_id}/edit"
+            if log_id
+            else "/fleet/fuel/new",
+            "is_edit": bool(log_id),
         }
 
     # ─────────────────────────────────────────────────────────────
@@ -1249,9 +1279,13 @@ class FleetWebService:
                 {
                     "incidents": [],
                     "cost_summary": {},
+                    "vehicles": [],
                     "statuses": [s.value for s in IncidentStatus],
                     "incident_types": [t.value for t in IncidentType],
                     "severities": [s.value for s in IncidentSeverity],
+                    "status": status,
+                    "severity": severity,
+                    "vehicle_id": vehicle_id,
                     "current_status": status,
                     "current_severity": severity,
                     "current_vehicle_id": vehicle_id,
@@ -1260,6 +1294,7 @@ class FleetWebService:
             return context
         org_id = coerce_uuid(organization_id)
         service = IncidentService(self.db, org_id)
+        vehicle_service = VehicleService(self.db, org_id)
 
         status_filter = IncidentStatus(status) if status else None
         severity_filter = IncidentSeverity(severity) if severity else None
@@ -1274,6 +1309,10 @@ class FleetWebService:
 
         # Get cost summary
         cost_summary = service.get_cost_summary(vehicle_id=vehicle_id)
+        vehicles = vehicle_service.list_vehicles(
+            include_disposed=False,
+            params=PaginationParams(limit=200),
+        ).items
 
         active_filters = build_active_filters(
             params={
@@ -1290,9 +1329,13 @@ class FleetWebService:
             "has_next": result.has_next,
             "has_prev": result.has_prev,
             "cost_summary": cost_summary,
+            "vehicles": vehicles,
             "statuses": [s.value for s in IncidentStatus],
             "incident_types": [t.value for t in IncidentType],
             "severities": [s.value for s in IncidentSeverity],
+            "status": status,
+            "severity": severity,
+            "vehicle_id": vehicle_id,
             "current_status": status,
             "current_severity": severity,
             "current_vehicle_id": vehicle_id,
@@ -1373,6 +1416,8 @@ class FleetWebService:
                     "pending_count": 0,
                     "pool_vehicles": [],
                     "statuses": [s.value for s in ReservationStatus],
+                    "status": status,
+                    "vehicle_id": vehicle_id,
                     "current_status": status,
                     "current_vehicle_id": vehicle_id,
                 }
@@ -1417,6 +1462,8 @@ class FleetWebService:
             "pending_count": len(pending),
             "pool_vehicles": pool_vehicles.items,
             "statuses": [s.value for s in ReservationStatus],
+            "status": status,
+            "vehicle_id": vehicle_id,
             "current_status": status,
             "current_vehicle_id": vehicle_id,
             "active_filters": active_filters,
@@ -1487,9 +1534,12 @@ class FleetWebService:
             context.update(
                 {
                     "documents": [],
+                    "vehicles": [],
                     "expiring_count": 0,
                     "expired_count": 0,
                     "document_types": [t.value for t in DocumentType],
+                    "document_type": document_type,
+                    "vehicle_id": vehicle_id,
                     "current_type": document_type,
                     "current_vehicle_id": vehicle_id,
                 }
@@ -1535,6 +1585,8 @@ class FleetWebService:
             "expired_count": len(expired),
             "vehicles": vehicles_result.items,
             "document_types": [t.value for t in DocumentType],
+            "document_type": document_type,
+            "vehicle_id": vehicle_id,
             "current_type": document_type,
             "current_vehicle_id": vehicle_id,
             "active_filters": active_filters,
@@ -1545,16 +1597,27 @@ class FleetWebService:
         organization_id: UUID,
         *,
         vehicle_id: UUID | None = None,
+        document_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """Build context for document create form."""
+        """Build context for document create/edit form."""
         if not self._fleet_tables_ready():
             return {
                 "vehicles": [],
                 "document_types": [t.value for t in DocumentType],
                 "selected_vehicle_id": vehicle_id,
+                "selected_document_type": "",
+                "document": None,
+                "form_action": "/fleet/documents/new",
+                "is_edit": False,
             }
         org_id = coerce_uuid(organization_id)
         vehicle_service = VehicleService(self.db, org_id)
+        document = None
+        if document_id:
+            document = DocumentService(self.db, org_id).get_or_raise(
+                coerce_uuid(document_id)
+            )
+            vehicle_id = document.vehicle_id
 
         vehicles_result = vehicle_service.list_vehicles(
             include_disposed=False,
@@ -1565,6 +1628,16 @@ class FleetWebService:
             "vehicles": vehicles_result.items,
             "document_types": [t.value for t in DocumentType],
             "selected_vehicle_id": vehicle_id,
+            "selected_document_type": document.document_type.value
+            if document and getattr(document.document_type, "value", None)
+            else str(document.document_type)
+            if document and document.document_type
+            else "",
+            "document": document,
+            "form_action": f"/fleet/documents/{document_id}/edit"
+            if document_id
+            else "/fleet/documents/new",
+            "is_edit": bool(document_id),
         }
 
     def document_detail_context(
@@ -1940,6 +2013,116 @@ class FleetWebService:
             db.rollback()
             return RedirectResponse(
                 url=f"/fleet/maintenance/{record_id}/edit?error={quote(str(exc)[:200])}",
+                status_code=303,
+            )
+
+    async def update_fuel_response(
+        self,
+        request: "Request",
+        organization_id: Any,
+        log_id: Any,
+        db: Session,
+    ) -> "RedirectResponse":
+        """Handle POST to update an existing fuel log from form data."""
+        from app.schemas.fleet.fuel import FuelLogUpdate
+        from fastapi.responses import RedirectResponse
+
+        form = await request.form()
+        org_id = coerce_uuid(organization_id)
+        fid = coerce_uuid(log_id)
+
+        def _form_value(name: str) -> str:
+            value = form.get(name)
+            return str(value).strip() if value is not None else ""
+
+        try:
+            log_date_raw = _form_value("log_date")
+            fuel_type_raw = _form_value("fuel_type")
+            expense_claim_id_raw = _form_value("expense_claim_id")
+            data = FuelLogUpdate(
+                log_date=date.fromisoformat(log_date_raw) if log_date_raw else None,
+                fuel_type=FuelType(fuel_type_raw) if fuel_type_raw else None,
+                quantity_liters=Decimal(_form_value("quantity_liters")),
+                price_per_liter=Decimal(_form_value("price_per_liter")),
+                total_cost=Decimal(_form_value("total_cost")),
+                odometer_reading=int(_form_value("odometer_reading")),
+                station_name=_form_value("station_name") or None,
+                receipt_number=_form_value("receipt_number") or None,
+                is_full_tank="is_full_tank" in form,
+                expense_claim_id=UUID(expense_claim_id_raw)
+                if expense_claim_id_raw
+                else None,
+                notes=_form_value("notes") or None,
+            )
+            FuelService(db, org_id).update(fid, data)
+            db.commit()
+            return RedirectResponse(url="/fleet/fuel?success=updated", status_code=303)
+        except Exception as exc:
+            logger.warning("Fuel log update failed: %s", exc)
+            db.rollback()
+            return RedirectResponse(
+                url=f"/fleet/fuel/{log_id}/edit?error={quote(str(exc)[:200])}",
+                status_code=303,
+            )
+
+    async def update_document_response(
+        self,
+        request: "Request",
+        organization_id: Any,
+        document_id: Any,
+        db: Session,
+    ) -> "RedirectResponse":
+        """Handle POST to update an existing vehicle document from form data."""
+        from app.schemas.fleet.document import DocumentUpdate
+        from fastapi.responses import RedirectResponse
+
+        form = await request.form()
+        org_id = coerce_uuid(organization_id)
+        did = coerce_uuid(document_id)
+
+        def _form_value(name: str) -> str:
+            value = form.get(name)
+            return str(value).strip() if value is not None else ""
+
+        def _date_value(name: str) -> date | None:
+            raw_value = _form_value(name)
+            return date.fromisoformat(raw_value) if raw_value else None
+
+        def _decimal_value(name: str) -> Decimal | None:
+            raw_value = _form_value(name)
+            return Decimal(raw_value) if raw_value else None
+
+        try:
+            document_type_raw = _form_value("document_type")
+            reminder_days_raw = _form_value("reminder_days_before")
+            data = DocumentUpdate(
+                document_type=DocumentType(document_type_raw)
+                if document_type_raw
+                else None,
+                document_number=_form_value("document_number") or None,
+                description=_form_value("description") or None,
+                issue_date=_date_value("issue_date"),
+                expiry_date=_date_value("expiry_date"),
+                provider_name=_form_value("provider_name") or None,
+                policy_number=_form_value("policy_number") or None,
+                coverage_amount=_decimal_value("coverage_amount"),
+                premium_amount=_decimal_value("premium_amount"),
+                reminder_days_before=int(reminder_days_raw)
+                if reminder_days_raw
+                else None,
+                notes=_form_value("notes") or None,
+            )
+            DocumentService(db, org_id).update(did, data)
+            db.commit()
+            return RedirectResponse(
+                url=f"/fleet/documents/{document_id}?success=updated",
+                status_code=303,
+            )
+        except Exception as exc:
+            logger.warning("Document update failed: %s", exc)
+            db.rollback()
+            return RedirectResponse(
+                url=f"/fleet/documents/{document_id}/edit?error={quote(str(exc)[:200])}",
                 status_code=303,
             )
 

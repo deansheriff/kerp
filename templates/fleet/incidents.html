@@ -81,7 +81,7 @@
             <select aria-label="Filter by status" name="status" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Status</option>
                 {% for s in statuses %}
-                <option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s | replace('_', ' ') | title }}</option>
+                <option value="{{ s }}" {{ 'selected' if current_status == s else '' }}>{{ s | replace('_', ' ') | title }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -89,7 +89,7 @@
             <select aria-label="Filter by severity" name="severity" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Severity</option>
                 {% for sev in severities %}
-                <option value="{{ sev }}" {{ 'selected' if severity == sev else '' }}>{{ sev | title }}</option>
+                <option value="{{ sev }}" {{ 'selected' if current_severity == sev else '' }}>{{ sev | title }}</option>
                 {% endfor %}
             </select>
     </div>
@@ -97,7 +97,7 @@
             <select aria-label="Filter by vehicle" name="vehicle_id" class="form-select w-full" {{ filter_attrs }}>
                 <option value="">All Vehicles</option>
                 {% for v in vehicles %}
-                <option value="{{ v.vehicle_id }}" {{ 'selected' if vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
+                <option value="{{ v.vehicle_id }}" {{ 'selected' if current_vehicle_id|string == v.vehicle_id|string else '' }}>{{ v.registration_number }}</option>
                 {% endfor %}
             </select>
     </div>
