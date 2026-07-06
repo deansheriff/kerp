@@ -1074,9 +1074,14 @@ class WebAuthContext:
             "expense_reimburser",
             "department_manager",
         }
-        operations_roles = {"operations_manager"}
-        support_roles = {"operations_manager", "support_agent"}
-        project_roles = {"operations_manager", "support_agent", "department_manager"}
+        operations_roles = {"operations_manager", "fleet_manager"}
+        support_roles = {"operations_manager", "support_manager", "support_agent"}
+        project_roles = {
+            "operations_manager",
+            "support_manager",
+            "support_agent",
+            "department_manager",
+        }
         settings_roles = {"operator", "operations_manager"}
 
         if (

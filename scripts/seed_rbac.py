@@ -790,6 +790,8 @@ DEFAULT_ROLES = [
     # Operations Roles
     # -------------------------------------------------------------------------
     ("operations_manager", "Operations management"),
+    ("fleet_manager", "Fleet operations and maintenance management"),
+    ("support_manager", "Support team and ticket queue management"),
     ("support_agent", "Support ticket handling"),
     # -------------------------------------------------------------------------
     # Cross-Functional Roles
@@ -2388,6 +2390,28 @@ ROLE_PERMISSIONS = {
         "coach:insights:feedback",
         "coach:reports:read",
         "coach:chat:access",
+        "support:tickets:read",
+        "support:tickets:create",
+        "support:tickets:update",
+        "support:tickets:assign",
+        "support:tickets:resolve",
+        "support:tickets:close",
+        "support:categories:read",
+        "support:categories:manage",
+        "tasks:read",
+        "tasks:create",
+        "tasks:update",
+        "tasks:assign",
+        "tasks:complete",
+    ],
+    "fleet_manager": [
+        "fleet:access",
+        "fleet:dashboard",
+    ],
+    "support_manager": [
+        "support:access",
+        "support:dashboard",
+        "projects:access",
         "support:tickets:read",
         "support:tickets:create",
         "support:tickets:update",

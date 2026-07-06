@@ -268,6 +268,55 @@ async def test_update_employee_response_keeps_linked_person_read_only_without_pe
 
 
 @pytest.mark.asyncio
+async def test_update_employee_response_updates_linked_person_with_hr_employee_update(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    employee_id = uuid4()
+    employee = SimpleNamespace(employee_id=employee_id, person_id=person.id)
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.get_employee",
+        lambda self, _employee_id: employee,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
+        lambda self, _employee_id, _data: employee,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
+    )
+
+    request = _make_request(
+        {
+            "first_name": "HR",
+            "last_name": "Editor",
+            "email": f"hr-editor-{uuid4().hex[:8]}@example.com",
+            "phone": "+2348011111111",
+            "city": "Enugu",
+            "country_code": "NG",
+        }
+    )
+    auth = _make_auth(person.id, person.organization_id, ["hr:employees:update"])
+
+    response = await service.update_employee_response(
+        request=request,
+        employee_id=employee_id,
+        auth=auth,
+        db=db_session,
+    )
+
+    db_session.refresh(person)
+    assert response.status_code == 303
+    assert person.first_name == "HR"
+    assert person.last_name == "Editor"
+    assert person.phone == "+2348011111111"
+    assert person.city == "Enugu"
+
+
+@pytest.mark.asyncio
 async def test_update_employee_response_does_not_clear_manager_when_field_omitted(
     db_session, person, monkeypatch
 ):

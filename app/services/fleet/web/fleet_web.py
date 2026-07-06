@@ -1720,6 +1720,7 @@ class FleetWebService:
             raise HTTPException(status_code=401, detail="Authentication required")
 
         user_id = getattr(auth, "user_id", None) or getattr(auth, "person_id", None)
+        employee_id = self._current_employee_id(db, org_id, auth)
 
         # Build a cleaned data dict, coercing types
         data: dict[str, Any] = {}
@@ -1796,7 +1797,7 @@ class FleetWebService:
                 "service_cls": ReservationService,
                 "schema_cls": ReservationCreate,
                 "list_url": "/fleet/reservations",
-                "extra_fields": {"employee_id": user_id},
+                "extra_fields": {"employee_id": employee_id},
             },
             "document": {
                 "service_cls": DocumentService,
@@ -1808,7 +1809,7 @@ class FleetWebService:
                 "service_cls": FuelService,
                 "schema_cls": FuelLogCreate,
                 "list_url": "/fleet/fuel",
-                "extra_fields": {"employee_id": user_id},
+                "extra_fields": {"employee_id": employee_id},
             },
             "maintenance": {
                 "service_cls": MaintenanceService,
@@ -1826,6 +1827,11 @@ class FleetWebService:
 
         # Add inferred fields
         data.update(cfg["extra_fields"])
+        if entity_type == "reservation" and not data.get("employee_id"):
+            return RedirectResponse(
+                url="/fleet/reservations?error=employee_profile_required",
+                status_code=303,
+            )
 
         try:
             schema = cfg["schema_cls"](**data)
@@ -1844,6 +1850,29 @@ class FleetWebService:
         return RedirectResponse(
             url=cfg["list_url"],
             status_code=303,
+        )
+
+    @staticmethod
+    def _current_employee_id(db: Session, org_id: UUID, auth: Any) -> UUID | None:
+        """Resolve the signed-in person to an HR employee id for fleet records."""
+        employee_id = getattr(auth, "employee_id", None)
+        if employee_id:
+            employee = db.get(Employee, employee_id)
+            if employee and employee.organization_id == org_id:
+                return employee.employee_id
+
+        person_id = getattr(auth, "person_id", None) or getattr(auth, "user_id", None)
+        if not person_id:
+            return None
+
+        return db.scalar(
+            sa_select(Employee.employee_id)
+            .where(
+                Employee.organization_id == org_id,
+                Employee.person_id == coerce_uuid(person_id),
+                Employee.status != EmployeeStatus.TERMINATED,
+            )
+            .limit(1)
         )
 
     async def cancel_reservation_response(

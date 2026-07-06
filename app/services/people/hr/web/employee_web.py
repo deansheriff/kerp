@@ -384,8 +384,8 @@ class HRWebService:
         employee: Employee,
         form: Any,
     ) -> None:
-        """Apply linked Person updates when the caller has people:write."""
-        if not auth.has_permission("people:write") or not employee.person_id:
+        """Apply linked Person updates when the caller can edit employee profiles."""
+        if not self._can_edit_employee_person(auth) or not employee.person_id:
             return
 
         person = db.get(Person, employee.person_id)
@@ -493,6 +493,17 @@ class HRWebService:
         profile.nhf_number = nhf_number or profile.nhf_number
         if pension_rate is not None:
             profile.pension_rate = pension_rate
+
+    @staticmethod
+    def _can_edit_employee_person(auth: WebAuthContext) -> bool:
+        """Return True when the user can update personal fields on employee profiles."""
+        return auth.has_any_permission(
+            [
+                "people:write",
+                "hr:employees:update",
+                "hr:employees:create",
+            ]
+        )
 
     def list_employees_response(
         self,
@@ -2674,7 +2685,7 @@ class HRWebService:
             **base_context(request, auth, "Edit Employee", "employees"),
             "employee": employee,
             "person": person,
-            "can_edit_person": auth.has_permission("people:write"),
+            "can_edit_person": self._can_edit_employee_person(auth),
             "can_edit_tax": auth.has_permission("people:write"),
             "departments": departments,
             "designations": designations,
