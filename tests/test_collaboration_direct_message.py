@@ -92,3 +92,26 @@ def test_collaboration_panel_has_direct_message_employee_picker():
     assert "New DM" in template
     assert "/collaboration/api/employees" in template
     assert "/collaboration/api/conversations/direct" in template
+
+
+def test_collaboration_inbox_direct_message_form_includes_csrf_token():
+    template = (
+        Path(__file__).resolve().parents[1]
+        / "templates"
+        / "collaboration"
+        / "inbox.html"
+    ).read_text()
+
+    assert 'action="/collaboration/direct"' in template
+    assert "{{ request.state.csrf_form | safe }}" in template
+
+
+def test_collaboration_fetch_posts_include_explicit_csrf_token():
+    root = Path(__file__).resolve().parents[1] / "templates" / "collaboration"
+    conversation = (root / "conversation.html").read_text()
+    pane = (root / "partials" / "_message_pane.html").read_text()
+
+    assert "formData.append('csrf_token', csrf)" in conversation
+    assert "fd.append('csrf_token', csrf)" in pane
+    assert "'X-CSRF-Token': csrf" in conversation
+    assert "'X-CSRF-Token': csrf" in pane

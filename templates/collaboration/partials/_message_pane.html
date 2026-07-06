@@ -8,8 +8,15 @@
         this.sending = true;
         const fd = new FormData();
         fd.append('content', this.msgContent.trim());
+        const csrf = document.querySelector('meta[name=&quot;csrf-token&quot;]')?.content
+            || document.querySelector('input[name=&quot;csrf_token&quot;]')?.value
+            || '';
+        if (csrf) {
+            fd.append('csrf_token', csrf);
+        }
         try {
-            const r = await fetch('/collaboration/api/conversations/' + this.convId + '/messages', {method: 'POST', body: fd});
+            const headers = csrf ? {'X-CSRF-Token': csrf} : {};
+            const r = await fetch('/collaboration/api/conversations/' + this.convId + '/messages', {method: 'POST', body: fd, headers});
             if (r.ok) {
                 this.msgContent = '';
                 htmx.ajax('GET', '/collaboration/panel/conversation/' + this.convId, {target: this.$el.parentElement, swap: 'innerHTML'});

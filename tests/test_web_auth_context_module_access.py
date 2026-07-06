@@ -88,6 +88,26 @@ def test_module_access_infers_from_permission_scope_prefixes():
     assert auth.has_module_access("settings") is True
 
 
+def test_granular_fleet_permissions_expose_fleet_module():
+    auth = WebAuthContext(
+        is_authenticated=True,
+        person_id=UUID("00000000-0000-0000-0000-000000000002"),
+        organization_id=UUID("00000000-0000-0000-0000-000000000001"),
+        roles=[],
+        scopes=["fleet:maintenance:create", "fleet:fuel:create"],
+    )
+
+    assert auth.has_module_access("fleet") is True
+
+
+def test_seed_rbac_contains_fleet_fuel_and_maintenance_permissions():
+    seed = (Path(__file__).resolve().parents[1] / "scripts" / "seed_rbac.py").read_text()
+
+    assert '"fleet:maintenance:create"' in seed
+    assert '"fleet:fuel:create"' in seed
+    assert '"fleet_manager"' in seed
+
+
 def test_collaboration_panel_does_not_eager_load_null_conversation():
     template = (
         Path(__file__).resolve().parents[1]

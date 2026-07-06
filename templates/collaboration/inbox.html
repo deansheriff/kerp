@@ -64,6 +64,7 @@
                             <div x-show="results.length > 0" class="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
                                 <template x-for="emp in results" :key="emp.person_id">
                                     <form method="POST" action="/collaboration/direct" class="block">
+                                        {{ request.state.csrf_form | safe }}
                                         <input type="hidden" name="target_person_id" :value="emp.person_id">
                                         <button type="submit"
                                                 class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800">

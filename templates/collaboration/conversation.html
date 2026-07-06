@@ -313,11 +313,16 @@ function chatApp() {
             formData.append('content', content);
             if (this.quotedMessageId) formData.append('quoted_message_id', this.quotedMessageId);
             for (const file of this.selectedFiles) formData.append('files', file);
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="csrf_token"]')?.value
+                || '';
+            if (csrf) formData.append('csrf_token', csrf);
 
             try {
                 const resp = await fetch(`/collaboration/api/conversations/${this.conversationId}/messages`, {
                     method: 'POST',
                     body: formData,
+                    headers: csrf ? {'X-CSRF-Token': csrf} : {},
                 });
                 if (resp.ok) {
                     this.messageContent = '';
@@ -348,22 +353,40 @@ function chatApp() {
         },
 
         async toggleReaction(msgId, emoji) {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="csrf_token"]')?.value
+                || '';
             await fetch(`/collaboration/api/messages/${msgId}/react`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(csrf ? {'X-CSRF-Token': csrf} : {}),
+                },
                 body: JSON.stringify({emoji}),
             });
             location.reload();
         },
 
         async pinMessage(msgId) {
-            await fetch(`/collaboration/api/messages/${msgId}/pin`, {method: 'POST'});
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="csrf_token"]')?.value
+                || '';
+            await fetch(`/collaboration/api/messages/${msgId}/pin`, {
+                method: 'POST',
+                headers: csrf ? {'X-CSRF-Token': csrf} : {},
+            });
             location.reload();
         },
 
         async deleteMessage(msgId) {
             if (!confirm('Delete this message?')) return;
-            await fetch(`/collaboration/api/messages/${msgId}`, {method: 'DELETE'});
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="csrf_token"]')?.value
+                || '';
+            await fetch(`/collaboration/api/messages/${msgId}`, {
+                method: 'DELETE',
+                headers: csrf ? {'X-CSRF-Token': csrf} : {},
+            });
             location.reload();
         },
     };
