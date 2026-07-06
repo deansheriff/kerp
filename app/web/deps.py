@@ -1399,6 +1399,26 @@ def _ensure_admin_role(db: Session, person_id: UUID, roles: list[str]) -> list[s
     return roles
 
 
+def _load_web_roles(
+    db: Session,
+    person_id: UUID,
+    existing_roles: list[str],
+) -> list[str]:
+    """Merge token roles with current DB-backed role assignments for web auth."""
+    role_rows = db.scalars(
+        select(Role.name)
+        .join(PersonRole, PersonRole.role_id == Role.id)
+        .where(PersonRole.person_id == person_id)
+        .where(Role.is_active.is_(True))
+    ).all()
+    return list(
+        {
+            *existing_roles,
+            *(str(name).strip().lower() for name in role_rows if str(name).strip()),
+        }
+    )
+
+
 def _load_web_permission_scopes(
     db: Session,
     person_id: UUID,
@@ -1527,6 +1547,7 @@ def require_web_auth(
             else []
         )
         roles, scopes = _normalize_roles_scopes(roles, scopes)
+        roles = _load_web_roles(db, person_uuid, roles)
         roles = _ensure_admin_role(db, person_uuid, roles)
         scopes = _load_web_permission_scopes(db, person_uuid, scopes)
     else:
@@ -1543,6 +1564,7 @@ def require_web_auth(
         person_uuid, _ = resolved
         roles, scopes = _load_rbac_claims(db, str(person_uuid))
         roles, scopes = _normalize_roles_scopes(roles, scopes)
+        roles = _load_web_roles(db, person_uuid, roles)
         roles = _ensure_admin_role(db, person_uuid, roles)
         scopes = _load_web_permission_scopes(db, person_uuid, scopes)
 
@@ -1794,6 +1816,7 @@ def optional_web_auth(
             else []
         )
         roles, scopes = _normalize_roles_scopes(roles, scopes)
+        roles = _load_web_roles(db, person_uuid, roles)
         roles = _ensure_admin_role(db, person_uuid, roles)
         scopes = _load_web_permission_scopes(db, person_uuid, scopes)
     else:
@@ -1806,6 +1829,7 @@ def optional_web_auth(
         person_uuid, _ = resolved
         roles, scopes = _load_rbac_claims(db, str(person_uuid))
         roles, scopes = _normalize_roles_scopes(roles, scopes)
+        roles = _load_web_roles(db, person_uuid, roles)
         roles = _ensure_admin_role(db, person_uuid, roles)
         scopes = _load_web_permission_scopes(db, person_uuid, scopes)
 

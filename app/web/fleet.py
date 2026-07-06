@@ -44,6 +44,23 @@ from app.web.deps import (
 router = APIRouter(prefix="/fleet", tags=["fleet-web"])
 
 
+def _has_fleet_role(auth: WebAuthContext, *role_names: str) -> bool:
+    roles = {role.strip().lower() for role in auth.roles if role and role.strip()}
+    return bool(roles.intersection(role_names))
+
+
+def _can_create_maintenance(auth: WebAuthContext) -> bool:
+    return auth.has_permission("fleet:maintenance:create") or _has_fleet_role(
+        auth, "operations_manager", "fleet_manager"
+    )
+
+
+def _can_update_maintenance(auth: WebAuthContext) -> bool:
+    return auth.has_permission("fleet:maintenance:update") or _has_fleet_role(
+        auth, "operations_manager", "fleet_manager"
+    )
+
+
 # =============================================================================
 # Dashboard
 # =============================================================================
@@ -518,6 +535,8 @@ def maintenance_list(
 ):
     """List maintenance records."""
     context = base_context(request, auth, "Maintenance", "fleet", db=db)
+    context["can_create_maintenance"] = _can_create_maintenance(auth)
+    context["can_update_maintenance"] = _can_update_maintenance(auth)
     web_service = FleetWebService(db)
     context.update(
         web_service.maintenance_list_context(
@@ -540,6 +559,11 @@ def maintenance_new(
     db: Session = Depends(get_db_for_org),
 ):
     """New maintenance record form."""
+    if not _can_create_maintenance(auth):
+        return RedirectResponse(
+            url="/fleet/maintenance?error=not_authorized",
+            status_code=303,
+        )
     context = base_context(request, auth, "Schedule Maintenance", "fleet", db=db)
     web_service = FleetWebService(db)
     context.update(
@@ -557,8 +581,63 @@ async def maintenance_create(
     db: Session = Depends(get_db_for_org),
 ):
     """Create maintenance record from form submission."""
+    if not _can_create_maintenance(auth):
+        return RedirectResponse(
+            url="/fleet/maintenance?error=not_authorized",
+            status_code=303,
+        )
     web_service = FleetWebService(db)
     return await web_service.create_entity_response(request, auth, db, "maintenance")
+
+
+@router.get("/maintenance/{record_id}/edit", response_class=HTMLResponse)
+def maintenance_edit(
+    request: Request,
+    record_id: UUID,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Edit maintenance record form."""
+    if not _can_update_maintenance(auth):
+        return RedirectResponse(
+            url=f"/fleet/maintenance/{record_id}?error=not_authorized",
+            status_code=303,
+        )
+    context = base_context(request, auth, "Edit Maintenance", "fleet", db=db)
+    web_service = FleetWebService(db)
+    try:
+        context.update(
+            web_service.maintenance_form_context(
+                auth.organization_id, record_id=record_id
+            )
+        )
+        return templates.TemplateResponse(request, "fleet/maintenance_form.html", context)
+    except NotFoundError:
+        return RedirectResponse(
+            url="/fleet/maintenance?error=not_found", status_code=303
+        )
+
+
+@router.post("/maintenance/{record_id}/edit")
+async def maintenance_update(
+    request: Request,
+    record_id: UUID,
+    auth: WebAuthContext = Depends(require_fleet_access),
+    db: Session = Depends(get_db_for_org),
+):
+    """Handle maintenance record updates."""
+    if not _can_update_maintenance(auth):
+        return RedirectResponse(
+            url=f"/fleet/maintenance/{record_id}?error=not_authorized",
+            status_code=303,
+        )
+    web_service = FleetWebService(db)
+    return await web_service.update_maintenance_response(
+        request,
+        auth.organization_id,
+        record_id,
+        db,
+    )
 
 
 @router.get("/maintenance/{record_id}", response_class=HTMLResponse)
@@ -570,6 +649,7 @@ def maintenance_detail(
 ):
     """Maintenance record detail view."""
     context = base_context(request, auth, "Maintenance Details", "fleet", db=db)
+    context["can_update_maintenance"] = _can_update_maintenance(auth)
     web_service = FleetWebService(db)
     try:
         context.update(

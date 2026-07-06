@@ -508,7 +508,10 @@ class HRWebService:
     @staticmethod
     def _can_update_employee(auth: WebAuthContext) -> bool:
         """Return True when the user can update employee records."""
-        return auth.has_any_permission(["people:write", "hr:employees:update"])
+        if auth.has_any_permission(["people:write", "hr:employees:update"]):
+            return True
+        roles = {role.strip().lower() for role in auth.roles if role and role.strip()}
+        return bool(roles.intersection({"hr_director", "hr_manager", "hr_officer"}))
 
     def list_employees_response(
         self,

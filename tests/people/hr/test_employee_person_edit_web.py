@@ -40,12 +40,17 @@ def _make_new_employee_request(form: dict[str, str]) -> Request:
     return request
 
 
-def _make_auth(person_id, organization_id, scopes: list[str]) -> WebAuthContext:
+def _make_auth(
+    person_id,
+    organization_id,
+    scopes: list[str],
+    roles: list[str] | None = None,
+) -> WebAuthContext:
     return WebAuthContext(
         is_authenticated=True,
         person_id=person_id,
         organization_id=organization_id,
-        roles=["hr_manager"],
+        roles=roles if roles is not None else ["hr_manager"],
         scopes=["hr:access", *scopes],
     )
 
@@ -119,7 +124,18 @@ def _stub_salary_structure_lookup(
 
 
 def test_employee_update_permission_helper_allows_update_permission(person):
-    auth = _make_auth(person.id, person.organization_id, ["hr:employees:update"])
+    auth = _make_auth(
+        person.id,
+        person.organization_id,
+        ["hr:employees:update"],
+        roles=["hr_viewer"],
+    )
+
+    assert HRWebService._can_update_employee(auth)
+
+
+def test_employee_update_permission_helper_allows_seeded_hr_roles(person):
+    auth = _make_auth(person.id, person.organization_id, [], roles=["hr_officer"])
 
     assert HRWebService._can_update_employee(auth)
 
@@ -271,7 +287,7 @@ async def test_update_employee_response_rejects_without_update_permission(
             "city": "Abuja",
         }
     )
-    auth = _make_auth(person.id, person.organization_id, [])
+    auth = _make_auth(person.id, person.organization_id, [], roles=["hr_viewer"])
 
     response = await service.update_employee_response(
         request=request,

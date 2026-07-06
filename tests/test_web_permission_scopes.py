@@ -73,7 +73,7 @@ def test_require_web_auth_loads_db_backed_permission_scopes(db_session):
         db_session,
         str(person_id),
         str(session_id),
-        roles=["finance_manager"],
+        roles=["finance_viewer"],
         permissions=["finance:access"],
     )
     request = Request({"type": "http", "method": "GET", "path": "/finance/ap/invoices"})
@@ -85,6 +85,7 @@ def test_require_web_auth_loads_db_backed_permission_scopes(db_session):
     )
 
     assert "finance:access" in auth.scopes
+    assert "finance_manager" in auth.roles
     assert "ap:invoices:read" in auth.scopes
     assert auth.has_permission("ap:invoices:read") is True
 
@@ -134,7 +135,7 @@ def test_optional_web_auth_loads_db_backed_permission_scopes(db_session):
         db_session,
         str(person_id),
         str(session_id),
-        roles=["ops_manager"],
+        roles=[],
         permissions=["finance:access"],
     )
     request = Request({"type": "http", "method": "GET", "path": "/finance/payments"})
@@ -146,5 +147,6 @@ def test_optional_web_auth_loads_db_backed_permission_scopes(db_session):
     )
 
     assert auth.is_authenticated is True
+    assert "ops_manager" in auth.roles
     assert "expense:claims:reimburse" in auth.scopes
     assert auth.has_permission("expense:claims:reimburse") is True

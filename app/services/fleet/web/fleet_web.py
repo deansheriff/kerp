@@ -1079,16 +1079,27 @@ class FleetWebService:
         organization_id: UUID,
         *,
         vehicle_id: UUID | None = None,
+        record_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """Build context for maintenance create form."""
+        """Build context for maintenance create/edit form."""
         if not self._fleet_tables_ready():
             return {
                 "vehicles": [],
                 "maintenance_types": [t.value for t in MaintenanceType],
                 "selected_vehicle_id": vehicle_id,
+                "record": None,
+                "form_action": "/fleet/maintenance/new",
+                "is_edit": False,
+                "selected_maintenance_type": "",
             }
         org_id = coerce_uuid(organization_id)
         vehicle_service = VehicleService(self.db, org_id)
+        record = None
+        if record_id:
+            record = MaintenanceService(self.db, org_id).get_or_raise(
+                coerce_uuid(record_id)
+            )
+            vehicle_id = record.vehicle_id
 
         # Get active vehicles for dropdown
         vehicles_result = vehicle_service.list_vehicles(
@@ -1097,9 +1108,20 @@ class FleetWebService:
         )
 
         context: dict[str, Any] = {
+            "record": record,
+            "form_action": f"/fleet/maintenance/{record_id}/edit"
+            if record_id
+            else "/fleet/maintenance/new",
+            "is_edit": bool(record_id),
             "vehicles": vehicles_result.items,
             "maintenance_types": [t.value for t in MaintenanceType],
             "selected_vehicle_id": vehicle_id,
+            "selected_maintenance_type": record.maintenance_type.value
+            if record
+            and getattr(record.maintenance_type, "value", None)
+            else str(record.maintenance_type)
+            if record and record.maintenance_type
+            else "",
         }
 
         return context
@@ -1868,6 +1890,58 @@ class FleetWebService:
             url=cfg["list_url"],
             status_code=303,
         )
+
+    async def update_maintenance_response(
+        self,
+        request: "Request",
+        organization_id: Any,
+        record_id: Any,
+        db: Session,
+    ) -> "RedirectResponse":
+        """Handle POST to update an existing maintenance record from form data."""
+        from app.schemas.fleet.maintenance import MaintenanceUpdate
+        from fastapi.responses import RedirectResponse
+
+        form = await request.form()
+        org_id = coerce_uuid(organization_id)
+        mid = coerce_uuid(record_id)
+
+        def _form_value(name: str) -> str:
+            value = form.get(name)
+            return str(value).strip() if value is not None else ""
+
+        try:
+            maintenance_type_raw = _form_value("maintenance_type")
+            scheduled_date_raw = _form_value("scheduled_date")
+            estimated_cost_raw = _form_value("estimated_cost")
+            supplier_id_raw = _form_value("supplier_id")
+            data = MaintenanceUpdate(
+                maintenance_type=MaintenanceType(maintenance_type_raw)
+                if maintenance_type_raw
+                else None,
+                description=_form_value("description") or None,
+                scheduled_date=date.fromisoformat(scheduled_date_raw)
+                if scheduled_date_raw
+                else None,
+                estimated_cost=Decimal(estimated_cost_raw)
+                if estimated_cost_raw
+                else None,
+                supplier_id=UUID(supplier_id_raw) if supplier_id_raw else None,
+                notes=_form_value("notes") or None,
+            )
+            MaintenanceService(db, org_id).update(mid, data)
+            db.commit()
+            return RedirectResponse(
+                url=f"/fleet/maintenance/{record_id}?success=updated",
+                status_code=303,
+            )
+        except Exception as exc:
+            logger.warning("Maintenance update failed: %s", exc)
+            db.rollback()
+            return RedirectResponse(
+                url=f"/fleet/maintenance/{record_id}/edit?error={quote(str(exc)[:200])}",
+                status_code=303,
+            )
 
     @staticmethod
     def _current_employee_id(db: Session, org_id: UUID, auth: Any) -> UUID | None:
