@@ -123,6 +123,9 @@ NIGERIA_STATES = [
 class HRWebService:
     """Service for HR web views."""
 
+    EMPLOYEE_EDITOR_ROLES = frozenset(
+        {"admin", "hr_director", "hr_manager", "hr_officer"}
+    )
     FINAL_PAYROLL_EDITOR_ROLES = frozenset({"admin", "hr_director", "hr_manager"})
 
     # =========================================================================
@@ -147,6 +150,11 @@ class HRWebService:
     def _can_manage_final_payroll(auth: WebAuthContext) -> bool:
         roles = {role.strip().lower() for role in auth.roles if role and role.strip()}
         return bool(roles.intersection(HRWebService.FINAL_PAYROLL_EDITOR_ROLES))
+
+    @staticmethod
+    def _has_employee_editor_role(auth: WebAuthContext) -> bool:
+        roles = {role.strip().lower() for role in auth.roles if role and role.strip()}
+        return bool(roles.intersection(HRWebService.EMPLOYEE_EDITOR_ROLES))
 
     @staticmethod
     def _clean_person_text(value: str | None) -> str | None:
@@ -454,7 +462,7 @@ class HRWebService:
         employee: Employee,
         form: Any,
     ) -> None:
-        if not auth.has_permission("people:write"):
+        if not self._can_edit_employee_tax(auth):
             return
         org_id = coerce_uuid(auth.organization_id)
         profile = db.scalar(
@@ -497,21 +505,29 @@ class HRWebService:
     @staticmethod
     def _can_edit_employee_person(auth: WebAuthContext) -> bool:
         """Return True when the user can update personal fields on employee profiles."""
-        return auth.has_any_permission(
+        if auth.has_any_permission(
             [
                 "people:write",
                 "hr:employees:update",
                 "hr:employees:create",
             ]
-        )
+        ):
+            return True
+        return HRWebService._has_employee_editor_role(auth)
+
+    @staticmethod
+    def _can_edit_employee_tax(auth: WebAuthContext) -> bool:
+        """Return True when the user can update statutory employee profile fields."""
+        if auth.has_any_permission(["people:write", "hr:employees:update"]):
+            return True
+        return HRWebService._has_employee_editor_role(auth)
 
     @staticmethod
     def _can_update_employee(auth: WebAuthContext) -> bool:
         """Return True when the user can update employee records."""
         if auth.has_any_permission(["people:write", "hr:employees:update"]):
             return True
-        roles = {role.strip().lower() for role in auth.roles if role and role.strip()}
-        return bool(roles.intersection({"hr_director", "hr_manager", "hr_officer"}))
+        return HRWebService._has_employee_editor_role(auth)
 
     def list_employees_response(
         self,
@@ -2462,7 +2478,7 @@ class HRWebService:
             "pfas": pfas,
             "tax_profile": None,
             "nigeria_states": NIGERIA_STATES,
-            "can_edit_tax": auth.has_permission("people:write"),
+            "can_edit_tax": self._can_edit_employee_tax(auth),
         }
 
         return templates.TemplateResponse(
@@ -2709,7 +2725,7 @@ class HRWebService:
             "person": person,
             "can_update_employee": self._can_update_employee(auth),
             "can_edit_person": self._can_edit_employee_person(auth),
-            "can_edit_tax": auth.has_permission("people:write"),
+            "can_edit_tax": self._can_edit_employee_tax(auth),
             "departments": departments,
             "designations": designations,
             "employment_types": employment_types,

@@ -140,6 +140,13 @@ def test_employee_update_permission_helper_allows_seeded_hr_roles(person):
     assert HRWebService._can_update_employee(auth)
 
 
+def test_employee_person_edit_helper_allows_seeded_hr_roles(person):
+    auth = _make_auth(person.id, person.organization_id, [], roles=["hr_manager"])
+
+    assert HRWebService._can_edit_employee_person(auth)
+    assert HRWebService._can_edit_employee_tax(auth)
+
+
 def test_employee_templates_gate_edit_links_on_update_permission():
     root = Path(__file__).resolve().parents[3]
     detail_template = (
@@ -353,6 +360,55 @@ async def test_update_employee_response_updates_linked_person_with_hr_employee_u
     assert person.last_name == "Editor"
     assert person.phone == "+2348011111111"
     assert person.city == "Enugu"
+
+
+@pytest.mark.asyncio
+async def test_update_employee_response_updates_linked_person_with_seeded_hr_role(
+    db_session, person, monkeypatch
+):
+    service = HRWebService()
+    employee_id = uuid4()
+    employee = SimpleNamespace(employee_id=employee_id, person_id=person.id)
+
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.get_employee",
+        lambda self, _employee_id: employee,
+    )
+    monkeypatch.setattr(
+        "app.services.people.hr.web.employee_web.EmployeeService.update_employee",
+        lambda self, _employee_id, _data: employee,
+    )
+    monkeypatch.setattr(
+        HRWebService,
+        "_update_tax_profile",
+        lambda self, *, auth, db, employee, form: None,
+    )
+
+    request = _make_request(
+        {
+            "first_name": "Role",
+            "last_name": "Editor",
+            "email": f"role-editor-{uuid4().hex[:8]}@example.com",
+            "phone": "+2348022222222",
+            "city": "Lagos",
+            "country_code": "NG",
+        }
+    )
+    auth = _make_auth(person.id, person.organization_id, [], roles=["hr_manager"])
+
+    response = await service.update_employee_response(
+        request=request,
+        employee_id=employee_id,
+        auth=auth,
+        db=db_session,
+    )
+
+    db_session.refresh(person)
+    assert response.status_code == 303
+    assert person.first_name == "Role"
+    assert person.last_name == "Editor"
+    assert person.phone == "+2348022222222"
+    assert person.city == "Lagos"
 
 
 @pytest.mark.asyncio
