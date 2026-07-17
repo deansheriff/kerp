@@ -10,7 +10,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_permission,
+)
 from app.models.pm import BillingStatus
 from app.schemas.pm import (
     TimeEntryCreate,
@@ -24,7 +28,11 @@ from app.schemas.pm import (
 from app.services.common import NotFoundError, PaginationParams, ValidationError
 from app.services.pm import TimeEntryService
 
-router = APIRouter(prefix="/time-entries", tags=["pm-time-entries"])
+router = APIRouter(
+    prefix="/time-entries",
+    tags=["pm-time-entries"],
+    dependencies=[Depends(require_tenant_permission("projects:read"))],
+)
 
 
 # =============================================================================
@@ -106,6 +114,7 @@ def list_time_entries(
 @router.post("", response_model=TimeEntryRead, status_code=status.HTTP_201_CREATED)
 def log_time(
     data: TimeEntryCreate,
+    _auth: dict = Depends(require_tenant_permission("projects:time:log")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -209,6 +218,7 @@ def get_time_entry(
 def update_time_entry(
     entry_id: UUID,
     data: TimeEntryUpdate,
+    _auth: dict = Depends(require_tenant_permission("projects:time:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -226,6 +236,7 @@ def update_time_entry(
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_time_entry(
     entry_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("projects:time:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):

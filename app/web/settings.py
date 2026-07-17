@@ -23,9 +23,11 @@ from app.web.deps import (
     base_context,
     get_async_db_for_org,
     get_db_for_org,
-    require_finance_access,
-    require_settings_access,
+    require_web_permission,
 )
+
+_settings_read = require_web_permission("settings:read")
+_settings_manage = require_web_permission("settings:manage")
 
 router = APIRouter(prefix="/settings", tags=["settings-web"])
 
@@ -99,7 +101,7 @@ def _normalize_form(form) -> dict[str, str]:
 @router.get("", response_class=HTMLResponse)
 def settings_index(
     request: Request,
-    auth: WebAuthContext = Depends(require_settings_access),
+    auth: WebAuthContext = Depends(_settings_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Settings hub page."""
@@ -112,7 +114,7 @@ def settings_index(
 @router.get("/numbering", response_class=HTMLResponse)
 async def finance_numbering_sequences(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_settings_read),
     db: AsyncSession = Depends(get_async_db_for_org),
     sync_db: Session = Depends(get_db_for_org),
 ):
@@ -141,7 +143,7 @@ def _get_module_config(module_key: str):
 def module_settings(
     module_key: str,
     request: Request,
-    auth: WebAuthContext = Depends(require_settings_access),
+    auth: WebAuthContext = Depends(_settings_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Module settings page."""
@@ -156,7 +158,7 @@ def module_settings(
 async def update_module_settings(
     module_key: str,
     request: Request,
-    auth: WebAuthContext = Depends(require_settings_access),
+    auth: WebAuthContext = Depends(_settings_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Handle module settings update."""

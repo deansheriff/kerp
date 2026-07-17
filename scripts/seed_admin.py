@@ -37,7 +37,7 @@ from app.models.auth import AuthProvider, UserCredential
 from app.models.person import Person, PersonStatus
 from app.models.rbac import Permission, PersonRole, Role, RolePermission
 from app.services.auth_flow import hash_password
-from scripts.seed_rbac import DEFAULT_PERMISSIONS, DEFAULT_ROLES
+from scripts.seed_rbac import DEFAULT_PERMISSIONS, DEFAULT_ROLES, ROLE_PERMISSIONS
 
 DEFAULT_ORGANIZATION_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -189,9 +189,42 @@ def setup_rbac(db) -> Role:
     db.flush()
     print(f"  Roles: {len(DEFAULT_ROLES)}")
 
-    admin_role = db.scalar(select(Role).where(Role.name == "admin"))
-    all_permissions = db.scalars(select(Permission)).all()
+    roles = {role.name: role for role in db.scalars(select(Role)).all()}
+    permissions = {
+        permission.key: permission for permission in db.scalars(select(Permission)).all()
+    }
+    admin_role = roles["admin"]
 
+    for role_name, permission_keys in ROLE_PERMISSIONS.items():
+        role = roles.get(role_name)
+        if role is None:
+            continue
+        for permission_key in permission_keys:
+            permission = permissions.get(permission_key)
+            if permission is not None:
+                ensure_role_permission(db, role.id, permission.id)
+
+    # These legacy module-wide grants exposed management screens to every employee.
+    # Remove only this known unsafe set, preserving any custom role configuration.
+    employee_role = roles.get("employee")
+    if employee_role is not None:
+        legacy_employee_grants = {
+            "expense:access",
+            "projects:access",
+            "support:access",
+        }
+        stale_permission_ids = [
+            permissions[key].id
+            for key in legacy_employee_grants
+            if key in permissions
+        ]
+        if stale_permission_ids:
+            db.query(RolePermission).filter(
+                RolePermission.role_id == employee_role.id,
+                RolePermission.permission_id.in_(stale_permission_ids),
+            ).delete(synchronize_session=False)
+
+    all_permissions = list(permissions.values())
     for permission in all_permissions:
         ensure_role_permission(db, admin_role.id, permission.id)
     db.flush()

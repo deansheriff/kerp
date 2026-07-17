@@ -11,7 +11,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.api.idempotency import (
     build_cached_response,
     build_request_hash,
@@ -65,7 +70,7 @@ from app.services.people.expense import ExpenseService
 router = APIRouter(
     prefix="/expenses",
     tags=["expenses"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("expense:access"))],
 )
 
 

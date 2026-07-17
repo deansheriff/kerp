@@ -9,7 +9,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.people.hr.lifecycle import BoardingStatus
 from app.schemas.people.lifecycle import (
     OnboardingCreate,
@@ -35,7 +40,7 @@ from app.services.people.hr.lifecycle import LifecycleService
 router = APIRouter(
     prefix="/lifecycle",
     tags=["lifecycle"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 

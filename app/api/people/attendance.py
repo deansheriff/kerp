@@ -12,7 +12,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.people.attendance import AttendanceRequestStatus
 from app.models.people.attendance.attendance import AttendanceStatus
 from app.schemas.people.attendance import (
@@ -48,7 +53,7 @@ from app.services.people.attendance import AttendanceService
 router = APIRouter(
     prefix="/attendance",
     tags=["attendance"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 

@@ -1079,7 +1079,10 @@ class WebAuthContext:
             }
         ):
             modules.append("coach")
-        if self.is_admin or "public_sector:access" in scopes_set:
+        has_public_sector_scope = any(
+            scope == "ipsas" or scope.startswith("ipsas:") for scope in scopes_set
+        )
+        if self.is_admin or has_public_sector_scope:
             modules.append("public_sector")
         if "self:access" in scopes_set:
             modules.append("self_service")
@@ -1917,6 +1920,7 @@ def require_inventory_access(
 
 
 def require_fleet_access(
+    request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
 ) -> WebAuthContext:
     """Require access to the Fleet module."""
@@ -1924,6 +1928,16 @@ def require_fleet_access(
         raise HTTPException(
             status_code=403,
             detail="Fleet module access required",
+        )
+    permission = (
+        "fleet:read"
+        if request.method in {"GET", "HEAD", "OPTIONS"}
+        else "fleet:manage"
+    )
+    if not auth.has_permission(permission):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Permission '{permission}' required",
         )
     return auth
 
@@ -1953,6 +1967,7 @@ def require_support_access(
 
 
 def require_procurement_access(
+    request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
 ) -> WebAuthContext:
     """Require access to the Procurement module."""
@@ -1960,6 +1975,16 @@ def require_procurement_access(
         raise HTTPException(
             status_code=403,
             detail="Procurement module access required",
+        )
+    permission = (
+        "procurement:read"
+        if request.method in {"GET", "HEAD", "OPTIONS"}
+        else "procurement:manage"
+    )
+    if not auth.has_permission(permission):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Permission '{permission}' required",
         )
     return auth
 
@@ -2248,3 +2273,19 @@ def require_any_web_permission(permissions: list[str]):
         return auth
 
     return _require_any_permission
+
+
+def require_all_web_permissions(permissions: list[str]):
+    """Factory for requiring every specified permission."""
+
+    def _require_all_permissions(
+        auth: WebAuthContext = Depends(require_web_auth),
+    ) -> WebAuthContext:
+        if not auth.has_all_permissions(permissions):
+            raise HTTPException(
+                status_code=403,
+                detail=f"All of these permissions required: {', '.join(permissions)}",
+            )
+        return auth
+
+    return _require_all_permissions

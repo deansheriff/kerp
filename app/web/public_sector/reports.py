@@ -19,8 +19,10 @@ from app.web.deps import (
     get_db_for_org,
     WebAuthContext,
     base_context,
-    require_public_sector_access,
+    require_web_permission,
 )
+
+_reports_read = require_web_permission("ipsas:reports:read")
 
 router = APIRouter(tags=["public-sector-reports"])
 
@@ -30,7 +32,7 @@ def budget_comparison(
     request: Request,
     fiscal_year_id: str | None = None,
     fund_id: str | None = None,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_reports_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """IPSAS 24 Budget vs Actual statement page."""
@@ -82,7 +84,7 @@ def budget_comparison(
 def available_balance_dashboard(
     request: Request,
     fund_id: str | None = None,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_reports_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Available balance dashboard page."""

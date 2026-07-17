@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.services.common import coerce_uuid
 from app.services.storage import get_storage
 from app.services.support.attachment import attachment_service
+from app.services.support.authorization import can_read_ticket
 from app.services.support.ticket import ticket_service
 
 if TYPE_CHECKING:
@@ -90,8 +91,15 @@ class AttachmentWebService:
         org_id = coerce_uuid(auth.organization_id)
         aid = coerce_uuid(attachment_id)
 
+        ticket = ticket_service.get_ticket(db, org_id, coerce_uuid(ticket_id))
+        if not ticket or not can_read_ticket(db, auth, ticket):
+            return RedirectResponse(
+                url="/support/tickets?error=Ticket+not+found",
+                status_code=303,
+            )
+
         attachment = attachment_service.get_attachment(db, org_id, aid)
-        if not attachment:
+        if not attachment or attachment.ticket_id != ticket.ticket_id:
             return RedirectResponse(
                 url=f"/support/tickets/{ticket_id}?error=Attachment+not+found",
                 status_code=303,

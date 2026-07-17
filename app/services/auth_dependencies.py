@@ -842,6 +842,50 @@ def require_tenant_permission(permission_key: str):
     return _require_tenant_permission
 
 
+def require_tenant_method_permission(
+    read_permission: str,
+    manage_permission: str,
+):
+    """Require read permission for safe methods and manage permission otherwise."""
+
+    def _require_method_permission(
+        request: Request,
+        auth=Depends(require_tenant_auth),
+        db: Session = Depends(_get_db),
+    ):
+        permission_key = (
+            read_permission
+            if request.method in {"GET", "HEAD", "OPTIONS"}
+            else manage_permission
+        )
+        person_id = coerce_uuid(auth["person_id"])
+        roles = set(auth.get("roles") or [])
+        scopes = set(auth.get("scopes") or [])
+        if "admin" in roles or permission_key in scopes:
+            return auth
+        permission = db.scalar(
+            select(Permission)
+            .where(Permission.key == permission_key)
+            .where(Permission.is_active.is_(True))
+        )
+        if not permission:
+            raise HTTPException(status_code=403, detail="Permission not found")
+        has_permission = db.scalar(
+            select(RolePermission)
+            .join(Role, RolePermission.role_id == Role.id)
+            .join(PersonRole, PersonRole.role_id == Role.id)
+            .where(PersonRole.person_id == person_id)
+            .where(RolePermission.permission_id == permission.id)
+            .where(Role.is_active.is_(True))
+            .limit(1)
+        )
+        if not has_permission:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        return auth
+
+    return _require_method_permission
+
+
 def require_admin_bypass(
     authorization: str | None = Header(default=None),
     request: Request = None,

@@ -19,7 +19,12 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.finance.core_org.location import LocationType
 from app.models.people.hr.checklist_template import ChecklistTemplateType
 from app.net import get_request_host, get_request_scheme
@@ -98,7 +103,7 @@ from app.services.people.hr.employees import send_employee_access_invite_backgro
 router = APIRouter(
     prefix="/hr",
     tags=["hr"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 
@@ -713,6 +718,7 @@ def delete_employee_grade(
 
 @router.get("/employees", response_model=EmployeeListResponse)
 def list_employees(
+    _auth: dict = Depends(require_tenant_permission("hr:employees:read")),
     organization_id: UUID = Depends(require_organization_id),
     search: str | None = None,
     status: str | None = None,
@@ -757,6 +763,7 @@ def list_employees(
 
 @router.get("/employees/stats", response_model=EmployeeStatsRead)
 def get_employee_stats(
+    _auth: dict = Depends(require_tenant_permission("hr:employees:read")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -772,6 +779,7 @@ def create_employee(
     payload: EmployeeCreate,
     request: Request,
     background_tasks: BackgroundTasks,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:create")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -815,6 +823,7 @@ def create_employee(
 @router.get("/employees/{employee_id}", response_model=EmployeeRead)
 def get_employee(
     employee_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:read")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -827,7 +836,7 @@ def get_employee(
 def update_employee(
     employee_id: UUID,
     payload: EmployeeUpdate,
-    auth: dict = Depends(require_tenant_auth),
+    auth: dict = Depends(require_tenant_permission("hr:employees:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -875,6 +884,9 @@ def update_employee(
 def create_employee_user_credentials(
     employee_id: UUID,
     payload: EmployeeUserCredentialCreate,
+    _auth: dict = Depends(
+        require_tenant_permission("hr:employees:manage_credentials")
+    ),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -894,6 +906,9 @@ def create_employee_user_credentials(
 def link_employee_user(
     employee_id: UUID,
     payload: EmployeeUserLink,
+    _auth: dict = Depends(
+        require_tenant_permission("hr:employees:manage_credentials")
+    ),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -906,6 +921,7 @@ def link_employee_user(
 @router.delete("/employees/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(
     employee_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:delete")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -922,6 +938,7 @@ def delete_employee(
 @router.post("/employees/{employee_id}/activate", response_model=EmployeeRead)
 def activate_employee(
     employee_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -934,6 +951,7 @@ def activate_employee(
 @router.post("/employees/{employee_id}/suspend", response_model=EmployeeRead)
 def suspend_employee(
     employee_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -947,7 +965,7 @@ def suspend_employee(
 def terminate_employee(
     employee_id: UUID,
     payload: TerminationRequest,
-    auth: dict = Depends(require_tenant_auth),
+    auth: dict = Depends(require_tenant_permission("hr:employees:terminate")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -974,7 +992,7 @@ def terminate_employee(
 def resign_employee(
     employee_id: UUID,
     payload: ResignationRequest,
-    auth: dict = Depends(require_tenant_auth),
+    auth: dict = Depends(require_tenant_permission("hr:employees:terminate")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -999,6 +1017,7 @@ def resign_employee(
 def rehire_employee(
     employee_id: UUID,
     payload: RehireRequest,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:terminate")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -1020,6 +1039,7 @@ def rehire_employee(
 @router.post("/employees/bulk-update", response_model=BulkOperationResponse)
 def bulk_update_employees(
     payload: BulkUpdateRequest,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -1043,6 +1063,7 @@ def bulk_update_employees(
 @router.post("/employees/bulk-delete", response_model=BulkOperationResponse)
 def bulk_delete_employees(
     payload: BulkDeleteRequest,
+    _auth: dict = Depends(require_tenant_permission("hr:employees:delete")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):

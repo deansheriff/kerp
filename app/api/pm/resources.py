@@ -10,7 +10,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_permission,
+)
 from app.schemas.pm import (
     EndAllocationRequest,
     ResourceAllocationCreate,
@@ -28,7 +32,11 @@ from app.services.common import (
 )
 from app.services.pm import ResourceService
 
-router = APIRouter(prefix="/resources", tags=["pm-resources"])
+router = APIRouter(
+    prefix="/resources",
+    tags=["pm-resources"],
+    dependencies=[Depends(require_tenant_permission("projects:read"))],
+)
 
 
 # =============================================================================
@@ -95,6 +103,7 @@ def list_allocations(
 )
 def allocate_resource(
     data: ResourceAllocationCreate,
+    _auth: dict = Depends(require_tenant_permission("projects:team:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -240,6 +249,7 @@ def get_allocation(
 def update_allocation(
     allocation_id: UUID,
     data: ResourceAllocationUpdate,
+    _auth: dict = Depends(require_tenant_permission("projects:team:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -258,6 +268,7 @@ def update_allocation(
 def end_allocation(
     allocation_id: UUID,
     data: EndAllocationRequest = None,
+    _auth: dict = Depends(require_tenant_permission("projects:team:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -276,6 +287,7 @@ def end_allocation(
 @router.delete("/{allocation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_allocation(
     allocation_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("projects:team:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):

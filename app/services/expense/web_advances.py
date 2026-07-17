@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from uuid import UUID
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -11,6 +12,10 @@ from sqlalchemy import select
 from app.services.common import PaginationParams, coerce_uuid
 from app.services.common_filters import build_active_filters
 from app.services.expense.expense_service import ExpenseService, ExpenseServiceError
+from app.services.expense.authorization import (
+    can_read_employee_record,
+    readable_employee_ids,
+)
 from app.templates import templates
 from app.web.deps import base_context
 
@@ -27,6 +32,16 @@ class ExpenseAdvancesWebMixin:
         org_id = coerce_uuid(auth.organization_id)
         svc = ExpenseService(db)
         pagination = PaginationParams.from_page(page, 20)
+        allowed_employee_ids = readable_employee_ids(
+            db,
+            org_id,
+            auth,
+            read_all_permission="expense:advances:read",
+            read_own_permission="expense:advances:read_own",
+        )
+        employee_id = None
+        if allowed_employee_ids is not None:
+            employee_id = next(iter(allowed_employee_ids), UUID(int=0))
         status_filter = None
         if status:
             try:
@@ -34,7 +49,12 @@ class ExpenseAdvancesWebMixin:
             except ValueError:
                 pass
 
-        result = svc.list_advances(org_id, status=status_filter, pagination=pagination)
+        result = svc.list_advances(
+            org_id,
+            employee_id=employee_id,
+            status=status_filter,
+            pagination=pagination,
+        )
         context = base_context(request, auth, "Cash Advances", "advances")
         context.update(
             {
@@ -75,17 +95,31 @@ class ExpenseAdvancesWebMixin:
             return templates.TemplateResponse(
                 request, "expense/advances/detail.html", context
             )
+        if not can_read_employee_record(
+            db,
+            org_id,
+            auth,
+            advance.employee_id,
+            read_all_permission="expense:advances:read",
+            read_own_permission="expense:advances:read_own",
+        ):
+            return RedirectResponse(
+                "/expense/advances/list?error=permission", status_code=302
+            )
 
-        bank_accounts = list(
-            db.scalars(
-                select(BankAccount)
-                .where(
-                    BankAccount.organization_id == org_id,
-                    BankAccount.status == BankAccountStatus.active,
+        bank_accounts = []
+        if auth.has_permission("expense:advances:disburse"):
+            bank_accounts = list(
+                db.scalars(
+                    select(BankAccount)
+                    .where(
+                        BankAccount.organization_id == org_id,
+                        BankAccount.status == BankAccountStatus.active,
+                    )
+                    .order_by(BankAccount.account_name)
                 )
-                .order_by(BankAccount.account_name)
-            ).all()
-        )
+                .all()
+            )
 
         linked_claims = []
         if advance.status in [
@@ -111,8 +145,10 @@ class ExpenseAdvancesWebMixin:
                 "advance": advance,
                 "bank_accounts": bank_accounts,
                 "linked_claims": linked_claims,
-                "can_disburse": advance.status == CashAdvanceStatus.APPROVED,
-                "can_settle": advance.status
+                "can_disburse": auth.has_permission("expense:advances:disburse")
+                and advance.status == CashAdvanceStatus.APPROVED,
+                "can_settle": auth.has_permission("expense:advances:settle")
+                and advance.status
                 in [CashAdvanceStatus.DISBURSED, CashAdvanceStatus.PARTIALLY_SETTLED],
             }
         )

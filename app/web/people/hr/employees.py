@@ -7,7 +7,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web import hr_web_service
-from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
+from app.web.deps import WebAuthContext, get_db_for_org, require_web_permission
+
+_employee_read = require_web_permission("hr:employees:read")
+_employee_create = require_web_permission("hr:employees:create")
+_employee_update = require_web_permission("hr:employees:update")
+_employee_terminate = require_web_permission("hr:employees:terminate")
+_employee_credentials = require_web_permission("hr:employees:manage_credentials")
+_final_payroll_update = require_web_permission("payroll:final_payroll:update")
 
 router = APIRouter(tags=["employees"])
 
@@ -28,7 +35,7 @@ def list_employees(
     limit: int = Query(default=25, ge=1, le=200),
     success: str | None = None,
     error: str | None = None,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Employee list page."""
@@ -59,7 +66,7 @@ def view_org_chart_redirect() -> RedirectResponse:
 
 @router.get("/employees/stats")
 def employee_stats(
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Employee stats endpoint for dashboards."""
@@ -69,7 +76,7 @@ def employee_stats(
 @router.get("/employees/position-options", response_class=HTMLResponse)
 def employee_position_options(
     selected_position_id: str | None = None,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Lazy-load vacant position options for employee forms."""
@@ -84,7 +91,7 @@ def employee_position_options(
 @router.get("/employees/new", response_class=HTMLResponse)
 def new_employee_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New employee form page."""
@@ -95,7 +102,7 @@ def new_employee_form(
 async def create_employee(
     request: Request,
     background_tasks: BackgroundTasks,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Handle new employee form submission."""
@@ -115,7 +122,7 @@ def view_employee(
     invite_status: str | None = None,
     invite_recipient_kind: str | None = None,
     invite_recipient_email: str | None = None,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Employee detail page."""
@@ -135,7 +142,7 @@ def view_employee(
 def edit_employee_form(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Edit employee form page."""
@@ -148,7 +155,7 @@ def edit_employee_form(
 async def update_employee(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Handle employee update form submission."""
@@ -163,7 +170,7 @@ async def update_employee(
 @router.post("/employees/{employee_id}/activate")
 def activate_employee(
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Activate an employee."""
@@ -178,7 +185,7 @@ def activate_employee(
 def resend_employee_invite(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_credentials),
     db: Session = Depends(get_db_for_org),
 ):
     """Resend employee access invite."""
@@ -194,7 +201,7 @@ def resend_employee_invite(
 async def suspend_employee(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Suspend an employee."""
@@ -209,7 +216,7 @@ async def suspend_employee(
 @router.post("/employees/{employee_id}/on-leave")
 def set_employee_on_leave(
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Set an employee on leave."""
@@ -224,7 +231,7 @@ def set_employee_on_leave(
 async def resign_employee(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_terminate),
     db: Session = Depends(get_db_for_org),
 ):
     """Record employee resignation."""
@@ -240,7 +247,7 @@ async def resign_employee(
 async def rehire_employee(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_terminate),
     db: Session = Depends(get_db_for_org),
 ):
     """Rehire a previously separated employee."""
@@ -256,7 +263,7 @@ async def rehire_employee(
 async def terminate_employee(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_terminate),
     db: Session = Depends(get_db_for_org),
 ):
     """Terminate an employee."""
@@ -272,7 +279,7 @@ async def terminate_employee(
 async def update_final_payroll(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_final_payroll_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Update final payroll settings for an exited employee."""
@@ -289,7 +296,7 @@ async def toggle_employee_credential(
     request: Request,
     employee_id: UUID,
     credential_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_credentials),
     db: Session = Depends(get_db_for_org),
 ):
     """Enable/disable a user's login credential from the employee record."""

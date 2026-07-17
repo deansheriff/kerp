@@ -15,6 +15,7 @@ from app.api.deps import (
     require_current_employee_id,
     require_organization_id,
     require_tenant_auth,
+    require_tenant_permission,
 )
 from app.models.people.scheduling import RotationType, ScheduleStatus, SwapRequestStatus
 from app.schemas.people.scheduling import (
@@ -87,7 +88,7 @@ def handle_scheduling_error(e: Exception) -> None:
 router = APIRouter(
     prefix="/scheduling",
     tags=["scheduling"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 

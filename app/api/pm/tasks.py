@@ -9,7 +9,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_permission,
+)
 from app.models.pm import TaskPriority, TaskStatus
 from app.schemas.pm import (
     TaskAssignRequest,
@@ -37,6 +41,7 @@ router = APIRouter(prefix="/tasks", tags=["pm-tasks"])
 
 @router.get("", response_model=TaskListResponse)
 def list_tasks(
+    _auth: dict = Depends(require_tenant_permission("tasks:read")),
     organization_id: UUID = Depends(require_organization_id),
     project_id: UUID | None = None,
     status: str | None = None,
@@ -85,6 +90,7 @@ def list_tasks(
 @router.post("", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
 def create_task(
     data: TaskCreate,
+    _auth: dict = Depends(require_tenant_permission("tasks:create")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -100,6 +106,7 @@ def create_task(
 @router.get("/{task_id}", response_model=TaskRead)
 def get_task(
     task_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("tasks:read")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -116,6 +123,7 @@ def get_task(
 def update_task(
     task_id: UUID,
     data: TaskUpdate,
+    _auth: dict = Depends(require_tenant_permission("tasks:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -133,6 +141,7 @@ def update_task(
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task(
     task_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("tasks:delete")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -152,6 +161,7 @@ def delete_task(
 @router.post("/{task_id}/start", response_model=TaskStartResponse)
 def start_task(
     task_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("tasks:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -175,6 +185,7 @@ def start_task(
 @router.post("/{task_id}/complete", response_model=TaskCompleteResponse)
 def complete_task(
     task_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("tasks:complete")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -200,6 +211,7 @@ def complete_task(
 def update_progress(
     task_id: UUID,
     data: TaskProgressRequest,
+    _auth: dict = Depends(require_tenant_permission("tasks:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -218,6 +230,7 @@ def update_progress(
 def assign_task(
     task_id: UUID,
     data: TaskAssignRequest,
+    _auth: dict = Depends(require_tenant_permission("tasks:assign")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -238,6 +251,7 @@ def assign_task(
 @router.get("/{task_id}/dependencies", response_model=TaskDependencyListResponse)
 def get_dependencies(
     task_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("tasks:read")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -270,6 +284,7 @@ def get_dependencies(
 def add_dependency(
     task_id: UUID,
     data: TaskDependencyCreate,
+    _auth: dict = Depends(require_tenant_permission("tasks:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -305,6 +320,7 @@ def add_dependency(
 def remove_dependency(
     task_id: UUID,
     depends_on_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("tasks:update")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
