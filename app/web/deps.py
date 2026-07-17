@@ -1828,8 +1828,30 @@ def require_fixed_assets_access(
     return auth
 
 
+def _has_non_employee_hr_access(db: Session, person_id: UUID) -> bool:
+    """Ignore accidental HR grants inherited from the shared employee role."""
+    return (
+        db.scalar(
+            select(RolePermission.id)
+            .join(Role, RolePermission.role_id == Role.id)
+            .join(Permission, RolePermission.permission_id == Permission.id)
+            .join(PersonRole, PersonRole.role_id == Role.id)
+            .where(
+                PersonRole.person_id == person_id,
+                Role.name != "employee",
+                Role.is_active.is_(True),
+                Permission.key == "hr:access",
+                Permission.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        is not None
+    )
+
+
 def require_hr_access(
     auth: WebAuthContext = Depends(require_web_auth),
+    db: Session = Depends(get_db),
 ) -> WebAuthContext:
     """
     Require access to the HR module.
@@ -1844,7 +1866,12 @@ def require_hr_access(
         ):
             ...
     """
-    if not auth.has_module_access("people"):
+    has_valid_hr_role = bool(
+        auth.person_id and _has_non_employee_hr_access(db, auth.person_id)
+    )
+    if not auth.is_admin and (
+        not auth.has_module_access("people") or not has_valid_hr_role
+    ):
         raise HTTPException(
             status_code=403,
             detail="HR module access required",

@@ -204,25 +204,23 @@ def setup_rbac(db) -> Role:
             if permission is not None:
                 ensure_role_permission(db, role.id, permission.id)
 
-    # These legacy module-wide grants exposed management screens to every employee.
-    # Remove only this known unsafe set, preserving any custom role configuration.
+    # The default employee role is managed as a strict self-service baseline.
+    # Additional access belongs on separately assigned roles, not this shared role.
     employee_role = roles.get("employee")
     if employee_role is not None:
-        legacy_employee_grants = {
-            "expense:access",
-            "projects:access",
-            "support:access",
-        }
-        stale_permission_ids = [
+        allowed_permission_ids = [
             permissions[key].id
-            for key in legacy_employee_grants
+            for key in ROLE_PERMISSIONS["employee"]
             if key in permissions
         ]
-        if stale_permission_ids:
-            db.query(RolePermission).filter(
-                RolePermission.role_id == employee_role.id,
-                RolePermission.permission_id.in_(stale_permission_ids),
-            ).delete(synchronize_session=False)
+        stale_links = db.query(RolePermission).filter(
+            RolePermission.role_id == employee_role.id
+        )
+        if allowed_permission_ids:
+            stale_links = stale_links.filter(
+                RolePermission.permission_id.notin_(allowed_permission_ids)
+            )
+        stale_links.delete(synchronize_session=False)
 
     all_permissions = list(permissions.values())
     for permission in all_permissions:

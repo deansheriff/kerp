@@ -2652,20 +2652,25 @@ def _ensure_person_role(db, person_id, role_id):
     return link
 
 
-def _remove_legacy_employee_grants(db, roles, permissions):
-    """Remove module-wide grants that are unsafe for the default employee role."""
+def _reconcile_default_employee_permissions(db, roles, permissions):
+    """Keep the managed employee role limited to its self-service baseline."""
     employee_role = roles.get("employee")
     if employee_role is None:
         return
-    stale_keys = {"expense:access", "projects:access", "support:access"}
-    stale_permission_ids = [
-        permissions[key].id for key in stale_keys if key in permissions
+
+    allowed_permission_ids = [
+        permissions[key].id
+        for key in ROLE_PERMISSIONS["employee"]
+        if key in permissions
     ]
-    if stale_permission_ids:
-        db.query(RolePermission).filter(
-            RolePermission.role_id == employee_role.id,
-            RolePermission.permission_id.in_(stale_permission_ids),
-        ).delete(synchronize_session=False)
+    stale_links = db.query(RolePermission).filter(
+        RolePermission.role_id == employee_role.id
+    )
+    if allowed_permission_ids:
+        stale_links = stale_links.filter(
+            RolePermission.permission_id.notin_(allowed_permission_ids)
+        )
+    stale_links.delete(synchronize_session=False)
 
 
 def main():
@@ -2709,7 +2714,7 @@ def main():
                     )
                     continue
                 _ensure_role_permission(db, role.id, permission.id)
-        _remove_legacy_employee_grants(db, roles, permissions)
+        _reconcile_default_employee_permissions(db, roles, permissions)
         db.commit()
 
         admin_role = roles.get("admin")

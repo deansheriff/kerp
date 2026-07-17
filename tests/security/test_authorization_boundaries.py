@@ -69,11 +69,11 @@ class EmployeeRoleBoundaryTests(unittest.TestCase):
         self.assertNotIn("projects:access", permissions)
         self.assertNotIn("support:access", permissions)
 
-    def test_startup_seed_revokes_legacy_employee_grants(self) -> None:
+    def test_startup_seed_reconciles_employee_role_exactly(self) -> None:
         source = _source("scripts/seed_admin.py")
-        for permission in ("expense:access", "projects:access", "support:access"):
-            self.assertIn(f'"{permission}"', source)
-        self.assertIn("RolePermission.permission_id.in_", source)
+        self.assertIn('ROLE_PERMISSIONS["employee"]', source)
+        self.assertIn("RolePermission.permission_id.notin_", source)
+        self.assertNotIn("legacy_employee_grants", source)
 
     def test_tighter_routes_keep_expected_manager_access(self) -> None:
         operations_permissions = _role_permissions("operations_manager")
@@ -104,6 +104,12 @@ class RouteBoundaryTests(unittest.TestCase):
             "resend_employee_invite",
             "_employee_credentials",
         )
+
+    def test_broad_hr_gate_ignores_employee_role_grants(self) -> None:
+        source = _source("app/web/deps.py")
+        self.assertIn("def _has_non_employee_hr_access", source)
+        self.assertIn('Role.name != "employee"', source)
+        self.assertIn("not has_valid_hr_role", source)
 
     def test_support_and_project_routes_do_not_use_module_wide_guards(self) -> None:
         self.assertNotIn("require_support_access", _source("app/web/support.py"))
