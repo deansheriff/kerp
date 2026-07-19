@@ -5,7 +5,7 @@ Dashboard page for the People/HR module.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web import people_dashboard_service
@@ -20,7 +20,7 @@ def people_dashboard(
     request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
     db: Session = Depends(get_db_for_org),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     """People module dashboard page."""
     if not auth.has_permission("hr:dashboard"):
         if auth.has_any_permission(

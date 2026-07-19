@@ -182,6 +182,8 @@ class RouteBoundaryTests(unittest.TestCase):
     def test_people_landing_supports_read_only_employee_access(self) -> None:
         source = _source("app/web/people/dashboard.py")
         self.assertIn("Depends(require_web_auth)", source)
+        self.assertIn(") -> Response:", source)
+        self.assertNotIn("HTMLResponse | RedirectResponse", source)
         self.assertIn('auth.has_permission("hr:dashboard")', source)
         self.assertIn('"hr:employees:directory", "hr:employees:read"', source)
         self.assertIn('url="/people/hr/employees"', source)
