@@ -99,6 +99,12 @@ class EmployeeRoleBoundaryTests(unittest.TestCase):
         self.assertIn("RolePermission.permission_id.notin_", source)
         self.assertNotIn("legacy_employee_grants", source)
 
+    def test_startup_seed_deduplicates_role_permissions_before_flush(self) -> None:
+        source = _source("scripts/seed_admin.py")
+        self.assertIn("known_role_permission_pairs = {", source)
+        self.assertGreaterEqual(source.count("known_role_permission_pairs,"), 2)
+        self.assertIn("if known_pairs is not None and pair in known_pairs", source)
+
     def test_runtime_employee_scope_baseline_matches_seed(self) -> None:
         self.assertEqual(_employee_permissions(), _employee_runtime_scopes())
 

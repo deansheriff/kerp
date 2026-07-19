@@ -253,7 +253,10 @@ def bypass_rls_sync(db: Session) -> Generator[None, None, None]:
     try:
         yield
     finally:
-        disable_rls_bypass_sync(db)
+        # A failed flush leaves the transaction unusable until rollback. Do not
+        # mask the original database error with a PendingRollbackError here.
+        if db.is_active:
+            disable_rls_bypass_sync(db)
 
 
 @contextmanager

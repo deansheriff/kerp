@@ -158,8 +158,16 @@ def ensure_role(db, name: str, description: str) -> Role:
     return role
 
 
-def ensure_role_permission(db, role_id, permission_id):
+def ensure_role_permission(
+    db,
+    role_id,
+    permission_id,
+    known_pairs: set[tuple[uuid.UUID, uuid.UUID]] | None = None,
+):
     """Link a permission to a role."""
+    pair = (role_id, permission_id)
+    if known_pairs is not None and pair in known_pairs:
+        return None
     link = db.scalar(
         select(RolePermission)
         .where(RolePermission.role_id == role_id)
@@ -168,6 +176,8 @@ def ensure_role_permission(db, role_id, permission_id):
     if not link:
         link = RolePermission(role_id=role_id, permission_id=permission_id)
         db.add(link)
+    if known_pairs is not None:
+        known_pairs.add(pair)
     return link
 
 
@@ -203,6 +213,12 @@ def setup_rbac(db) -> Role:
         permission.key: permission for permission in db.scalars(select(Permission)).all()
     }
     admin_role = roles["admin"]
+    known_role_permission_pairs = {
+        (role_id, permission_id)
+        for role_id, permission_id in db.execute(
+            select(RolePermission.role_id, RolePermission.permission_id)
+        )
+    }
 
     for role_name, permission_keys in ROLE_PERMISSIONS.items():
         role = roles.get(role_name)
@@ -211,7 +227,12 @@ def setup_rbac(db) -> Role:
         for permission_key in permission_keys:
             permission = permissions.get(permission_key)
             if permission is not None:
-                ensure_role_permission(db, role.id, permission.id)
+                ensure_role_permission(
+                    db,
+                    role.id,
+                    permission.id,
+                    known_role_permission_pairs,
+                )
 
     # The default employee role is managed as a strict self-service baseline.
     # Additional access belongs on separately assigned roles, not this shared role.
@@ -233,7 +254,12 @@ def setup_rbac(db) -> Role:
 
     all_permissions = list(permissions.values())
     for permission in all_permissions:
-        ensure_role_permission(db, admin_role.id, permission.id)
+        ensure_role_permission(
+            db,
+            admin_role.id,
+            permission.id,
+            known_role_permission_pairs,
+        )
     db.flush()
     print(f"  Admin role: {len(all_permissions)} permissions")
 
