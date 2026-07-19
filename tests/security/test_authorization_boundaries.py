@@ -38,13 +38,13 @@ def _employee_permissions() -> set[str]:
 
 
 def _employee_runtime_scopes() -> set[str]:
-    tree = ast.parse(_source("app/web/deps.py"))
+    tree = ast.parse(_source("app/services/auth_flow.py"))
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign):
             continue
         if not any(
             isinstance(target, ast.Name)
-            and target.id == "_EMPLOYEE_SELF_SERVICE_SCOPES"
+            and target.id == "EMPLOYEE_SELF_SERVICE_PERMISSIONS"
             for target in node.targets
         ):
             continue
@@ -135,16 +135,83 @@ class RouteBoundaryTests(unittest.TestCase):
     def test_broad_hr_gate_ignores_employee_role_grants(self) -> None:
         source = _source("app/web/deps.py")
         self.assertIn("def _has_non_employee_hr_access", source)
-        self.assertIn('Role.name != "employee"', source)
+        self.assertIn('func.lower(Role.name) != "employee"', source)
         self.assertIn("not has_valid_hr_role", source)
 
-    def test_employee_only_sessions_are_restricted_on_every_request(self) -> None:
+    def test_web_sessions_reload_current_effective_permissions(self) -> None:
         source = _source("app/web/deps.py")
-        self.assertIn("def _restrict_employee_only_scopes", source)
-        self.assertIn('normalized_roles != {"employee"}', source)
+        self.assertGreaterEqual(source.count("load_effective_rbac_claims("), 2)
+        self.assertNotIn("_load_web_permission_scopes", source)
+
+    def test_api_sessions_reload_current_effective_permissions(self) -> None:
+        source = _source("app/services/auth_dependencies.py")
+        self.assertGreaterEqual(source.count("load_effective_rbac_claims("), 4)
+        self.assertNotIn("select(RolePermission)", source)
+
+    def test_employee_role_is_filtered_at_permission_query(self) -> None:
+        source = _source("app/services/auth_flow.py")
+        self.assertIn('func.lower(Role.name) != "employee"', source)
         self.assertIn(
-            "scopes = _restrict_employee_only_scopes(roles, scopes)", source
+            "Permission.key.in_(EMPLOYEE_SELF_SERVICE_PERMISSIONS)", source
         )
+
+    def test_employee_create_is_guarded_on_web_and_api(self) -> None:
+        web_source = _source("app/web/people/hr/employees.py")
+        api_source = _source("app/api/people/hr.py")
+        self.assertIn(
+            '_employee_create = require_web_permission("hr:employees:create")',
+            web_source,
+        )
+        self.assertIn(
+            'require_tenant_permission("hr:employees:create")', api_source
+        )
+
+    def test_health_exposes_authorization_policy_version(self) -> None:
+        source = _source("app/main.py")
+        self.assertIn('"authorization_policy": "effective-rbac-v2"', source)
+
+    def test_integration_and_scheduler_apis_have_permission_boundaries(self) -> None:
+        self.assertIn(
+            'require_tenant_permission("integrations:manage")',
+            _source("app/api/service_hooks.py"),
+        )
+        self.assertIn(
+            'require_tenant_permission("integrations:manage")',
+            _source("app/api/crm.py"),
+        )
+        scheduler = _source("app/api/scheduler.py")
+        self.assertIn("require_tenant_method_permission", scheduler)
+        self.assertIn('"scheduler:read", "scheduler:manage"', scheduler)
+
+    def test_finance_import_and_analysis_apis_have_specific_guards(self) -> None:
+        opening_balance = _source("app/api/finance/opening_balance.py")
+        analysis = _source("app/api/finance/analysis.py")
+        self.assertIn(
+            'require_tenant_permission("gl:balances:read")', opening_balance
+        )
+        self.assertGreaterEqual(
+            opening_balance.count(
+                'require_tenant_permission("gl:journals:create")'
+            ),
+            2,
+        )
+        self.assertIn('"gl:accounts:create" not in scopes', opening_balance)
+        self.assertIn('require_tenant_permission("gl:balances:read")', analysis)
+
+    def test_fleet_write_access_is_separate_from_module_access(self) -> None:
+        source = _source("app/api/fleet/__init__.py")
+        self.assertIn('require_tenant_permission("fleet:access")', source)
+        self.assertIn(
+            'require_tenant_method_permission("fleet:read", "fleet:manage")',
+            source,
+        )
+
+    def test_workflow_task_mutations_require_scope_and_assignment(self) -> None:
+        source = _source("app/api/workflow_tasks.py")
+        self.assertIn("def _require_assigned_task", source)
+        self.assertIn("task.assignee_employee_id != employee_id", source)
+        self.assertIn('require_tenant_permission("tasks:update")', source)
+        self.assertIn('require_tenant_permission("tasks:complete")', source)
 
     def test_support_and_project_routes_do_not_use_module_wide_guards(self) -> None:
         self.assertNotIn("require_support_access", _source("app/web/support.py"))

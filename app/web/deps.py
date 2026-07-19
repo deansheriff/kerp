@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover
     UTC = timezone.utc
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -34,9 +34,9 @@ from app.rls import set_current_organization, set_current_organization_sync
 from app.services.auth_dependencies import is_session_inactive
 from app.services.auth_flow import (
     AuthFlow,
-    _load_rbac_claims,
     decode_access_token,
     hash_session_token,
+    load_effective_rbac_claims,
 )
 from app.services.common import coerce_uuid
 from app.services.finance.branding import BrandingService, CSSGenerator
@@ -50,47 +50,6 @@ from app.templates import templates  # noqa: F401 - re-exported for web routes
 logger = logging.getLogger(__name__)
 
 _SESSION_TOUCH_INTERVAL = timedelta(seconds=60)
-
-_EMPLOYEE_SELF_SERVICE_SCOPES = frozenset(
-    {
-        "coach:insights:read",
-        "coach:insights:feedback",
-        "coach:reports:read",
-        "coach:chat:access",
-        "self:access",
-        "selfservice:profile:read",
-        "selfservice:profile:update",
-        "selfservice:documents:read",
-        "selfservice:documents:upload",
-        "leave:applications:read_own",
-        "leave:applications:create",
-        "leave:balance:read_own",
-        "attendance:records:read_own",
-        "attendance:requests:read_own",
-        "attendance:requests:create",
-        "perf:appraisals:read_own",
-        "perf:appraisals:self_review",
-        "perf:goals:read",
-        "perf:goals:update",
-        "expense:claims:read_own",
-        "expense:claims:create",
-        "expense:claims:update",
-        "expense:claims:delete",
-        "expense:claims:submit",
-        "expense:advances:read_own",
-        "expense:advances:create",
-        "payroll:slips:read_own",
-        "training:events:read",
-        "training:enrollments:self_enroll",
-        "training:feedback:submit",
-        "support:tickets:read_own",
-        "support:tickets:create",
-        "tasks:read_own",
-        "tasks:update",
-        "tasks:complete",
-    }
-)
-
 
 def _set_actor_context(request: Request, actor_id: UUID | str) -> None:
     """Keep request state and observability context in sync for auditing."""
@@ -1333,51 +1292,6 @@ def _normalize_roles_scopes(
     return normalized_roles, normalized_scopes
 
 
-def _ensure_admin_role(db: Session, person_id: UUID, roles: list[str]) -> list[str]:
-    if "admin" in roles:
-        return roles
-    admin_role = db.scalar(select(Role).where(Role.name == "admin"))
-    if not admin_role:
-        return roles
-    has_admin_role = db.scalar(
-        select(PersonRole).where(
-            PersonRole.person_id == person_id,
-            PersonRole.role_id == admin_role.id,
-        )
-    )
-    if has_admin_role:
-        roles = [*roles, "admin"]
-    return roles
-
-
-def _load_web_permission_scopes(
-    db: Session,
-    person_id: UUID,
-    existing_scopes: list[str],
-) -> list[str]:
-    """Merge token scopes with current DB-backed permission scopes for web auth."""
-    permission_rows = db.scalars(
-        select(Permission.key)
-        .join(RolePermission, RolePermission.permission_id == Permission.id)
-        .join(Role, RolePermission.role_id == Role.id)
-        .join(PersonRole, PersonRole.role_id == Role.id)
-        .where(PersonRole.person_id == person_id)
-        .where(Role.is_active.is_(True))
-        .where(Permission.is_active.is_(True))
-    ).all()
-    return list({*existing_scopes, *(str(key) for key in permission_rows if key)})
-
-
-def _restrict_employee_only_scopes(
-    roles: list[str], scopes: list[str]
-) -> list[str]:
-    """Fail closed when the shared employee role contains stale DB grants."""
-    normalized_roles = {role.strip().lower() for role in roles if role.strip()}
-    if normalized_roles != {"employee"}:
-        return scopes
-    return [scope for scope in scopes if scope in _EMPLOYEE_SELF_SERVICE_SCOPES]
-
-
 def require_web_auth(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -1477,19 +1391,6 @@ def require_web_auth(
             if auth_db:
                 auth_db.close()
 
-        roles_value = payload.get("roles")
-        roles = (
-            [str(role) for role in roles_value] if isinstance(roles_value, list) else []
-        )
-        scopes_value = payload.get("scopes")
-        scopes = (
-            [str(scope) for scope in scopes_value]
-            if isinstance(scopes_value, list)
-            else []
-        )
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
     else:
         refresh_token = _get_refresh_token_cookie(request, db)
         if not refresh_token:
@@ -1502,12 +1403,9 @@ def require_web_auth(
         if not resolved:
             raise HTTPException(status_code=401, detail="Invalid or expired session")
         person_uuid, _ = resolved
-        roles, scopes = _load_rbac_claims(db, str(person_uuid))
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
 
-    scopes = _restrict_employee_only_scopes(roles, scopes)
+    roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
+    roles, scopes = _normalize_roles_scopes(roles, scopes)
 
     # Get person details
     person = _get_person_for_web_session(db, person_uuid)
@@ -1746,19 +1644,6 @@ def optional_web_auth(
             if auth_db:
                 auth_db.close()
 
-        roles_value = payload.get("roles")
-        roles = (
-            [str(role) for role in roles_value] if isinstance(roles_value, list) else []
-        )
-        scopes_value = payload.get("scopes")
-        scopes = (
-            [str(scope) for scope in scopes_value]
-            if isinstance(scopes_value, list)
-            else []
-        )
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
     else:
         refresh_token = _get_refresh_token_cookie(request, db)
         if not refresh_token:
@@ -1767,10 +1652,9 @@ def optional_web_auth(
         if not resolved:
             return WebAuthContext(is_authenticated=False)
         person_uuid, _ = resolved
-        roles, scopes = _load_rbac_claims(db, str(person_uuid))
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
+
+    roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
+    roles, scopes = _normalize_roles_scopes(roles, scopes)
 
     # Get person details
     person = _get_person_for_web_session(db, person_uuid)
@@ -1890,7 +1774,7 @@ def _has_non_employee_hr_access(db: Session, person_id: UUID) -> bool:
             .join(PersonRole, PersonRole.role_id == Role.id)
             .where(
                 PersonRole.person_id == person_id,
-                Role.name != "employee",
+                func.lower(Role.name) != "employee",
                 Role.is_active.is_(True),
                 Permission.key == "hr:access",
                 Permission.is_active.is_(True),

@@ -16,7 +16,6 @@ from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.coach.insight import CoachInsight
-from app.models.rbac import Permission, PersonRole, Role, RolePermission
 from app.services.common import PaginationParams, coerce_uuid, paginate
 from app.services.people.hr.org_resolver import OrgResolver
 
@@ -412,40 +411,11 @@ class CoachService:
         )
 
     def _has_permission(self, person_id: UUID, permission_key: str) -> bool:
-        # "admin" role is always allowed.
-        stmt_admin = (
-            select(func.count())
-            .select_from(PersonRole)
-            .join(Role, PersonRole.role_id == Role.id)
-            .where(
-                PersonRole.person_id == person_id,
-                Role.name == "admin",
-                Role.is_active.is_(True),
-            )
-        )
-        if int(self.db.scalar(stmt_admin) or 0) > 0:
-            return True
+        from app.services.auth_flow import load_effective_rbac_claims
 
-        perm = self.db.scalar(
-            select(Permission)
-            .where(Permission.key == permission_key, Permission.is_active.is_(True))
-            .limit(1)
-        )
-        if not perm:
-            return False
-
-        stmt = (
-            select(func.count())
-            .select_from(RolePermission)
-            .join(Role, RolePermission.role_id == Role.id)
-            .join(PersonRole, PersonRole.role_id == Role.id)
-            .where(
-                PersonRole.person_id == person_id,
-                RolePermission.permission_id == perm.id,
-                Role.is_active.is_(True),
-            )
-        )
-        return int(self.db.scalar(stmt) or 0) > 0
+        roles, permissions = load_effective_rbac_claims(self.db, str(person_id))
+        normalized_roles = {str(role).strip().lower() for role in roles}
+        return "admin" in normalized_roles or permission_key in permissions
 
     def _collect_report_tree(
         self, organization_id: UUID, root_employee_id: UUID

@@ -7,7 +7,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.workflow_task import WorkflowTaskPriority, WorkflowTaskStatus
 from app.schemas.workflow_task import (
     WorkflowTaskRead,
@@ -38,6 +42,24 @@ def _get_employee_id(db: Session, organization_id: UUID, person_id: UUID) -> UUI
     if not employee:
         raise HTTPException(status_code=404, detail="Employee record not found")
     return employee.employee_id
+
+
+def _require_assigned_task(
+    service: WorkflowTaskService,
+    db: Session,
+    organization_id: UUID,
+    task_id: UUID,
+    auth: dict,
+) -> None:
+    """Limit ordinary task actions to the caller's assigned tasks."""
+    roles = {str(role).strip().lower() for role in auth.get("roles") or []}
+    scopes = {str(scope).strip().lower() for scope in auth.get("scopes") or []}
+    if "admin" in roles or scopes.intersection({"tasks:read", "tasks:assign"}):
+        return
+    employee_id = _get_employee_id(db, organization_id, UUID(auth["person_id"]))
+    task = service.get_task(organization_id, task_id)
+    if task.assignee_employee_id != employee_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 
 @router.get("/my-tasks")
@@ -88,12 +110,13 @@ def my_tasks_summary(
 def update_task_status(
     task_id: UUID,
     payload: WorkflowTaskStatusUpdate,
-    auth: dict = Depends(require_tenant_auth),
+    auth: dict = Depends(require_tenant_permission("tasks:update")),
     db: Session = Depends(get_db_with_org),
 ):
     """Update workflow task status."""
     organization_id = UUID(auth["organization_id"])
     svc = WorkflowTaskService(db)
+    _require_assigned_task(svc, db, organization_id, task_id, auth)
     task = svc.update_status(organization_id, task_id, payload.status)
     return WorkflowTaskRead.model_validate(task)
 
@@ -101,12 +124,13 @@ def update_task_status(
 @router.post("/{task_id}/complete")
 def complete_task(
     task_id: UUID,
-    auth: dict = Depends(require_tenant_auth),
+    auth: dict = Depends(require_tenant_permission("tasks:complete")),
     db: Session = Depends(get_db_with_org),
 ):
     """Mark workflow task completed."""
     organization_id = UUID(auth["organization_id"])
     svc = WorkflowTaskService(db)
+    _require_assigned_task(svc, db, organization_id, task_id, auth)
     task = svc.complete_task(organization_id, task_id)
     return WorkflowTaskRead.model_validate(task)
 
@@ -115,11 +139,12 @@ def complete_task(
 def snooze_task(
     task_id: UUID,
     payload: WorkflowTaskSnoozeRequest,
-    auth: dict = Depends(require_tenant_auth),
+    auth: dict = Depends(require_tenant_permission("tasks:update")),
     db: Session = Depends(get_db_with_org),
 ):
     """Snooze a workflow task."""
     organization_id = UUID(auth["organization_id"])
     svc = WorkflowTaskService(db)
+    _require_assigned_task(svc, db, organization_id, task_id, auth)
     task = svc.snooze_task(organization_id, task_id, days=payload.days)
     return WorkflowTaskRead.model_validate(task)
