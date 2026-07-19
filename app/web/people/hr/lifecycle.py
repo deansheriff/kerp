@@ -7,7 +7,14 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web.lifecycle_web import lifecycle_web_service
-from app.web.deps import get_db_for_org, WebAuthContext, require_hr_access
+from app.web.deps import (
+    WebAuthContext,
+    get_db_for_org,
+    require_hr_access,
+    require_web_permission,
+)
+
+_employee_credentials = require_web_permission("hr:employees:manage_credentials")
 
 router = APIRouter(tags=["lifecycle"])
 
@@ -96,7 +103,7 @@ async def complete_onboarding(
 async def create_employee_user_credentials(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_credentials),
     db: Session = Depends(get_db_for_org),
 ):
     """Create user credentials for an employee."""
@@ -112,7 +119,7 @@ async def create_employee_user_credentials(
 async def link_employee_user(
     request: Request,
     employee_id: UUID,
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_credentials),
     db: Session = Depends(get_db_for_org),
 ):
     """Link an employee to an existing user (Person)."""
@@ -127,7 +134,7 @@ async def link_employee_user(
 @router.get("/people/search")
 def search_people(
     query: str = Query("", min_length=1),
-    auth: WebAuthContext = Depends(require_hr_access),
+    auth: WebAuthContext = Depends(_employee_credentials),
     db: Session = Depends(get_db_for_org),
 ):
     """Search people by name or email for linking users."""

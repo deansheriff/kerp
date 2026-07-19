@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session, joinedload
 from starlette.datastructures import UploadFile
 
 from app.models.auth import Session as AuthSession
-from app.models.auth import SessionStatus, UserCredential
+from app.models.auth import AuthProvider, SessionStatus, UserCredential
 from app.models.finance.core_org.cost_center import CostCenter
 from app.models.finance.core_org.location import Location
 from app.models.finance.core_org.pfa_directory import PFADirectory
@@ -2240,8 +2240,11 @@ class HRWebService:
                     "name": approver_person.name if approver_person else "",
                 }
 
+        can_manage_credentials = auth.has_permission(
+            "hr:employees:manage_credentials"
+        )
         credentials: list[UserCredential] = []
-        if employee.person_id:
+        if can_manage_credentials and employee.person_id:
             credentials = list(
                 db.scalars(
                     select(UserCredential)
@@ -2303,12 +2306,17 @@ class HRWebService:
             "expense_approver": expense_approver,
             "position_chain": position_chain,
             "credentials": credentials,
+            "has_local_credential": any(
+                credential.provider == AuthProvider.local
+                for credential in credentials
+            ),
             "salary_assignments": salary_assignments,
             "tax_profile": tax_profile,
             "onboarding": onboarding,
             "assigned_assets": assigned_assets,
             "can_view_assigned_assets": can_view_assigned_assets,
             "can_manage_final_payroll": self._can_manage_final_payroll(auth),
+            "can_manage_credentials": can_manage_credentials,
             "can_update_employee": self._can_update_employee(auth),
         }
 
@@ -2338,6 +2346,9 @@ class HRWebService:
             raise HTTPException(status_code=404, detail="Employee not found") from exc
 
         if not auth.has_permission("hr:employees:read_sensitive"):
+            can_manage_credentials = auth.has_permission(
+                "hr:employees:manage_credentials"
+            )
             person = db.get(Person, employee.person_id)
             department = (
                 db.get(Department, employee.department_id)
@@ -2359,6 +2370,16 @@ class HRWebService:
                         "name": manager_person.name if manager_person else "",
                     }
 
+            credentials: list[UserCredential] = []
+            if can_manage_credentials and employee.person_id:
+                credentials = list(
+                    db.scalars(
+                        select(UserCredential)
+                        .where(UserCredential.person_id == employee.person_id)
+                        .order_by(UserCredential.created_at.asc())
+                    )
+                )
+
             return templates.TemplateResponse(
                 request,
                 "people/hr/employee_directory_detail.html",
@@ -2375,6 +2396,12 @@ class HRWebService:
                     "department": department,
                     "designation": designation,
                     "manager": manager,
+                    "credentials": credentials,
+                    "has_local_credential": any(
+                        credential.provider == AuthProvider.local
+                        for credential in credentials
+                    ),
+                    "can_manage_credentials": can_manage_credentials,
                 },
             )
 

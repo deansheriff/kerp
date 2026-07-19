@@ -48,6 +48,26 @@ class LifecycleWebService:
         return str(value).strip()
 
     @staticmethod
+    def _employee_user_access_error_response(
+        request: Request,
+        auth: WebAuthContext,
+        db: Session,
+        employee_id: UUID,
+        message: str,
+    ) -> HTMLResponse:
+        response = hr_web_service.employee_detail_response(
+            request, auth, db, str(employee_id)
+        )
+        context = cast(Any, response).context
+        context["user_access_error"] = message
+        template_name = (
+            "people/hr/employee_detail.html"
+            if auth.has_permission("hr:employees:read_sensitive")
+            else "people/hr/employee_directory_detail.html"
+        )
+        return templates.TemplateResponse(request, template_name, context)
+
+    @staticmethod
     def new_onboarding_form_response(
         request: Request,
         employee_id: UUID,
@@ -229,13 +249,8 @@ class LifecycleWebService:
             )
         except ValidationError as exc:
             db.rollback()
-            response = hr_web_service.employee_detail_response(
-                request, auth, db, str(employee_id)
-            )
-            context = cast(Any, response).context
-            context["user_access_error"] = str(exc)
-            return templates.TemplateResponse(
-                request, "people/hr/employee_detail.html", context
+            return LifecycleWebService._employee_user_access_error_response(
+                request, auth, db, employee_id, str(exc)
             )
 
     @staticmethod
@@ -251,13 +266,8 @@ class LifecycleWebService:
 
         person_id = LifecycleWebService._form_str(form, "person_id")
         if not person_id:
-            response = hr_web_service.employee_detail_response(
-                request, auth, db, str(employee_id)
-            )
-            context = cast(Any, response).context
-            context["user_access_error"] = "Person ID is required."
-            return templates.TemplateResponse(
-                request, "people/hr/employee_detail.html", context
+            return LifecycleWebService._employee_user_access_error_response(
+                request, auth, db, employee_id, "Person ID is required."
             )
 
         org_id = coerce_uuid(auth.organization_id)
@@ -266,13 +276,8 @@ class LifecycleWebService:
         try:
             person_uuid = coerce_uuid(person_id, raise_http=False)
         except Exception:
-            response = hr_web_service.employee_detail_response(
-                request, auth, db, str(employee_id)
-            )
-            context = cast(Any, response).context
-            context["user_access_error"] = "Invalid Person ID."
-            return templates.TemplateResponse(
-                request, "people/hr/employee_detail.html", context
+            return LifecycleWebService._employee_user_access_error_response(
+                request, auth, db, employee_id, "Invalid Person ID."
             )
 
         try:
@@ -283,13 +288,8 @@ class LifecycleWebService:
             )
         except ValidationError as exc:
             db.rollback()
-            response = hr_web_service.employee_detail_response(
-                request, auth, db, str(employee_id)
-            )
-            context = cast(Any, response).context
-            context["user_access_error"] = str(exc)
-            return templates.TemplateResponse(
-                request, "people/hr/employee_detail.html", context
+            return LifecycleWebService._employee_user_access_error_response(
+                request, auth, db, employee_id, str(exc)
             )
 
     @staticmethod

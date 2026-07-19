@@ -144,6 +144,41 @@ class RouteBoundaryTests(unittest.TestCase):
             "_employee_credentials",
         )
 
+    def test_employee_login_management_uses_specific_permission(self) -> None:
+        source = _source("app/web/people/hr/lifecycle.py")
+        self.assertIn(
+            '_employee_credentials = require_web_permission('
+            '"hr:employees:manage_credentials")',
+            source,
+        )
+        self.assert_guard(
+            "app/web/people/hr/lifecycle.py",
+            "create_employee_user_credentials",
+            "_employee_credentials",
+        )
+        self.assert_guard(
+            "app/web/people/hr/lifecycle.py",
+            "link_employee_user",
+            "_employee_credentials",
+        )
+        self.assert_guard(
+            "app/web/people/hr/lifecycle.py",
+            "search_people",
+            "_employee_credentials",
+        )
+
+    def test_employee_login_controls_follow_credential_permission(self) -> None:
+        service = _source("app/services/people/hr/web/employee_web.py")
+        detail = _source("templates/people/hr/employee_detail.html")
+        directory = _source(
+            "templates/people/hr/employee_directory_detail.html"
+        )
+        self.assertIn('"can_manage_credentials": can_manage_credentials', service)
+        self.assertIn("credential.provider == AuthProvider.local", service)
+        self.assertIn("{% if can_manage_credentials %}", detail)
+        self.assertIn("{% if can_manage_credentials %}", directory)
+        self.assertIn("{% if has_local_credential %}disabled{% endif %}", detail)
+
     def test_people_landing_supports_read_only_employee_access(self) -> None:
         source = _source("app/web/people/dashboard.py")
         self.assertIn("Depends(require_web_auth)", source)
@@ -160,7 +195,7 @@ class RouteBoundaryTests(unittest.TestCase):
         self.assertIn("Work information", directory_template)
         self.assertNotIn("salary", directory_template.lower())
         self.assertNotIn("tax", directory_template.lower())
-        self.assertNotIn("credentials", directory_template.lower())
+        self.assertIn("{% if can_manage_credentials %}", directory_template)
 
     def test_broad_hr_gate_ignores_employee_role_grants(self) -> None:
         source = _source("app/web/deps.py")
