@@ -88,7 +88,13 @@ class EmployeeRoleBoundaryTests(unittest.TestCase):
     def test_employee_role_is_self_service_only(self) -> None:
         permissions = _employee_permissions()
         self.assertIn("self:access", permissions)
+        self.assertIn("hr:employees:directory", permissions)
+        self.assertNotIn("hr:employees:read", permissions)
         self.assertNotIn("hr:access", permissions)
+        self.assertNotIn("hr:employees:read_sensitive", permissions)
+        self.assertNotIn("hr:employees:create", permissions)
+        self.assertNotIn("hr:employees:update", permissions)
+        self.assertNotIn("hr:employees:delete", permissions)
         self.assertNotIn("expense:access", permissions)
         self.assertNotIn("projects:access", permissions)
         self.assertNotIn("support:access", permissions)
@@ -138,6 +144,24 @@ class RouteBoundaryTests(unittest.TestCase):
             "_employee_credentials",
         )
 
+    def test_people_landing_supports_read_only_employee_access(self) -> None:
+        source = _source("app/web/people/dashboard.py")
+        self.assertIn("Depends(require_web_auth)", source)
+        self.assertIn('auth.has_permission("hr:dashboard")', source)
+        self.assertIn('"hr:employees:directory", "hr:employees:read"', source)
+        self.assertIn('url="/people/hr/employees"', source)
+
+    def test_directory_detail_does_not_render_sensitive_hr_record(self) -> None:
+        service = _source("app/services/people/hr/web/employee_web.py")
+        directory_template = _source(
+            "templates/people/hr/employee_directory_detail.html"
+        )
+        self.assertIn('auth.has_permission("hr:employees:read_sensitive")', service)
+        self.assertIn("Work information", directory_template)
+        self.assertNotIn("salary", directory_template.lower())
+        self.assertNotIn("tax", directory_template.lower())
+        self.assertNotIn("credentials", directory_template.lower())
+
     def test_broad_hr_gate_ignores_employee_role_grants(self) -> None:
         source = _source("app/web/deps.py")
         self.assertIn("def _has_non_employee_hr_access", source)
@@ -171,6 +195,16 @@ class RouteBoundaryTests(unittest.TestCase):
         self.assertIn(
             'require_tenant_permission("hr:employees:create")', api_source
         )
+
+    def test_employee_directory_permission_does_not_open_employee_api(self) -> None:
+        permissions = _employee_permissions()
+        api_source = _source("app/api/people/hr.py")
+        self.assertIn("hr:employees:directory", permissions)
+        self.assertNotIn("hr:employees:read", permissions)
+        self.assertIn(
+            'require_tenant_permission("hr:employees:read")', api_source
+        )
+        self.assertNotIn("hr:employees:directory", api_source)
 
     def test_health_exposes_authorization_policy_version(self) -> None:
         source = _source("app/main.py")

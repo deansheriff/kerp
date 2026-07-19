@@ -101,7 +101,7 @@
         <!-- Navigation -->
         <nav class="flex-1 space-y-1 overflow-y-auto p-3" aria-label="People navigation">
             {% set switch_module = "discipline" if (active_module | default("people")) in ["discipline", "hr-discipline"] else "people" %}
-            {% if "people" in modules %}
+            {% if "people" in modules and auth.has_permission("hr:access") %}
             <!-- Dashboard Link -->
             <a href="/people"
                :aria-current="activeModule === 'dashboard' ? 'page' : false"
@@ -225,6 +225,16 @@
             {% endwith %}
 
             {% else %}
+            {% if auth.has_any_permission(["hr:employees:directory", "hr:employees:read"]) %}
+            <a href="/people/hr/employees"
+               :aria-current="activeModule === 'employees' ? 'page' : false"
+               :class="activeModule === 'employees' ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
+               class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all mb-2">
+                {{ icon_svg("user-group", "h-5 w-5 flex-shrink-0") }}
+                <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Colleagues</span>
+            </a>
+            {% endif %}
+
             {% if "discipline" in modules %}
             <a href="/people/hr/discipline"
                :class="['discipline','hr-discipline'].includes(activeModule) ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
@@ -234,12 +244,14 @@
             </a>
             {% endif %}
 
+            {% if auth.has_permission("self:access") %}
             <a href="/people/self"
                :class="['self','self-attendance','self-leave','self-payslips','self-expenses','self-tax-info','self-discipline','self-team-leave','self-team-expenses','self-team-discipline'].includes(activeModule) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' : 'text-slate-600 hover:bg-slate-50 border-transparent dark:text-slate-400 dark:hover:bg-slate-800/50'"
                class="flex items-center gap-3 rounded-lg border px-3 py-2.5 font-medium transition-all mb-2">
                 {{ icon_svg("user", "h-5 w-5 flex-shrink-0") }}
                 <span x-show="!sidebarCollapsed" class="truncate" x-cloak>Self Service</span>
             </a>
+            {% endif %}
 
 
             {% with current_module=switch_module %}

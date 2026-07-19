@@ -57,6 +57,7 @@ EMPLOYEE_SELF_SERVICE_PERMISSIONS = frozenset(
         "coach:insights:feedback",
         "coach:reports:read",
         "coach:chat:access",
+        "hr:employees:directory",
         "self:access",
         "selfservice:profile:read",
         "selfservice:profile:update",

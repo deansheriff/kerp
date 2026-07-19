@@ -420,6 +420,7 @@ HR_PERMISSIONS = [
     # -------------------------------------------------------------------------
     # Employee Management (Core HR)
     # -------------------------------------------------------------------------
+    ("hr:employees:directory", "View the non-sensitive colleague directory"),
     ("hr:employees:read", "View employee records"),
     ("hr:employees:read_sensitive", "View sensitive employee data (salary, personal)"),
     ("hr:employees:create", "Create employee records"),
@@ -2616,6 +2617,8 @@ ROLE_PERMISSIONS = {
         "coach:insights:feedback",
         "coach:reports:read",
         "coach:chat:access",
+        # Organization colleague directory (non-sensitive employee data only)
+        "hr:employees:directory",
         # Self-service permissions
         "self:access",
         "selfservice:profile:read",

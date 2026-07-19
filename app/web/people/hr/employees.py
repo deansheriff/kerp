@@ -7,9 +7,16 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.services.people.hr.web import hr_web_service
-from app.web.deps import WebAuthContext, get_db_for_org, require_web_permission
+from app.web.deps import (
+    WebAuthContext,
+    get_db_for_org,
+    require_any_web_permission,
+    require_web_permission,
+)
 
-_employee_read = require_web_permission("hr:employees:read")
+_employee_read = require_any_web_permission(
+    ["hr:employees:directory", "hr:employees:read"]
+)
 _employee_create = require_web_permission("hr:employees:create")
 _employee_update = require_web_permission("hr:employees:update")
 _employee_terminate = require_web_permission("hr:employees:terminate")

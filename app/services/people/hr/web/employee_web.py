@@ -732,6 +732,7 @@ class HRWebService:
             "success": success,
             "error": error,
             "active_filters": active_filters,
+            "can_create_employee": auth.has_permission("hr:employees:create"),
             "can_update_employee": self._can_update_employee(auth),
         }
 
@@ -2335,6 +2336,47 @@ class HRWebService:
             employee = svc.get_employee(parsed_employee_id)
         except EmployeeNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Employee not found") from exc
+
+        if not auth.has_permission("hr:employees:read_sensitive"):
+            person = db.get(Person, employee.person_id)
+            department = (
+                db.get(Department, employee.department_id)
+                if employee.department_id
+                else None
+            )
+            designation = (
+                db.get(Designation, employee.designation_id)
+                if employee.designation_id
+                else None
+            )
+            manager = None
+            if employee.reports_to_id:
+                manager_employee = db.get(Employee, employee.reports_to_id)
+                if manager_employee:
+                    manager_person = db.get(Person, manager_employee.person_id)
+                    manager = {
+                        "employee_id": manager_employee.employee_id,
+                        "name": manager_person.name if manager_person else "",
+                    }
+
+            return templates.TemplateResponse(
+                request,
+                "people/hr/employee_directory_detail.html",
+                {
+                    **base_context(
+                        request,
+                        auth,
+                        "Colleague Profile",
+                        "employees",
+                        db=db,
+                    ),
+                    "employee": employee,
+                    "person": person,
+                    "department": department,
+                    "designation": designation,
+                    "manager": manager,
+                },
+            )
 
         context = self._employee_detail_context(request, auth, db, employee)
         context["saved"] = saved
