@@ -10,13 +10,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_permission,
+)
 from app.services.finance.rpt.analysis_cube import AnalysisCubeService
 
 router = APIRouter(
     prefix="/analysis",
     tags=["analysis"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("gl:balances:read"))],
 )
 
 

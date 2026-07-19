@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.person import Person
@@ -20,6 +20,7 @@ from app.schemas.rbac import (
     RolePermissionUpdate,
     RoleUpdate,
 )
+from app.services.auth_flow import EMPLOYEE_SELF_SERVICE_PERMISSIONS
 from app.services.common import coerce_uuid
 from app.services.response import ListResponseMixin
 
@@ -300,6 +301,10 @@ def get_users_with_permission(
             Role.is_active.is_(True),
             Permission.is_active.is_(True),
             Person.is_active.is_(True),
+            or_(
+                func.lower(Role.name) != "employee",
+                Permission.key.in_(EMPLOYEE_SELF_SERVICE_PERMISSIONS),
+            ),
         )
     )
     return list(db.scalars(stmt).all())

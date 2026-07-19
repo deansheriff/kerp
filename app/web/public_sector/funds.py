@@ -19,8 +19,11 @@ from app.web.deps import (
     get_db_for_org,
     WebAuthContext,
     base_context,
-    require_public_sector_access,
+    require_web_permission,
 )
+
+_funds_read = require_web_permission("ipsas:funds:read")
+_funds_create = require_web_permission("ipsas:funds:create")
 
 router = APIRouter(tags=["public-sector-funds"])
 
@@ -29,7 +32,7 @@ router = APIRouter(tags=["public-sector-funds"])
 @router.get("/funds/", response_class=HTMLResponse)
 def funds_index(
     request: Request,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_funds_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Funds landing page."""
@@ -45,7 +48,7 @@ def list_funds(
     status: str | None = None,
     fund_type: str | None = None,
     page: int = Query(default=1, ge=1),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_funds_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Fund list page."""
@@ -60,7 +63,7 @@ def list_funds(
 @router.get("/funds/new", response_class=HTMLResponse)
 def new_fund_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_funds_create),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create fund form page."""
@@ -74,7 +77,7 @@ def new_fund_form(
 def view_fund(
     request: Request,
     fund_id: str,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_funds_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Fund detail page."""
@@ -97,7 +100,7 @@ def create_fund(
     is_restricted: str | None = Form(None),
     donor_name: str | None = Form(None),
     donor_reference: str | None = Form(None),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_funds_create),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create a fund (form submission)."""

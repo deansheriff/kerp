@@ -20,8 +20,12 @@ from app.web.deps import (
     get_db_for_org,
     WebAuthContext,
     base_context,
-    require_public_sector_access,
+    require_web_permission,
 )
+
+_virements_read = require_web_permission("ipsas:virements:read")
+_virements_create = require_web_permission("ipsas:virements:create")
+_virements_approve = require_web_permission("ipsas:virements:approve")
 
 router = APIRouter(tags=["public-sector-virements"])
 
@@ -32,7 +36,7 @@ def list_virements(
     fiscal_year_id: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_virements_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Virement list page."""
@@ -54,7 +58,7 @@ def list_virements(
 @router.get("/virements/new", response_class=HTMLResponse)
 def new_virement_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_virements_create),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create virement form page."""
@@ -86,7 +90,7 @@ def create_virement(
     currency_code: str | None = Form(None),
     justification: str = Form(...),
     approval_authority: str | None = Form(None),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_virements_create),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create a virement (form submission)."""
@@ -128,7 +132,7 @@ def create_virement(
 def view_virement(
     request: Request,
     virement_id: str,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_virements_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Virement detail page."""
@@ -146,7 +150,7 @@ def view_virement(
 def approve_virement(
     request: Request,
     virement_id: str,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_virements_approve),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Approve a virement (form submission)."""
@@ -162,7 +166,7 @@ def approve_virement(
 def apply_virement(
     request: Request,
     virement_id: str,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_virements_approve),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Apply an approved virement (form submission)."""

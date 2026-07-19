@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover
     UTC = timezone.utc
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -34,9 +34,9 @@ from app.rls import set_current_organization, set_current_organization_sync
 from app.services.auth_dependencies import is_session_inactive
 from app.services.auth_flow import (
     AuthFlow,
-    _load_rbac_claims,
     decode_access_token,
     hash_session_token,
+    load_effective_rbac_claims,
 )
 from app.services.common import coerce_uuid
 from app.services.finance.branding import BrandingService, CSSGenerator
@@ -50,7 +50,6 @@ from app.templates import templates  # noqa: F401 - re-exported for web routes
 logger = logging.getLogger(__name__)
 
 _SESSION_TOUCH_INTERVAL = timedelta(seconds=60)
-
 
 def _set_actor_context(request: Request, actor_id: UUID | str) -> None:
     """Keep request state and observability context in sync for auditing."""
@@ -1382,61 +1381,6 @@ def _normalize_roles_scopes(
     return normalized_roles, normalized_scopes
 
 
-def _ensure_admin_role(db: Session, person_id: UUID, roles: list[str]) -> list[str]:
-    if "admin" in roles:
-        return roles
-    admin_role = db.scalar(select(Role).where(Role.name == "admin"))
-    if not admin_role:
-        return roles
-    has_admin_role = db.scalar(
-        select(PersonRole).where(
-            PersonRole.person_id == person_id,
-            PersonRole.role_id == admin_role.id,
-        )
-    )
-    if has_admin_role:
-        roles = [*roles, "admin"]
-    return roles
-
-
-def _load_web_roles(
-    db: Session,
-    person_id: UUID,
-    existing_roles: list[str],
-) -> list[str]:
-    """Merge token roles with current DB-backed role assignments for web auth."""
-    role_rows = db.scalars(
-        select(Role.name)
-        .join(PersonRole, PersonRole.role_id == Role.id)
-        .where(PersonRole.person_id == person_id)
-        .where(Role.is_active.is_(True))
-    ).all()
-    return list(
-        {
-            *existing_roles,
-            *(str(name).strip().lower() for name in role_rows if str(name).strip()),
-        }
-    )
-
-
-def _load_web_permission_scopes(
-    db: Session,
-    person_id: UUID,
-    existing_scopes: list[str],
-) -> list[str]:
-    """Merge token scopes with current DB-backed permission scopes for web auth."""
-    permission_rows = db.scalars(
-        select(Permission.key)
-        .join(RolePermission, RolePermission.permission_id == Permission.id)
-        .join(Role, RolePermission.role_id == Role.id)
-        .join(PersonRole, PersonRole.role_id == Role.id)
-        .where(PersonRole.person_id == person_id)
-        .where(Role.is_active.is_(True))
-        .where(Permission.is_active.is_(True))
-    ).all()
-    return list({*existing_scopes, *(str(key) for key in permission_rows if key)})
-
-
 def require_web_auth(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -1536,20 +1480,6 @@ def require_web_auth(
             if auth_db:
                 auth_db.close()
 
-        roles_value = payload.get("roles")
-        roles = (
-            [str(role) for role in roles_value] if isinstance(roles_value, list) else []
-        )
-        scopes_value = payload.get("scopes")
-        scopes = (
-            [str(scope) for scope in scopes_value]
-            if isinstance(scopes_value, list)
-            else []
-        )
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _load_web_roles(db, person_uuid, roles)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
     else:
         refresh_token = _get_refresh_token_cookie(request, db)
         if not refresh_token:
@@ -1562,11 +1492,9 @@ def require_web_auth(
         if not resolved:
             raise HTTPException(status_code=401, detail="Invalid or expired session")
         person_uuid, _ = resolved
-        roles, scopes = _load_rbac_claims(db, str(person_uuid))
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _load_web_roles(db, person_uuid, roles)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
+
+    roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
+    roles, scopes = _normalize_roles_scopes(roles, scopes)
 
     # Get person details
     person = _get_person_for_web_session(db, person_uuid)
@@ -1805,20 +1733,6 @@ def optional_web_auth(
             if auth_db:
                 auth_db.close()
 
-        roles_value = payload.get("roles")
-        roles = (
-            [str(role) for role in roles_value] if isinstance(roles_value, list) else []
-        )
-        scopes_value = payload.get("scopes")
-        scopes = (
-            [str(scope) for scope in scopes_value]
-            if isinstance(scopes_value, list)
-            else []
-        )
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _load_web_roles(db, person_uuid, roles)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
     else:
         refresh_token = _get_refresh_token_cookie(request, db)
         if not refresh_token:
@@ -1827,11 +1741,9 @@ def optional_web_auth(
         if not resolved:
             return WebAuthContext(is_authenticated=False)
         person_uuid, _ = resolved
-        roles, scopes = _load_rbac_claims(db, str(person_uuid))
-        roles, scopes = _normalize_roles_scopes(roles, scopes)
-        roles = _load_web_roles(db, person_uuid, roles)
-        roles = _ensure_admin_role(db, person_uuid, roles)
-        scopes = _load_web_permission_scopes(db, person_uuid, scopes)
+
+    roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
+    roles, scopes = _normalize_roles_scopes(roles, scopes)
 
     # Get person details
     person = _get_person_for_web_session(db, person_uuid)
@@ -1941,8 +1853,30 @@ def require_fixed_assets_access(
     return auth
 
 
+def _has_non_employee_hr_access(db: Session, person_id: UUID) -> bool:
+    """Ignore accidental HR grants inherited from the shared employee role."""
+    return (
+        db.scalar(
+            select(RolePermission.id)
+            .join(Role, RolePermission.role_id == Role.id)
+            .join(Permission, RolePermission.permission_id == Permission.id)
+            .join(PersonRole, PersonRole.role_id == Role.id)
+            .where(
+                PersonRole.person_id == person_id,
+                func.lower(Role.name) != "employee",
+                Role.is_active.is_(True),
+                Permission.key == "hr:access",
+                Permission.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        is not None
+    )
+
+
 def require_hr_access(
     auth: WebAuthContext = Depends(require_web_auth),
+    db: Session = Depends(get_db),
 ) -> WebAuthContext:
     """
     Require access to the HR module.
@@ -1957,7 +1891,12 @@ def require_hr_access(
         ):
             ...
     """
-    if not auth.has_module_access("people"):
+    has_valid_hr_role = bool(
+        auth.person_id and _has_non_employee_hr_access(db, auth.person_id)
+    )
+    if not auth.is_admin and (
+        not auth.has_module_access("people") or not has_valid_hr_role
+    ):
         raise HTTPException(
             status_code=403,
             detail="HR module access required",
@@ -2033,6 +1972,7 @@ def require_inventory_access(
 
 
 def require_fleet_access(
+    request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
 ) -> WebAuthContext:
     """Require access to the Fleet module."""
@@ -2040,6 +1980,16 @@ def require_fleet_access(
         raise HTTPException(
             status_code=403,
             detail="Fleet module access required",
+        )
+    permission = (
+        "fleet:read"
+        if request.method in {"GET", "HEAD", "OPTIONS"}
+        else "fleet:manage"
+    )
+    if not auth.has_permission(permission):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Permission '{permission}' required",
         )
     return auth
 
@@ -2069,6 +2019,7 @@ def require_support_access(
 
 
 def require_procurement_access(
+    request: Request,
     auth: WebAuthContext = Depends(require_web_auth),
 ) -> WebAuthContext:
     """Require access to the Procurement module."""
@@ -2076,6 +2027,16 @@ def require_procurement_access(
         raise HTTPException(
             status_code=403,
             detail="Procurement module access required",
+        )
+    permission = (
+        "procurement:read"
+        if request.method in {"GET", "HEAD", "OPTIONS"}
+        else "procurement:manage"
+    )
+    if not auth.has_permission(permission):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Permission '{permission}' required",
         )
     return auth
 
@@ -2364,3 +2325,19 @@ def require_any_web_permission(permissions: list[str]):
         return auth
 
     return _require_any_permission
+
+
+def require_all_web_permissions(permissions: list[str]):
+    """Factory for requiring every specified permission."""
+
+    def _require_all_permissions(
+        auth: WebAuthContext = Depends(require_web_auth),
+    ) -> WebAuthContext:
+        if not auth.has_all_permissions(permissions):
+            raise HTTPException(
+                status_code=403,
+                detail=f"All of these permissions required: {', '.join(permissions)}",
+            )
+        return auth
+
+    return _require_all_permissions

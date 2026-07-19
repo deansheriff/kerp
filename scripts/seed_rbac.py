@@ -428,6 +428,8 @@ HR_PERMISSIONS = [
     ("hr:employees:terminate", "Process employee terminations"),
     ("hr:employees:transfer", "Process employee transfers"),
     ("hr:employees:promote", "Process promotions"),
+    ("hr:employees:manage_credentials", "Manage employee login credentials"),
+    ("payroll:final_payroll:update", "Update final payroll settings for leavers"),
     ("hr:departments:read", "View departments"),
     ("hr:departments:manage", "Manage departments"),
     ("hr:designations:read", "View designations/job titles"),
@@ -675,12 +677,29 @@ MODULE_PERMISSIONS = [
     ("fleet:documents:read", "View fleet documents"),
     ("fleet:documents:create", "Create fleet documents"),
     ("fleet:documents:update", "Update fleet documents"),
+    ("fleet:read", "View fleet records"),
+    ("fleet:manage", "Create and manage fleet records"),
     ("support:access", "Access support module"),
     ("support:dashboard", "View support dashboard"),
     ("procurement:access", "Access procurement module"),
     ("procurement:dashboard", "View procurement dashboard"),
+    ("procurement:read", "View procurement records"),
+    ("procurement:manage", "Create and manage procurement records"),
+    ("procurement:approve", "Approve procurement transactions"),
     ("projects:access", "Access projects module"),
     ("projects:dashboard", "View projects dashboard"),
+    ("projects:read", "View projects"),
+    ("projects:create", "Create projects"),
+    ("projects:update", "Update projects"),
+    ("projects:delete", "Cancel or delete projects"),
+    ("projects:templates:manage", "Manage project templates"),
+    ("projects:team:manage", "Manage project resource allocations"),
+    ("projects:milestones:manage", "Manage project milestones"),
+    ("projects:time:log", "Log project time"),
+    ("projects:time:manage", "Manage and bill project time"),
+    ("projects:attachments:manage", "Manage project attachments"),
+    ("projects:import", "Import project data"),
+    ("tasks:delete", "Delete project tasks"),
     ("settings:access", "Access settings module"),
     ("settings:dashboard", "View settings dashboard"),
     # -------------------------------------------------------------------------
@@ -695,6 +714,9 @@ MODULE_PERMISSIONS = [
     ("support:tickets:close", "Close tickets"),
     ("support:categories:read", "View ticket categories"),
     ("support:categories:manage", "Manage ticket categories"),
+    ("support:teams:read", "View support teams"),
+    ("support:teams:manage", "Manage support teams and membership"),
+    ("self:access", "Access employee self-service"),
     # -------------------------------------------------------------------------
     # IPSAS Fund Accounting
     # -------------------------------------------------------------------------
@@ -834,6 +856,7 @@ ROLE_PERMISSIONS = {
         "finance:dashboard",
         "gl:accounts:read",
         "gl:journals:read",
+        "gl:balances:read",
         "gl:periods:read",
         "gl:budgets:read",
         "ar:customers:read",
@@ -926,6 +949,7 @@ ROLE_PERMISSIONS = {
         "gl:accounts:update",
         "gl:accounts:delete",
         "gl:journals:read",
+        "gl:balances:read",
         "gl:journals:create",
         "gl:journals:post",
         "gl:journals:reverse",
@@ -1232,6 +1256,7 @@ ROLE_PERMISSIONS = {
         "gl:accounts:create",
         "gl:accounts:update",
         "gl:journals:read",
+        "gl:balances:read",
         "gl:journals:create",
         "gl:journals:post",
         "gl:journals:reverse",
@@ -1497,6 +1522,7 @@ ROLE_PERMISSIONS = {
         "coach:chat:access",
         "gl:accounts:read",
         "gl:journals:read",
+        "gl:balances:read",
         "gl:journals:create",
         "gl:journals:post",
         "gl:periods:read",
@@ -1579,6 +1605,7 @@ ROLE_PERMISSIONS = {
         "finance:dashboard",
         "gl:accounts:read",
         "gl:journals:read",
+        "gl:balances:read",
         "gl:journals:create",
         "gl:periods:read",
         "ar:customers:read",
@@ -1637,6 +1664,7 @@ ROLE_PERMISSIONS = {
         "finance:dashboard",
         "gl:accounts:read",
         "gl:journals:read",
+        "gl:balances:read",
         "gl:journals:create",
         "ar:customers:read",
         "ar:invoices:read",
@@ -1655,6 +1683,7 @@ ROLE_PERMISSIONS = {
         "finance:dashboard",
         "gl:accounts:read",
         "gl:journals:read",
+        "gl:balances:read",
         "gl:periods:read",
         "gl:budgets:read",
         "ar:customers:read",
@@ -1868,6 +1897,7 @@ ROLE_PERMISSIONS = {
         # Supporting access
         "gl:accounts:read",
         "gl:journals:read",
+        "gl:balances:read",
         "ar:invoices:read",
         "ap:invoices:read",
         "reports:instances:read",
@@ -1892,6 +1922,8 @@ ROLE_PERMISSIONS = {
         "hr:employees:update",
         "hr:employees:delete",
         "hr:employees:terminate",
+        "hr:employees:manage_credentials",
+        "payroll:final_payroll:update",
         "hr:employees:transfer",
         "hr:employees:promote",
         "hr:departments:read",
@@ -2036,6 +2068,8 @@ ROLE_PERMISSIONS = {
         "hr:employees:create",
         "hr:employees:update",
         "hr:employees:terminate",
+        "hr:employees:manage_credentials",
+        "payroll:final_payroll:update",
         "hr:employees:transfer",
         "hr:employees:promote",
         "hr:departments:read",
@@ -2214,6 +2248,7 @@ ROLE_PERMISSIONS = {
         "payroll:entries:process",
         "payroll:entries:approve",
         "payroll:entries:post",
+        "payroll:final_payroll:update",
         "payroll:tax:read",
         "payroll:tax:manage",
         "attendance:records:read",
@@ -2382,6 +2417,40 @@ ROLE_PERMISSIONS = {
     "operations_manager": [
         "inventory:access",
         "inventory:dashboard",
+        "inventory:items:read",
+        "inventory:items:create",
+        "inventory:items:update",
+        "inventory:items:delete",
+        "inventory:warehouses:read",
+        "inventory:warehouses:manage",
+        "inventory:transactions:read",
+        "inventory:transactions:create",
+        "inventory:transactions:post",
+        "inventory:transactions:receipt",
+        "inventory:transactions:issue",
+        "inventory:transactions:transfer",
+        "inventory:transactions:adjust",
+        "inventory:stock:read",
+        "inventory:stock:allocate",
+        "inventory:counts:read",
+        "inventory:counts:create",
+        "inventory:counts:post",
+        "inventory:valuation:read",
+        "inventory:valuation:create",
+        "inventory:valuation:update",
+        "inventory:valuation:calculate",
+        "inventory:valuation:revalue",
+        "inventory:lots:read",
+        "inventory:lots:create",
+        "inventory:lots:allocate",
+        "inventory:lots:quarantine",
+        "inventory:price_lists:read",
+        "inventory:price_lists:manage",
+        "inventory:categories:read",
+        "inventory:categories:create",
+        "inventory:categories:manage",
+        "inventory:bom:read",
+        "inventory:bom:manage",
         "discipline:access",
         "discipline:cases:read",
         "discipline:cases:create",
@@ -2401,14 +2470,32 @@ ROLE_PERMISSIONS = {
         "fleet:documents:read",
         "fleet:documents:create",
         "fleet:documents:update",
+        "fleet:read",
+        "fleet:manage",
         "support:access",
         "support:dashboard",
         "procurement:access",
         "procurement:dashboard",
+        "procurement:read",
+        "procurement:manage",
+        "procurement:approve",
         "projects:access",
         "projects:dashboard",
+        "projects:read",
+        "projects:create",
+        "projects:update",
+        "projects:delete",
+        "projects:templates:manage",
+        "projects:team:manage",
+        "projects:milestones:manage",
+        "projects:time:log",
+        "projects:time:manage",
+        "projects:attachments:manage",
+        "projects:import",
         "settings:access",
         "settings:dashboard",
+        "settings:read",
+        "settings:manage",
         # Coach
         "coach:insights:read",
         "coach:insights:feedback",
@@ -2422,15 +2509,20 @@ ROLE_PERMISSIONS = {
         "support:tickets:close",
         "support:categories:read",
         "support:categories:manage",
+        "support:teams:read",
+        "support:teams:manage",
         "tasks:read",
         "tasks:create",
         "tasks:update",
         "tasks:assign",
         "tasks:complete",
+        "tasks:delete",
     ],
     "fleet_manager": [
         "fleet:access",
         "fleet:dashboard",
+        "fleet:read",
+        "fleet:manage",
         "fleet:vehicles:read",
         "fleet:vehicles:create",
         "fleet:vehicles:update",
@@ -2471,11 +2563,13 @@ ROLE_PERMISSIONS = {
         "coach:reports:read",
         "coach:chat:access",
         "projects:access",
+        "projects:read",
         "support:tickets:read",
         "support:tickets:create",
         "support:tickets:update",
         "support:tickets:resolve",
         "support:categories:read",
+        "support:teams:read",
         "tasks:read",
         "tasks:read_own",
         "tasks:update",
@@ -2511,6 +2605,7 @@ ROLE_PERMISSIONS = {
         "expense:claims:approve:tier1",
         "expense:claims:reject",
         "projects:access",
+        "projects:read",
         "tasks:read",
         "tasks:create",
         "tasks:assign",
@@ -2522,6 +2617,7 @@ ROLE_PERMISSIONS = {
         "coach:reports:read",
         "coach:chat:access",
         # Self-service permissions
+        "self:access",
         "selfservice:profile:read",
         "selfservice:profile:update",
         "selfservice:documents:read",
@@ -2536,7 +2632,6 @@ ROLE_PERMISSIONS = {
         "perf:appraisals:self_review",
         "perf:goals:read",
         "perf:goals:update",
-        "expense:access",
         "expense:claims:read_own",
         "expense:claims:create",
         "expense:claims:update",
@@ -2548,10 +2643,8 @@ ROLE_PERMISSIONS = {
         "training:events:read",
         "training:enrollments:self_enroll",
         "training:feedback:submit",
-        "support:access",
         "support:tickets:read_own",
         "support:tickets:create",
-        "projects:access",
         "tasks:read_own",
         "tasks:update",
         "tasks:complete",
@@ -2621,6 +2714,27 @@ def _ensure_person_role(db, person_id, role_id):
     return link
 
 
+def _reconcile_default_employee_permissions(db, roles, permissions):
+    """Keep the managed employee role limited to its self-service baseline."""
+    employee_role = roles.get("employee")
+    if employee_role is None:
+        return
+
+    allowed_permission_ids = [
+        permissions[key].id
+        for key in ROLE_PERMISSIONS["employee"]
+        if key in permissions
+    ]
+    stale_links = db.query(RolePermission).filter(
+        RolePermission.role_id == employee_role.id
+    )
+    if allowed_permission_ids:
+        stale_links = stale_links.filter(
+            RolePermission.permission_id.notin_(allowed_permission_ids)
+        )
+    stale_links.delete(synchronize_session=False)
+
+
 def main():
     load_dotenv()
     args = parse_args()
@@ -2662,6 +2776,7 @@ def main():
                     )
                     continue
                 _ensure_role_permission(db, role.id, permission.id)
+        _reconcile_default_employee_permissions(db, roles, permissions)
         db.commit()
 
         admin_role = roles.get("admin")

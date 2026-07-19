@@ -9,7 +9,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_permission,
+)
 from app.schemas.pm import (
     GanttChartData,
     ProjectDashboard,
@@ -26,7 +30,11 @@ from app.services.pm import (
     TimeEntryService,
 )
 
-router = APIRouter(prefix="/projects", tags=["pm-projects"])
+router = APIRouter(
+    prefix="/projects",
+    tags=["pm-projects"],
+    dependencies=[Depends(require_tenant_permission("projects:read"))],
+)
 
 
 @router.get("/{project_id}/dashboard", response_model=ProjectDashboard)

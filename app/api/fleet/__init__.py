@@ -13,7 +13,7 @@ REST API endpoints for:
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import require_tenant_permission
+from app.api.deps import require_tenant_method_permission, require_tenant_permission
 from app.api.fleet.assignments import router as assignments_router
 from app.api.fleet.documents import router as documents_router
 from app.api.fleet.fuel import router as fuel_router
@@ -26,7 +26,10 @@ from app.api.fleet.vehicles import router as vehicles_router
 router = APIRouter(
     prefix="/fleet",
     tags=["fleet"],
-    dependencies=[Depends(require_tenant_permission("fleet:access"))],
+    dependencies=[
+        Depends(require_tenant_permission("fleet:access")),
+        Depends(require_tenant_method_permission("fleet:read", "fleet:manage")),
+    ],
 )
 
 router.include_router(vehicles_router)

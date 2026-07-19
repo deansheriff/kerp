@@ -14,7 +14,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.config import settings
 from app.db import SessionLocal
 from app.db.session_context import prime_tenant_context
@@ -22,7 +27,11 @@ from app.db.session_context import prime_tenant_context
 logger = logging.getLogger(__name__)
 
 # Main router for authenticated sync endpoints
-router = APIRouter(prefix="/crm", tags=["crm-integration"])
+router = APIRouter(
+    prefix="/crm",
+    tags=["crm-integration"],
+    dependencies=[Depends(require_tenant_permission("integrations:manage"))],
+)
 
 # Webhook router (no authentication - uses signature verification)
 webhook_router = APIRouter(prefix="/crm", tags=["crm-webhooks"])

@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_tenant_auth
+from app.api.deps import require_tenant_permission
 from app.db import get_db_session
 from app.services.auth_dependencies import get_current_org_id, get_current_user_id
 from app.services.finance.import_export import ImportConfig
@@ -28,7 +28,7 @@ from app.services.upload_utils import get_env_max_bytes, write_upload_to_temp
 router = APIRouter(
     prefix="/opening-balance",
     tags=["Opening Balance"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("gl:balances:read"))],
 )
 
 
@@ -205,6 +205,7 @@ async def preview_opening_balance(
     db: Session = Depends(get_db_session),
     org_id: UUID = Depends(get_current_org_id),
     user_id: UUID = Depends(get_current_user_id),
+    _auth: dict = Depends(require_tenant_permission("gl:journals:create")),
 ) -> OpeningBalancePreviewResponse:
     """
     Preview opening balance file before importing.
@@ -273,6 +274,7 @@ async def import_opening_balance(
     db: Session = Depends(get_db_session),
     org_id: UUID = Depends(get_current_org_id),
     user_id: UUID = Depends(get_current_user_id),
+    auth: dict = Depends(require_tenant_permission("gl:journals:create")),
 ) -> OpeningBalanceImportResponse:
     """
     Import opening balances and create journal entry.
@@ -286,6 +288,12 @@ async def import_opening_balance(
     - All accounts must exist in Chart of Accounts (unless auto_create_accounts=True)
     - A fiscal period must exist for the entry date
     """
+    if auto_create_accounts:
+        roles = {str(role).strip().lower() for role in auth.get("roles") or []}
+        scopes = {str(scope).strip().lower() for scope in auth.get("scopes") or []}
+        if "admin" not in roles and "gl:accounts:create" not in scopes:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

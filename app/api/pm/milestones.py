@@ -9,7 +9,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_permission,
+)
 from app.models.pm import MilestoneStatus
 from app.schemas.pm import (
     MilestoneAchieveRequest,
@@ -23,7 +27,11 @@ from app.schemas.pm import (
 from app.services.common import ConflictError, NotFoundError, PaginationParams
 from app.services.pm import MilestoneService
 
-router = APIRouter(prefix="/milestones", tags=["pm-milestones"])
+router = APIRouter(
+    prefix="/milestones",
+    tags=["pm-milestones"],
+    dependencies=[Depends(require_tenant_permission("projects:read"))],
+)
 
 
 # =============================================================================
@@ -66,6 +74,7 @@ def list_milestones(
 @router.post("", response_model=MilestoneRead, status_code=status.HTTP_201_CREATED)
 def create_milestone(
     data: MilestoneCreate,
+    _auth: dict = Depends(require_tenant_permission("projects:milestones:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -167,6 +176,7 @@ def get_milestone(
 def update_milestone(
     milestone_id: UUID,
     data: MilestoneUpdate,
+    _auth: dict = Depends(require_tenant_permission("projects:milestones:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -184,6 +194,7 @@ def update_milestone(
 @router.delete("/{milestone_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_milestone(
     milestone_id: UUID,
+    _auth: dict = Depends(require_tenant_permission("projects:milestones:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):
@@ -204,6 +215,7 @@ def delete_milestone(
 def achieve_milestone(
     milestone_id: UUID,
     data: MilestoneAchieveRequest = None,
+    _auth: dict = Depends(require_tenant_permission("projects:milestones:manage")),
     organization_id: UUID = Depends(require_organization_id),
     db: Session = Depends(get_db_with_org),
 ):

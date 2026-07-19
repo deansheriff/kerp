@@ -22,6 +22,60 @@ from app.web.deps import (
     base_context,
     require_any_web_permission,
     require_inventory_access,
+    require_web_permission,
+)
+
+_items_read = require_web_permission("inventory:items:read")
+_items_create = require_web_permission("inventory:items:create")
+_items_update = require_web_permission("inventory:items:update")
+_items_delete = require_web_permission("inventory:items:delete")
+_categories_read = require_web_permission("inventory:categories:read")
+_categories_create = require_web_permission("inventory:categories:create")
+_categories_manage = require_web_permission("inventory:categories:manage")
+_warehouses_read = require_web_permission("inventory:warehouses:read")
+_warehouses_manage = require_web_permission("inventory:warehouses:manage")
+_transactions_read = require_web_permission("inventory:transactions:read")
+_transactions_create = require_web_permission("inventory:transactions:create")
+_transactions_receipt = require_web_permission("inventory:transactions:receipt")
+_transactions_issue = require_web_permission("inventory:transactions:issue")
+_transactions_transfer = require_web_permission("inventory:transactions:transfer")
+_transactions_adjust = require_web_permission("inventory:transactions:adjust")
+_transactions_post = require_web_permission("inventory:transactions:post")
+_stock_read = require_web_permission("inventory:stock:read")
+_counts_read = require_web_permission("inventory:counts:read")
+_counts_create = require_web_permission("inventory:counts:create")
+_counts_post = require_web_permission("inventory:counts:post")
+_valuation_read = require_web_permission("inventory:valuation:read")
+_bom_read = require_web_permission("inventory:bom:read")
+_bom_manage = require_web_permission("inventory:bom:manage")
+_price_lists_read = require_web_permission("inventory:price_lists:read")
+_price_lists_manage = require_web_permission("inventory:price_lists:manage")
+_lots_read = require_web_permission("inventory:lots:read")
+_lots_quarantine = require_web_permission("inventory:lots:quarantine")
+_import_preview = require_web_permission("import:preview")
+_import_execute = require_web_permission("import:execute")
+_inventory_read = require_any_web_permission(
+    [
+        "inventory:items:read",
+        "inventory:warehouses:read",
+        "inventory:transactions:read",
+        "inventory:stock:read",
+        "inventory:counts:read",
+        "inventory:valuation:read",
+        "inventory:lots:read",
+        "inventory:price_lists:read",
+        "inventory:categories:read",
+        "inventory:bom:read",
+    ]
+)
+_transactions_entry = require_any_web_permission(
+    [
+        "inventory:transactions:create",
+        "inventory:transactions:receipt",
+        "inventory:transactions:issue",
+        "inventory:transactions:transfer",
+        "inventory:transactions:adjust",
+    ]
 )
 
 logger = logging.getLogger(__name__)
@@ -33,7 +87,7 @@ router = APIRouter(prefix="/inventory", tags=["inventory-web"])
 @router.get("/", response_class=HTMLResponse)
 def inventory_index(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_inventory_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory landing page."""
@@ -45,7 +99,7 @@ def inventory_index(
 @router.get("/quick-entry/", response_class=HTMLResponse)
 def inventory_quick_entry(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_entry),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory quick entry landing page."""
@@ -56,7 +110,7 @@ def inventory_quick_entry(
 @router.get("/import", response_class=HTMLResponse)
 def inventory_import_dashboard(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_import_preview),
 ):
     """Inventory import dashboard page."""
     return inventory_import_web_service.dashboard_response(request, auth)
@@ -66,7 +120,7 @@ def inventory_import_dashboard(
 def inventory_import_form(
     request: Request,
     entity_type: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_import_preview),
 ):
     """Inventory import form for a supported entity type."""
     return inventory_import_web_service.import_form_response(request, auth, entity_type)
@@ -77,7 +131,7 @@ async def inventory_import_preview(
     request: Request,
     entity_type: str,
     file: UploadFile = File(...),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_import_preview),
     db: Session = Depends(get_db_for_org),
 ):
     """Preview inventory import with validation and column mapping."""
@@ -98,7 +152,7 @@ async def inventory_execute_import(
     skip_duplicates: str | None = Form(default=None),
     dry_run: str | None = Form(default=None),
     column_mapping: str | None = Form(default=None),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_import_execute),
     db: Session = Depends(get_db_for_org),
 ):
     """Execute inventory import operation."""
@@ -117,7 +171,7 @@ async def inventory_execute_import(
 @router.get("/items", response_class=HTMLResponse)
 def list_items(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_read),
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
@@ -135,7 +189,7 @@ def list_items(
 @router.get("/items/new", response_class=HTMLResponse)
 def new_item_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New inventory item form page."""
@@ -145,7 +199,7 @@ def new_item_form(
 @router.post("/items/new")
 def create_item(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_create),
     item_code: str = Form(...),
     item_name: str = Form(...),
     category_id: str = Form(...),
@@ -208,7 +262,7 @@ async def export_all_items(
     status: str = "",
     category: str = "",
     item_type: str = "",
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export all items matching filters to CSV."""
@@ -223,7 +277,7 @@ async def export_all_items(
 def view_item(
     request: Request,
     item_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Item detail page."""
@@ -234,7 +288,7 @@ def view_item(
 def edit_item_form(
     request: Request,
     item_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Edit inventory item form page."""
@@ -245,7 +299,7 @@ def edit_item_form(
 async def update_item(
     request: Request,
     item_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Update an inventory item."""
@@ -313,7 +367,7 @@ async def update_item(
 @router.post("/items/bulk-delete")
 async def bulk_delete_items(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_delete),
     db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete items (if no transactions)."""
@@ -329,7 +383,7 @@ async def bulk_delete_items(
 @router.post("/items/bulk-export")
 async def bulk_export_items(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export selected items to CSV."""
@@ -345,7 +399,7 @@ async def bulk_export_items(
 @router.post("/items/bulk-activate")
 async def bulk_activate_items(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Bulk activate items."""
@@ -361,7 +415,7 @@ async def bulk_activate_items(
 @router.post("/items/bulk-deactivate")
 async def bulk_deactivate_items(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Bulk deactivate items."""
@@ -377,7 +431,7 @@ async def bulk_deactivate_items(
 @router.get("/transactions", response_class=HTMLResponse)
 def list_transactions(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     search: str | None = None,
     transaction_type: str | None = None,
     page: int = Query(default=1, ge=1),
@@ -402,7 +456,7 @@ def list_transactions(
 @router.get("/categories", response_class=HTMLResponse)
 def list_categories(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_categories_read),
     search: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
@@ -418,7 +472,7 @@ def list_categories(
 @router.get("/categories/new", response_class=HTMLResponse)
 def new_category_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_categories_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New item category form page."""
@@ -428,7 +482,7 @@ def new_category_form(
 @router.post("/categories/new")
 def create_category(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_categories_create),
     category_code: str = Form(...),
     category_name: str = Form(...),
     inventory_account_id: str = Form(...),
@@ -465,7 +519,7 @@ def create_category(
 def edit_category_form(
     request: Request,
     category_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_categories_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Edit item category form page."""
@@ -476,7 +530,7 @@ def edit_category_form(
 def update_category(
     request: Request,
     category_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_categories_manage),
     category_code: str = Form(...),
     category_name: str = Form(...),
     inventory_account_id: str = Form(...),
@@ -514,7 +568,7 @@ def update_category(
 def toggle_category_status(
     request: Request,
     category_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_categories_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Toggle category active/inactive status."""
@@ -531,7 +585,7 @@ def toggle_category_status(
 @router.get("/warehouses", response_class=HTMLResponse)
 def list_warehouses(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_warehouses_read),
     search: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
@@ -547,7 +601,7 @@ def list_warehouses(
 @router.get("/warehouses/new", response_class=HTMLResponse)
 def new_warehouse_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_warehouses_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """New warehouse form page."""
@@ -557,7 +611,7 @@ def new_warehouse_form(
 @router.post("/warehouses/new")
 def create_warehouse(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_warehouses_manage),
     warehouse_code: str = Form(...),
     warehouse_name: str = Form(...),
     description: str | None = Form(default=None),
@@ -604,7 +658,7 @@ def create_warehouse(
 def view_warehouse(
     request: Request,
     warehouse_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_warehouses_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Warehouse detail page."""
@@ -615,7 +669,7 @@ def view_warehouse(
 def edit_warehouse_form(
     request: Request,
     warehouse_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_warehouses_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Edit warehouse form page."""
@@ -626,7 +680,7 @@ def edit_warehouse_form(
 def update_warehouse(
     request: Request,
     warehouse_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_warehouses_manage),
     warehouse_code: str = Form(...),
     warehouse_name: str = Form(...),
     description: str | None = Form(default=None),
@@ -674,7 +728,7 @@ def update_warehouse(
 def toggle_warehouse_status(
     request: Request,
     warehouse_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_warehouses_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Toggle warehouse active/inactive status."""
@@ -691,7 +745,7 @@ def toggle_warehouse_status(
 @router.get("/transactions/receipt/new", response_class=HTMLResponse)
 def new_receipt_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_receipt),
     db: Session = Depends(get_db_for_org),
 ):
     """New inventory receipt form page."""
@@ -701,7 +755,7 @@ def new_receipt_form(
 @router.post("/transactions/receipt/new")
 def create_receipt_transaction(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_receipt),
     item_id: str = Form(...),
     warehouse_id: str = Form(...),
     quantity: str = Form(...),
@@ -746,7 +800,7 @@ def create_receipt_transaction(
 @router.get("/returns/new", response_class=HTMLResponse)
 def new_inventory_return_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New return-to-store form page."""
@@ -762,7 +816,7 @@ def inventory_return_list(
     request: Request,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=100),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory returned-items list page."""
@@ -778,7 +832,7 @@ def inventory_return_list(
 @router.post("/returns/new")
 async def create_inventory_return(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Create a return-to-store record."""
@@ -794,7 +848,7 @@ async def create_inventory_return(
 @router.get("/attachments/{attachment_id}/download")
 def download_inventory_attachment(
     attachment_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Download an inventory attachment file."""
@@ -808,7 +862,7 @@ def download_inventory_attachment(
 @router.post("/attachments/{attachment_id}/delete")
 def delete_inventory_attachment(
     attachment_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Delete an inventory attachment file."""
@@ -823,7 +877,7 @@ def delete_inventory_attachment(
 def inventory_return_material_request_search(
     q: str = Query(..., min_length=1),
     limit: int = Query(default=8, ge=1, le=20),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Search issued material requests for return linkage."""
@@ -839,7 +893,7 @@ def inventory_return_material_request_search(
 def inventory_return_item_search(
     q: str = Query(..., min_length=1),
     limit: int = Query(default=8, ge=1, le=20),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Search inventory items for return selection."""
@@ -855,7 +909,7 @@ def inventory_return_item_search(
 def inventory_return_detail(
     request: Request,
     return_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory return detail page."""
@@ -870,7 +924,7 @@ def inventory_return_detail(
 @router.get("/transactions/issue/new", response_class=HTMLResponse)
 def new_issue_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_issue),
     db: Session = Depends(get_db_for_org),
 ):
     """New inventory issue form page."""
@@ -880,7 +934,7 @@ def new_issue_form(
 @router.post("/transactions/issue/new")
 def create_issue_transaction(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_issue),
     item_id: str = Form(...),
     warehouse_id: str = Form(...),
     quantity: str = Form(...),
@@ -913,7 +967,7 @@ def create_issue_transaction(
 @router.get("/transactions/transfer/new", response_class=HTMLResponse)
 def new_transfer_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_transfer),
     db: Session = Depends(get_db_for_org),
 ):
     """New inventory transfer form page."""
@@ -923,7 +977,7 @@ def new_transfer_form(
 @router.post("/transactions/transfer/new")
 def create_transfer_transaction(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_transfer),
     item_id: str = Form(...),
     from_warehouse_id: str = Form(...),
     to_warehouse_id: str = Form(...),
@@ -955,7 +1009,7 @@ def create_transfer_transaction(
 @router.get("/transactions/adjustment/new", response_class=HTMLResponse)
 def new_adjustment_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_adjust),
     db: Session = Depends(get_db_for_org),
 ):
     """New inventory adjustment form page."""
@@ -965,7 +1019,7 @@ def new_adjustment_form(
 @router.post("/transactions/adjustment/new")
 def create_adjustment_transaction(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_adjust),
     item_id: str = Form(...),
     warehouse_id: str = Form(...),
     quantity: str = Form(...),
@@ -1007,7 +1061,7 @@ def material_request_list(
     project_id: str | None = None,
     page: int = 1,
     limit: int = 50,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Material request list page."""
@@ -1104,7 +1158,7 @@ def material_request_report(
     start_date: str | None = None,
     end_date: str | None = None,
     group_by: str = Query(default="status", pattern="^(status|type)$"),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Material request summary report page."""
@@ -1122,7 +1176,7 @@ def material_request_report(
 def material_request_detail(
     request: Request,
     request_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Material request detail page."""
@@ -1289,7 +1343,7 @@ def delete_material_request(
 def transaction_detail(
     request: Request,
     transaction_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory transaction detail page."""
@@ -1305,7 +1359,7 @@ def transaction_detail(
 def reverse_transaction(
     request: Request,
     transaction_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_post),
     db: Session = Depends(get_db_for_org),
 ):
     """Reverse an inventory transaction."""
@@ -1324,7 +1378,7 @@ def reverse_transaction(
 @router.get("/counts", response_class=HTMLResponse)
 def list_counts(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_read),
     status: str | None = None,
     search: str | None = None,
     warehouse: str | None = None,
@@ -1352,7 +1406,7 @@ def list_counts(
 @router.get("/counts/new", response_class=HTMLResponse)
 def new_count_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New inventory count form."""
@@ -1366,7 +1420,7 @@ def new_count_form(
 @router.post("/counts/new", response_class=HTMLResponse)
 async def create_count(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Create new inventory count."""
@@ -1381,7 +1435,7 @@ async def create_count(
 def count_detail(
     request: Request,
     count_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory count detail page."""
@@ -1397,7 +1451,7 @@ def count_detail(
 def export_count(
     count_id: str,
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export a posted inventory count as CSV or PDF."""
@@ -1418,7 +1472,7 @@ def export_count(
 def start_count(
     request: Request,
     count_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Start an inventory count."""
@@ -1433,7 +1487,7 @@ def start_count(
 def complete_count(
     request: Request,
     count_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Complete an inventory count."""
@@ -1448,7 +1502,7 @@ def complete_count(
 def post_count(
     request: Request,
     count_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_post),
     db: Session = Depends(get_db_for_org),
 ):
     """Post inventory count adjustments."""
@@ -1464,7 +1518,7 @@ async def record_count_line(
     request: Request,
     count_id: str,
     line_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Record counted quantity for a count line."""
@@ -1481,7 +1535,7 @@ async def record_count_line(
 async def bulk_record_count_lines(
     request: Request,
     count_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_counts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Record counted quantities for multiple selected count lines."""
@@ -1501,7 +1555,7 @@ async def bulk_record_count_lines(
 @router.get("/boms", response_class=HTMLResponse)
 def list_boms(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_bom_read),
     search: str | None = None,
     bom_type: str | None = None,
     status: str | None = None,
@@ -1523,7 +1577,7 @@ def list_boms(
 @router.get("/boms/new", response_class=HTMLResponse)
 def new_bom_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_bom_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """New BOM form."""
@@ -1537,7 +1591,7 @@ def new_bom_form(
 @router.post("/boms/new", response_class=HTMLResponse)
 async def create_bom(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_bom_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Create new BOM."""
@@ -1552,7 +1606,7 @@ async def create_bom(
 def bom_detail(
     request: Request,
     bom_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_bom_read),
     db: Session = Depends(get_db_for_org),
 ):
     """BOM detail page."""
@@ -1572,7 +1626,7 @@ def bom_detail(
 @router.get("/price-lists", response_class=HTMLResponse)
 def list_price_lists(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_price_lists_read),
     search: str | None = None,
     price_list_type: str | None = None,
     list_type: str | None = None,
@@ -1593,7 +1647,7 @@ def list_price_lists(
 @router.get("/price-lists/new", response_class=HTMLResponse)
 def new_price_list_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_price_lists_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """New price list form."""
@@ -1607,7 +1661,7 @@ def new_price_list_form(
 @router.post("/price-lists/new", response_class=HTMLResponse)
 async def create_price_list(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_price_lists_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Create new price list."""
@@ -1626,7 +1680,7 @@ async def create_price_list(
 @router.get("/serials", response_class=HTMLResponse)
 def list_serials(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_stock_read),
     search: str | None = None,
     status: str | None = None,
     warehouse: str | None = None,
@@ -1652,7 +1706,7 @@ def list_serials(
 @router.post("/serials/missing/add")
 async def add_missing_serials(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_items_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Add serial records for stock already on hand."""
@@ -1673,7 +1727,7 @@ async def add_missing_serials(
 def serial_detail(
     request: Request,
     serial_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_stock_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Serial number detail page."""
@@ -1688,7 +1742,7 @@ def serial_detail(
 @router.get("/lots", response_class=HTMLResponse)
 def list_lots(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_lots_read),
     search: str | None = None,
     status: str | None = None,
     warehouse: str | None = None,
@@ -1711,7 +1765,7 @@ def list_lots(
 def lot_detail(
     request: Request,
     lot_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_lots_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Lot detail page."""
@@ -1727,7 +1781,7 @@ def lot_detail(
 def toggle_lot_quarantine(
     request: Request,
     lot_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_lots_quarantine),
     db: Session = Depends(get_db_for_org),
 ):
     """Toggle lot quarantine status."""
@@ -1746,7 +1800,7 @@ def toggle_lot_quarantine(
 @router.get("/reports", response_class=HTMLResponse)
 def inventory_reports_hub(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_inventory_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory reports hub page."""
@@ -1759,7 +1813,7 @@ def inventory_reports_hub(
 @router.get("/reports/stock-on-hand", response_class=HTMLResponse)
 def stock_on_hand_report(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_stock_read),
     warehouse: str | None = None,
     category: str | None = None,
     show_zero: str | None = None,
@@ -1783,7 +1837,7 @@ def stock_on_hand_report(
 @router.get("/reports/serial-stock", response_class=HTMLResponse)
 def serial_stock_report(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_stock_read),
     warehouse: str | None = None,
     item: str | None = None,
     search: str | None = None,
@@ -1805,7 +1859,7 @@ def serial_stock_report(
 @router.get("/reports/valuation", response_class=HTMLResponse)
 def inventory_valuation_report(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_valuation_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory valuation report."""
@@ -1819,7 +1873,7 @@ def inventory_valuation_report(
 @router.get("/reports/valuation/export")
 def export_inventory_valuation_report(
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_valuation_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export inventory valuation summary rows as CSV or PDF."""
@@ -1839,7 +1893,7 @@ def inventory_valuation_wac_breakdown_report(
     request: Request,
     item_id: str,
     warehouse_id: str,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_valuation_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Inventory valuation WAC breakdown report."""
@@ -1857,7 +1911,7 @@ def export_inventory_valuation_wac_breakdown(
     item_id: str | None = None,
     warehouse_id: str | None = None,
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_valuation_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export WAC breakdown rows as CSV or PDF."""
@@ -1879,7 +1933,7 @@ def export_inventory_valuation_wac_breakdown(
 @router.get("/reports/fifo-layers", response_class=HTMLResponse)
 def fifo_layers_report(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_valuation_read),
     warehouse: str | None = None,
     item: str | None = None,
     search: str | None = None,
@@ -1901,7 +1955,7 @@ def fifo_layers_report(
 @router.get("/reports/aging", response_class=HTMLResponse)
 def stock_aging_report(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_stock_read),
     warehouse: str | None = None,
     item: str | None = None,
     search: str | None = None,
@@ -1923,7 +1977,7 @@ def stock_aging_report(
 @router.get("/reports/movement", response_class=HTMLResponse)
 def stock_movement_report(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     warehouse: str | None = None,
     item: str | None = None,
     transaction_type: str | None = None,
@@ -1947,7 +2001,7 @@ def stock_movement_report(
 @router.get("/reports/yearly-movement", response_class=HTMLResponse)
 def yearly_stock_movement_report(
     request: Request,
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     year: str | None = None,
     month: str | None = None,
     warehouse: str | None = None,
@@ -1973,7 +2027,7 @@ def yearly_stock_movement_report(
 @router.get("/reports/yearly-movement/export")
 def export_yearly_stock_movement_report(
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
-    auth: WebAuthContext = Depends(require_inventory_access),
+    auth: WebAuthContext = Depends(_transactions_read),
     year: str | None = None,
     month: str | None = None,
     warehouse: str | None = None,

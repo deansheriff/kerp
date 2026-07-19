@@ -20,8 +20,12 @@ from app.web.deps import (
     get_db_for_org,
     WebAuthContext,
     base_context,
-    require_public_sector_access,
+    require_web_permission,
 )
+
+_appropriations_read = require_web_permission("ipsas:appropriations:read")
+_appropriations_create = require_web_permission("ipsas:appropriations:create")
+_appropriations_approve = require_web_permission("ipsas:appropriations:approve")
 
 router = APIRouter(tags=["public-sector-appropriations"])
 
@@ -33,7 +37,7 @@ def list_appropriations(
     fund_id: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_appropriations_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Appropriation list page."""
@@ -56,7 +60,7 @@ def list_appropriations(
 @router.get("/appropriations/new", response_class=HTMLResponse)
 def new_appropriation_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_appropriations_create),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create appropriation form page."""
@@ -103,7 +107,7 @@ def create_appropriation(
     cost_center_id: str | None = Form(None),
     business_unit_id: str | None = Form(None),
     appropriation_act_reference: str | None = Form(None),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_appropriations_create),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create an appropriation (form submission)."""
@@ -139,7 +143,7 @@ def create_appropriation(
 def view_appropriation(
     request: Request,
     appropriation_id: str,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_appropriations_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Appropriation detail page."""
@@ -159,7 +163,7 @@ def view_appropriation(
 def approve_appropriation(
     request: Request,
     appropriation_id: str,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_appropriations_approve),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Approve an appropriation (web form submission)."""

@@ -13,7 +13,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.people.recruit import (
     ApplicantStatus,
     InterviewStatus,
@@ -53,7 +58,7 @@ from app.services.people.recruit.recruit_service import JobOpeningNotFoundError
 router = APIRouter(
     prefix="/recruit",
     tags=["recruitment"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 

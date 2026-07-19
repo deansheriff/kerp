@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_tenant_auth
+from app.api.deps import require_tenant_permission
 from app.db import get_db_session
 from app.services.auth_dependencies import (
     get_current_org_id,
@@ -39,7 +39,7 @@ from app.services.upload_utils import get_env_max_bytes, write_upload_to_temp
 router = APIRouter(
     prefix="/import",
     tags=["people-import"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 

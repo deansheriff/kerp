@@ -20,7 +20,8 @@ from app.web.deps import (
     WebAuthContext,
     base_context,
     get_db_for_org,
-    require_expense_access,
+    require_all_web_permissions,
+    require_any_web_permission,
     require_web_permission,
 )
 from app.web.finance.exp_limits import router as limits_router
@@ -28,15 +29,44 @@ from app.web.finance.exp_limits import router as limits_router
 logger = logging.getLogger(__name__)
 
 # Permission dependencies for action-specific routes
-_require_claim_approve = require_web_permission("expense:claims:approve:tier1")
+_require_dashboard = require_web_permission("expense:dashboard")
+_require_claim_read = require_any_web_permission(
+    [
+        "expense:claims:read",
+        "expense:claims:read_team",
+        "expense:claims:read_own",
+    ]
+)
+_require_claim_read_all = require_web_permission("expense:claims:read")
+_require_claim_export = require_all_web_permissions(
+    ["expense:claims:read", "expense:reports:export"]
+)
+_require_claim_approve = require_any_web_permission(
+    [
+        "expense:claims:approve:tier1",
+        "expense:claims:approve:tier2",
+        "expense:claims:approve:tier3",
+    ]
+)
 _require_claim_reject = require_web_permission("expense:claims:reject")
 _require_claim_submit = require_web_permission("expense:claims:submit")
+_require_claim_create = require_web_permission("expense:claims:create")
+_require_claim_update = require_web_permission("expense:claims:update")
 _require_claim_delete = require_web_permission("expense:claims:delete")
 _require_claim_post = require_web_permission("expense:claims:post")
 _require_claim_reimburse = require_web_permission("expense:claims:reimburse")
+_require_category_read = require_web_permission("expense:categories:read")
 _require_category_manage = require_web_permission("expense:categories:manage")
+_require_advance_read = require_any_web_permission(
+    ["expense:advances:read", "expense:advances:read_own"]
+)
 _require_advance_disburse = require_web_permission("expense:advances:disburse")
 _require_advance_settle = require_web_permission("expense:advances:settle")
+_require_cards_read = require_web_permission("expense:cards:read")
+_require_reports_read = require_web_permission("expense:reports:read")
+_require_legacy_expense_update = require_all_web_permissions(
+    ["expense:claims:read", "expense:claims:update"]
+)
 
 router = APIRouter(prefix="/expense", tags=["expense-web"])
 
@@ -73,7 +103,7 @@ def _safe_return_to(request: Request, fallback: str = "/expense") -> str:
 def expense_dashboard(
     request: Request,
     period: str = Query("month", description="Period: month, quarter, year, or all"),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_dashboard),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense module dashboard page."""
@@ -94,7 +124,7 @@ def expense_list(
     search: str | None = None,
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=100),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_read_all),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense list page."""
@@ -121,7 +151,7 @@ def expense_list(
 def expense_claims_dashboard(
     request: Request,
     period: str = Query("month", description="Period: month, quarter, year, or all"),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense claims dashboard with charts."""
@@ -133,7 +163,7 @@ def expense_claims_dashboard(
 @router.get("/claims/new")
 def expense_claim_new_redirect(
     request: Request,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Redirect expense claim creation to self-service claims form.
@@ -178,7 +208,7 @@ def expense_claims_list(
     approver_id: str | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(25, ge=1, le=100),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense claims list page."""
@@ -207,7 +237,7 @@ def expense_claims_export(
     search: str | None = None,
     employee_id: str | None = None,
     approver_id: str | None = None,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_export),
     db: Session = Depends(get_db_for_org),
 ):
     """Export filtered expense claims as CSV."""
@@ -228,7 +258,7 @@ def expense_claims_export(
 def expense_claim_detail(
     request: Request,
     claim_id: str,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense claim detail page."""
@@ -245,7 +275,7 @@ def expense_claim_item_detail(
     request: Request,
     claim_id: str,
     item_id: str,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense claim item detail page."""
@@ -263,7 +293,7 @@ def expense_claim_item_receipt(
     claim_id: str,
     item_id: str,
     index: int = Query(default=0, ge=0),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Open receipt content for a claim item in the browser."""
@@ -296,7 +326,7 @@ def submit_expense_claim(
 def add_expense_claim_comment(
     claim_id: str,
     content: str = Form(...),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Add a comment to an expense claim."""
@@ -351,7 +381,7 @@ def reject_expense_claim(
 def cancel_expense_claim(
     claim_id: str,
     reason: str | None = Form(None),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Cancel an expense claim."""
@@ -368,7 +398,7 @@ def cancel_expense_claim(
 @router.post("/claims/{claim_id}/resubmit")
 def resubmit_expense_claim(
     claim_id: str,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_submit),
     db: Session = Depends(get_db_for_org),
 ):
     """Resubmit a rejected expense claim."""
@@ -403,7 +433,7 @@ def expense_advances(
     status: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_advance_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Cash advances list page."""
@@ -427,7 +457,7 @@ def expense_cards(
     start_date: str | None = None,
     end_date: str | None = None,
     search: str | None = None,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_cards_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Corporate cards list page."""
@@ -452,7 +482,7 @@ def expense_categories(
     search: str | None = None,
     is_active: str | None = None,
     page: int = Query(default=1, ge=1),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_category_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense categories page."""
@@ -469,7 +499,7 @@ def expense_categories(
 @router.get("/categories/new", response_class=HTMLResponse)
 def new_expense_category_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_category_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """New expense category form."""
@@ -500,7 +530,7 @@ async def create_expense_category(
 def edit_expense_category_form(
     request: Request,
     category_id: str,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_category_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Edit expense category form."""
@@ -555,7 +585,7 @@ def delete_expense_category(
 @router.get("/new", response_class=HTMLResponse)
 def new_expense_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New expense form."""
@@ -589,7 +619,7 @@ def create_expense(
     cost_center_id: str | None = Form(None),
     business_unit_id: str | None = Form(None),
     return_to: str | None = Form(None),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Create new expense."""
@@ -631,7 +661,7 @@ def create_expense(
 @router.get("/reports", response_class=HTMLResponse)
 def expense_reports_hub(
     request: Request,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_reports_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense reports hub page."""
@@ -680,7 +710,7 @@ def expense_reports_hub(
 def expense_detail(
     request: Request,
     expense_id: str,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_read_all),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense detail page."""
@@ -704,7 +734,7 @@ def expense_detail(
 def edit_expense_form(
     request: Request,
     expense_id: str,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_legacy_expense_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Edit expense form."""
@@ -830,7 +860,7 @@ def expense_summary_report(
     request: Request,
     start_date: str | None = None,
     end_date: str | None = None,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_reports_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense summary report page."""
@@ -848,7 +878,7 @@ def expense_by_category_report(
     request: Request,
     start_date: str | None = None,
     end_date: str | None = None,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_reports_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense by category report page."""
@@ -867,7 +897,7 @@ def expense_by_employee_report(
     start_date: str | None = None,
     end_date: str | None = None,
     department_id: str | None = None,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_reports_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense by employee report page."""
@@ -885,7 +915,7 @@ def expense_by_employee_report(
 def expense_trends_report(
     request: Request,
     months: int = Query(default=12, ge=3, le=24),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_reports_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Expense trends report page."""
@@ -902,7 +932,7 @@ def my_approvals_report(
     request: Request,
     start_date: str | None = None,
     end_date: str | None = None,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_claim_approve),
     db: Session = Depends(get_db_for_org),
 ):
     """Approver decisions report for the logged-in user."""
@@ -925,7 +955,7 @@ def cash_advances_list(
     request: Request,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_advance_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Cash advances list page."""
@@ -942,7 +972,7 @@ def cash_advances_list(
 def cash_advance_detail(
     request: Request,
     advance_id: str,
-    auth: WebAuthContext = Depends(require_expense_access),
+    auth: WebAuthContext = Depends(_require_advance_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Cash advance detail page with disburse/settle actions."""

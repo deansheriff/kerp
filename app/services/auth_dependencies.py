@@ -19,11 +19,14 @@ from app.db.session_context import allow_cross_org, prime_session
 from app.models.auth import ApiKey, SessionStatus
 from app.models.auth import Session as AuthSession
 from app.models.person import Person
-from app.models.rbac import Permission, PersonRole, Role, RolePermission
 from app.observability import actor_id_var
 from app.rls import enable_rls_bypass_sync, set_current_organization_sync
 from app.services.auth import hash_api_key
-from app.services.auth_flow import decode_access_token, hash_session_token
+from app.services.auth_flow import (
+    decode_access_token,
+    hash_session_token,
+    load_effective_rbac_claims,
+)
 from app.services.cache import cache_service
 from app.services.common import coerce_uuid
 
@@ -454,32 +457,36 @@ def require_audit_auth(
     if token:
         if _is_jwt(token):
             payload = decode_access_token(db, token)
-            if not _has_audit_scope(payload):
-                raise HTTPException(status_code=403, detail="Insufficient scope")
             session_id = payload.get("session_id")
             person_id = payload.get("sub")
-            if session_id and person_id:
-                # SSO: validate session against shared auth database
-                auth_db = _get_auth_db_for_sso()
-                try:
-                    session_uuid = coerce_uuid(session_id)
-                    person_uuid = coerce_uuid(person_id)
-                    if auth_db:
-                        session = _validate_session_sso(
-                            session_uuid, person_uuid, now, auth_db
-                        )
-                    else:
-                        session = db.get(AuthSession, session_uuid)
+            if not session_id or not person_id:
+                raise HTTPException(status_code=401, detail="Invalid session")
+            # SSO: validate session against shared auth database
+            auth_db = _get_auth_db_for_sso()
+            try:
+                session_uuid = coerce_uuid(session_id)
+                person_uuid = coerce_uuid(person_id)
+                if auth_db:
+                    session = _validate_session_sso(
+                        session_uuid, person_uuid, now, auth_db
+                    )
+                else:
+                    session = db.get(AuthSession, session_uuid)
 
-                    if not session:
-                        raise HTTPException(status_code=401, detail="Invalid session")
-                    if session.status != SessionStatus.active or session.revoked_at:
-                        raise HTTPException(status_code=401, detail="Invalid session")
-                    if _make_aware(session.expires_at) <= now:
-                        raise HTTPException(status_code=401, detail="Session expired")
-                finally:
-                    if auth_db:
-                        auth_db.close()
+                if not session:
+                    raise HTTPException(status_code=401, detail="Invalid session")
+                if session.status != SessionStatus.active or session.revoked_at:
+                    raise HTTPException(status_code=401, detail="Invalid session")
+                if _make_aware(session.expires_at) <= now:
+                    raise HTTPException(status_code=401, detail="Session expired")
+            finally:
+                if auth_db:
+                    auth_db.close()
+
+            roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
+            effective_claims = {"roles": roles, "scopes": scopes}
+            if not _has_audit_scope(effective_claims):
+                raise HTTPException(status_code=403, detail="Insufficient scope")
 
             actor_id = str(person_id)
             _set_actor_context(request, actor_id)
@@ -585,12 +592,7 @@ def require_user_auth(
         if auth_db:
             auth_db.close()
 
-    roles_value = payload.get("roles")
-    scopes_value = payload.get("scopes")
-    roles = [str(role) for role in roles_value] if isinstance(roles_value, list) else []
-    scopes = (
-        [str(scope) for scope in scopes_value] if isinstance(scopes_value, list) else []
-    )
+    roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
     actor_id = str(person_id)
     _set_actor_context(request, actor_id)
     return {
@@ -604,23 +606,9 @@ def require_user_auth(
 def require_role(role_name: str):
     def _require_role(
         auth=Depends(require_user_auth),
-        db: Session = Depends(_get_db),
     ):
-        person_id = coerce_uuid(auth["person_id"])
-        roles = set(auth.get("roles") or [])
-        if role_name in roles:
-            return auth
-        role = db.scalar(
-            select(Role).where(Role.name == role_name).where(Role.is_active.is_(True))
-        )
-        if not role:
-            raise HTTPException(status_code=403, detail="Role not found")
-        link = db.scalar(
-            select(PersonRole)
-            .where(PersonRole.person_id == person_id)
-            .where(PersonRole.role_id == role.id)
-        )
-        if not link:
+        roles = {str(role).strip().lower() for role in auth.get("roles") or []}
+        if role_name.strip().lower() not in roles:
             raise HTTPException(status_code=403, detail="Forbidden")
         return auth
 
@@ -630,32 +618,12 @@ def require_role(role_name: str):
 def require_permission(permission_key: str):
     def _require_permission(
         auth=Depends(require_user_auth),
-        db: Session = Depends(_get_db),
     ):
-        person_id = coerce_uuid(auth["person_id"])
-        roles = set(auth.get("roles") or [])
-        scopes = set(auth.get("scopes") or [])
+        roles = {str(role).strip().lower() for role in auth.get("roles") or []}
+        scopes = {str(scope).strip().lower() for scope in auth.get("scopes") or []}
         if "admin" in roles or permission_key in scopes:
             return auth
-        permission = db.scalar(
-            select(Permission)
-            .where(Permission.key == permission_key)
-            .where(Permission.is_active.is_(True))
-        )
-        if not permission:
-            raise HTTPException(status_code=403, detail="Permission not found")
-        has_permission = db.scalar(
-            select(RolePermission)
-            .join(Role, RolePermission.role_id == Role.id)
-            .join(PersonRole, PersonRole.role_id == Role.id)
-            .where(PersonRole.person_id == person_id)
-            .where(RolePermission.permission_id == permission.id)
-            .where(Role.is_active.is_(True))
-            .limit(1)
-        )
-        if not has_permission:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        return auth
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     return _require_permission
 
@@ -754,12 +722,7 @@ def require_tenant_auth(
         if request is not None:
             request.state.organization_id = str(organization_id)
 
-    roles_value = payload.get("roles")
-    scopes_value = payload.get("scopes")
-    roles = [str(role) for role in roles_value] if isinstance(roles_value, list) else []
-    scopes = (
-        [str(scope) for scope in scopes_value] if isinstance(scopes_value, list) else []
-    )
+    roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
     actor_id = str(person_id)
     _set_actor_context(request, actor_id)
     return {
@@ -780,23 +743,9 @@ def require_tenant_role(role_name: str):
 
     def _require_tenant_role(
         auth=Depends(require_tenant_auth),
-        db: Session = Depends(_get_db),
     ):
-        person_id = coerce_uuid(auth["person_id"])
-        roles = set(auth.get("roles") or [])
-        if role_name in roles:
-            return auth
-        role = db.scalar(
-            select(Role).where(Role.name == role_name).where(Role.is_active.is_(True))
-        )
-        if not role:
-            raise HTTPException(status_code=403, detail="Role not found")
-        link = db.scalar(
-            select(PersonRole)
-            .where(PersonRole.person_id == person_id)
-            .where(PersonRole.role_id == role.id)
-        )
-        if not link:
+        roles = {str(role).strip().lower() for role in auth.get("roles") or []}
+        if role_name.strip().lower() not in roles:
             raise HTTPException(status_code=403, detail="Forbidden")
         return auth
 
@@ -812,34 +761,38 @@ def require_tenant_permission(permission_key: str):
 
     def _require_tenant_permission(
         auth=Depends(require_tenant_auth),
-        db: Session = Depends(_get_db),
     ):
-        person_id = coerce_uuid(auth["person_id"])
-        roles = set(auth.get("roles") or [])
-        scopes = set(auth.get("scopes") or [])
+        roles = {str(role).strip().lower() for role in auth.get("roles") or []}
+        scopes = {str(scope).strip().lower() for scope in auth.get("scopes") or []}
         if "admin" in roles or permission_key in scopes:
             return auth
-        permission = db.scalar(
-            select(Permission)
-            .where(Permission.key == permission_key)
-            .where(Permission.is_active.is_(True))
-        )
-        if not permission:
-            raise HTTPException(status_code=403, detail="Permission not found")
-        has_permission = db.scalar(
-            select(RolePermission)
-            .join(Role, RolePermission.role_id == Role.id)
-            .join(PersonRole, PersonRole.role_id == Role.id)
-            .where(PersonRole.person_id == person_id)
-            .where(RolePermission.permission_id == permission.id)
-            .where(Role.is_active.is_(True))
-            .limit(1)
-        )
-        if not has_permission:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        return auth
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     return _require_tenant_permission
+
+
+def require_tenant_method_permission(
+    read_permission: str,
+    manage_permission: str,
+):
+    """Require read permission for safe methods and manage permission otherwise."""
+
+    def _require_method_permission(
+        request: Request,
+        auth=Depends(require_tenant_auth),
+    ):
+        permission_key = (
+            read_permission
+            if request.method in {"GET", "HEAD", "OPTIONS"}
+            else manage_permission
+        )
+        roles = {str(role).strip().lower() for role in auth.get("roles") or []}
+        scopes = {str(scope).strip().lower() for scope in auth.get("scopes") or []}
+        if "admin" in roles or permission_key in scopes:
+            return auth
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return _require_method_permission
 
 
 def require_admin_bypass(
@@ -907,32 +860,14 @@ def require_admin_bypass(
         if auth_db:
             auth_db.close()
 
-    # Check for admin role
-    roles_value = payload.get("roles")
-    roles = [str(role) for role in roles_value] if isinstance(roles_value, list) else []
-    if "admin" not in roles:
-        # Also check database for admin role
-        admin_role = db.scalar(
-            select(Role).where(Role.name == "admin").where(Role.is_active.is_(True))
-        )
-        if admin_role:
-            link = db.scalar(
-                select(PersonRole)
-                .where(PersonRole.person_id == person_uuid)
-                .where(PersonRole.role_id == admin_role.id)
-            )
-            if not link:
-                raise HTTPException(status_code=403, detail="Admin access required")
-        else:
-            raise HTTPException(status_code=403, detail="Admin access required")
+    roles, scopes = load_effective_rbac_claims(db, str(person_uuid))
+    normalized_roles = {str(role).strip().lower() for role in roles}
+    if "admin" not in normalized_roles:
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     # Enable RLS bypass for admin operations
     enable_rls_bypass_sync(db)
 
-    scopes_value = payload.get("scopes")
-    scopes = (
-        [str(scope) for scope in scopes_value] if isinstance(scopes_value, list) else []
-    )
     actor_id = str(person_id)
     _set_actor_context(request, actor_id)
     if request is not None:

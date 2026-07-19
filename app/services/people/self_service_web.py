@@ -476,6 +476,7 @@ class SelfServiceWebService:
                 or_(
                     func.lower(Role.name) == "admin",
                     and_(
+                        func.lower(Role.name) != "employee",
                         Permission.is_active == True,
                         Permission.key.in_(
                             [
@@ -523,6 +524,7 @@ class SelfServiceWebService:
                     or_(
                         func.lower(Role.name) == "admin",
                         and_(
+                            func.lower(Role.name) != "employee",
                             Permission.is_active == True,
                             Permission.key.in_(
                                 [

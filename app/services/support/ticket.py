@@ -66,6 +66,7 @@ class TicketService:
         date_from: date | None = None,
         date_to: date | None = None,
         include_deleted: bool = False,
+        raised_by_id: UUID | None = None,
         page: int = 1,
         per_page: int = 50,
     ) -> tuple[list[Ticket], int]:
@@ -109,6 +110,9 @@ class TicketService:
         if assigned_to_id:
             query = query.where(Ticket.assigned_to_id == assigned_to_id)
 
+        if raised_by_id:
+            query = query.where(Ticket.raised_by_id == coerce_uuid(raised_by_id))
+
         if category_id:
             query = query.where(Ticket.category_id == coerce_uuid(category_id))
 
@@ -151,6 +155,7 @@ class TicketService:
         organization_id: UUID,
         *,
         search: str | None = None,
+        raised_by_id: UUID | None = None,
         page: int = 1,
         per_page: int = 50,
     ) -> tuple[list[Ticket], int]:
@@ -174,6 +179,9 @@ class TicketService:
                 joinedload(Ticket.assigned_to),
             )
         )
+
+        if raised_by_id:
+            query = query.where(Ticket.raised_by_id == coerce_uuid(raised_by_id))
 
         # Apply search filter
         if search:
@@ -707,17 +715,21 @@ class TicketService:
         self,
         db: Session,
         organization_id: UUID,
+        raised_by_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Get ticket statistics for dashboard."""
         org_id = coerce_uuid(organization_id)
 
         # Total tickets (excluding deleted)
         not_deleted = Ticket.status != TicketStatus.CLOSED
+        scope_filters = [Ticket.organization_id == org_id]
+        if raised_by_id:
+            scope_filters.append(Ticket.raised_by_id == coerce_uuid(raised_by_id))
 
         total = (
             db.scalar(
                 select(func.count(Ticket.ticket_id)).where(
-                    Ticket.organization_id == org_id, not_deleted
+                    *scope_filters, not_deleted
                 )
             )
             or 0
@@ -727,7 +739,7 @@ class TicketService:
         open_count = (
             db.scalar(
                 select(func.count(Ticket.ticket_id)).where(
-                    Ticket.organization_id == org_id,
+                    *scope_filters,
                     Ticket.status == TicketStatus.OPEN,
                     not_deleted,
                 )
@@ -738,7 +750,7 @@ class TicketService:
         on_hold = (
             db.scalar(
                 select(func.count(Ticket.ticket_id)).where(
-                    Ticket.organization_id == org_id,
+                    *scope_filters,
                     Ticket.status == TicketStatus.ON_HOLD,
                     not_deleted,
                 )
@@ -749,7 +761,7 @@ class TicketService:
         resolved = (
             db.scalar(
                 select(func.count(Ticket.ticket_id)).where(
-                    Ticket.organization_id == org_id,
+                    *scope_filters,
                     Ticket.status == TicketStatus.RESOLVED,
                     not_deleted,
                 )
@@ -760,7 +772,7 @@ class TicketService:
         closed = (
             db.scalar(
                 select(func.count(Ticket.ticket_id)).where(
-                    Ticket.organization_id == org_id,
+                    *scope_filters,
                     Ticket.status == TicketStatus.CLOSED,
                     not_deleted,
                 )
@@ -772,7 +784,7 @@ class TicketService:
         urgent = (
             db.scalar(
                 select(func.count(Ticket.ticket_id)).where(
-                    Ticket.organization_id == org_id,
+                    *scope_filters,
                     Ticket.priority == TicketPriority.URGENT,
                     Ticket.status.in_(
                         [TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD]
@@ -787,7 +799,7 @@ class TicketService:
         unassigned = (
             db.scalar(
                 select(func.count(Ticket.ticket_id)).where(
-                    Ticket.organization_id == org_id,
+                    *scope_filters,
                     Ticket.assigned_to_id.is_(None),
                     Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED]),
                     not_deleted,

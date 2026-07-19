@@ -10,7 +10,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.fixed_assets.depreciation_run import DepreciationRunStatus
 from app.schemas.finance.common import ListResponse
 from app.models.fixed_assets.maintenance_request import MaintenanceRequestStatus
@@ -65,7 +70,7 @@ from app.services.people.assets import (
 router = APIRouter(
     prefix="/assets",
     tags=["assets"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 

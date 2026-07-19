@@ -39,6 +39,11 @@ from app.services.expense.expense_service import (
     ExpenseService,
     ExpenseServiceError,
 )
+from app.services.expense.authorization import (
+    can_read_employee_record,
+    current_employee_id,
+    readable_employee_ids,
+)
 from app.services.expense.limit_service import (
     ApproverWeeklyBudgetExhaustedError,
     ExpenseLimitServiceError,
@@ -57,6 +62,37 @@ def _web_facade():
 
 
 class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
+    @staticmethod
+    def _can_read_claim(db, auth, claim: ExpenseClaim) -> bool:
+        return can_read_employee_record(
+            db,
+            claim.organization_id,
+            auth,
+            claim.employee_id,
+            read_all_permission="expense:claims:read",
+            read_own_permission="expense:claims:read_own",
+            read_team_permission="expense:claims:read_team",
+        )
+
+    @staticmethod
+    def _owns_claim(db, auth, claim: ExpenseClaim) -> bool:
+        if auth.is_admin:
+            return True
+        employee_id = current_employee_id(db, claim.organization_id, auth)
+        return employee_id is not None and claim.employee_id == employee_id
+
+    @classmethod
+    def _owned_claim(cls, db, auth, organization_id, claim_id) -> ExpenseClaim | None:
+        claim = db.scalar(
+            select(ExpenseClaim).where(
+                ExpenseClaim.organization_id == organization_id,
+                ExpenseClaim.claim_id == claim_id,
+            )
+        )
+        if not claim or not cls._owns_claim(db, auth, claim):
+            return None
+        return claim
+
     @staticmethod
     def _parse_claim_filter_date(value: str | None) -> date_type | None:
         if not value:
@@ -77,6 +113,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
 
     @staticmethod
     def _filtered_claims_stmt(
+        db,
         auth,
         org_id,
         view: str | None,
@@ -96,6 +133,19 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         end = ExpenseClaimsWebMixin._parse_claim_filter_date(end_date)
 
         stmt = select(ExpenseClaim).where(ExpenseClaim.organization_id == org_id)
+        allowed_employee_ids = readable_employee_ids(
+            db,
+            org_id,
+            auth,
+            read_all_permission="expense:claims:read",
+            read_own_permission="expense:claims:read_own",
+            read_team_permission="expense:claims:read_team",
+        )
+        if allowed_employee_ids is not None:
+            if allowed_employee_ids:
+                stmt = stmt.where(ExpenseClaim.employee_id.in_(allowed_employee_ids))
+            else:
+                stmt = stmt.where(false())
         if filter_view == "submitted_to_me":
             if auth_employee_id:
                 latest_round = (
@@ -279,6 +329,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         org_id = coerce_uuid(auth.organization_id)
         stmt, filter_view, filter_employee_id, filter_approver_id = (
             ExpenseClaimsWebMixin._filtered_claims_stmt(
+                db=db,
                 auth=auth,
                 org_id=org_id,
                 view=view,
@@ -515,6 +566,7 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         org_id = coerce_uuid(auth.organization_id)
         stmt, _filter_view, _filter_employee_id, _filter_approver_id = (
             ExpenseClaimsWebMixin._filtered_claims_stmt(
+                db=db,
                 auth=auth,
                 org_id=org_id,
                 view=view,
@@ -632,6 +684,10 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         )
         if not claim:
             return RedirectResponse("/expense/claims/list", status_code=302)
+        if not ExpenseClaimsWebMixin._can_read_claim(db, auth, claim):
+            return RedirectResponse(
+                "/expense/claims/list?error=permission", status_code=302
+            )
 
         approve_perms = [
             "expense:claims:approve:tier1",
@@ -768,6 +824,10 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             return RedirectResponse(
                 "/expense/claims/list?error=not_found", status_code=302
             )
+        if not ExpenseClaimsWebMixin._can_read_claim(db, auth, claim):
+            return RedirectResponse(
+                "/expense/claims/list?error=permission", status_code=302
+            )
 
         author_id_raw = auth.person_id or auth.user_id
         if not author_id_raw:
@@ -828,6 +888,10 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
 
         requested_approver = None
         claim = item.claim
+        if not claim or not ExpenseClaimsWebMixin._can_read_claim(db, auth, claim):
+            return RedirectResponse(
+                "/expense/claims/list?error=permission", status_code=302
+            )
         if claim and claim.requested_approver_id:
             requested_approver = db.scalars(
                 select(Employee).where(
@@ -871,6 +935,16 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
         if not item or not item.receipt_url:
             return RedirectResponse(
                 f"/expense/claims/{claim_id}?error=Receipt+not+found", status_code=303
+            )
+        claim = db.scalar(
+            select(ExpenseClaim).where(
+                ExpenseClaim.organization_id == org_id,
+                ExpenseClaim.claim_id == claim_uuid,
+            )
+        )
+        if not claim or not cls._can_read_claim(db, auth, claim):
+            return RedirectResponse(
+                "/expense/claims/list?error=permission", status_code=302
             )
 
         receipt_urls = cls._parse_receipt_urls(item.receipt_url)
@@ -947,24 +1021,14 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             content_disposition_type="inline",
         )
 
-    @staticmethod
-    def submit_claim_response(claim_id: str, auth, db) -> RedirectResponse:
-        if not (
-            auth.is_admin
-            or auth.has_any_permission(
-                [
-                    "expense:claims:approve:tier1",
-                    "expense:claims:approve:tier2",
-                    "expense:claims:approve:tier3",
-                ]
-            )
-        ):
+    @classmethod
+    def submit_claim_response(cls, claim_id: str, auth, db) -> RedirectResponse:
+        org_id = coerce_uuid(auth.organization_id)
+        claim_uuid = coerce_uuid(claim_id)
+        if not cls._owned_claim(db, auth, org_id, claim_uuid):
             return RedirectResponse(
                 "/expense/claims/list?error=permission", status_code=302
             )
-
-        org_id = coerce_uuid(auth.organization_id)
-        claim_uuid = coerce_uuid(claim_id)
         actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         svc = ExpenseService(db)
         try:
@@ -1200,17 +1264,22 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             f"/expense/claims/{claim_id}?action=rejected", status_code=303
         )
 
-    @staticmethod
+    @classmethod
     def cancel_claim_response(
-        claim_id: str, reason: str | None, auth, db
+        cls, claim_id: str, reason: str | None, auth, db
     ) -> RedirectResponse:
         org_id = coerce_uuid(auth.organization_id)
+        claim_uuid = coerce_uuid(claim_id)
+        if not cls._owned_claim(db, auth, org_id, claim_uuid):
+            return RedirectResponse(
+                "/expense/claims/list?error=permission", status_code=302
+            )
         actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         svc = ExpenseService(db)
         try:
             claim = svc.cancel_claim(
                 org_id,
-                coerce_uuid(claim_id),
+                claim_uuid,
                 reason=(reason or "").strip() or None,
                 actor_id=actor_id,
             )
@@ -1238,13 +1307,18 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             f"/expense/claims/{claim_id}?action=cancelled", status_code=303
         )
 
-    @staticmethod
-    def resubmit_claim_response(claim_id: str, auth, db) -> RedirectResponse:
+    @classmethod
+    def resubmit_claim_response(cls, claim_id: str, auth, db) -> RedirectResponse:
         org_id = coerce_uuid(auth.organization_id)
+        claim_uuid = coerce_uuid(claim_id)
+        if not cls._owned_claim(db, auth, org_id, claim_uuid):
+            return RedirectResponse(
+                "/expense/claims/list?error=permission", status_code=302
+            )
         actor_id = coerce_uuid(auth.person_id) if auth.person_id else None
         svc = ExpenseService(db)
         try:
-            claim = svc.resubmit_claim(org_id, coerce_uuid(claim_id), actor_id=actor_id)
+            claim = svc.resubmit_claim(org_id, claim_uuid, actor_id=actor_id)
             if claim.status != ExpenseClaimStatus.DRAFT:
                 db.rollback()
                 return RedirectResponse(
@@ -1268,12 +1342,17 @@ class ExpenseClaimsWebMixin(ExpenseWebCommonMixin):
             f"/expense/claims/{claim_id}?action=resubmitted", status_code=303
         )
 
-    @staticmethod
-    def delete_claim_response(claim_id: str, auth, db) -> RedirectResponse:
+    @classmethod
+    def delete_claim_response(cls, claim_id: str, auth, db) -> RedirectResponse:
         org_id = coerce_uuid(auth.organization_id)
+        claim_uuid = coerce_uuid(claim_id)
+        if not cls._owned_claim(db, auth, org_id, claim_uuid):
+            return RedirectResponse(
+                "/expense/claims/list?error=permission", status_code=302
+            )
         svc = ExpenseService(db)
         try:
-            svc.delete_claim(org_id, coerce_uuid(claim_id))
+            svc.delete_claim(org_id, claim_uuid)
             db.flush()
         except ExpenseClaimStatusError:
             db.rollback()

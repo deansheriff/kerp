@@ -17,7 +17,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException, Request, Response, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -50,6 +50,93 @@ PASSWORD_CONTEXT = CryptContext(
     deprecated="auto",
 )
 _REFRESH_REUSE_GRACE_SECONDS = 30
+
+EMPLOYEE_SELF_SERVICE_PERMISSIONS = frozenset(
+    {
+        "coach:insights:read",
+        "coach:insights:feedback",
+        "coach:reports:read",
+        "coach:chat:access",
+        "self:access",
+        "selfservice:profile:read",
+        "selfservice:profile:update",
+        "selfservice:documents:read",
+        "selfservice:documents:upload",
+        "leave:applications:read_own",
+        "leave:applications:create",
+        "leave:balance:read_own",
+        "attendance:records:read_own",
+        "attendance:requests:read_own",
+        "attendance:requests:create",
+        "perf:appraisals:read_own",
+        "perf:appraisals:self_review",
+        "perf:goals:read",
+        "perf:goals:update",
+        "expense:claims:read_own",
+        "expense:claims:create",
+        "expense:claims:update",
+        "expense:claims:delete",
+        "expense:claims:submit",
+        "expense:advances:read_own",
+        "expense:advances:create",
+        "payroll:slips:read_own",
+        "training:events:read",
+        "training:enrollments:self_enroll",
+        "training:feedback:submit",
+        "support:tickets:read_own",
+        "support:tickets:create",
+        "tasks:read_own",
+        "tasks:update",
+        "tasks:complete",
+    }
+)
+
+_TOKEN_SCOPE_KEYS = frozenset(
+    {
+        "finance:access",
+        "finance:dashboard",
+        "hr:access",
+        "hr:dashboard",
+        "inventory:access",
+        "inventory:dashboard",
+        "fleet:access",
+        "fleet:dashboard",
+        "support:access",
+        "support:dashboard",
+        "procurement:access",
+        "procurement:dashboard",
+        "projects:access",
+        "projects:dashboard",
+        "settings:access",
+        "settings:dashboard",
+        "expense:access",
+        "expense:dashboard",
+        "discipline:access",
+        "discipline:cases:read",
+        "discipline:cases:create",
+        "discipline:cases:update",
+        "discipline:workflow:manage",
+        "self:access",
+        "inv:material_requests:read",
+        "inv:material_requests:create",
+        "inv:material_requests:submit",
+        "inv:material_requests:delete",
+        "inv:material_requests:approve",
+        "inventory:material_requests:read",
+        "inventory:material_requests:create",
+        "inventory:material_requests:submit",
+        "inventory:material_requests:delete",
+        "inventory:material_requests:approve",
+        "leave:applications:approve:tier1",
+        "leave:applications:approve:tier2",
+        "leave:applications:approve:tier3",
+        "expense:claims:approve:tier1",
+        "expense:claims:approve:tier2",
+        "expense:claims:approve:tier3",
+        "expense:claims:reject",
+        "expense:limits:review",
+    }
+)
 
 
 def _env_value(name: str) -> str | None:
@@ -415,13 +502,13 @@ def _person_or_404(db: Session, person_id: str) -> Person:
     return person
 
 
-def _load_rbac_claims(db: Session, person_id: str) -> tuple[list[str], list[str]]:
-    """Load RBAC claims for JWT token.
-
-    Only includes module-access scopes in the token to keep it small enough
-    for browser cookies (~4KB limit). Full permission checks should be done
-    via database lookup or by checking the 'admin' role.
-    """
+def load_effective_rbac_claims(
+    db: Session,
+    person_id: str,
+    *,
+    token_scopes_only: bool = False,
+) -> tuple[list[str], list[str]]:
+    """Load current roles and permissions with managed-role limits applied."""
     if db is None:
         return [], []
     person_uuid = coerce_uuid(person_id)
@@ -431,65 +518,32 @@ def _load_rbac_claims(db: Session, person_id: str) -> tuple[list[str], list[str]
         .where(PersonRole.person_id == person_uuid)
         .where(Role.is_active.is_(True))
     ).all()
-    # Only include module-level access scopes to keep token size under 4KB
-    # Full permissions are checked via 'admin' role or DB lookup
-    module_access_scopes = {
-        "finance:access",
-        "finance:dashboard",
-        "hr:access",
-        "hr:dashboard",
-        "inventory:access",
-        "inventory:dashboard",
-        "fleet:access",
-        "fleet:dashboard",
-        "support:access",
-        "support:dashboard",
-        "procurement:access",
-        "procurement:dashboard",
-        "projects:access",
-        "projects:dashboard",
-        "settings:access",
-        "settings:dashboard",
-        "expense:access",
-        "expense:dashboard",
-        "discipline:access",
-        "discipline:cases:read",
-        "discipline:cases:create",
-        "discipline:cases:update",
-        "discipline:workflow:manage",
-        "self:access",
-        "inv:material_requests:read",
-        "inv:material_requests:create",
-        "inv:material_requests:submit",
-        "inv:material_requests:delete",
-        "inv:material_requests:approve",
-        "inventory:material_requests:read",
-        "inventory:material_requests:create",
-        "inventory:material_requests:submit",
-        "inventory:material_requests:delete",
-        "inventory:material_requests:approve",
-        "leave:applications:approve:tier1",
-        "leave:applications:approve:tier2",
-        "leave:applications:approve:tier3",
-        "expense:claims:approve:tier1",
-        "expense:claims:approve:tier2",
-        "expense:claims:approve:tier3",
-        "expense:claims:reject",
-        "expense:limits:review",
-    }
-    permissions = db.scalars(
-        select(Permission)
+    permission_query = (
+        select(Permission.key)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
         .join(Role, RolePermission.role_id == Role.id)
         .join(PersonRole, PersonRole.role_id == Role.id)
         .where(PersonRole.person_id == person_uuid)
         .where(Role.is_active.is_(True))
         .where(Permission.is_active.is_(True))
-        .where(Permission.key.in_(module_access_scopes))
-    ).all()
+        .where(
+            or_(
+                func.lower(Role.name) != "employee",
+                Permission.key.in_(EMPLOYEE_SELF_SERVICE_PERMISSIONS),
+            )
+        )
+    )
+    if token_scopes_only:
+        permission_query = permission_query.where(Permission.key.in_(_TOKEN_SCOPE_KEYS))
+    permissions = db.scalars(permission_query).all()
     role_names = [role.name for role in roles]
-    permission_keys = list({perm.key for perm in permissions})
+    permission_keys = list({str(key) for key in permissions if key})
     return role_names, permission_keys
+
+
+def _load_rbac_claims(db: Session, person_id: str) -> tuple[list[str], list[str]]:
+    """Load compact RBAC claims for JWT token issuance."""
+    return load_effective_rbac_claims(db, person_id, token_scopes_only=True)
 
 
 def _primary_totp_method(db: Session, person_id: str) -> MFAMethod | None:

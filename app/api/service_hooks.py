@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.finance.platform.service_hook import (
     HookExecutionMode,
     HookHandlerType,
@@ -27,7 +32,7 @@ from app.services.hooks.service_hook import ServiceHookService
 router = APIRouter(
     prefix="/service-hooks",
     tags=["service-hooks"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("integrations:manage"))],
 )
 
 

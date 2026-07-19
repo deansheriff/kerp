@@ -15,7 +15,31 @@ from app.web.deps import (
     get_db_for_org,
     WebAuthContext,
     base_context,
-    require_finance_access,
+    require_any_web_permission,
+    require_web_permission,
+)
+
+_accounts_read = require_web_permission("banking:accounts:read")
+_accounts_create = require_web_permission("banking:accounts:create")
+_accounts_update = require_web_permission("banking:accounts:update")
+_accounts_manage = require_web_permission("banking:accounts:manage")
+_statements_read = require_web_permission("banking:statements:read")
+_statements_import = require_web_permission("banking:statements:import")
+_statements_delete = require_web_permission("banking:statements:delete")
+_reconciliation_read = require_web_permission("banking:reconciliation:read")
+_reconciliation_create = require_web_permission("banking:reconciliation:create")
+_reconciliation_update = require_web_permission("banking:reconciliation:update")
+_reconciliation_submit = require_web_permission("banking:reconciliation:submit")
+_reconciliation_approve = require_web_permission("banking:reconciliation:approve")
+_rules_read = require_web_permission("banking:rules:read")
+_rules_manage = require_web_permission("banking:rules:manage")
+_banking_read = require_any_web_permission(
+    [
+        "banking:accounts:read",
+        "banking:statements:read",
+        "banking:reconciliation:read",
+        "banking:rules:read",
+    ]
 )
 
 router = APIRouter(prefix="/banking", tags=["banking-web"])
@@ -25,7 +49,7 @@ router = APIRouter(prefix="/banking", tags=["banking-web"])
 @router.get("/", response_class=HTMLResponse)
 def banking_landing(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_banking_read),
 ):
     """Banking landing page."""
     context = base_context(request, auth, "Banking", "banking")
@@ -41,7 +65,7 @@ def banking_landing(
 @router.get("/dashboard", response_class=HTMLResponse)
 def banking_dashboard(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_banking_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Banking module dashboard page."""
@@ -57,7 +81,7 @@ def list_bank_accounts(
     limit: int = Query(default=50, ge=1, le=200),
     sort: str | None = None,
     sort_dir: str | None = None,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Bank accounts list page."""
@@ -69,7 +93,7 @@ def list_bank_accounts(
 @router.get("/accounts/new", response_class=HTMLResponse)
 def new_bank_account_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New bank account form page."""
@@ -79,7 +103,7 @@ def new_bank_account_form(
 @router.post("/accounts/new")
 async def new_bank_account_submit(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Create new bank account from form."""
@@ -90,7 +114,7 @@ async def new_bank_account_submit(
 async def export_all_accounts(
     search: str = "",
     status: str = "",
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export all bank accounts to CSV."""
@@ -102,7 +126,7 @@ async def export_all_accounts(
 @router.post("/accounts/bulk-export")
 async def bulk_export_accounts(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export selected bank accounts to CSV."""
@@ -113,7 +137,7 @@ async def bulk_export_accounts(
 async def edit_bank_account_submit(
     request: Request,
     account_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Update bank account from form."""
@@ -126,7 +150,7 @@ async def edit_bank_account_submit(
 def view_bank_account(
     request: Request,
     account_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Bank account detail page."""
@@ -137,7 +161,7 @@ def view_bank_account(
 def unlink_mono_web(
     request: Request,
     account_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Disconnect a bank account from Mono Connect."""
@@ -153,7 +177,7 @@ def unlink_mono_web(
 def edit_bank_account_form(
     request: Request,
     account_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Edit bank account form page."""
@@ -173,7 +197,7 @@ def list_statements(
     limit: int = Query(default=50, ge=1, le=200),
     sort: str | None = None,
     sort_dir: str | None = None,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Bank statements list page (flat view of imported statement lines)."""
@@ -202,7 +226,7 @@ def export_statement_lines(
     search: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_read),
     db: Session = Depends(get_db_for_org),
 ) -> Response:
     """Export bank transaction lines matching filters to CSV."""
@@ -230,7 +254,7 @@ def list_statement_imports(
     limit: int = Query(default=25, ge=1, le=100),
     sort: str | None = None,
     sort_dir: str | None = None,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Imported statements list page (header-level view)."""
@@ -253,7 +277,7 @@ def list_statement_imports(
 @router.get("/statements/import", response_class=HTMLResponse)
 def import_statement_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_import),
     db: Session = Depends(get_db_for_org),
 ):
     """Import statement form page."""
@@ -263,7 +287,7 @@ def import_statement_form(
 @router.post("/statements/import", response_class=HTMLResponse)
 async def import_statement_submit(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_import),
     db: Session = Depends(get_db_for_org),
 ):
     """Handle bank statement import submission."""
@@ -273,7 +297,7 @@ async def import_statement_submit(
 @router.post("/statements/import/preview", response_class=JSONResponse)
 async def import_statement_preview(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_import),
     db: Session = Depends(get_db_for_org),
 ):
     """Preview uploaded statement columns/sample rows for mapping."""
@@ -284,7 +308,7 @@ async def import_statement_preview(
 
 @router.get("/statements/sample-csv")
 def download_sample_csv(
-    _auth: WebAuthContext = Depends(require_finance_access),
+    _auth: WebAuthContext = Depends(_statements_import),
     format: str = Query(default="type"),
 ):
     """Download a sample CSV template for bank statement import."""
@@ -308,7 +332,7 @@ def download_sample_csv(
 def view_transaction(
     request: Request,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Bank transaction line detail page."""
@@ -318,7 +342,7 @@ def view_transaction(
 @router.post("/statements/bulk-delete")
 async def bulk_delete_statements(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_delete),
     db: Session = Depends(get_db_for_org),
 ):
     """Bulk delete statement batches."""
@@ -328,7 +352,7 @@ async def bulk_delete_statements(
 @router.post("/statements/bulk-export")
 async def bulk_export_statements(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export selected statements to CSV."""
@@ -341,7 +365,7 @@ async def bulk_export_statements(
 @router.post("/lines/apply-rules")
 async def apply_rules_flat(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Apply categorization rules across all statements for a bank account."""
@@ -358,7 +382,7 @@ async def apply_rules_flat(
 async def accept_suggestion_flat(
     request: Request,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Accept a categorization suggestion from the flat lines view."""
@@ -372,7 +396,7 @@ async def accept_suggestion_flat(
 async def reject_suggestion_flat(
     request: Request,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Reject a categorization suggestion from the flat lines view."""
@@ -388,7 +412,7 @@ def view_statement(
     statement_id: str,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Statement detail page with lines."""
@@ -401,7 +425,7 @@ def view_statement(
 async def apply_rules(
     request: Request,
     statement_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Apply categorization rules to statement lines."""
@@ -413,7 +437,7 @@ async def apply_rules(
 async def statement_auto_match(
     request: Request,
     statement_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Run auto-match on a statement's unmatched lines (HTMX action)."""
@@ -428,7 +452,7 @@ async def accept_suggestion(
     request: Request,
     statement_id: str,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Accept a categorization suggestion for a statement line."""
@@ -443,7 +467,7 @@ async def reject_suggestion(
     request: Request,
     statement_id: str,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Reject a categorization suggestion for a statement line."""
@@ -457,7 +481,7 @@ async def reject_suggestion(
 async def delete_statement(
     request: Request,
     statement_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_statements_delete),
     db: Session = Depends(get_db_for_org),
 ):
     """Delete a bank statement batch and its lines."""
@@ -471,7 +495,7 @@ async def delete_statement(
 async def batch_match_statement_lines(
     request: Request,
     statement_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Match multiple statement lines to GL entries in one request (JSON)."""
@@ -485,7 +509,7 @@ async def create_journal_and_match(
     request: Request,
     statement_id: str,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Create a GL journal entry and match it to a bank line (JSON)."""
@@ -499,7 +523,7 @@ async def match_statement_line(
     request: Request,
     statement_id: str,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Accept a GL transaction match for a statement line (JSON from Alpine.js)."""
@@ -513,7 +537,7 @@ async def unmatch_statement_line(
     request: Request,
     statement_id: str,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Remove a direct match from a statement line (JSON from Alpine.js)."""
@@ -539,7 +563,7 @@ def scored_candidates(
     sort: str = Query("relevance"),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Return scored GL candidates for a specific bank statement line."""
@@ -566,7 +590,7 @@ async def multi_match_statement_line(
     request: Request,
     statement_id: str,
     line_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Match one bank line to multiple GL entries (JSON from Alpine.js)."""
@@ -584,7 +608,7 @@ def list_reconciliations(
     end_date: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Reconciliations list page."""
@@ -605,7 +629,7 @@ def list_reconciliations(
 def new_reconciliation_form(
     request: Request,
     account_id: str | None = None,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_create),
     db: Session = Depends(get_db_for_org),
 ):
     """New reconciliation form page."""
@@ -617,7 +641,7 @@ def new_reconciliation_form(
 @router.post("/reconciliations/new")
 async def create_reconciliation_submit(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_create),
     db: Session = Depends(get_db_for_org),
 ):
     """Create a new reconciliation from form submission."""
@@ -632,7 +656,7 @@ async def create_reconciliation_submit(
 async def reconciliation_auto_match(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Run auto-match on a reconciliation (HTMX action)."""
@@ -645,7 +669,7 @@ async def reconciliation_auto_match(
 async def reconciliation_submit_for_review(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_submit),
     db: Session = Depends(get_db_for_org),
 ):
     """Submit reconciliation for review (HTMX action)."""
@@ -658,7 +682,7 @@ async def reconciliation_submit_for_review(
 async def reconciliation_approve(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_approve),
     db: Session = Depends(get_db_for_org),
 ):
     """Approve a reconciliation (HTMX action)."""
@@ -671,7 +695,7 @@ async def reconciliation_approve(
 async def reconciliation_reject(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_approve),
     db: Session = Depends(get_db_for_org),
 ):
     """Reject a reconciliation (HTMX action)."""
@@ -684,7 +708,7 @@ async def reconciliation_reject(
 async def reconciliation_add_match(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Add a manual match (JSON from Alpine.js fetch)."""
@@ -697,7 +721,7 @@ async def reconciliation_add_match(
 async def reconciliation_multi_match(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Add multi-match (JSON from Alpine.js fetch)."""
@@ -710,7 +734,7 @@ async def reconciliation_multi_match(
 async def reconciliation_unmatch(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Reverse a confirmed match for a statement line (JSON from Alpine.js fetch)."""
@@ -723,7 +747,7 @@ async def reconciliation_unmatch(
 async def reconciliation_add_reconciling_item(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_update),
     db: Session = Depends(get_db_for_org),
 ):
     """Add a reconciling item (adjustment / outstanding) — JSON from Alpine.js."""
@@ -739,7 +763,7 @@ def view_reconciliation(
     matched_page: int = Query(1, ge=1),
     stmt_page: int = Query(1, ge=1),
     gl_page: int = Query(1, ge=1),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Reconciliation workspace page."""
@@ -758,7 +782,7 @@ def view_reconciliation(
 def reconciliation_report(
     request: Request,
     reconciliation_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_reconciliation_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Reconciliation report page (printable)."""
@@ -777,7 +801,7 @@ def list_payees(
     payee_type: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=200),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Payees list page."""
@@ -789,7 +813,7 @@ def list_payees(
 @router.get("/payees/new", response_class=HTMLResponse)
 def new_payee_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """New payee form page."""
@@ -799,7 +823,7 @@ def new_payee_form(
 @router.post("/payees/new")
 async def new_payee_submit(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Create new payee from form."""
@@ -810,7 +834,7 @@ async def new_payee_submit(
 async def export_all_payees(
     search: str = "",
     payee_type: str = "",
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export all payees to CSV."""
@@ -822,7 +846,7 @@ async def export_all_payees(
 @router.post("/payees/bulk-export")
 async def bulk_export_payees(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Export selected payees to CSV."""
@@ -833,7 +857,7 @@ async def bulk_export_payees(
 async def edit_payee_submit(
     request: Request,
     payee_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Update payee from form."""
@@ -844,7 +868,7 @@ async def edit_payee_submit(
 def view_payee(
     request: Request,
     payee_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_accounts_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Payee detail/edit page."""
@@ -857,7 +881,7 @@ def list_transaction_rules(
     rule_type: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=200),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Transaction rules list page."""
@@ -869,7 +893,7 @@ def list_transaction_rules(
 @router.get("/rules/new", response_class=HTMLResponse)
 def new_rule_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """New transaction rule form page."""
@@ -879,7 +903,7 @@ def new_rule_form(
 @router.post("/rules/new")
 async def create_rule(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Create a new transaction rule."""
@@ -891,7 +915,7 @@ async def create_rule(
 @router.post("/rules/reorder")
 async def reorder_rule(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Swap a rule's position up or down in evaluation order."""
@@ -911,7 +935,7 @@ async def reorder_rule(
 def view_rule(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_read),
     db: Session = Depends(get_db_for_org),
 ):
     """Transaction rule detail/edit page."""
@@ -922,7 +946,7 @@ def view_rule(
 async def update_rule(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Update an existing transaction rule."""
@@ -937,7 +961,7 @@ async def update_rule(
 def duplicate_rule_form(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Duplicate-rule form page."""
@@ -948,7 +972,7 @@ def duplicate_rule_form(
 async def duplicate_rule(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Duplicate a rule to selected bank accounts."""
@@ -974,7 +998,7 @@ async def duplicate_rule(
 def duplicate_rules_bulk_form(
     request: Request,
     rule_ids: list[str] = Query(default=[]),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Bulk duplicate-rules form page."""
@@ -989,7 +1013,7 @@ def duplicate_rules_bulk_form(
 @router.post("/rules/duplicate/bulk")
 async def duplicate_rules_bulk(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ):
     """Duplicate selected rules to selected bank accounts."""
@@ -1020,7 +1044,7 @@ def list_match_rules(
     request: Request,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Match rules list page."""
@@ -1037,7 +1061,7 @@ def match_log(
     rule_id: str | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Match audit log page."""
@@ -1053,7 +1077,7 @@ def match_log(
 @router.get("/match-rules/new", response_class=HTMLResponse)
 def new_match_rule_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """New match rule form page."""
@@ -1067,7 +1091,7 @@ def new_match_rule_form(
 @router.post("/match-rules/new")
 async def create_match_rule(
     request: Request,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ) -> Response:
     """Create a new match rule."""
@@ -1086,7 +1110,7 @@ async def create_match_rule(
 def view_match_rule(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Match rule detail page."""
@@ -1101,7 +1125,7 @@ def view_match_rule(
 def edit_match_rule_form(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Edit match rule form page."""
@@ -1116,7 +1140,7 @@ def edit_match_rule_form(
 async def update_match_rule(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ) -> Response:
     """Update an existing match rule."""
@@ -1137,7 +1161,7 @@ async def update_match_rule(
 async def toggle_match_rule(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Toggle a match rule's active state."""
@@ -1154,7 +1178,7 @@ async def toggle_match_rule(
 async def delete_match_rule(
     request: Request,
     rule_id: str,
-    auth: WebAuthContext = Depends(require_finance_access),
+    auth: WebAuthContext = Depends(_rules_manage),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Delete a match rule."""

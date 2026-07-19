@@ -20,7 +20,12 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.people.discipline import CaseStatus, SeverityLevel, ViolationType
 from app.schemas.people.discipline import (
     CaseActionRead,
@@ -52,7 +57,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/discipline",
     tags=["discipline"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("discipline:access"))],
 )
 
 

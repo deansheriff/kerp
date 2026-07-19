@@ -20,8 +20,11 @@ from app.web.deps import (
     get_db_for_org,
     WebAuthContext,
     base_context,
-    require_public_sector_access,
+    require_web_permission,
 )
+
+_commitments_read = require_web_permission("ipsas:commitments:read")
+_commitments_create = require_web_permission("ipsas:commitments:create")
 
 router = APIRouter(tags=["public-sector-commitments"])
 
@@ -30,7 +33,7 @@ router = APIRouter(tags=["public-sector-commitments"])
 @router.get("/commitments/", response_class=HTMLResponse)
 def commitments_index(
     request: Request,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_commitments_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Commitments landing page."""
@@ -46,7 +49,7 @@ def list_commitments(
     fund_id: str | None = None,
     status: str | None = None,
     page: int = Query(default=1, ge=1),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_commitments_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Commitment register page."""
@@ -70,7 +73,7 @@ def list_commitments(
 @router.get("/commitments/new", response_class=HTMLResponse)
 def new_commitment_form(
     request: Request,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_commitments_create),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Create commitment form page."""
@@ -142,7 +145,7 @@ def create_commitment(
     committed_amount: str = Form(...),
     currency_code: str | None = Form(None),
     appropriation_id: str | None = Form(None),
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_commitments_create),
     db: Session = Depends(get_db_for_org),
 ) -> RedirectResponse:
     """Create a commitment (form submission)."""
@@ -172,7 +175,7 @@ def create_commitment(
 def view_commitment(
     request: Request,
     commitment_id: str,
-    auth: WebAuthContext = Depends(require_public_sector_access),
+    auth: WebAuthContext = Depends(_commitments_read),
     db: Session = Depends(get_db_for_org),
 ) -> HTMLResponse:
     """Commitment detail page."""

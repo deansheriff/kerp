@@ -13,7 +13,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_organization_id, require_tenant_auth
+from app.api.deps import (
+    get_db_with_org,
+    require_organization_id,
+    require_tenant_auth,
+    require_tenant_permission,
+)
 from app.models.people.payroll.payroll_entry import PayrollEntryStatus
 from app.models.people.payroll.salary_component import (
     SalaryComponentType,
@@ -61,7 +66,7 @@ from app.services.people.payroll import (
 router = APIRouter(
     prefix="/payroll",
     tags=["payroll"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[Depends(require_tenant_permission("hr:access"))],
 )
 
 

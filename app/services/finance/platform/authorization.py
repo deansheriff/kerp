@@ -9,12 +9,12 @@ import logging
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.person import Person
-from app.models.rbac import Permission, PersonRole, Role, RolePermission
 from app.services.common import coerce_uuid
+from app.services.auth_flow import load_effective_rbac_claims
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -53,34 +53,9 @@ class AuthorizationService(ListResponseMixin):
         ):
             return False
 
-        # Get user's roles
-        person_roles = list(
-            db.scalars(select(PersonRole).where(PersonRole.person_id == uid)).all()
-        )
-
-        if not person_roles:
-            return False
-
-        role_ids = [pr.role_id for pr in person_roles]
-
-        # Get permission
-        permission = db.scalars(
-            select(Permission)
-            .where(Permission.key == permission_key)
-            .where(Permission.is_active == True)  # noqa: E712
-        ).first()
-
-        if not permission:
-            return False
-
-        # Check if any of the user's roles have this permission
-        role_permission = db.scalars(
-            select(RolePermission)
-            .where(RolePermission.role_id.in_(role_ids))
-            .where(RolePermission.permission_id == permission.id)
-        ).first()
-
-        return role_permission is not None
+        roles, permissions = load_effective_rbac_claims(db, str(uid))
+        normalized_roles = {str(role).strip().lower() for role in roles}
+        return "admin" in normalized_roles or permission_key in permissions
 
     @staticmethod
     def require_permission(
@@ -128,20 +103,9 @@ class AuthorizationService(ListResponseMixin):
         """
         uid = coerce_uuid(user_id)
 
-        role = db.scalars(
-            select(Role).where(Role.name == role_name).where(Role.is_active == True)  # noqa: E712
-        ).first()
-
-        if not role:
-            return False
-
-        person_role = db.scalars(
-            select(PersonRole)
-            .where(PersonRole.person_id == uid)
-            .where(PersonRole.role_id == role.id)
-        ).first()
-
-        return person_role is not None
+        roles, _ = load_effective_rbac_claims(db, str(uid))
+        normalized_roles = {str(role).strip().lower() for role in roles}
+        return role_name.strip().lower() in normalized_roles
 
     @staticmethod
     def require_role(
@@ -270,35 +234,8 @@ class AuthorizationService(ListResponseMixin):
         ):
             return []
 
-        # Get user's roles
-        person_roles = list(
-            db.scalars(select(PersonRole).where(PersonRole.person_id == uid)).all()
-        )
-
-        if not person_roles:
-            return []
-
-        role_ids = [pr.role_id for pr in person_roles]
-
-        # Get permissions for those roles
-        role_permissions = list(
-            db.scalars(
-                select(RolePermission)
-                .join(Permission)
-                .where(RolePermission.role_id.in_(role_ids))
-                .where(Permission.is_active == True)  # noqa: E712
-            ).all()
-        )
-
-        # Get permission keys
-        permission_ids = [rp.permission_id for rp in role_permissions]
-        permissions = list(
-            db.scalars(
-                select(Permission).where(Permission.id.in_(permission_ids))
-            ).all()
-        )
-
-        return [p.key for p in permissions]
+        _, permissions = load_effective_rbac_claims(db, str(uid))
+        return permissions
 
     @staticmethod
     def get_user_roles(
@@ -317,23 +254,8 @@ class AuthorizationService(ListResponseMixin):
         """
         uid = coerce_uuid(user_id)
 
-        person_roles = list(
-            db.scalars(
-                select(PersonRole)
-                .join(Role)
-                .where(
-                    and_(
-                        PersonRole.person_id == uid,
-                        Role.is_active == True,  # noqa: E712
-                    )
-                )
-            ).all()
-        )
-
-        role_ids = [pr.role_id for pr in person_roles]
-        roles = list(db.scalars(select(Role).where(Role.id.in_(role_ids))).all())
-
-        return [r.name for r in roles]
+        roles, _ = load_effective_rbac_claims(db, str(uid))
+        return roles
 
     @staticmethod
     def check_any_permission(

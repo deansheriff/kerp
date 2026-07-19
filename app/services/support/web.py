@@ -26,6 +26,7 @@ from app.services.common import coerce_uuid
 from app.services.dropdown import dropdown_service
 from app.services.recent_activity import get_recent_activity_for_record
 from app.services.support.attachment import attachment_service
+from app.services.support.authorization import can_read_ticket, employee_id_for_person
 from app.services.support.category import category_service
 from app.services.support.comment import comment_service
 from app.services.support.sla import sla_service
@@ -360,6 +361,10 @@ class SupportWebService:
         from app.web.deps import base_context
 
         org_id = coerce_uuid(auth.organization_id)
+        can_read_all = auth.is_admin or auth.has_permission("support:tickets:read")
+        viewer_employee_id = None
+        if not can_read_all:
+            viewer_employee_id = employee_id_for_person(db, org_id, auth.person_id)
 
         # Get tickets
         assigned_to_id = coerce_uuid(assigned_to) if assigned_to else None
@@ -380,26 +385,44 @@ class SupportWebService:
             except ValueError:
                 pass
 
-        tickets, total = ticket_service.list_tickets(
-            db,
-            org_id,
-            status=status,
-            priority=priority,
-            assigned_to_id=assigned_to_id,
-            category_id=cat_id,
-            team_id=t_id,
-            search=search,
-            date_from=parsed_date_from,
-            date_to=parsed_date_to,
-            page=page,
-            per_page=per_page,
-        )
+        if not can_read_all and viewer_employee_id is None:
+            tickets, total = [], 0
+        else:
+            tickets, total = ticket_service.list_tickets(
+                db,
+                org_id,
+                status=status,
+                priority=priority,
+                assigned_to_id=assigned_to_id,
+                category_id=cat_id,
+                team_id=t_id,
+                search=search,
+                date_from=parsed_date_from,
+                date_to=parsed_date_to,
+                raised_by_id=viewer_employee_id,
+                page=page,
+                per_page=per_page,
+            )
 
         # Get stats for dashboard cards
-        stats = ticket_service.get_stats(db, org_id)
+        if not can_read_all and viewer_employee_id is None:
+            stats = {
+                "total": 0,
+                "open": 0,
+                "on_hold": 0,
+                "resolved": 0,
+                "closed": 0,
+                "urgent": 0,
+                "unassigned": 0,
+                "active": 0,
+            }
+        else:
+            stats = ticket_service.get_stats(
+                db, org_id, raised_by_id=viewer_employee_id
+            )
 
         # Get employees for filter dropdown
-        employees = dropdown_service.get_employees(db, org_id)
+        employees = dropdown_service.get_employees(db, org_id) if can_read_all else []
 
         # Get categories and teams for filter dropdowns
         categories = category_service.list_categories(db, org_id)
@@ -506,6 +529,9 @@ class SupportWebService:
                 status_code=404,
             )
 
+        if not can_read_ticket(db, auth, ticket):
+            raise HTTPException(status_code=404, detail="Ticket not found")
+
         # Get linked expenses
         linked_expenses = ticket_service.get_linked_expenses(
             db, org_id, ticket.ticket_id
@@ -515,7 +541,11 @@ class SupportWebService:
         linked_tasks = self._get_linked_tasks(db, org_id, ticket.ticket_id)
 
         # Get employees for assignment dropdown
-        employees = dropdown_service.get_employees(db, org_id)
+        employees = (
+            dropdown_service.get_employees(db, org_id)
+            if auth.is_admin or auth.has_permission("support:tickets:assign")
+            else []
+        )
 
         # Get attachments (split ticket vs comment attachments)
         all_attachments = attachment_service.list_attachments(db, ticket.ticket_id)
@@ -639,6 +669,15 @@ class SupportWebService:
         """Create a new ticket and redirect to detail page."""
         org_id = coerce_uuid(auth.organization_id)
         user_id = coerce_uuid(auth.user_id)
+        creator_employee_id = employee_id_for_person(db, org_id, auth.person_id)
+        can_manage = auth.is_admin or auth.has_permission("support:tickets:update")
+
+        if not can_manage:
+            raised_by_email = None
+            assigned_to_id = None
+            project_id = None
+            customer_id = None
+            team_id = None
 
         try:
             # Parse opening date
@@ -657,6 +696,7 @@ class SupportWebService:
                 description=description,
                 priority=priority,
                 raised_by_email=raised_by_email,
+                raised_by_id=creator_employee_id,
                 assigned_to_id=coerce_uuid(assigned_to_id) if assigned_to_id else None,
                 project_id=coerce_uuid(project_id) if project_id else None,
                 customer_id=coerce_uuid(customer_id) if customer_id else None,
@@ -1004,15 +1044,23 @@ class SupportWebService:
         from app.web.deps import base_context
 
         org_id = coerce_uuid(auth.organization_id)
+        can_read_all = auth.is_admin or auth.has_permission("support:tickets:read")
+        viewer_employee_id = None
+        if not can_read_all:
+            viewer_employee_id = employee_id_for_person(db, org_id, auth.person_id)
 
         # Delegate to core service
-        tickets, total = ticket_service.list_archived_tickets(
-            db,
-            org_id,
-            search=search,
-            page=page,
-            per_page=per_page,
-        )
+        if not can_read_all and viewer_employee_id is None:
+            tickets, total = [], 0
+        else:
+            tickets, total = ticket_service.list_archived_tickets(
+                db,
+                org_id,
+                search=search,
+                raised_by_id=viewer_employee_id,
+                page=page,
+                per_page=per_page,
+            )
 
         # Format tickets for template
         formatted_tickets = [_format_ticket_for_list(t) for t in tickets]

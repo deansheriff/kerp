@@ -892,7 +892,7 @@ def legacy_api_docs():
 @app.get("/health")
 def health_check():
     """Basic health check endpoint (backwards compatibility)."""
-    return {"status": "ok"}
+    return {"status": "ok", "authorization_policy": "effective-rbac-v2"}
 
 
 @app.get("/health/monitoring")

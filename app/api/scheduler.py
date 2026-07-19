@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_with_org, require_tenant_auth
+from app.api.deps import get_db_with_org, require_tenant_method_permission
 from app.schemas.common import ListResponse
 from app.schemas.scheduler import (
     ScheduledTaskCreate,
@@ -13,7 +13,11 @@ from app.services import scheduler as scheduler_service
 router = APIRouter(
     prefix="/scheduler",
     tags=["scheduler"],
-    dependencies=[Depends(require_tenant_auth)],
+    dependencies=[
+        Depends(
+            require_tenant_method_permission("scheduler:read", "scheduler:manage")
+        )
+    ],
 )
 
 
