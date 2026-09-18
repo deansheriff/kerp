@@ -171,18 +171,6 @@ def _ensure_sherpackage_org() -> uuid.UUID:
                 is_active=True,
             )
             db.add(org)
-        else:
-            org_id = org.organization_id
-            org.legal_name = "Sherpackage Technologies Limited"
-            org.trading_name = "Sherpackage"
-            org.slug = org.slug or "sherpackage"
-            org.functional_currency_code = org.functional_currency_code or "NGN"
-            org.presentation_currency_code = org.presentation_currency_code or "NGN"
-            org.contact_email = f"hello@{SHERPACKAGE_EMAIL_DOMAIN}"
-            org.website_url = "https://sherpackageonline.com"
-            org.hr_employee_id_prefix = "SHP"
-            org.hr_employee_id_format = "SHP-{SEQ}"
-            org.is_active = True
         db.commit()
     return org_id
 
@@ -221,9 +209,6 @@ def _get_or_create_by_code(db, model_cls, code_field: str, code: str, **values):
         )
         db.add(instance)
         db.flush()
-    else:
-        for key, value in values.items():
-            setattr(instance, key, value)
     return instance
 
 
@@ -269,7 +254,11 @@ def _seed_departments(db) -> dict[str, Department]:
         ("ENG", "Software Engineering", "Product engineering and platform delivery."),
         ("PROD", "Product & Design", "Product management, UX, and customer discovery."),
         ("OPS", "Cloud Operations", "Infrastructure, DevOps, and release operations."),
-        ("FINHR", "People & Finance", "People operations, finance, and administration."),
+        (
+            "FINHR",
+            "People & Finance",
+            "People operations, finance, and administration.",
+        ),
     ]
     return {
         code: _get_or_create_by_code(
@@ -384,7 +373,12 @@ def _seed_shifts(db) -> dict[str, ShiftType]:
 
 
 def _ensure_person(db, *, first_name: str, last_name: str, email: str, phone: str):
-    person = db.scalar(select(Person).where(Person.email == email))
+    person = db.scalar(
+        select(Person).where(
+            Person.organization_id == db.info["organization_id"],
+            Person.email == email,
+        )
+    )
     if person is None:
         person = Person(
             organization_id=db.info["organization_id"],
@@ -404,15 +398,6 @@ def _ensure_person(db, *, first_name: str, last_name: str, email: str, phone: st
         )
         db.add(person)
         db.flush()
-    else:
-        person.organization_id = db.info["organization_id"]
-        person.first_name = first_name
-        person.last_name = last_name
-        person.display_name = f"{first_name} {last_name}"
-        person.email_verified = True
-        person.phone = phone
-        person.status = PersonStatus.active
-        person.is_active = True
     return person
 
 
@@ -427,7 +412,18 @@ def _seed_employees(
     shifts: dict[str, ShiftType],
 ) -> dict[str, Employee]:
     employees: dict[str, Employee] = {}
+    created_codes: set[str] = set()
     for idx, row in enumerate(SHERPACKAGE_EMPLOYEES, start=1):
+        existing = db.scalar(
+            select(Employee).where(
+                Employee.organization_id == db.info["organization_id"],
+                Employee.employee_code == row["code"],
+            )
+        )
+        if existing is not None:
+            employees[row["code"]] = existing
+            continue
+        created_codes.add(row["code"])
         email = _work_email(row["first_name"], row["last_name"])
         person = _ensure_person(
             db,
@@ -436,22 +432,15 @@ def _seed_employees(
             email=email,
             phone=f"+234 801 743 {idx:04d}",
         )
-        employee = db.scalar(
-            select(Employee).where(
-                Employee.organization_id == db.info["organization_id"],
-                Employee.employee_code == row["code"],
-            )
+        employee = Employee(
+            organization_id=db.info["organization_id"],
+            person_id=person.id,
+            employee_code=row["code"],
+            date_of_joining=date(2025, idx, 3),
+            status=EmployeeStatus.ACTIVE,
         )
-        if employee is None:
-            employee = Employee(
-                organization_id=db.info["organization_id"],
-                person_id=person.id,
-                employee_code=row["code"],
-                date_of_joining=date(2025, idx, 3),
-                status=EmployeeStatus.ACTIVE,
-            )
-            db.add(employee)
-            db.flush()
+        db.add(employee)
+        db.flush()
         employee.person_id = person.id
         employee.department_id = departments[row["department"]].department_id
         employee.designation_id = designations[row["designation"]].designation_id
@@ -461,7 +450,7 @@ def _seed_employees(
         employee.default_shift_type_id = shifts[
             "OPS" if row["department"] == "OPS" else "FLEX"
         ].shift_type_id
-        employee.gender = row["gender"]
+        employee.gender = EmployeeGender(row["gender"])
         employee.personal_email = email.replace(
             f"@{SHERPACKAGE_EMAIL_DOMAIN}", "@example.com"
         )
@@ -472,16 +461,19 @@ def _seed_employees(
         employees[row["code"]] = employee
 
     db.flush()
-    employees["SHP-0002"].reports_to_id = employees["SHP-0001"].employee_id
-    employees["SHP-0003"].reports_to_id = employees["SHP-0001"].employee_id
-    employees["SHP-0004"].reports_to_id = employees["SHP-0002"].employee_id
-    employees["SHP-0005"].reports_to_id = employees["SHP-0001"].employee_id
-
-    departments["EXEC"].head_id = employees["SHP-0001"].employee_id
-    departments["ENG"].head_id = employees["SHP-0002"].employee_id
-    departments["PROD"].head_id = employees["SHP-0003"].employee_id
-    departments["OPS"].head_id = employees["SHP-0004"].employee_id
-    departments["FINHR"].head_id = employees["SHP-0005"].employee_id
+    for code, manager_code in {
+        "SHP-0002": "SHP-0001",
+        "SHP-0003": "SHP-0001",
+        "SHP-0004": "SHP-0002",
+        "SHP-0005": "SHP-0001",
+    }.items():
+        if code in created_codes:
+            employees[code].reports_to_id = employees[manager_code].employee_id
+    for row in SHERPACKAGE_EMPLOYEES:
+        if row["code"] in created_codes:
+            department = departments[row["department"]]
+            if department.head_id is None:
+                department.head_id = employees[row["code"]].employee_id
     return employees
 
 
@@ -509,6 +501,9 @@ def main() -> None:
             shifts=shifts,
         )
         bank_count = OrgBankDirectoryService(db).seed_defaults(org_id)
+        from scripts.seed_sherpackage_performance import seed_performance
+
+        performance_counts = seed_performance(db, org_id)
         db.commit()
 
     print("Sherpackage organization ready")
@@ -520,6 +515,8 @@ def main() -> None:
     print(f"  Shifts: {len(shifts)}")
     print(f"  Employees: {len(employees)}")
     print(f"  Banks seeded: {bank_count}")
+    for name, count in performance_counts.items():
+        print(f"  {name} added: {count}")
 
 
 if __name__ == "__main__":
