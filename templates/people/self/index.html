@@ -13,6 +13,10 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/ai_link.html" import ai_link %}
+{% if auth.has_any_permission(['selfservice:documents:read', 'hr:employees:read']) %}
+<div class="mb-4">{{ ai_link('knowledge', 'Company knowledge') }}</div>
+{% endif %}
 <div class="space-y-6 page-enter">
     <div class="card p-6">
         <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Self Service</h2>

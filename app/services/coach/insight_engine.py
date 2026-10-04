@@ -5,9 +5,12 @@ import logging
 import re
 from dataclasses import dataclass
 from hashlib import sha256
+from datetime import datetime, timezone
 from typing import Any, TypeVar, cast
+from uuid import UUID
 
 import httpx
+from redis.exceptions import RedisError
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
@@ -78,7 +81,7 @@ def _extract_json_object(text: str) -> dict[str, Any]:
 
 class InsightEngine:
     """
-    Provider-agnostic LLM wrapper (hosted Llama + DeepSeek via OpenAI-compatible API).
+    Provider-agnostic LLM wrapper for Gemini, hosted Llama and DeepSeek.
 
     This module is intentionally standalone: analyzers should provide deterministic
     context dicts and Pydantic output schemas; InsightEngine handles the LLM call
@@ -89,16 +92,31 @@ class InsightEngine:
     variables via ``app.config.settings``.
     """
 
-    def __init__(self, db: Session | None = None) -> None:
+    def __init__(
+        self, db: Session | None = None, *, organization_id: UUID | None = None
+    ) -> None:
+        if db is not None:
+            session_org = db.info.get("organization_id")
+            if (
+                not session_org
+                or db.info.get("allow_cross_org")
+                or (organization_id is not None and organization_id != session_org)
+            ):
+                raise LLMError("A matching tenant-scoped AI session is required")
+            organization_id = organization_id or session_org
         self._db = db
+        self.organization_id = organization_id
+        self.last_model: str | None = None
+        self._last_cache_key: str | None = None
+        self.tokens_used = 0
         self._timeout_s = int(
             self._setting("timeout_seconds", "coach_llm_timeout_s") or 30
         )
         self._max_retries = int(
-            self._setting("max_retries", "coach_llm_max_retries") or 2
+            self._setting("max_retries", "coach_llm_max_retries") or "2"
         )
         self._max_output_tokens = int(
-            getattr(app_settings, "coach_llm_max_output_tokens", 1200)
+            getattr(app_settings, "coach_llm_max_output_tokens", 4096)
         )
         self._cache_ttl_s = (
             int(getattr(app_settings, "coach_cache_ttl_hours", 24)) * 3600
@@ -110,10 +128,22 @@ class InsightEngine:
         """Read from DB domain settings first, fall back to env var config."""
         if self._db is not None:
             from app.models.domain_settings import SettingDomain
-            from app.services.settings_spec import resolve_value
+            from fastapi import HTTPException
+            from app.services.settings_spec import (
+                DOMAIN_SETTINGS_SERVICE,
+                extract_db_value,
+            )
 
-            val = resolve_value(self._db, SettingDomain.coach, key)
-            if val:
+            try:
+                record = DOMAIN_SETTINGS_SERVICE[SettingDomain.coach].get_by_key(
+                    self._db, key
+                )
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                record = None
+            val = extract_db_value(record)
+            if val is not None:
                 return str(val)
         return str(getattr(app_settings, fallback_attr, "") or "")
 
@@ -129,10 +159,25 @@ class InsightEngine:
         digest = sha256(
             (system_prompt.strip() + "\n" + user_prompt.strip()).encode("utf-8")
         ).hexdigest()
-        return f"coach:llm:{backend}:{model}:{tier}:{digest}"
+        scope = getattr(self, "organization_id", None) or "unscoped"
+        return f"coach:llm:{scope}:{backend}:{model}:{tier}:{digest}"
 
     def _load_backends(self) -> dict[str, LLMBackend]:
         return {
+            "gemini": LLMBackend(
+                name="gemini",
+                base_url=self._setting("gemini_base_url", "coach_llm_gemini_base_url"),
+                api_key=self._setting("gemini_api_key", "coach_llm_gemini_api_key"),
+                model_fast=self._setting(
+                    "gemini_model_fast", "coach_llm_gemini_model_fast"
+                ),
+                model_standard=self._setting(
+                    "gemini_model_standard", "coach_llm_gemini_model_standard"
+                ),
+                model_deep=self._setting(
+                    "gemini_model_deep", "coach_llm_gemini_model_deep"
+                ),
+            ),
             "llama": LLMBackend(
                 name="llama",
                 base_url=self._setting("llama_base_url", "coach_llm_llama_base_url"),
@@ -166,11 +211,15 @@ class InsightEngine:
         }
 
     def _backend_order(self, preferred: str) -> list[str]:
-        backends_csv = getattr(app_settings, "coach_llm_backends", "llama,deepseek")
+        backends_csv = (
+            self._setting("backends", "coach_llm_backends") or "llama,deepseek"
+        )
         allowed = _csv(backends_csv)
         if not allowed:
             allowed = ["llama", "deepseek"]
-        ordered = [preferred] + [b for b in allowed if b != preferred]
+        ordered = ([preferred] if preferred in allowed else []) + [
+            b for b in allowed if b != preferred
+        ]
         return [b for b in ordered if b in self._backends]
 
     def _model_for_tier(self, backend: LLMBackend, tier: str) -> str:
@@ -198,8 +247,12 @@ class InsightEngine:
         - Validates against a Pydantic model.
         - Retries are reserved for repair attempts (not endless sampling).
         """
-        default_backend = getattr(app_settings, "coach_llm_default_backend", "deepseek")
+        default_backend = (
+            self._setting("default_backend", "coach_llm_default_backend") or "deepseek"
+        )
         preferred = preferred_backend or default_backend
+        schema = json.dumps(output_model.model_json_schema(), sort_keys=True)
+        system_prompt += "\nOutput JSON schema:\n" + schema
 
         last_error: Exception | None = None
         for backend_name in self._backend_order(preferred):
@@ -219,11 +272,14 @@ class InsightEngine:
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                 )
+                self._last_cache_key = cache_key
                 if cache_service.is_available:
                     cached = cache_service.get(cache_key)
                     if isinstance(cached, dict):
                         try:
-                            return cast(T, output_model.model_validate(cached))
+                            parsed = cast(T, output_model.model_validate(cached))
+                            self.last_model = f"{backend.name}/{model} (cached)"
+                            return parsed
                         except ValidationError:
                             cache_service.delete(cache_key)
 
@@ -238,10 +294,17 @@ class InsightEngine:
                 )
             except Exception as exc:
                 last_error = exc
-                logger.warning("LLM backend %s failed: %s", backend.name, exc)
+                logger.warning(
+                    "LLM backend %s failed (%s)", backend.name, type(exc).__name__
+                )
                 continue
 
         raise LLMError("All LLM backends failed") from last_error
+
+    def discard_cached_output(self) -> None:
+        """Remove a structurally valid response rejected by workflow validation."""
+        if self._last_cache_key and cache_service.is_available:
+            cache_service.delete(self._last_cache_key)
 
     def _call_with_repairs(
         self,
@@ -349,6 +412,7 @@ class InsightEngine:
         user_prompt: str,
         temperature: float,
     ) -> str:
+        self._reserve_budget(system_prompt, user_prompt)
         url = backend.base_url.rstrip("/") + "/chat/completions"
         headers = {"Authorization": f"Bearer {backend.api_key}"}
         payload: dict[str, Any] = {
@@ -368,10 +432,42 @@ class InsightEngine:
         with httpx.Client(timeout=self._timeout_s) as client:
             resp = client.post(url, headers=headers, json=payload)
         if resp.status_code >= 400:
-            raise LLMError(f"LLM HTTP {resp.status_code}: {resp.text[:500]}")
+            raise LLMError(f"LLM HTTP {resp.status_code}")
         data = resp.json()
+        self.last_model = f"{backend.name}/{model}"
+        self.tokens_used = getattr(self, "tokens_used", 0) + int(
+            (data.get("usage") or {}).get("total_tokens") or 0
+        )
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMError("Unexpected LLM response shape") from exc
         return str(content or "")
+
+    def _reserve_budget(self, system_prompt: str, user_prompt: str) -> None:
+        """Reserve conservatively before each external call, including repairs/failover."""
+        org_id = getattr(self, "organization_id", None)
+        if org_id is None:
+            return
+        size = len((system_prompt + user_prompt).encode("utf-8"))
+        if size > 120000:
+            raise LLMError("AI context exceeds the request limit")
+        client = cache_service.client
+        if client is None:
+            raise LLMError("AI budget storage is unavailable")
+        # Byte count overestimates input tokens. Failed attempts retain reservations
+        # so concurrent workers cannot exceed the configured processing allowance.
+        reserve = size + self._max_output_tokens + 256
+        budget = int(getattr(app_settings, "coach_monthly_token_budget", 500000))
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+        key = f"ai:budget:{org_id}:{month}"
+        try:
+            with client.pipeline(transaction=True) as pipe:
+                pipe.incrby(key, reserve)
+                pipe.expire(key, 40 * 86400)
+                total, _ = pipe.execute()
+            if total > budget:
+                client.decrby(key, reserve)
+                raise LLMError("Organization AI processing budget reached")
+        except RedisError as exc:
+            raise LLMError("AI budget storage is unavailable") from exc

@@ -844,12 +844,15 @@ class SettingsWebService:
         from app.config import settings as app_settings
         from app.models.coach.insight import CoachInsight
         from app.models.coach.report import CoachReport
+        from app.services.coach.insight_engine import InsightEngine
+
+        engine = InsightEngine(db, organization_id=organization_id)
 
         specs = list_specs(SettingDomain.coach)
         settings: dict[str, dict[str, Any]] = {}
 
         for spec in specs:
-            value = resolve_value(db, SettingDomain.coach, spec.key)
+            value = engine._setting(spec.key, (spec.env_var or "").lower())
             settings[spec.key] = {
                 "value": value if not spec.is_secret else "",
                 "default": spec.default,
@@ -862,10 +865,10 @@ class SettingsWebService:
                 "max": spec.max_value,
             }
 
-        deepseek_base = resolve_value(db, SettingDomain.coach, "deepseek_base_url")
-        deepseek_key = resolve_value(db, SettingDomain.coach, "deepseek_api_key")
-        llama_base = resolve_value(db, SettingDomain.coach, "llama_base_url")
-        llama_key = resolve_value(db, SettingDomain.coach, "llama_api_key")
+        deepseek_base = engine._backends["deepseek"].base_url
+        deepseek_key = engine._backends["deepseek"].api_key
+        llama_base = engine._backends["llama"].base_url
+        llama_key = engine._backends["llama"].api_key
 
         deepseek_configured = bool(deepseek_base and deepseek_key)
         llama_configured = bool(llama_base and llama_key)
@@ -900,7 +903,11 @@ class SettingsWebService:
 
         coach_status = {
             "enabled": bool(getattr(app_settings, "coach_enabled", False)),
-            "default_backend": getattr(app_settings, "coach_llm_default_backend", ""),
+            "default_backend": engine._setting(
+                "default_backend", "coach_llm_default_backend"
+            ),
+            "ai_enabled": engine._setting("ai_enabled", "coach_ai_enabled").lower() == "true",
+            "gemini_configured": engine._backends["gemini"].is_configured(),
             "deepseek_configured": deepseek_configured,
             "llama_configured": llama_configured,
             "configured_backends": [
@@ -908,6 +915,7 @@ class SettingsWebService:
                 for b, configured in (
                     ("deepseek", deepseek_configured),
                     ("llama", llama_configured),
+                    ("gemini", engine._backends["gemini"].is_configured()),
                 )
                 if configured
             ],
@@ -923,34 +931,9 @@ class SettingsWebService:
         self, db, organization_id: uuid.UUID, data: dict[str, Any]
     ) -> tuple[bool, str | None]:
         """Update Coach / AI settings."""
-        from app.services.settings_spec import coerce_value
+        from app.services.coach.configuration import save_configuration
 
-        service = DOMAIN_SETTINGS_SERVICE.get(SettingDomain.coach)
-        if not service:
-            return False, "Coach settings service not found"
-
-        for key, value in data.items():
-            spec = get_spec(SettingDomain.coach, key)
-            if not spec:
-                continue
-
-            # Skip empty secret fields (don't overwrite existing)
-            if spec.is_secret and value == "":
-                continue
-
-            coerced, error = coerce_value(spec, value)
-            if error:
-                return False, f"{spec.label or key}: {error}"
-
-            payload = DomainSettingUpdate(
-                value_type=spec.value_type,
-                value_text=str(coerced) if coerced is not None else None,
-                is_secret=spec.is_secret,
-            )
-            service.upsert_by_key(db, key, payload)
-
-        db.flush()
-        return True, None
+        return save_configuration(db, organization_id, data)
 
     # ========== Payments Settings ==========
 

@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.config import settings as app_settings
 from app.db.session_context import cross_org_session, session_for_org
 from app.models.finance.core_org.organization import Organization
+from app.services.coach.narration import narrate_daily_insights, narrate_report
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ def generate_daily_data_quality_insights(organization_id: str | None = None) -> 
 
                 analyzer = DataQualityAnalyzer(db)
                 written = analyzer.upsert_daily_org_insights(org_id)
+                narrate_daily_insights(db, org_id)
                 db.commit()
             results["organizations_processed"] += 1
             results["insights_written"] += int(written)
@@ -103,6 +105,7 @@ def generate_daily_banking_health_insights(organization_id: str | None = None) -
 
                 analyzer = BankingHealthAnalyzer(db)
                 written = analyzer.upsert_daily_org_insights(org_id)
+                narrate_daily_insights(db, org_id)
                 db.commit()
             results["organizations_processed"] += 1
             results["insights_written"] += int(written)
@@ -157,6 +160,7 @@ def generate_daily_expense_approval_insights(
                     org_id,
                     limit=min(20, per_org_limit),
                 )
+                narrate_daily_insights(db, org_id)
                 db.commit()
             results["organizations_processed"] += 1
             results["insights_written"] += int(written)
@@ -203,6 +207,7 @@ def generate_daily_ar_overdue_insights(organization_id: str | None = None) -> di
 
                 analyzer = AROverdueAnalyzer(db)
                 written = analyzer.upsert_daily_org_insights(org_id)
+                narrate_daily_insights(db, org_id)
                 db.commit()
             results["organizations_processed"] += 1
             results["insights_written"] += int(written)
@@ -251,6 +256,7 @@ def generate_daily_ap_due_insights(organization_id: str | None = None) -> dict:
 
                 analyzer = APDueAnalyzer(db)
                 written = analyzer.upsert_daily_org_insights(org_id)
+                narrate_daily_insights(db, org_id)
                 db.commit()
             results["organizations_processed"] += 1
             results["insights_written"] += int(written)
@@ -306,6 +312,7 @@ def _run_org_analyzer(
                 cls = getattr(mod, analyzer_cls_name)
                 analyzer = cls(db)
                 written = analyzer.upsert_daily_org_insights(org_id)
+                narrate_daily_insights(db, org_id)
                 db.commit()
             results["organizations_processed"] += 1
             results["insights_written"] += int(written)
@@ -418,6 +425,7 @@ def generate_weekly_finance_report(organization_id: str | None = None) -> dict:
                 generator = ReportGenerator(db)
                 report = generator.generate_weekly_finance_report(org_id)
                 if report:
+                    narrate_report(db, report)
                     db.add(report)
                     db.commit()
                     results["reports_written"] += 1
@@ -464,6 +472,7 @@ def generate_weekly_hr_report(organization_id: str | None = None) -> dict:
                 generator = ReportGenerator(db)
                 report = generator.generate_weekly_hr_report(org_id)
                 if report:
+                    narrate_report(db, report)
                     db.add(report)
                     db.commit()
                     results["reports_written"] += 1

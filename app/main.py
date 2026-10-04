@@ -85,6 +85,7 @@ from app.web.auth import router as auth_web_router
 from app.web.careers import router as careers_web_router
 from app.web.careers import short_router as careers_short_web_router
 from app.web.coach import router as coach_web_router
+from app.web.ai import router as ai_web_router
 from app.web.collaboration import router as collaboration_web_router
 from app.web.csrf import csrf_middleware
 from app.web.finance import automation_router as automation_web_router
@@ -104,7 +105,6 @@ from app.web.profile import router as profile_web_router
 from app.web.projects import router as projects_web_router
 from app.web.public_sector import router as public_sector_web_router
 from app.web.settings import router as module_settings_web_router
-from app.web.collaboration import router as collaboration_web_router
 from app.web.support import router as support_web_router
 from app.web.workflow_tasks import router as workflow_tasks_web_router
 from app.web_home import router as web_home_router
@@ -851,6 +851,7 @@ if is_module_enabled("coach"):
         dependencies=[Depends(require_tenant_auth)],
     )
     app.include_router(coach_web_router)
+    app.include_router(ai_web_router)
 
 # ---------------------------------------------------------------------------
 # Public Sector (IPSAS) module

@@ -23,7 +23,7 @@
         <div>
             <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Coach / AI Settings</h2>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Configure LLM backends (DeepSeek, Llama) for the AI Coach insight engine.
+                Google Gemini, DeepSeek and hosted Llama.
             </p>
         </div>
     </div>
@@ -42,7 +42,7 @@
     <div class="admin-card p-6">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Coach Runtime Status</h3>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Scheduled Coach</h3>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Health summary without exposing secret values.</p>
             </div>
             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium {{ 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300' if coach_status.enabled else 'bg-rose-100 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300' }}">
@@ -70,6 +70,12 @@
         </div>
 
         <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
+            <span class="inline-flex items-center rounded-full px-2.5 py-1 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                AI workflows {{ 'Enabled' if coach_status.ai_enabled else 'Disabled' }}
+            </span>
+            <span class="inline-flex items-center rounded-full px-2.5 py-1 font-medium {{ 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300' if coach_status.gemini_configured else 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' }}">
+                Gemini {{ 'Configured' if coach_status.gemini_configured else 'Missing' }}
+            </span>
             <span class="inline-flex items-center rounded-full px-2.5 py-1 font-medium {{ 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300' if coach_status.deepseek_configured else 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' }}">
                 DeepSeek {{ 'Configured' if coach_status.deepseek_configured else 'Missing' }}
             </span>
@@ -97,6 +103,34 @@
 
     <form method="POST" action="/admin/settings/coach" class="space-y-6">
         {{ request.state.csrf_form | safe }}
+
+        <section class="space-y-4 border-b border-slate-200 dark:border-slate-700 pb-6">
+            <h2 class="text-lg font-semibold">AI workflow access</h2>
+            <input type="hidden" name="ai_enabled" value="false">
+            <label for="ai_enabled" class="flex items-center gap-2">
+                <input type="checkbox" id="ai_enabled" name="ai_enabled" value="true" {% if val('ai_enabled') | lower == 'true' %}checked{% endif %}>
+                Enable external AI processing
+            </label>
+            <p class="text-sm text-amber-700 dark:text-amber-300">Enabling AI sends authorized workflow excerpts to the configured external providers. Human approval is still required for business actions.</p>
+            <label for="backends" class="form-label">Allowed providers</label>
+            <input id="backends" name="backends" value="{{ val('backends') }}" placeholder="gemini,deepseek,llama" class="form-input w-full">
+            <label for="default_backend" class="form-label">Default provider</label>
+            <select id="default_backend" name="default_backend" class="form-select w-full">
+                {% for provider in ['gemini', 'deepseek', 'llama'] %}<option value="{{ provider }}" {% if val('default_backend') == provider %}selected{% endif %}>{{ provider | title }}</option>{% endfor %}
+            </select>
+        </section>
+        <section class="space-y-4 border-b border-slate-200 dark:border-slate-700 pb-6">
+            <h2 class="text-lg font-semibold">Google Gemini</h2>
+            <label for="gemini_base_url" class="form-label">API base URL</label>
+            <input type="url" id="gemini_base_url" name="gemini_base_url" value="{{ val('gemini_base_url') }}" placeholder="https://generativelanguage.googleapis.com/v1beta/openai" class="form-input w-full">
+            <label for="gemini_api_key" class="form-label">API key</label>
+            <input type="password" id="gemini_api_key" name="gemini_api_key" autocomplete="new-password" value="" placeholder="{{ 'Configured; leave blank to keep' if s.get('gemini_api_key', {}).get('has_value') else 'Not configured' }}" class="form-input w-full">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {% for tier in ['fast', 'standard', 'deep'] %}
+                <div><label for="gemini_model_{{ tier }}" class="form-label">{{ tier | title }} model</label><input id="gemini_model_{{ tier }}" name="gemini_model_{{ tier }}" value="{{ val('gemini_model_' ~ tier) }}" class="form-input w-full"></div>
+            {% endfor %}
+            </div>
+        </section>
 
         <!-- Section 1: DeepSeek API -->
         <div class="admin-card p-6">

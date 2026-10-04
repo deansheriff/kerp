@@ -1,0 +1,74 @@
+{% extends "coach/base_coach.html" %}
+{% from "components/macros.html" import icon_svg, empty_state %}
+{% block page_title %}AI Assistant{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6 break-words">
+    <nav class="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700" aria-label="AI workflows">
+        {% for key, label in workflows.items() %}
+        <a href="/ai?workflow={{ key }}" class="px-3 py-2 text-sm font-medium border-b-2 {{ 'border-teal-600 text-teal-800 dark:text-teal-200' if key == workflow else 'border-transparent text-slate-600 dark:text-slate-300' }}" {% if key == workflow %}aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
+    </nav>
+    {% if error %}<div role="alert" class="p-4 border border-rose-300 text-rose-700 dark:text-rose-300 rounded-lg">{{ error }}</div>{% endif %}
+    <form method="post" action="/ai" class="space-y-4" x-data='{ busy: false }' @submit="busy = true">
+        {{ request.state.csrf_form | safe }}
+        <input type="hidden" name="workflow" value="{{ workflow }}">
+        {% if record_id %}<input type="hidden" name="record_id" value="{{ record_id }}">
+        {% elif records %}
+        <label for="ai-record" class="form-label">{{ 'Appraisal' if workflow == 'appraisal' else 'Ticket' if workflow == 'support' else 'Job opening (optional)' }}</label>
+        <select name="record_id" id="ai-record" class="form-select w-full" {% if workflow in ['appraisal', 'support'] %}required{% endif %}>
+            <option value="">Select a record</option>
+            {% for record in records %}<option value="{{ record.id }}">{{ record.label }}</option>{% endfor %}
+        </select>
+        {% endif %}
+        <div>
+            <label for="ai-brief" class="form-label">{{ 'Question' if workflow == 'knowledge' else 'Brief / review focus' }}</label>
+            <textarea id="ai-brief" name="brief" rows="4" maxlength="8000" class="form-input w-full" {% if workflow in ['knowledge', 'hiring', 'kpi'] and not record_id %}required{% endif %}>{{ brief }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" :disabled="busy">
+            {{ icon_svg("lightning-bolt", "h-4 w-4 mr-2") }}
+            <span x-text="busy ? 'Generating...' : 'Generate draft'">Generate draft</span>
+        </button>
+    </form>
+    {% if draft %}
+    <section aria-label="AI draft" class="border-t border-slate-200 dark:border-slate-700 pt-6 space-y-5">
+        <div class="flex flex-wrap justify-between gap-3 items-center">
+            <h2 class="text-xl font-semibold">{{ 'Source-grounded answer' if workflow == 'knowledge' else 'Draft for human review' }}</h2>
+            <span class="text-sm text-slate-500 dark:text-slate-400 break-all">{{ draft.model if draft.model else 'No model called' }}</span>
+        </div>
+        <p class="text-sm text-amber-700 dark:text-amber-300">{% if workflow == 'appraisal' %}Ratings remain unassigned by AI. Review the evidence and submit ratings through the appraisal review form.{% elif workflow != 'knowledge' %}Not saved, published or sent. Review before applying.{% else %}Verify the cited policy version before acting.{% endif %}</p>
+        {% set result = draft.result %}
+        {% if workflow in ['hiring', 'kpi'] %}
+        <label for="ai-description" class="form-label">Description</label>
+        <textarea id="ai-description" rows="12" class="form-input w-full">{{ result.description }}</textarea>
+        <h3 class="font-semibold">Requirements</h3>
+        <ul class="list-disc pl-5 space-y-2">{% for item in result.requirements %}<li>{{ item }}</li>{% else %}<li>No requirements proposed.</li>{% endfor %}</ul>
+        <h3 class="font-semibold">Interview questions</h3>
+        <ol class="list-decimal pl-5 space-y-2">{% for item in result.interview_questions %}<li>{{ item }}</li>{% else %}<li>No questions proposed.</li>{% endfor %}</ol>
+        <h3 class="font-semibold">Proposed KPIs</h3>
+        <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Proposed KPI table"><table class="w-full min-w-[640px] text-sm"><thead><tr><th scope="col" class="p-3 text-left">KPI / KRA</th><th scope="col" class="p-3 text-left">Target</th><th scope="col" class="p-3 text-left">Weight</th><th scope="col" class="p-3 text-left">Measurement / evidence</th></tr></thead><tbody>
+        {% for kpi in result.kpis %}<tr class="border-t border-slate-200 dark:border-slate-700"><td class="p-3">{{ kpi.name }}<br><span class="text-slate-500 dark:text-slate-400">{{ kpi.kra }}</span></td><td class="p-3">{{ kpi.target }} {{ kpi.unit }}</td><td class="p-3">{{ kpi.weight_percent }}%</td><td class="p-3">{{ kpi.measurement }}<br>{{ kpi.evidence_required }}</td></tr>{% endfor %}
+        </tbody></table></div>
+        <h3 class="font-semibold">Assumptions to confirm</h3>
+        <ul class="list-disc pl-5">{% for item in result.assumptions %}<li>{{ item }}</li>{% else %}<li>None supplied.</li>{% endfor %}</ul>
+        {% if workflow == 'kpi' %}<a href="/people/perf/goals/new" class="btn btn-secondary">Open KPI form</a>
+        {% elif record_id and auth.has_permission('recruit:openings:update') %}<a href="/people/recruit/jobs/{{ record_id }}/edit" class="btn btn-secondary">Review job opening</a>
+        {% elif auth.has_permission('recruit:openings:create') %}<a href="/people/recruit/jobs/new" class="btn btn-secondary">Open job form</a>{% endif %}
+        {% elif workflow == 'support' %}
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><dt class="form-label">Suggested category</dt><dd>{{ result.category_code if result.category_code else 'Unclassified' }}</dd></div><div><dt class="form-label">Suggested priority</dt><dd>{{ result.priority | title }}</dd></div></dl>
+        <p>{{ result.rationale }}</p>
+        <label for="ai-reply" class="form-label">Suggested reply</label>
+        <textarea id="ai-reply" rows="10" class="form-input w-full">{{ result.suggested_reply }}</textarea>
+        <ul class="list-disc pl-5">{% for item in result.missing_information %}<li>{{ item }}</li>{% else %}<li>No further information requested.</li>{% endfor %}</ul>
+        <a href="/support/tickets/{{ record_id }}" class="btn btn-secondary">Review ticket</a>
+        {% else %}
+        {% for statement in result.statements %}
+        <div class="space-y-2"><p>{{ statement.text }}</p><blockquote class="border-l-2 border-teal-500 pl-4 text-sm text-slate-600 dark:text-slate-300">{{ statement.quote }}</blockquote>
+        {% for source in draft.sources if source.id == statement.source_id %}<a href="{{ source.url }}" class="text-teal-700 dark:text-teal-300 underline">{{ source.title }}</a>{% if source.coverage %}<p class="text-sm text-slate-500 dark:text-slate-400">{{ source.coverage }}</p>{% endif %}{% endfor %}</div>
+        {% else %}{{ empty_state("No supported answer", "No matching evidence is available.", "document") }}{% endfor %}
+        {% if result.gaps %}<h3 class="font-semibold">Evidence gaps</h3><ul class="list-disc pl-5">{% for gap in result.gaps %}<li>{{ gap }}</li>{% endfor %}</ul>{% endif %}
+        {% if workflow == 'appraisal' %}<a href="/people/perf/appraisals/{{ record_id }}" class="btn btn-secondary">Review appraisal</a>{% endif %}
+        {% endif %}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

@@ -971,6 +971,37 @@ SETTINGS_SPECS: list[SettingSpec] = [
         description="Number of repair retries for invalid structured output",
     ),
     # =========================================================================
+    # AI workflow routing and Gemini (compatible chat-completions endpoint).
+    *[
+        SettingSpec(
+            domain=SettingDomain.coach,
+            key=key,
+            env_var=env_var,
+            value_type=SettingValueType.string,
+            default=None,
+            is_secret=key.endswith("api_key"),
+            label=label,
+            description=label,
+        )
+        for key, env_var, label in [
+            ("gemini_base_url", "COACH_LLM_GEMINI_BASE_URL", "Gemini API Base URL"),
+            ("gemini_api_key", "COACH_LLM_GEMINI_API_KEY", "Gemini API Key"),
+            ("gemini_model_fast", "COACH_LLM_GEMINI_MODEL_FAST", "Gemini Fast Model"),
+            ("gemini_model_standard", "COACH_LLM_GEMINI_MODEL_STANDARD", "Gemini Standard Model"),
+            ("gemini_model_deep", "COACH_LLM_GEMINI_MODEL_DEEP", "Gemini Deep Model"),
+            ("backends", "COACH_LLM_BACKENDS", "Allowed providers (comma-separated)"),
+            ("default_backend", "COACH_LLM_DEFAULT_BACKEND", "Default provider"),
+        ]
+    ],
+    SettingSpec(
+        domain=SettingDomain.coach,
+        key="ai_enabled",
+        env_var="COACH_AI_ENABLED",
+        value_type=SettingValueType.boolean,
+        default=False,
+        label="Enable AI workflows",
+        description="Allow authorized workflow data to be sent to configured AI providers.",
+    ),
     # Notifications — Nextcloud Talk
     # =========================================================================
     SettingSpec(

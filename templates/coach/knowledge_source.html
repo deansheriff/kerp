@@ -1,0 +1,10 @@
+{% extends "coach/base_coach.html" %}
+{% block page_title %}Knowledge Source{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-4">
+    <a href="/ai?workflow=knowledge" class="btn btn-secondary">Back to knowledge search</a>
+    <h2 class="text-xl font-semibold">{{ source.title }}</h2>
+    <p class="text-sm text-slate-500 dark:text-slate-400">{{ source.coverage }}</p>
+    <div class="whitespace-pre-wrap break-words">{{ source.text }}</div>
+</div>
+{% endblock %}

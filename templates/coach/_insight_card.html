@@ -18,6 +18,12 @@
       </div>
 
       <p class="mt-4 text-sm text-slate-700 dark:text-slate-200 whitespace-pre-line">{{ insight.summary }}</p>
+      {% if insight.detail %}
+      <details class="mt-4">
+        <summary class="cursor-pointer text-sm font-medium">AI explanation</summary>
+        <p class="mt-3 text-sm whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">{{ insight.detail }}</p>
+      </details>
+      {% endif %}
       <div class="mt-4 rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 text-sm dark:border-slate-700/60 dark:bg-slate-900/30">
         <p class="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Next action</p>
         <p class="mt-2 text-slate-900 dark:text-white">{{ insight.coaching_action }}</p>

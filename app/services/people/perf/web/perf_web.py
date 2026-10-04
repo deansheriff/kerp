@@ -2173,11 +2173,21 @@ class PerfWebService:
                 org_id,
                 coerce_uuid(kpi_id),
                 actual_value=actual_value,
-                notes=_get_form_str(form_data, "progress_notes") or None,
+                notes=(
+                    _get_form_str(form_data, "notes")
+                    or _get_form_str(form_data, "progress_notes")
+                    or None
+                ),
+                evidence=_get_form_str(form_data, "evidence") or None,
             )
             db.commit()
         except Exception:
             db.rollback()
+
+            return RedirectResponse(
+                url=f"{self._goals_base_url(request)}/{kpi_id}?error=Unable+to+save+KPI+progress",
+                status_code=303,
+            )
 
         return RedirectResponse(
             url=f"{self._goals_base_url(request)}/{kpi_id}?saved=1", status_code=303

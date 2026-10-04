@@ -21,6 +21,8 @@ from app.templates import templates
 from app.web.deps import (
     WebAuthContext,
     get_db,
+    get_db_for_org,
+    require_web_permission,
     optional_web_auth,
     resolve_brand_context,
 )
@@ -1705,8 +1707,8 @@ async def admin_settings_mono_update(
 @router.get("/settings/coach", response_class=HTMLResponse)
 def admin_settings_coach(
     request: Request,
-    db: Session = Depends(get_db),
-    auth: WebAuthContext = Depends(optional_web_auth),
+    db: Session = Depends(get_db_for_org),
+    auth: WebAuthContext = Depends(require_web_permission("settings:manage")),
 ):
     """Coach / AI settings page."""
     context = _admin_base_context(request, auth, "Coach / AI Settings", db)
@@ -1720,13 +1722,11 @@ def admin_settings_coach(
 @router.post("/settings/coach", response_class=HTMLResponse)
 async def admin_settings_coach_update(
     request: Request,
-    db: Session = Depends(get_db),
-    auth: WebAuthContext = Depends(optional_web_auth),
+    db: Session = Depends(get_db_for_org),
+    auth: WebAuthContext = Depends(require_web_permission("settings:manage")),
 ):
     """Update Coach / AI settings."""
-    form = getattr(request.state, "csrf_form", None)
-    if form is None:
-        form = await request.form()
+    form = await request.form()
     data = dict(form)
 
     if auth and auth.organization_id:
@@ -1742,6 +1742,8 @@ async def admin_settings_coach_update(
             return templates.TemplateResponse(
                 request, "admin/settings/coach.html", context
             )
+
+        db.commit()
 
     return RedirectResponse(url="/admin/settings/coach?saved=1", status_code=303)
 

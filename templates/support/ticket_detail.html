@@ -82,6 +82,8 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/ai_link.html" import ai_link %}
+{% if ticket and auth.has_all_permissions(['support:tickets:read', 'support:tickets:update']) %}<div class="mb-4">{{ ai_link('support', 'Suggest category and reply', ticket.ticket_id) }}</div>{% endif %}
 <div class="max-w-4xl mx-auto space-y-6" x-data="attachmentPreview()">
     {% if not ticket %}
     <div class="card p-12">

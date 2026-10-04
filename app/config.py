@@ -65,7 +65,7 @@ class Settings:
     branding_url_prefix: str = os.getenv("BRANDING_URL_PREFIX", "/static/branding")
 
     # Branding
-    app_version: str = os.getenv("APP_VERSION", "1.5.0")
+    app_version: str = os.getenv("APP_VERSION", "1.7.0")
     brand_name: str = os.getenv("BRAND_NAME", "Kxmeleon ERP")
     brand_tagline: str = os.getenv(
         "BRAND_TAGLINE",
@@ -207,9 +207,15 @@ class Settings:
     analytics_enabled: bool = os.getenv("ANALYTICS_ENABLED", "false").lower() == "true"
 
     # ==========================================================================
-    # Coach / Intelligence Engine (hosted Llama + DeepSeek)
+    # Coach / Intelligence Engine (Gemini, hosted Llama and DeepSeek)
     # ==========================================================================
     coach_enabled: bool = os.getenv("COACH_ENABLED", "false").lower() == "true"
+    coach_ai_enabled: bool = os.getenv("COACH_AI_ENABLED", "false").lower() == "true"
+    coach_llm_gemini_base_url: str = os.getenv("COACH_LLM_GEMINI_BASE_URL", "")
+    coach_llm_gemini_api_key: str = os.getenv("COACH_LLM_GEMINI_API_KEY", "")
+    coach_llm_gemini_model_fast: str = os.getenv("COACH_LLM_GEMINI_MODEL_FAST", "")
+    coach_llm_gemini_model_standard: str = os.getenv("COACH_LLM_GEMINI_MODEL_STANDARD", "")
+    coach_llm_gemini_model_deep: str = os.getenv("COACH_LLM_GEMINI_MODEL_DEEP", "")
 
     # Backends are expected to expose an OpenAI-compatible Chat Completions API.
     coach_llm_backends: str = os.getenv("COACH_LLM_BACKENDS", "llama,deepseek")
@@ -242,7 +248,7 @@ class Settings:
     coach_llm_timeout_s: int = int(os.getenv("COACH_LLM_TIMEOUT_S", "30"))
     coach_llm_max_retries: int = int(os.getenv("COACH_LLM_MAX_RETRIES", "2"))
     coach_llm_max_output_tokens: int = int(
-        os.getenv("COACH_LLM_MAX_OUTPUT_TOKENS", "1200")
+        os.getenv("COACH_LLM_MAX_OUTPUT_TOKENS", "4096")
     )
 
     # Budgeting + caching

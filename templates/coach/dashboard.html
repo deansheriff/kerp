@@ -4,6 +4,8 @@
 {% block page_title %}Coach Dashboard{% endblock %}
 
 {% block content %}
+{% from "components/ai_link.html" import ai_link %}
+{% if auth.has_any_permission(['selfservice:documents:read', 'hr:employees:read']) %}<div class="mb-4">{{ ai_link('knowledge', 'Search company knowledge') }}</div>{% endif %}
 {# ── Stat cards ──────────────────────────────────────────────── #}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
   {{ stats_card(

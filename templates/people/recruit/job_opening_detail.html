@@ -28,6 +28,8 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/ai_link.html" import ai_link %}
+{% if auth.has_any_permission(['recruit:openings:create', 'recruit:openings:update']) %}<div class="mb-4">{{ ai_link('hiring', 'Draft interview questions and KPIs', opening.job_opening_id) }}</div>{% endif %}
 <div class="space-y-6">
     {% if error %}
     <div class="p-4 rounded-lg bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800">

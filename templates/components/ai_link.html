@@ -1,0 +1,6 @@
+{% from "components/macros.html" import icon_svg %}
+{% macro ai_link(workflow, label, record_id='') %}
+<a href="/ai?workflow={{ workflow }}{% if record_id %}&amp;record_id={{ record_id }}{% endif %}" target="_blank" rel="noopener" class="btn btn-secondary" title="{{ label }} (new tab)">
+    {{ icon_svg("lightning-bolt", "h-4 w-4 mr-2") }}{{ label }}
+</a>
+{% endmacro %}

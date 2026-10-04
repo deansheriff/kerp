@@ -106,7 +106,7 @@ ADMIN_SETTINGS_SECTIONS = [
     },
     {
         "title": "Coach / AI",
-        "description": "Configure LLM backends (DeepSeek, Llama) for the AI Coach module.",
+        "description": "Configure Gemini, DeepSeek and Llama for AI workflows and Coach.",
         "url": "/admin/settings/coach",
         "icon": "lightning-bolt",
     },

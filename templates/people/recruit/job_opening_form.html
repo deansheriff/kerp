@@ -15,6 +15,8 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/ai_link.html" import ai_link %}
+{% if auth.has_any_permission(['recruit:openings:create', 'recruit:openings:update']) %}<div class="mb-4">{{ ai_link('hiring', 'Draft with AI', opening.job_opening_id if opening else '') }}</div>{% endif %}
 <div class="max-w-3xl">
     {% if error %}
     <div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800">
