@@ -111,8 +111,28 @@ confidential previous-client data. Humans make shortlisting and hiring decisions
 ## Database Application
 
 No live database is connected to this workspace. Preparing and testing these
-files does **not** mean the job is posted. Nothing was added to automatic startup
-seeding, so an ordinary restart will not publish this vacancy.
+files does **not** mean the job is posted. Deploy the new image to apply it.
+
+The container entrypoint now runs
+`scripts/seed_sherpackage_digital_marketer_on_start.py` after migrations and
+Sherpackage organization/performance seeding, before the web server accepts
+requests. It publishes this package once for the active `SHP` organization.
+It does not run in Celery worker containers or on unrelated organizations.
+
+The organization-specific `operations` setting
+`seed_sherpackage_digital_marketer_v1` records completion. The job and marker
+commit in one transaction, protected by the same PostgreSQL advisory lock as
+the manual seed. Restarts skip completed runs, even if HR later edits, closes
+or deletes the opening. Existing manually seeded packages are preserved and
+marked complete without creating duplicates. No additional migration is needed.
+
+`SEED_SHERPACKAGE_DIGITAL_MARKETER_ON_START` defaults to `true`; set it to `false`
+to disable the startup seed. Failures leave no marker and retry up to three
+times (five seconds apart); the app then continues with a warning and retries
+on its next restart. A missing/inactive Sherpackage organization is skipped
+without marking completion. Check deployment logs for `Digital Marketer startup
+seed completed` or `already completed`, and look for `SHP-DM-2026-001` under
+Sherpackage's Job Openings. A restart of an old image cannot run the new wrapper.
 
 Run from an app environment with its normal database configuration and the new
 script plus its `scripts/data` text file present:
@@ -154,7 +174,7 @@ in the appropriate real review cycle using `SHP-DM-90DAY`; no dummy cycle or
 appraisal is created. The interview rubric and onboarding plan above are a guide,
 not fabricated interviews or completed onboarding tasks in the database.
 
-Existing KPI screen limitations still apply: progress Notes/Evidence have a known
-save-handler mismatch; achieved KPIs hide editing; scoring does not understand
-lower-is-better metrics or elapsed-time pacing. These require a separate fix.
-Keep evidence in the team's existing records until those issues are addressed.
+KPI progress Notes/Evidence are persisted by the updated save handler. Remaining
+limitations: achieved KPIs hide editing; scoring does not understand
+lower-is-better metrics or elapsed-time pacing. The proposed targets above use
+only higher-is-better metrics.

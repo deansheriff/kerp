@@ -109,6 +109,28 @@ seed_sherpackage_data() {
   return 1
 }
 
+seed_sherpackage_digital_marketer() {
+  retries="${SEED_SHERPACKAGE_DIGITAL_MARKETER_RETRIES:-3}"
+  delay="${SEED_SHERPACKAGE_DIGITAL_MARKETER_RETRY_DELAY_SECONDS:-5}"
+  attempt=1
+
+  while [ "$attempt" -le "$retries" ]; do
+    echo "Checking Digital Marketer startup seed (attempt $attempt/$retries)..."
+    if python "$APP_ROOT/scripts/seed_sherpackage_digital_marketer_on_start.py"; then
+      return 0
+    fi
+
+    attempt=$((attempt + 1))
+    if [ "$attempt" -le "$retries" ]; then
+      echo "Digital Marketer seed failed; retrying in ${delay}s..."
+      sleep "$delay"
+    fi
+  done
+
+  echo "WARNING: Digital Marketer seed failed after $retries attempts; continuing startup. It will retry on the next restart."
+  return 1
+}
+
 if is_web_command "$1"; then
   run_migrations || exit 1
 
@@ -136,6 +158,16 @@ if is_web_command "$1"; then
       ;;
     *)
       seed_sherpackage_data || exit 1
+      ;;
+  esac
+
+  case "${SEED_SHERPACKAGE_DIGITAL_MARKETER_ON_START:-true}" in
+    false|False|FALSE|0|no|No|NO|off|Off|OFF)
+      echo "Digital Marketer startup seed disabled."
+      ;;
+    *)
+      # Optional vacancy data must not put the application in a restart loop.
+      seed_sherpackage_digital_marketer || true
       ;;
   esac
 

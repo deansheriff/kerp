@@ -1,11 +1,18 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
+from app.models.domain_settings import (
+    DomainSetting,
+    SettingDomain,
+    SettingScope,
+    SettingValueType,
+)
 from app.models.finance.core_org.organization import Organization, PerformanceMode
 from app.models.people.hr import (
     Department,
@@ -23,6 +30,7 @@ from app.models.people.perf.appraisal_template import (
 from app.models.people.perf.kpi import KPI, KPIStatus
 from app.models.people.perf.kra import KRA
 from app.models.people.recruit.job_opening import JobOpening, JobOpeningStatus
+from app.models.people.recruit.job_applicant import JobApplicant
 from app.models.person import Person
 from scripts.seed_sherpackage_digital_marketer import (
     JOB_CODE,
@@ -31,9 +39,11 @@ from scripts.seed_sherpackage_digital_marketer import (
     TARGETS,
     seed_job_package,
 )
+from scripts.seed_sherpackage_digital_marketer_on_start import SEED_KEY, seed_once
 
 TABLE_MODELS = (
     Organization,
+    DomainSetting,
     Person,
     Department,
     Designation,
@@ -45,11 +55,12 @@ TABLE_MODELS = (
     AppraisalTemplateKRA,
     KPI,
     JobOpening,
+    JobApplicant,
 )
 
 
 @pytest.fixture
-def marketing_db():
+def marketing_db(monkeypatch):
     engine = create_engine(
         "sqlite://",
         execution_options={
@@ -63,7 +74,7 @@ def marketing_db():
             if column.server_default is not None and "gen_random_uuid" in str(
                 column.server_default.arg
             ):
-                column.server_default = None
+                monkeypatch.setattr(column, "server_default", None)
         model.__table__.create(engine)
     with Session(engine, autoflush=False) as db:
         org_id = uuid4()
@@ -301,3 +312,144 @@ def test_seed_requires_private_mode(marketing_db):
     db.get(Organization, org_id).performance_mode = PerformanceMode.GOVERNMENT_PMS
     with pytest.raises(ValueError, match="PRIVATE"):
         seed_job_package(db, org_id)
+
+
+def marker_for(db, org_id):
+    return db.scalar(
+        select(DomainSetting).where(
+            DomainSetting.organization_id == org_id,
+            DomainSetting.domain == SettingDomain.operations,
+            DomainSetting.key == SEED_KEY,
+        )
+    )
+
+
+@pytest.mark.parametrize("remove_job", [False, True])
+def test_startup_seed_is_durable_and_never_recreates_or_reopens(
+    marketing_db, remove_job
+):
+    db, org_id = marketing_db
+    counts = seed_once(db, org_id)
+    assert counts["job_opening"] == 1 and counts["job_published"] == 1
+    marker = marker_for(db, org_id)
+    assert marker.value_json["status"] == "OPEN"
+    assert marker.scope == SettingScope.ORG_SPECIFIC
+    assert marker.value_json["job_code"] == JOB_CODE
+    db.commit()
+    with Session(db.get_bind()) as restarted:
+        restarted.info["organization_id"] = org_id
+        job = rows(restarted, JobOpening, org_id)[0]
+        if remove_job:
+            restarted.delete(job)
+        else:
+            job.status = JobOpeningStatus.CLOSED
+            job.description = "Edited by HR"
+        restarted.commit()
+        with patch(
+            "scripts.seed_sherpackage_digital_marketer_on_start.seed_job_package"
+        ) as seed:
+            assert seed_once(restarted, org_id) is None
+            seed.assert_not_called()
+        remaining = rows(restarted, JobOpening, org_id)
+        if remove_job:
+            assert not remaining
+        else:
+            assert remaining[0].status == JobOpeningStatus.CLOSED
+            assert remaining[0].description == "Edited by HR"
+
+
+def test_startup_rollback_does_not_mark_complete_and_allows_retry(marketing_db):
+    db, org_id = marketing_db
+    with pytest.raises(RuntimeError, match="Failed transaction"):
+        with db.begin_nested():
+            seed_once(db, org_id)
+            assert marker_for(db, org_id) is not None
+            raise RuntimeError("Failed transaction")
+    assert marker_for(db, org_id) is None
+    assert rows(db, JobOpening, org_id) == []
+    assert seed_once(db, org_id)["job_published"] == 1
+
+
+def test_existing_manual_seed_gets_marker_without_overwriting_job(marketing_db):
+    db, org_id = marketing_db
+    job, _ = seed_job_package(db, org_id, publish=True)
+    job.status = JobOpeningStatus.CLOSED
+    job.description = "Reviewed description"
+    db.flush()
+    assert seed_once(db, org_id) == {}
+    assert job.status == JobOpeningStatus.CLOSED
+    assert job.description == "Reviewed description"
+    assert marker_for(db, org_id).value_json["status"] == "CLOSED"
+
+
+def test_startup_marker_cannot_skip_another_tenant(marketing_db):
+    db, org_id = marketing_db
+    db.add(
+        DomainSetting(
+            organization_id=uuid4(),
+            domain=SettingDomain.operations,
+            key=SEED_KEY,
+            scope=SettingScope.ORG_SPECIFIC,
+            value_type=SettingValueType.json,
+            value_json={"completed": True},
+        )
+    )
+    db.flush()
+    assert seed_once(db, org_id)["job_opening"] == 1
+    with pytest.raises(ValueError, match="tenant-scoped"):
+        seed_once(db, uuid4())
+
+
+def test_startup_seed_failure_has_no_completion_marker(marketing_db):
+    db, org_id = marketing_db
+    seed_job_package(db, org_id)
+    _hire_marketer(db, org_id)
+    with pytest.raises(ValueError, match="occupied"):
+        with db.begin_nested():
+            seed_once(db, org_id)
+    assert marker_for(db, org_id) is None
+    assert rows(db, JobOpening, org_id)[0].status == JobOpeningStatus.DRAFT
+
+
+def test_startup_lock_precedes_marker_check():
+    db = MagicMock()
+    org_id = uuid4()
+    db.info = {"organization_id": org_id}
+    db.get_bind.return_value.dialect.name = "postgresql"
+    db.scalar.return_value = object()
+    assert seed_once(db, org_id) is None
+    names = [call[0] for call in db.mock_calls]
+    assert names.index("execute") < names.index("scalar")
+    stmt = db.execute.call_args.args[0]
+    assert "pg_advisory_xact_lock" in str(stmt)
+    assert set(stmt.compile().params.values()) == {73421, org_id.int % (2**31)}
+
+
+def test_startup_main_skips_missing_organization(capsys):
+    from scripts import seed_sherpackage_digital_marketer_on_start as startup
+
+    with (
+        patch.object(startup, "cross_org_session") as cross,
+        patch.object(startup, "session_for_org") as scoped,
+    ):
+        cross.return_value.__enter__.return_value.scalar.return_value = None
+        startup.main()
+    scoped.assert_not_called()
+    assert "organization not found" in capsys.readouterr().out
+
+
+def test_startup_main_commits_and_then_skips(marketing_db, capsys):
+    from scripts import seed_sherpackage_digital_marketer_on_start as startup
+
+    db, org_id = marketing_db
+    with (
+        patch.object(startup, "cross_org_session") as cross,
+        patch.object(startup, "session_for_org") as scoped,
+    ):
+        cross.return_value.__enter__.return_value.scalar.return_value = org_id
+        scoped.return_value.__enter__.return_value = db
+        startup.main()
+        startup.main()
+    output = capsys.readouterr().out
+    assert "startup seed completed" in output and "already completed" in output
+    assert len(rows(db, JobOpening, org_id)) == 1

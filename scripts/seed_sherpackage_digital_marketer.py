@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Prepare Sherpackage's Abuja vacancy; publish only with --publish.
 
-This is deliberately not a startup seed. Existing vacancies and ratings are not
-reset. Employee KPIs are optional and require an existing position incumbent.
+The startup wrapper publishes this package once and records database completion.
+Manual runs preserve existing vacancies and ratings. Employee KPIs are optional
+and require an existing position incumbent.
 """
 
 from __future__ import annotations
