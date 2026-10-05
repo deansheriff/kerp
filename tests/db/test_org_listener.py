@@ -28,6 +28,65 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 
+@pytest.mark.parametrize("explicit_org_filter", [False, True])
+@pytest.mark.parametrize("query_kind", ["columns", "entities", "count", "alias"])
+def test_cached_job_queries_use_each_sessions_organization(
+    explicit_org_filter, query_kind, monkeypatch
+):
+    """A prior tenant's compiled query must not hide or expose another's jobs."""
+    from sqlalchemy import create_engine, event, func
+    from sqlalchemy.orm import aliased
+
+    from app.db.org_listener import _add_org_filter
+    from app.models.people.recruit.job_opening import JobOpening
+
+    engine = create_engine(
+        "sqlite://",
+        execution_options={"schema_translate_map": {"recruit": None}},
+    )
+    monkeypatch.setattr(JobOpening.__table__.c.job_opening_id, "server_default", None)
+    JobOpening.__table__.create(engine)
+    org_ids = [uuid4(), uuid4()]
+
+    class TenantSession(Session):
+        pass
+
+    try:
+        with Session(engine) as setup:
+            setup.add_all(
+                JobOpening(
+                    organization_id=org_id,
+                    job_code=f"TEST-{idx}",
+                    job_title=f"Tenant {idx} job",
+                )
+                for idx, org_id in enumerate(org_ids)
+            )
+            setup.commit()
+        event.listen(TenantSession, "do_orm_execute", _add_org_filter)
+        # Return to the first tenant too, exercising the same compiled cache.
+        for idx in [0, 1, 0]:
+            with TenantSession(engine) as db:
+                db.info["organization_id"] = org_ids[idx]
+                model = aliased(JobOpening) if query_kind == "alias" else JobOpening
+                if query_kind == "entities":
+                    stmt = select(model)
+                elif query_kind == "count":
+                    stmt = select(func.count()).select_from(model)
+                else:
+                    stmt = select(model.job_code)
+                if explicit_org_filter:
+                    stmt = stmt.where(model.organization_id == org_ids[idx])
+                results = list(db.scalars(stmt))
+                if query_kind == "entities":
+                    assert [job.job_code for job in results] == [f"TEST-{idx}"]
+                elif query_kind == "count":
+                    assert results == [1]
+                else:
+                    assert results == [f"TEST-{idx}"]
+    finally:
+        engine.dispose()
+
+
 @pytest.fixture
 def registered_listener():
     """Register and unregister the listener for a single test."""

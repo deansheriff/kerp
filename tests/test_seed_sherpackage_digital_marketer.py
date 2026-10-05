@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import Session
 
 from app.models.domain_settings import (
@@ -32,6 +32,8 @@ from app.models.people.perf.kra import KRA
 from app.models.people.recruit.job_opening import JobOpening, JobOpeningStatus
 from app.models.people.recruit.job_applicant import JobApplicant
 from app.models.person import Person
+from app.db.org_listener import _add_org_filter
+from app.services.people.recruit.recruit_service import RecruitmentService
 from scripts.seed_sherpackage_digital_marketer import (
     JOB_CODE,
     JOB_TEXT,
@@ -453,3 +455,34 @@ def test_startup_main_commits_and_then_skips(marketing_db, capsys):
     output = capsys.readouterr().out
     assert "startup seed completed" in output and "already completed" in output
     assert len(rows(db, JobOpening, org_id)) == 1
+
+
+def test_seeded_opening_is_visible_after_another_tenants_recruitment_query(
+    marketing_db,
+):
+    db, org_id = marketing_db
+    db.commit()
+
+    class TenantSession(Session):
+        pass
+
+    event.listen(TenantSession, "do_orm_execute", _add_org_filter)
+    with TenantSession(db.get_bind()) as other:
+        other_id = uuid4()
+        other.info["organization_id"] = other_id
+        assert RecruitmentService(other).list_job_openings(other_id).items == []
+
+    event.listen(db, "do_orm_execute", _add_org_filter)
+    try:
+        assert seed_once(db, org_id)["job_published"] == 1
+        db.commit()
+    finally:
+        event.remove(db, "do_orm_execute", _add_org_filter)
+
+    with TenantSession(db.get_bind()) as restarted:
+        restarted.info["organization_id"] = org_id
+        result = RecruitmentService(restarted).list_job_openings(org_id)
+        assert result.total == 1
+        assert [job.job_code for job in result.items] == [JOB_CODE]
+        assert result.items[0].status == JobOpeningStatus.OPEN
+        assert result.items[0].department.department_name == "Marketing & Growth"

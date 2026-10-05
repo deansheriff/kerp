@@ -124,7 +124,17 @@ The organization-specific `operations` setting
 commit in one transaction, protected by the same PostgreSQL advisory lock as
 the manual seed. Restarts skip completed runs, even if HR later edits, closes
 or deletes the opening. Existing manually seeded packages are preserved and
-marked complete without creating duplicates. No additional migration is needed.
+marked complete without creating duplicates. The marker uses the existing
+settings table.
+
+For deployments missing `operations` in PostgreSQL's `settingdomain` enum,
+the `20261005_settingdomain_repair` migration adds missing domain labels before
+startup seeding runs. The previous attempt failed before creating the job or
+recording completion, so the next startup can retry normally. This migration
+preserves existing settings and enum labels.
+
+The tenant filter also binds the organization afresh for cached queries, so a
+previous request for another organization does not hide Sherpackage's opening.
 
 `SEED_SHERPACKAGE_DIGITAL_MARKETER_ON_START` defaults to `true`; set it to `false`
 to disable the startup seed. Failures leave no marker and retry up to three
